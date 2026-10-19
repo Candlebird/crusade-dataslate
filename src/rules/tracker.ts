@@ -3,17 +3,30 @@ import { battlePoints } from './engine';
 import { listUnits } from './lists';
 import { emptyUnitBattle, unitName, type BattleInput } from './battle';
 import { benefitOf, ORGANIZED_STRIKE, ownedSectors } from './nexus';
-import type { MissionDef, MissionRule } from './missions';
+import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
 
 // The battle tracker: one game in progress, scored from the mission it was started with.
 // The mission is copied in, so editing the library mid-game doesn't change a running battle.
 
-export type SideKey = 'a' | 'b';
-/** Who holds an objective: nobody, side a, side b, or contested. */
-export type Holder = '' | SideKey | 'x';
+// Any number of players split into teams: 1v1, 1v1v1, 2v1, 3 players vs the AI… Objectives and mission VP
+// belong to a team; a free-for-all is just one player per team.
 
-export const SIDES: SideKey[] = ['a', 'b'];
-export const other = (s: SideKey): SideKey => (s === 'a' ? 'b' : 'a');
+export const TEAMS = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
+export type TeamKey = (typeof TEAMS)[number];
+/** Who holds an objective: nobody, a team, or contested. */
+export type Holder = '' | TeamKey | 'x';
+
+/** Quick set-ups for the start screen. Each inner list is a team; 'ai' is a side run by the OPR solo/co-op AI rules. */
+export const FORMATS: { label: string; teams: ('player' | 'ai')[][] }[] = [
+  { label: '1 v 1', teams: [['player'], ['player']] },
+  { label: '1 v 1 v 1', teams: [['player'], ['player'], ['player']] },
+  { label: '2 v 1', teams: [['player', 'player'], ['player']] },
+  { label: '2 v 2', teams: [['player', 'player'], ['player', 'player']] },
+  { label: '1 v 1 v 1 v 1', teams: [['player'], ['player'], ['player'], ['player']] },
+  { label: '1 v AI', teams: [['player'], ['ai']] },
+  { label: '2 v AI', teams: [['player', 'player'], ['ai']] },
+  { label: '3 v AI', teams: [['player', 'player', 'player'], ['ai']] },
+];
 
 export interface TrackerUnit {
   id: string;
@@ -37,13 +50,16 @@ export interface TrackerAgenda {
 }
 
 export interface TrackerSide {
+  id: string;
   name: string;
+  team: TeamKey;
+  /** Played by the AI rather than a person. */
+  ai?: boolean;
   forceId?: string;
   listId?: string;
   bp: number;
   /** Manual VP adjustment (penalties, house rules…). */
   vpAdjust: number;
-  counters: Record<string, number>;
   agendas: TrackerAgenda[];
   /** Combat Manipulations and other one-use effects for this match. */
   manipulations: { text: string; used: boolean }[];
@@ -58,28 +74,86 @@ export interface TrackedBattle {
   objectives: number;
   /** control[round - 1][marker] = who held it at the end of that round. */
   control: Holder[][];
-  sides: Record<SideKey, TrackerSide>;
-  vsAi: boolean;
-  /** Nexus Wars: the sector fought over, and which side attacks it. */
+  sides: TrackerSide[];
+  /** Mission tallies, per team: counters[team][counter id]. */
+  counters: Partial<Record<TeamKey, Record<string, number>>>;
+  /** Nexus Wars: the sector fought over, and which team attacks it (every other team defends). */
   sectorId?: string;
-  attacker?: SideKey;
+  attacker?: TeamKey;
+  /** OPR Advanced deployment style, if one was picked or rolled. */
+  deploymentStyle?: string;
   notes: string;
   ended: boolean;
-  /** Sides already recorded in their force's crusade log. */
-  recorded: SideKey[];
+  /** Ids of the sides already recorded in their force's crusade log. */
+  recorded: string[];
 }
 
-export const newSide = (name: string): TrackerSide => ({ name, bp: 0, vpAdjust: 0, counters: {}, agendas: [], manipulations: [], units: [] });
+export const newSide = (id: string, name: string, team: TeamKey, ai = false): TrackerSide => ({
+  id, name, team, ...(ai ? { ai } : {}), bp: 0, vpAdjust: 0, agendas: [], manipulations: [], units: [],
+});
 
-export const rollObjectives = (rng = Math.random) => 3 + Math.floor(rng() * 3);
+/** Add a player (or the AI) to a team, with the next free id. */
+export function addSide(b: TrackedBattle, team: TeamKey, ai = false): TrackerSide {
+  let n = b.sides.length + 1;
+  while (b.sides.some((x) => x.id === `s${n}`)) n++;
+  const side = newSide(`s${n}`, ai ? 'AI' : `Player ${b.sides.filter((x) => !x.ai).length + 1}`, team, ai);
+  b.sides.push(side);
+  return side;
+}
 
-export function newBattle(mission: MissionDef, id: string, startedAt: string, rng = Math.random): TrackedBattle {
-  const objectives = mission.objectives === 'D3+2' ? rollObjectives(rng) : mission.objectives;
-  return {
+/** Drop a side. Markers held by a team that no longer has anyone go back to nobody. */
+export function removeSide(b: TrackedBattle, id: string) {
+  b.sides = b.sides.filter((x) => x.id !== id);
+  b.recorded = b.recorded.filter((x) => x !== id);
+  cleanTeams(b);
+}
+
+export function setTeam(b: TrackedBattle, id: string, team: TeamKey) {
+  const side = b.sides.find((x) => x.id === id);
+  if (side) side.team = team;
+  cleanTeams(b);
+}
+
+function cleanTeams(b: TrackedBattle) {
+  const live = new Set<Holder>(teamsOf(b));
+  b.control = b.control.map((row) => row.map((h) => (h === '' || h === 'x' || live.has(h) ? h : '')));
+  if (b.attacker && !live.has(b.attacker)) b.attacker = undefined;
+}
+
+/** The teams in play, in A, B, C order. */
+export const teamsOf = (b: TrackedBattle): TeamKey[] => TEAMS.filter((t) => b.sides.some((x) => x.team === t));
+export const membersOf = (b: TrackedBattle, t: TeamKey) => b.sides.filter((x) => x.team === t);
+export const teamName = (b: TrackedBattle, t: TeamKey) => membersOf(b, t).map((x) => x.name).join(' & ') || `Team ${t}`;
+
+const d3 = (rng: () => number) => 1 + Math.floor(rng() * 3);
+export const rollObjectives = (roll: ObjectiveRoll = 'D3+2', rng = Math.random) => d3(rng) + (roll === 'D3+2' ? 2 : 0);
+
+export function newBattle(mission: MissionDef, id: string, startedAt: string, rng = Math.random, format = FORMATS[0]): TrackedBattle {
+  const objectives = typeof mission.objectives === 'number' ? mission.objectives : rollObjectives(mission.objectives, rng);
+  const b: TrackedBattle = {
     id, startedAt, mission: structuredClone(mission), round: 1, objectives,
     control: [Array<Holder>(objectives).fill('')],
-    sides: { a: newSide('Player 1'), b: newSide('Player 2') },
-    vsAi: false, notes: '', ended: false, recorded: [],
+    sides: [], counters: {}, notes: '', ended: false, recorded: [],
+  };
+  format.teams.forEach((team, i) => team.forEach((kind) => addSide(b, TEAMS[i], kind === 'ai')));
+  return b;
+}
+
+/** Battles saved before multiplayer had two fixed sides, a and b. */
+export function migrateBattle(b: any): TrackedBattle | undefined {
+  if (!b || Array.isArray(b.sides)) return b;
+  const team = (k: unknown): any => (k === 'a' ? 'A' : k === 'b' ? 'B' : k);
+  const side = (k: 'a' | 'b'): TrackerSide => {
+    const { counters: _c, ...rest } = b.sides[k];
+    return { ...rest, id: k, team: team(k), ...(k === 'b' && b.vsAi ? { ai: true } : {}) };
+  };
+  const { vsAi: _v, ...rest } = b;
+  return {
+    ...rest,
+    sides: [side('a'), side('b')],
+    counters: { A: b.sides.a.counters ?? {}, B: b.sides.b.counters ?? {} },
+    control: b.control.map((row: Holder[]) => row.map(team)),
+    attacker: team(b.attacker),
   };
 }
 
@@ -110,15 +184,18 @@ export function nextRound(b: TrackedBattle) {
   const last = b.control[b.round - 1] ?? [];
   b.round += 1;
   b.control[b.round - 1] ??= [...last];
-  for (const k of SIDES) for (const u of b.sides[k].units) u.activated = false;
+  for (const side of b.sides) for (const u of side.units) u.activated = false;
 }
 
 export function prevRound(b: TrackedBattle) {
   if (b.round > 1) b.round -= 1;
 }
 
-const CYCLE: Holder[] = ['', 'a', 'b', 'x'];
-export const cycleHolder = (h: Holder): Holder => CYCLE[(CYCLE.indexOf(h) + 1) % CYCLE.length];
+/** Tapping a marker steps through nobody, each team, then contested. */
+export function cycleHolder(b: TrackedBattle, h: Holder): Holder {
+  const cycle: Holder[] = ['', ...teamsOf(b), 'x'];
+  return cycle[(cycle.indexOf(h) + 1) % cycle.length];
+}
 
 /** Set a marker for the current round. Later rounds that still matched the old value follow along. */
 export function setHolder(b: TrackedBattle, marker: number, h: Holder) {
@@ -128,36 +205,49 @@ export function setHolder(b: TrackedBattle, marker: number, h: Holder) {
   for (let i = r + 1; i < b.control.length && b.control[i][marker] === old; i++) b.control[i][marker] = h;
 }
 
-export const held = (row: Holder[] | undefined, k: SideKey) => (row ?? []).filter((h) => h === k).length;
+export const held = (row: Holder[] | undefined, t: TeamKey) => (row ?? []).filter((h) => h === t).length;
 
-export interface SideScore {
+export interface TeamScore {
   objectives: number;
   counters: number;
   total: number;
 }
 
-/** VP so far. With 'last' scoring, objectives count the most recent round only. */
-export function score(b: TrackedBattle): Record<SideKey, SideScore> {
-  const { objectiveVp, when } = b.mission.scoring;
+/** VP so far, per team. With 'last' scoring, objectives (and the bonus for holding the most) count the most recent round only. */
+export function score(b: TrackedBattle): Partial<Record<TeamKey, TeamScore>> {
+  const { objectiveVp, when, mostBonus } = b.mission.scoring;
+  const teams = teamsOf(b);
   const rounds = b.control.slice(0, b.round);
-  const out = {} as Record<SideKey, SideScore>;
-  for (const k of SIDES) {
-    const side = b.sides[k];
-    const objectives = (when === 'every' ? rounds : rounds.slice(-1)).reduce((n, row) => n + held(row, k), 0) * objectiveVp;
-    const counters = (b.mission.counters ?? []).reduce((n, c) => n + (side.counters[c.id] ?? 0) * c.vp, 0);
-    out[k] = { objectives, counters, total: objectives + counters + side.vpAdjust };
+  const scored = (w: 'every' | 'last') => (w === 'every' ? rounds : rounds.slice(-1));
+  const out: Partial<Record<TeamKey, TeamScore>> = {};
+  for (const t of teams) {
+    let objectives = scored(when).reduce((n, row) => n + held(row, t), 0) * objectiveVp;
+    if (mostBonus) objectives += scored(mostBonus.when).filter((row) => teams.every((o) => o === t || held(row, t) > held(row, o))).length * mostBonus.vp;
+    const counters = (b.mission.counters ?? []).reduce((n, c) => n + (b.counters[t]?.[c.id] ?? 0) * c.vp, 0);
+    const adjust = membersOf(b, t).reduce((n, x) => n + x.vpAdjust, 0);
+    out[t] = { objectives, counters, total: objectives + counters + adjust };
   }
   return out;
 }
 
-export function winner(b: TrackedBattle): SideKey | 'draw' {
+/** The teams on the most VP: one is a win, several a draw between them. */
+export function leaders(b: TrackedBattle): TeamKey[] {
   const s = score(b);
-  return s.a.total === s.b.total ? 'draw' : s.a.total > s.b.total ? 'a' : 'b';
+  const teams = teamsOf(b);
+  const top = Math.max(...teams.map((t) => s[t]!.total));
+  return teams.filter((t) => s[t]!.total === top);
 }
 
-export function resultFor(b: TrackedBattle, k: SideKey): BattleResult {
-  const w = winner(b);
-  return w === 'draw' ? 'draw' : w === k ? 'win' : 'loss';
+export function winner(b: TrackedBattle): TeamKey | 'draw' {
+  const l = leaders(b);
+  return l.length === 1 ? l[0] : 'draw';
+}
+
+/** A side's result: its team won, drew for first, or lost (in a free-for-all, everyone but the leader loses). */
+export function resultFor(b: TrackedBattle, sideId: string): BattleResult {
+  const t = b.sides.find((x) => x.id === sideId)?.team;
+  const l = leaders(b);
+  return !t || !l.includes(t) ? 'loss' : l.length === 1 ? 'win' : 'draw';
 }
 
 /** The mission rules to show this round. */
@@ -170,26 +260,31 @@ export function nexusNotes(b: TrackedBattle, c: Campaign | undefined, forces: Fo
   const notes: string[] = [];
   const sector = c?.sectors.find((s) => s.id === b.sectorId);
   if (sector && b.attacker) {
-    const def = other(b.attacker);
-    if (sector.reinforced) notes.push(`${b.sides[def].name} defends a Reinforced sector: +200 Supply Limit.`);
-    if (b.sides[b.attacker].manipulations.some((m) => m.text.startsWith(ORGANIZED_STRIKE)))
-      notes.push(`${b.sides[b.attacker].name} attacks with an Organized Strike: +200 Supply Limit.`);
+    const defenders = b.sides.filter((x) => x.team !== b.attacker);
+    if (sector.reinforced && defenders.length)
+      notes.push(`${defenders.map((x) => x.name).join(' & ')} ${defenders.length > 1 ? 'defend' : 'defends'} a Reinforced sector: +200 Supply Limit.`);
+    for (const x of membersOf(b, b.attacker))
+      if (x.manipulations.some((m) => m.text.startsWith(ORGANIZED_STRIKE))) notes.push(`${x.name} attacks with an Organized Strike: +200 Supply Limit.`);
   }
   if (c) {
-    for (const k of SIDES) {
-      const factionId = forces.find((f) => f.id === b.sides[k].forceId)?.nexus?.factionId;
+    for (const side of b.sides) {
+      const factionId = forces.find((f) => f.id === side.forceId)?.nexus?.factionId;
       if (!factionId) continue;
       const ports = ownedSectors(c, factionId).filter((s) => benefitOf(s)?.id === 'spacePort').length;
-      if (ports) notes.push(`${b.sides[k].name} gets ${ports} free Combat Manipulation${ports > 1 ? 's' : ''} (Militarized Space Port).`);
+      if (ports) notes.push(`${side.name} gets ${ports} free Combat Manipulation${ports > 1 ? 's' : ''} (Militarized Space Port).`);
     }
   }
   return notes;
 }
 
 /** What the post-battle wizard can fill in for one side of a tracked battle. */
-export function wizardPrefill(b: TrackedBattle, k: SideKey, input: BattleInput, f: Force, c?: Campaign): BattleInput {
-  const side = b.sides[k];
-  const opp = b.sides[other(k)];
+export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInput, f: Force, c?: Campaign): BattleInput {
+  const side = b.sides.find((x) => x.id === sideId)!;
+  const opps = b.sides.filter((x) => x.team !== side.team);
+  const allies = membersOf(b, side.team).filter((x) => x !== side);
+  const teamBp = (t: TeamKey) => membersOf(b, t).reduce((n, x) => n + x.bp, 0);
+  // Suffering rolls compare team strength: my team against the strongest opposing team.
+  const oppBp = Math.max(0, ...teamsOf(b).filter((t) => t !== side.team).map(teamBp));
   const units = { ...input.units };
   const tracked = new Map(side.units.filter((t) => t.unitId).map((t) => [t.unitId!, t]));
   for (const u of f.units) {
@@ -200,24 +295,29 @@ export function wizardPrefill(b: TrackedBattle, k: SideKey, input: BattleInput, 
       : { ...units[u.id], in: tracked.size === 0 ? units[u.id].in : false };
   }
   const s = score(b);
+  const scores = [side.team, ...teamsOf(b).filter((t) => t !== side.team)].map((t) => s[t]!.total).join('–');
   const sector = c?.sectors.find((x) => x.id === b.sectorId);
   return {
     ...input,
-    opponent: opp.name,
-    result: resultFor(b, k),
-    vsAi: b.vsAi,
+    opponent: opps.map((x) => x.name).join(' & '),
+    result: resultFor(b, sideId),
+    vsAi: opps.some((x) => x.ai),
     agendas: side.agendas.map((a) => a.name),
-    myBp: side.bp || input.myBp,
-    oppBp: opp.bp || input.oppBp,
+    myBp: teamBp(side.team) || input.myBp,
+    oppBp: oppBp || input.oppBp,
     sectorId: sector?.id ?? input.sectorId,
     sectorName: sector?.name ?? input.sectorName,
-    notes: [`${b.mission.name}, ${s[k].total}–${s[other(k)].total} VP after round ${b.round}.`, b.notes].filter(Boolean).join(' '),
+    notes: [
+      `${b.mission.name}, ${scores} VP after round ${b.round}.`,
+      allies.length ? `Allied with ${allies.map((x) => x.name).join(' & ')}.` : '',
+      b.notes,
+    ].filter(Boolean).join(' '),
     units,
   };
 }
 
 /** Which side of the tracked battle a force played, if it still needs recording. */
-export function sideOfForce(b: TrackedBattle | undefined, forceId: string): SideKey | undefined {
+export function sideOfForce(b: TrackedBattle | undefined, forceId: string): string | undefined {
   if (!b?.ended) return undefined;
-  return SIDES.find((k) => b.sides[k].forceId === forceId && !b.recorded.includes(k));
+  return b.sides.find((x) => x.forceId === forceId && !b.recorded.includes(x.id))?.id;
 }

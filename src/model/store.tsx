@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { DEFAULT_SETTINGS, type AppState, type CatalogBook, type Force, type Unit } from './types';
 import { buildSeedState } from './seed';
 import { migrateForce } from '../rules/migrate';
+import { migrateBattle } from '../rules/tracker';
 import { nowIso } from './factory';
 import { toast } from '../components/ui';
 
@@ -15,6 +16,7 @@ function load(): AppState {
       return {
         ...parsed,
         forces: parsed.forces.map(migrateForce),
+        battle: migrateBattle(parsed.battle),
         settings: { ...DEFAULT_SETTINGS, ...parsed.settings, bp: { ...DEFAULT_SETTINGS.bp, ...parsed.settings?.bp } },
       };
     }

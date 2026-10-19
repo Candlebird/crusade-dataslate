@@ -2,8 +2,28 @@ import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
 import { DEFAULT_SETTINGS } from '../model/types';
 import { emptyUnitBattle, type BattleInput } from './battle';
-import { EXAMPLE_MISSION, STANDARD_MISSION, allMissions } from './missions';
-import { loadForce, newBattle, nextRound, prevRound, score, setHolder, setObjectives, sideOfForce, winner, wizardPrefill } from './tracker';
+import { ADVANCED_MISSION_TABLE, BUILTIN_MISSIONS, DEPLOYMENT_STYLES, EXAMPLE_MISSION, STANDARD_MISSION, allMissions, rollAdvancedMission, rollDeployment } from './missions';
+import {
+  FORMATS,
+  addSide,
+  cycleHolder,
+  leaders,
+  loadForce,
+  migrateBattle,
+  newBattle,
+  nextRound,
+  prevRound,
+  removeSide,
+  resultFor,
+  score,
+  setHolder,
+  setObjectives,
+  setTeam,
+  sideOfForce,
+  teamName,
+  winner,
+  wizardPrefill,
+} from './tracker';
 
 describe('battle tracker', () => {
   it('rolls D3+2 markers for the standard mission', () => {
@@ -14,32 +34,32 @@ describe('battle tracker', () => {
 
   it('carries control into the next round and scores only the last round in the standard mission', () => {
     const b = newBattle(STANDARD_MISSION, 'b', '', () => 0);
-    setHolder(b, 0, 'a');
-    setHolder(b, 1, 'a');
+    setHolder(b, 0, 'A');
+    setHolder(b, 1, 'A');
     nextRound(b);
-    expect(b.control[1]).toEqual(['a', 'a', '']);
-    setHolder(b, 1, 'b');
+    expect(b.control[1]).toEqual(['A', 'A', '']);
+    setHolder(b, 1, 'B');
     setHolder(b, 2, 'x');
-    expect(score(b).a.objectives).toBe(1);
-    expect(score(b).b.objectives).toBe(1);
+    expect(score(b).A!.objectives).toBe(1);
+    expect(score(b).B!.objectives).toBe(1);
     expect(winner(b)).toBe('draw');
-    b.sides.a.vpAdjust = 1;
-    expect(winner(b)).toBe('a');
+    b.sides[0].vpAdjust = 1;
+    expect(winner(b)).toBe('A');
   });
 
   it('scores every round, tallies and follows later rounds when an earlier round is corrected', () => {
     const b = newBattle(EXAMPLE_MISSION, 'b', '');
-    setHolder(b, 0, 'b');
+    setHolder(b, 0, 'B');
     nextRound(b);
     nextRound(b);
     prevRound(b);
     prevRound(b);
-    setHolder(b, 0, 'a'); // round 1 fix flows into rounds 2 and 3, which still matched
-    expect(b.control.map((r) => r[0])).toEqual(['a', 'a', 'a']);
+    setHolder(b, 0, 'A'); // round 1 fix flows into rounds 2 and 3, which still matched
+    expect(b.control.map((r) => r[0])).toEqual(['A', 'A', 'A']);
     b.round = 3;
-    b.sides.b.counters.salvage = 2;
-    expect(score(b).a).toEqual({ objectives: 3, counters: 0, total: 3 });
-    expect(score(b).b.total).toBe(4);
+    b.counters.B = { salvage: 2 };
+    expect(score(b).A!).toEqual({ objectives: 3, counters: 0, total: 3 });
+    expect(score(b).B!.total).toBe(4);
     setObjectives(b, 1);
     expect(b.control.every((r) => r.length === 1)).toBe(true);
   });
@@ -52,30 +72,30 @@ describe('battle tracker', () => {
     f.units.push(a, c, off);
     f.nexus = { factionId: 'x', permanentTables: [], tempTables: [], traitTokens: 0, pending: ['Combat Manipulation: Bombardment'] };
     const b = newBattle(STANDARD_MISSION, 'b', '', () => 0);
-    loadForce(b.sides.a, f, undefined, DEFAULT_SETTINGS);
-    b.sides.b.name = 'Orks';
-    expect(b.sides.a.units.map((u) => u.maxWounds)).toEqual([5, 6]);
-    expect(b.sides.a.manipulations).toEqual([{ text: 'Combat Manipulation: Bombardment', used: false }]);
-    b.sides.a.units[1].destroyed = true;
-    b.sides.a.units[0].kills = 2;
-    b.sides.a.agendas.push({ name: 'Survivor', count: 0, done: true });
-    setHolder(b, 0, 'a');
+    loadForce(b.sides[0], f, undefined, DEFAULT_SETTINGS);
+    b.sides[1].name = 'Orks';
+    expect(b.sides[0].units.map((u) => u.maxWounds)).toEqual([5, 6]);
+    expect(b.sides[0].manipulations).toEqual([{ text: 'Combat Manipulation: Bombardment', used: false }]);
+    b.sides[0].units[1].destroyed = true;
+    b.sides[0].units[0].kills = 2;
+    b.sides[0].agendas.push({ name: 'Survivor', count: 0, done: true });
+    setHolder(b, 0, 'A');
     expect(sideOfForce(b, f.id)).toBeUndefined();
     b.ended = true;
-    expect(sideOfForce(b, f.id)).toBe('a');
+    expect(sideOfForce(b, f.id)).toBe('s1');
 
     const blank: BattleInput = {
       date: '', opponent: '', result: 'draw', vsAi: false, agendas: [], myBp: 0, oppBp: 0, notes: '', table: '', agendaRp: 0,
       units: { a: emptyUnitBattle(a), c: emptyUnitBattle(c), off: emptyUnitBattle(off) }, rewards: {},
     };
-    const input = wizardPrefill(b, 'a', blank, f);
+    const input = wizardPrefill(b, 's1', blank, f);
     expect(input.opponent).toBe('Orks');
     expect(input.result).toBe('win');
     expect(input.agendas).toEqual(['Survivor']);
     expect(input.units.a).toMatchObject({ in: true, kills: 2, destroyed: false });
     expect(input.units.c).toMatchObject({ in: true, destroyed: true });
     expect(input.units.off.in).toBe(false);
-    b.recorded.push('a');
+    b.recorded.push('s1');
     expect(sideOfForce(b, f.id)).toBeUndefined();
   });
 
@@ -83,5 +103,126 @@ describe('battle tracker', () => {
     const mine = { ...STANDARD_MISSION, name: 'Our standard' };
     const all = allMissions([mine]);
     expect(all.filter((m) => m.id === STANDARD_MISSION.id).map((m) => m.name)).toEqual(['Our standard']);
+  });
+
+  it('rolls D3 markers and scores the most-markers bonus', () => {
+    const ambush = BUILTIN_MISSIONS.find((m) => m.id === 'opr-ambush')!;
+    expect(newBattle(ambush, 'b', '', () => 0).objectives).toBe(1);
+    expect(newBattle(ambush, 'b', '', () => 0.99).objectives).toBe(3);
+
+    const dom = BUILTIN_MISSIONS.find((m) => m.id === 'opr-domination')!; // bonus every round
+    const b = newBattle(dom, 'b', '');
+    setHolder(b, 0, 'A');
+    setHolder(b, 1, 'A');
+    setHolder(b, 2, 'B');
+    nextRound(b);
+    setHolder(b, 0, 'B');
+    setHolder(b, 1, 'B');
+    expect(score(b).A!.objectives).toBe(2 + 1 + 0); // round 1: 2 markers + most; round 2: none
+    expect(score(b).B!.objectives).toBe(1 + 3 + 1);
+
+    const cap = BUILTIN_MISSIONS.find((m) => m.id === 'opr-capture-and-hold')!; // bonus at the end only
+    const c = newBattle(cap, 'c', '');
+    setHolder(c, 0, 'A');
+    nextRound(c);
+    setHolder(c, 0, 'B');
+    setHolder(c, 1, 'B');
+    expect(score(c).A!.objectives).toBe(1);
+    expect(score(c).B!.objectives).toBe(2 + 1);
+  });
+
+  it('has the 18 OPR advanced missions and rolls on their table', () => {
+    const opr = BUILTIN_MISSIONS.filter((m) => m.source === 'OPR');
+    expect(opr).toHaveLength(18);
+    expect(new Set(opr.map((m) => m.id)).size).toBe(18);
+    for (const list of Object.values(ADVANCED_MISSION_TABLE)) expect(list).toHaveLength(6);
+    expect(rollAdvancedMission(() => 0).id).toBe(STANDARD_MISSION.id);
+    expect(rollAdvancedMission(() => 0.99).group).toBe('Attack & Defend');
+    expect(ADVANCED_MISSION_TABLE['Attack & Defend'].every((m) => m.roles)).toBe(true);
+    for (const t of DEPLOYMENT_STYLES) expect(t.styles).toContain(rollDeployment(t.group, () => 0.5));
+  });
+
+  const blankInput = (): BattleInput => ({
+    date: '', opponent: '', result: 'draw', vsAi: false, agendas: [], myBp: 0, oppBp: 0, notes: '', table: '', agendaRp: 0, units: {}, rewards: {},
+  });
+  const format = (label: string) => FORMATS.find((f) => f.label === label)!;
+
+  it('scores a 1 v 1 v 1 free-for-all, with a draw only between the leaders', () => {
+    const b = newBattle(EXAMPLE_MISSION, 'b', '', Math.random, format('1 v 1 v 1'));
+    expect(b.sides.map((x) => [x.id, x.name, x.team])).toEqual([['s1', 'Player 1', 'A'], ['s2', 'Player 2', 'B'], ['s3', 'Player 3', 'C']]);
+    expect(cycleHolder(b, '')).toBe('A');
+    expect(cycleHolder(b, 'C')).toBe('x');
+    setObjectives(b, 3);
+    setHolder(b, 0, 'A');
+    setHolder(b, 1, 'B');
+    setHolder(b, 2, 'C');
+    expect(winner(b)).toBe('draw');
+    b.sides[2].vpAdjust = -1;
+    expect(leaders(b)).toEqual(['A', 'B']);
+    expect(resultFor(b, 's1')).toBe('draw');
+    expect(resultFor(b, 's3')).toBe('loss');
+    b.sides[0].vpAdjust = 1;
+    expect(winner(b)).toBe('A');
+    expect(resultFor(b, 's2')).toBe('loss');
+  });
+
+  it('adds up a team in a 2 v 1, and the most-markers bonus needs more than every other team', () => {
+    const dom = BUILTIN_MISSIONS.find((m) => m.id === 'opr-domination')!;
+    const b = newBattle(dom, 'b', '', Math.random, format('2 v 1'));
+    expect(teamName(b, 'A')).toBe('Player 1 & Player 2');
+    b.sides[0].vpAdjust = 1;
+    b.sides[1].vpAdjust = 2;
+    setObjectives(b, 3);
+    setHolder(b, 0, 'A');
+    setHolder(b, 1, 'A');
+    setHolder(b, 2, 'B');
+    expect(score(b).A!.total).toBe(2 + 1 + 3);
+    expect(resultFor(b, 's2')).toBe('win');
+    // A third team ties team A on markers: no one gets the bonus.
+    addSide(b, 'C');
+    setHolder(b, 2, 'C');
+    setHolder(b, 1, 'C');
+    expect(score(b).A!.objectives).toBe(1);
+    expect(score(b).C!.objectives).toBe(2 + 1);
+    // Moving the last player off team C hands its markers back to nobody.
+    setTeam(b, 's4', 'A');
+    expect(b.control[0]).toEqual(['A', '', '']);
+  });
+
+  it('fills the wizard for each player of 3 v AI from the team totals', () => {
+    const b = newBattle(STANDARD_MISSION, 'b', '', () => 0, format('3 v AI'));
+    expect(b.sides.map((x) => [x.name, x.team, !!x.ai])).toEqual([['Player 1', 'A', false], ['Player 2', 'A', false], ['Player 3', 'A', false], ['AI', 'B', true]]);
+    const f = newForce('Iron Host');
+    b.sides[1].forceId = f.id;
+    b.sides.forEach((x, i) => (x.bp = [3, 4, 2, 6][i]));
+    setHolder(b, 0, 'A');
+    b.ended = true;
+    expect(sideOfForce(b, f.id)).toBe('s2');
+    const input = wizardPrefill(b, 's2', blankInput(), f);
+    expect(input).toMatchObject({ opponent: 'AI', vsAi: true, result: 'win', myBp: 9, oppBp: 6 });
+    expect(input.notes).toContain('1–0 VP');
+    expect(input.notes).toContain('Allied with Player 1 & Player 3.');
+    removeSide(b, 's4');
+    expect(teamName(b, 'B')).toBe('Team B');
+  });
+
+  it('converts a battle saved with the old two fixed sides', () => {
+    const old = {
+      id: 'b', startedAt: '', mission: STANDARD_MISSION, round: 1, objectives: 2, control: [['a', 'b']], notes: '', ended: true, recorded: ['a'],
+      vsAi: true, attacker: 'b',
+      sides: {
+        a: { name: 'Me', bp: 0, vpAdjust: 0, counters: { x: 1 }, agendas: [], manipulations: [], units: [] },
+        b: { name: 'Bots', bp: 0, vpAdjust: 0, counters: {}, agendas: [], manipulations: [], units: [] },
+      },
+    };
+    const b = migrateBattle(old)!;
+    expect(b.sides.map((x) => [x.id, x.name, x.team, !!x.ai])).toEqual([['a', 'Me', 'A', false], ['b', 'Bots', 'B', true]]);
+    expect(b.counters).toEqual({ A: { x: 1 }, B: {} });
+    expect(b.control).toEqual([['A', 'B']]);
+    expect(b.attacker).toBe('B');
+    expect(b.recorded).toEqual(['a']);
+    expect('vsAi' in b).toBe(false);
+    expect(migrateBattle(b)).toBe(b);
+    expect(migrateBattle(undefined)).toBeUndefined();
   });
 });

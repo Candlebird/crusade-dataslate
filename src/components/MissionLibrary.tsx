@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import { href } from '../route';
-import { SOURCES, allMissions, type MissionDef, type MissionSource } from '../rules/missions';
+import { OBJECTIVE_ROLLS, SOURCES, allMissions, type MissionDef, type MissionSource, type ObjectiveRoll } from '../rules/missions';
 import { Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
 // The group's missions. Built-ins come from rules/missions.ts; custom ones are saved here and shared with every player.
@@ -54,7 +54,7 @@ export default function MissionLibrary() {
         return (
           <div key={m.id} className="panel">
             <div className="panel-title">
-              <h2>{m.name} <span className="tag">{m.source}</span></h2>
+              <h2>{m.name} <span className="tag">{m.source}</span>{m.group && <span className="tag">{m.group}</span>}</h2>
               <span className="row">
                 {custom && <button onClick={() => setOpenId(open ? null : m.id)}>{open ? 'Done' : 'Edit'}</button>}
                 <button onClick={() => duplicate(m)}>Duplicate</button>
@@ -75,6 +75,8 @@ function MissionSummary({ m }: { m: MissionDef }) {
       <p>{m.summary}</p>
       <p className="small muted">
         {m.rounds} rounds · {m.objectives} objectives · {m.scoring.objectiveVp ? `${m.scoring.objectiveVp} VP per objective ${m.scoring.when === 'every' ? 'every round' : 'at the end'}` : 'objectives score no VP'}
+        {m.scoring.mostBonus && ` · +${m.scoring.mostBonus.vp} VP for most markers ${m.scoring.mostBonus.when === 'every' ? 'each round' : 'at the end'}`}
+        {m.roles && ' · attacker and defender'}
         {(m.counters ?? []).map((c) => ` · ${c.label} (${c.vp} VP)`).join('')}
       </p>
       {m.deployment && <p className="small"><b>Deployment.</b> {m.deployment}</p>}
@@ -89,7 +91,6 @@ function MissionForm({ m, onChange }: { m: MissionDef; onChange: (m: MissionDef)
     fn(d);
     onChange(d);
   };
-  const rolled = m.objectives === 'D3+2';
   return (
     <div className="fields">
       <label className="field">
@@ -117,8 +118,11 @@ function MissionForm({ m, onChange }: { m: MissionDef; onChange: (m: MissionDef)
       <div className="field">
         <span>Objective markers</span>
         <span className="row">
-          <label className="row"><input type="checkbox" checked={rolled} onChange={(e) => set((d) => void (d.objectives = e.target.checked ? 'D3+2' : 4))} /> Roll D3+2</label>
-          {!rolled && <Stepper value={m.objectives as number} min={0} onChange={(n) => set((d) => void (d.objectives = n))} />}
+          <select value={typeof m.objectives === 'number' ? 'fixed' : m.objectives} onChange={(e) => set((d) => void (d.objectives = e.target.value === 'fixed' ? 4 : (e.target.value as ObjectiveRoll)))}>
+            <option value="fixed">Fixed number</option>
+            {OBJECTIVE_ROLLS.map((r) => <option key={r} value={r}>Roll {r}</option>)}
+          </select>
+          {typeof m.objectives === 'number' && <Stepper value={m.objectives} min={0} onChange={(n) => set((d) => void (d.objectives = n))} />}
         </span>
       </div>
       <label className="field">
@@ -131,6 +135,26 @@ function MissionForm({ m, onChange }: { m: MissionDef; onChange: (m: MissionDef)
           <option value="last">At the end of the game</option>
           <option value="every">At the end of every round</option>
         </select>
+      </label>
+      <div className="field">
+        <span>Bonus VP for holding the most markers</span>
+        <span className="row">
+          <Stepper value={m.scoring.mostBonus?.vp ?? 0} min={0} onChange={(n) => set((d) => void (d.scoring.mostBonus = n ? { vp: n, when: d.scoring.mostBonus?.when ?? 'last' } : undefined))} />
+          {m.scoring.mostBonus && (
+            <select value={m.scoring.mostBonus.when} onChange={(e) => set((d) => void (d.scoring.mostBonus!.when = e.target.value as 'every' | 'last'))}>
+              <option value="last">At the end</option>
+              <option value="every">Every round</option>
+            </select>
+          )}
+        </span>
+      </div>
+      <label className="field">
+        <span>Group</span>
+        <TextField value={m.group ?? ''} onCommit={(v) => set((d) => void (d.group = v || undefined))} placeholder="e.g. Face-Off" />
+      </label>
+      <label className="field row">
+        <input type="checkbox" checked={!!m.roles} onChange={(e) => set((d) => void (d.roles = e.target.checked || undefined))} />
+        <span>Attacker and defender roles</span>
       </label>
 
       <div className="field span-all">

@@ -5,32 +5,37 @@ import type { Force } from '../model/types';
 import { href } from '../route';
 import { AGENDAS, MAX_AGENDAS } from '../rules/data';
 import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES } from '../rules/nexus';
-import { SEIZE_RULE, allMissions, type MissionDef } from '../rules/missions';
+import { DEPLOYMENT_STYLES, SEIZE_RULE, allMissions, rollAdvancedMission, rollDeployment, type MissionDef } from '../rules/missions';
 import {
-  SIDES,
+  FORMATS,
+  TEAMS,
+  addSide,
   cycleHolder,
   held,
+  leaders,
   loadForce,
+  membersOf,
   newBattle,
   nexusNotes,
   nextRound,
-  other,
   prevRound,
+  removeSide,
   roundRules,
   rollObjectives,
   score,
   setHolder,
   setObjectives,
+  setTeam,
+  teamName,
+  teamsOf,
   winner,
   type Holder,
-  type SideKey,
+  type TeamKey,
   type TrackedBattle,
   type TrackerSide,
   type TrackerUnit,
 } from '../rules/tracker';
 import { Stepper, TextArea, TextField, confirmAction } from './ui';
-
-const HOLDER_LABEL: Record<Holder, string> = { '': 'Nobody', a: '', b: '', x: 'Contested' };
 
 export default function BattleTracker() {
   const { state, update } = useStore();
@@ -39,10 +44,13 @@ export default function BattleTracker() {
 
   const set = (fn: (d: TrackedBattle) => void) => update((s) => void (s.battle && fn(s.battle)));
   const sc = score(b);
-  const w = winner(b);
+  const top = leaders(b);
+  const teams = teamsOf(b);
   const last = b.round >= b.mission.rounds;
   const notes = nexusNotes(b, state.campaign, state.forces);
-  const holderName = (h: Holder) => (h === 'a' || h === 'b' ? b.sides[h].name : HOLDER_LABEL[h]);
+  const holderName = (h: Holder) => (h === '' ? 'Nobody' : h === 'x' ? 'Contested' : teamName(b, h));
+  const showRoles = !!b.attacker && !!(b.mission.roles || b.sectorId);
+  const adjust = (t: TeamKey) => membersOf(b, t).reduce((n, x) => n + x.vpAdjust, 0);
 
   return (
     <div>
@@ -60,13 +68,13 @@ export default function BattleTracker() {
 
       {b.ended && <Result b={b} set={set} />}
 
-      <div className="panel scoreboard">
-        {SIDES.map((k) => (
-          <div key={k} className={`score-side side-${k}${w === k ? ' leading' : ''}`}>
-            <div className="small muted">{b.sides[k].name}</div>
-            <div className="score-vp">{sc[k].total}</div>
+      <div className={`panel scoreboard${teams.length === 2 ? ' duel' : ''}`}>
+        {teams.map((t) => (
+          <div key={t} className={`score-side team-${t}${top.length === 1 && top[0] === t ? ' leading' : ''}`}>
+            <div className="small muted">{teamName(b, t)}{showRoles ? ` · ${b.attacker === t ? 'Attacker' : 'Defender'}` : ''}</div>
+            <div className="score-vp">{sc[t]!.total}</div>
             <div className="small muted">
-              VP · {sc[k].objectives} obj{sc[k].counters ? ` · ${sc[k].counters} other` : ''}{b.sides[k].vpAdjust ? ` · ${b.sides[k].vpAdjust > 0 ? '+' : ''}${b.sides[k].vpAdjust} adj` : ''}
+              VP · {sc[t]!.objectives} obj{sc[t]!.counters ? ` · ${sc[t]!.counters} other` : ''}{adjust(t) ? ` · ${adjust(t) > 0 ? '+' : ''}${adjust(t)} adj` : ''}
             </div>
           </div>
         ))}
@@ -87,15 +95,17 @@ export default function BattleTracker() {
             <span className="row small">
               Markers
               <Stepper value={b.objectives} min={0} onChange={(n) => set((d) => setObjectives(d, n))} />
-              {b.mission.objectives === 'D3+2' && <button className="ghost small" onClick={() => set((d) => setObjectives(d, rollObjectives()))} title="Reroll D3+2">🎲</button>}
+              {typeof b.mission.objectives === 'string' && (
+                <button className="ghost small" onClick={() => set((d) => setObjectives(d, rollObjectives(d.mission.objectives as 'D3+2' | 'D3')))} title={`Reroll ${b.mission.objectives}`}>🎲</button>
+              )}
             </span>
           </div>
           <p className="muted small">
-            Tap a marker to change who holds it at the end of round {b.round}. Scored {b.mission.scoring.when === 'every' ? `every round, ${b.mission.scoring.objectiveVp} VP each` : `at the end of the game${b.mission.scoring.objectiveVp !== 1 ? `, ${b.mission.scoring.objectiveVp} VP each` : ''}`}.
+            Tap a marker to change who holds it at the end of round {b.round}. {objectiveScoring(b.mission)}
           </p>
           <div className="markers">
             {(b.control[b.round - 1] ?? []).map((h, i) => (
-              <button key={i} className={`marker holder-${h || 'none'}`} onClick={() => set((d) => setHolder(d, i, cycleHolder(h)))}>
+              <button key={i} className={`marker ${h === '' ? 'holder-none' : h === 'x' ? 'holder-x' : `team-${h}`}`} onClick={() => set((d) => setHolder(d, i, cycleHolder(d, h)))}>
                 <span className="marker-n">{i + 1}</span>
                 <span className="small">{holderName(h)}</span>
               </button>
@@ -104,10 +114,10 @@ export default function BattleTracker() {
           {b.round > 1 && b.objectives > 0 && (
             <div className="table-wrap">
               <table className="compact">
-                <thead><tr><th>Round</th>{SIDES.map((k) => <th key={k} className="num">{b.sides[k].name}</th>)}</tr></thead>
+                <thead><tr><th>Round</th>{teams.map((t) => <th key={t} className="num">{teamName(b, t)}</th>)}</tr></thead>
                 <tbody>
                   {b.control.slice(0, b.round).map((row, r) => (
-                    <tr key={r}><td>{r + 1}</td>{SIDES.map((k) => <td key={k} className="num">{held(row, k)}</td>)}</tr>
+                    <tr key={r}><td>{r + 1}</td>{teams.map((t) => <td key={t} className="num">{held(row, t)}</td>)}</tr>
                   ))}
                 </tbody>
               </table>
@@ -119,9 +129,9 @@ export default function BattleTracker() {
               {b.mission.counters!.map((c) => (
                 <div key={c.id} className="tally">
                   <span className="grow">{c.label} <span className="muted small">{c.vp} VP each{c.max ? `, max ${c.max}` : ''}</span></span>
-                  {SIDES.map((k) => (
-                    <span key={k} className={`side-${k}`}>
-                      <Stepper value={b.sides[k].counters[c.id] ?? 0} min={0} onChange={(n) => set((d) => void (d.sides[k].counters[c.id] = c.max ? Math.min(c.max, n) : n))} />
+                  {teams.map((t) => (
+                    <span key={t} className={`team-${t}`} title={teamName(b, t)}>
+                      <Stepper value={b.counters[t]?.[c.id] ?? 0} min={0} onChange={(n) => set((d) => void ((d.counters[t] ??= {})[c.id] = c.max ? Math.min(c.max, n) : n))} />
                     </span>
                   ))}
                 </div>
@@ -133,6 +143,7 @@ export default function BattleTracker() {
         <div className="panel">
           <div className="panel-title"><h2>Mission</h2></div>
           <p>{b.mission.summary}</p>
+          {b.deploymentStyle && <p className="small"><b>Deployment style.</b> {b.deploymentStyle} <span className="muted">(map in the OPR Advanced Rules)</span></p>}
           {b.mission.deployment && <p className="small"><b>Deployment.</b> {b.mission.deployment}</p>}
           {roundRules(b).map((r, i) => (
             <p key={i} className="small"><b>{r.title}{r.round ? ` (round ${r.round})` : ''}.</b> {r.text}</p>
@@ -148,33 +159,53 @@ export default function BattleTracker() {
       </div>
 
       <div className="cols-2">
-        {SIDES.map((k) => <SidePanel key={k} k={k} b={b} set={set} forces={state.forces} />)}
+        {b.sides.map((x) => <SidePanel key={x.id} id={x.id} b={b} set={set} forces={state.forces} />)}
       </div>
 
       <div className="panel">
         <div className="panel-title"><h2>Setup</h2></div>
         <div className="fields">
-          <label className="field">
-            <span>Opponent</span>
-            <label className="row"><input type="checkbox" checked={b.vsAi} onChange={(e) => set((d) => void (d.vsAi = e.target.checked))} /> Player 2 is the AI</label>
-          </label>
+          <div className="field">
+            <span>Players</span>
+            <span className="row">
+              <button onClick={() => set((d) => void addSide(d, TEAMS.find((t) => !teamsOf(d).includes(t)) ?? 'A'))}>+ Add player</button>
+              <button onClick={() => set((d) => void addSide(d, TEAMS.find((t) => !teamsOf(d).includes(t)) ?? 'A', true))}>+ Add AI</button>
+              <span className="muted small">Put players on the same team to share objectives and VP.</span>
+            </span>
+          </div>
+          <div className="field">
+            <span>Deployment style</span>
+            <span className="row">
+              <select value={b.deploymentStyle ?? ''} onChange={(e) => set((d) => void (d.deploymentStyle = e.target.value || undefined))}>
+                <option value="">Mission default</option>
+                {DEPLOYMENT_STYLES.map((t) => (
+                  <optgroup key={t.group} label={t.group}>
+                    {t.styles.map((x) => <option key={x}>{x}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+              {DEPLOYMENT_STYLES.map((t) => (
+                <button key={t.group} className="ghost small" title={`Roll on the ${t.group} table: ${t.desc}`} onClick={() => set((d) => void (d.deploymentStyle = rollDeployment(t.group)))}>🎲 {t.group}</button>
+              ))}
+            </span>
+          </div>
           {state.campaign && (
-            <>
-              <label className="field">
-                <span>Nexus sector fought over</span>
-                <select value={b.sectorId ?? ''} onChange={(e) => set((d) => void (d.sectorId = e.target.value || undefined))}>
-                  <option value="">None</option>
-                  {state.campaign.sectors.map((s) => <option key={s.id} value={s.id}>{s.name} ({SECTOR_TYPES[s.type].label})</option>)}
-                </select>
-              </label>
-              <label className="field">
-                <span>Attacker</span>
-                <select value={b.attacker ?? ''} onChange={(e) => set((d) => void (d.attacker = (e.target.value || undefined) as SideKey | undefined))}>
-                  <option value="">—</option>
-                  {SIDES.map((k) => <option key={k} value={k}>{b.sides[k].name}</option>)}
-                </select>
-              </label>
-            </>
+            <label className="field">
+              <span>Nexus sector fought over</span>
+              <select value={b.sectorId ?? ''} onChange={(e) => set((d) => void (d.sectorId = e.target.value || undefined))}>
+                <option value="">None</option>
+                {state.campaign.sectors.map((s) => <option key={s.id} value={s.id}>{s.name} ({SECTOR_TYPES[s.type].label})</option>)}
+              </select>
+            </label>
+          )}
+          {(state.campaign || b.mission.roles) && (
+            <label className="field">
+              <span>Attacker</span>
+              <select value={b.attacker ?? ''} onChange={(e) => set((d) => void (d.attacker = (e.target.value || undefined) as TeamKey | undefined))}>
+                <option value="">—</option>
+                {teams.map((t) => <option key={t} value={t}>{teamName(b, t)}</option>)}
+              </select>
+            </label>
           )}
           <label className="field span-all">
             <span>Notes</span>
@@ -188,12 +219,28 @@ export default function BattleTracker() {
 
 type Set = (fn: (d: TrackedBattle) => void) => void;
 
+function objectiveScoring(m: MissionDef): string {
+  const { objectiveVp, when, mostBonus } = m.scoring;
+  if (!objectiveVp && !mostBonus) return 'Markers score no VP here: use the tallies.';
+  const base = when === 'every' ? `Scored every round, ${objectiveVp} VP each` : `Scored at the end of the game${objectiveVp !== 1 ? `, ${objectiveVp} VP each` : ''}`;
+  const bonus = mostBonus ? `, plus ${mostBonus.vp} VP for holding more markers ${mostBonus.when === 'every' ? 'each round' : 'at the end'}` : '';
+  return `${base}${bonus}.`;
+}
+
 function StartBattle() {
   const { state, update } = useStore();
   const missions = allMissions(state.customMissions);
   const [id, setId] = useState(missions[0]?.id ?? '');
+  const [format, setFormat] = useState(0);
   const m = missions.find((x) => x.id === id) ?? missions[0];
-  const start = (mission: MissionDef) => update((s) => void (s.battle = newBattle(mission, uid(), nowIso())));
+  const groups: [string, MissionDef[]][] = [];
+  for (const x of missions) {
+    const g = x.source === 'OPR' && x.group ? `OPR · ${x.group}` : x.source;
+    const hit = groups.find(([k]) => k === g);
+    if (hit) hit[1].push(x);
+    else groups.push([g, [x]]);
+  }
+  const start = (mission: MissionDef) => update((s) => void (s.battle = newBattle(mission, uid(), nowIso(), Math.random, FORMATS[format])));
   return (
     <div>
       <div className="page-head">
@@ -202,20 +249,33 @@ function StartBattle() {
       </div>
       <div className="panel">
         <div className="panel-title"><h2>Start a battle</h2></div>
-        <p className="muted">Pick a mission, then load each side's force on the next screen. The battle is kept on this device until you discard it.</p>
-        <div className="mission-pick">
-          {missions.map((x) => (
-            <label key={x.id} className={`shop-item${x.id === m?.id ? ' selected' : ''}`}>
-              <input type="radio" name="mission" checked={x.id === m?.id} onChange={() => setId(x.id)} />
-              <div className="grow">
-                <b>{x.name}</b> <span className="tag">{x.source}</span>
-                <div className="muted small">{x.summary}</div>
-              </div>
-            </label>
+        <p className="muted">Pick who's playing and a mission, then load each side's force on the next screen. The battle is kept on this device until you discard it.</p>
+        <h3>Players</h3>
+        <div className="row">
+          {FORMATS.map((f, i) => (
+            <button key={f.label} className={i === format ? 'primary' : ''} onClick={() => setFormat(i)}>{f.label}</button>
           ))}
         </div>
+        <p className="muted small">Teams share objectives and VP. You can add, remove or regroup players once the battle starts.</p>
+        {groups.map(([group, list]) => (
+          <div key={group}>
+            <h3>{group}</h3>
+            <div className="mission-pick">
+              {list.map((x) => (
+                <label key={x.id} className={`shop-item${x.id === m?.id ? ' selected' : ''}`}>
+                  <input type="radio" name="mission" checked={x.id === m?.id} onChange={() => setId(x.id)} />
+                  <div className="grow">
+                    <b>{x.name}</b> <span className="tag">{x.source}</span>{x.roles && <span className="tag">Attacker / Defender</span>}
+                    <div className="muted small">{x.summary}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
         <div className="row" style={{ marginTop: '0.8rem' }}>
-          <button className="primary" disabled={!m} onClick={() => m && start(m)}>Start battle</button>
+          <button className="primary" disabled={!m} onClick={() => m && start(m)}>Start {m ? m.name : 'battle'}</button>
+          <button onClick={() => setId(rollAdvancedMission().id)} title="Roll the mission type (1-2 Face-Off, 3-4 Progressive, 5-6 Attack & Defend), then a D6">🎲 Random OPR mission</button>
         </div>
       </div>
     </div>
@@ -225,34 +285,36 @@ function StartBattle() {
 function Result({ b, set }: { b: TrackedBattle; set: Set }) {
   const sc = score(b);
   const w = winner(b);
+  const teams = teamsOf(b);
+  const drawn = leaders(b);
+  const title = w !== 'draw' ? `${teamName(b, w)} ${membersOf(b, w).length > 1 ? 'win' : 'wins'}` : drawn.length < teams.length ? `Draw: ${drawn.map((t) => teamName(b, t)).join(' and ')}` : 'Draw';
   return (
     <div className="panel result-panel">
       <div className="panel-title">
-        <h2>{w === 'draw' ? 'Draw' : `${b.sides[w].name} wins`} · {sc.a.total}–{sc.b.total}</h2>
+        <h2>{title} · {teams.map((t) => sc[t]!.total).join('–')}</h2>
         <button className="ghost" onClick={() => set((d) => void (d.ended = false))}>Resume</button>
       </div>
       <p className="muted small">Record the result in each crusade force's log. The wizard is filled in from this battle: check it, then apply.</p>
       <div className="row">
-        {SIDES.map((k) => {
-          const s = b.sides[k];
-          if (!s.forceId) return <span key={k} className="muted small">{s.name}: no force loaded.</span>;
-          if (b.recorded.includes(k)) return <span key={k} className="tag green">{s.name} recorded ✓</span>;
-          return <a key={k} className="btn primary" href={href.battle(s.forceId)}>⚔ Record battle for {s.name}</a>;
+        {b.sides.map((s) => {
+          if (!s.forceId) return <span key={s.id} className="muted small">{s.name}: no force loaded.</span>;
+          if (b.recorded.includes(s.id)) return <span key={s.id} className="tag green">{s.name} recorded ✓</span>;
+          return <a key={s.id} className="btn primary" href={href.battle(s.forceId)}>⚔ Record battle for {s.name}</a>;
         })}
       </div>
     </div>
   );
 }
 
-function SidePanel({ k, b, set, forces }: { k: SideKey; b: TrackedBattle; set: Set; forces: Force[] }) {
+function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: Set; forces: Force[] }) {
   const { state } = useStore();
-  const side = b.sides[k];
-  const setSide = (fn: (s: TrackerSide) => void) => set((d) => fn(d.sides[k]));
+  const side = b.sides.find((x) => x.id === id)!;
+  const setSide = (fn: (s: TrackerSide) => void) => set((d) => { const s = d.sides.find((x) => x.id === id); if (s) fn(s); });
   const setUnit = (id: string, fn: (u: TrackerUnit) => void) => setSide((s) => { const u = s.units.find((x) => x.id === id); if (u) fn(u); });
   const force = forces.find((f) => f.id === side.forceId);
   const taken = new Set(side.agendas.map((a) => a.name));
   const alive = side.units.filter((u) => !u.destroyed).length;
-  const takenForce = b.sides[other(k)].forceId;
+  const takenForces = new Set(b.sides.filter((x) => x.id !== id).map((x) => x.forceId));
   const [adding, setAdding] = useState('');
   const addUnit = () => {
     const name = adding.trim();
@@ -264,22 +326,37 @@ function SidePanel({ k, b, set, forces }: { k: SideKey; b: TrackedBattle; set: S
   const pickForce = (forceId: string, listId: string) => {
     const f = forces.find((x) => x.id === forceId);
     if (!f) return setSide((s) => Object.assign(s, { forceId: undefined, listId: undefined, units: [], bp: 0, manipulations: [] }));
-    set((d) => loadForce(d.sides[k], f, f.lists?.find((l) => l.id === listId), state.settings));
+    setSide((s) => loadForce(s, f, f.lists?.find((l) => l.id === listId), state.settings));
   };
 
   return (
-    <div className={`panel side-panel side-${k}`}>
+    <div className={`panel side-panel team-${side.team}`}>
       <div className="panel-title">
-        <h2><TextField value={side.name} onCommit={(v) => setSide((s) => void (s.name = v || (k === 'a' ? 'Player 1' : 'Player 2')))} /></h2>
-        <span className="small muted">{side.bp ? `${side.bp} BP · ` : ''}{alive}/{side.units.length} units</span>
+        <h2><TextField value={side.name} onCommit={(v) => setSide((s) => void (s.name = v || (s.ai ? 'AI' : 'Player')))} /></h2>
+        <span className="row small muted">
+          {side.bp ? `${side.bp} BP · ` : ''}{alive}/{side.units.length} units
+          {b.sides.length > 2 && (
+            <button className="ghost icon" aria-label={`Remove ${side.name}`} onClick={() => confirmAction(`Remove ${side.name} from this battle?`) && set((d) => removeSide(d, id))}>✕</button>
+          )}
+        </span>
       </div>
 
       <div className="fields">
         <label className="field">
+          <span>Team</span>
+          <select value={side.team} onChange={(e) => set((d) => setTeam(d, id, e.target.value as TeamKey))}>
+            {TEAMS.map((t) => <option key={t} value={t}>Team {t}{membersOf(b, t).some((x) => x.id !== id) ? ` (with ${membersOf(b, t).filter((x) => x.id !== id).map((x) => x.name).join(' & ')})` : ''}</option>)}
+          </select>
+        </label>
+        <label className="field">
+          <span>Played by</span>
+          <label className="row"><input type="checkbox" checked={!!side.ai} onChange={(e) => setSide((s) => void (s.ai = e.target.checked || undefined))} /> The AI</label>
+        </label>
+        <label className="field">
           <span>Crusade force</span>
           <select value={side.forceId ?? ''} onChange={(e) => pickForce(e.target.value, '')}>
             <option value="">None / not tracked</option>
-            {forces.map((f) => <option key={f.id} value={f.id} disabled={f.id === takenForce}>{f.name}</option>)}
+            {forces.map((f) => <option key={f.id} value={f.id} disabled={takenForces.has(f.id)}>{f.name}</option>)}
           </select>
         </label>
         {force && (force.lists ?? []).length > 0 && (

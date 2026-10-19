@@ -3,6 +3,7 @@ import { normalizeBook } from '../armyforge/book';
 import type { CatalogBook } from './types';
 import { uid } from './factory';
 import { migrateForce } from '../rules/migrate';
+import { migrateBattle } from '../rules/tracker';
 
 const FORCE_KIND = 'opr-crusade-force';
 const BACKUP_KIND = 'opr-crusade-backup';
@@ -44,7 +45,7 @@ export function interpretJson(data: any): Imported {
   if (data?.kind === CAMPAIGN_KIND && Array.isArray(data.campaign?.sectors)) return { kind: 'campaign', campaign: data.campaign };
   if (data?.kind === BACKUP_KIND && Array.isArray(data.forces)) {
     const { kind: _k, ...state } = data;
-    return { kind: 'backup', state: { ...state, forces: state.forces.map(migrateForce) } as AppState };
+    return { kind: 'backup', state: { ...state, forces: state.forces.map(migrateForce), battle: migrateBattle(state.battle) } as AppState };
   }
   if (Array.isArray(data?.units) && Array.isArray(data?.upgradePackages)) return { kind: 'book', book: normalizeBook(data) };
   if (Array.isArray(data?.rules) && Array.isArray(data?.traits) && !data.units) return { kind: 'coreRules', rules: normalizeCoreRules(data) };
