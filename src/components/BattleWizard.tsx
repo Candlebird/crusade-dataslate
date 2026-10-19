@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../model/store';
+import { sideOfForce, wizardPrefill } from '../rules/tracker';
 import { uid } from '../model/factory';
 import type { BattleResult, Campaign, Force, Unit } from '../model/types';
 import { AGENDAS, CATEGORIES, MARKED_XP, MAX_AGENDAS, RELICS, REWARD_TABLES, SCAR_TABLE, type RewardTableKey } from '../rules/data';
@@ -54,7 +55,13 @@ export default function BattleWizard({ forceId }: { forceId: string }) {
   const { state, update, updateForce } = useStore();
   const f = state.forces.find((x) => x.id === forceId);
   const [step, setStep] = useState(0);
-  const [input, setInput] = useState<BattleInput | null>(() => (f ? initialInput(f, forceTotals(f, state.settings).bp) : null));
+  // An ended game in the battle tracker that this force played fills the report in.
+  const [fromTracker] = useState(() => sideOfForce(state.battle, forceId));
+  const [input, setInput] = useState<BattleInput | null>(() => {
+    if (!f) return null;
+    const blank = initialInput(f, forceTotals(f, state.settings).bp);
+    return fromTracker && state.battle ? wizardPrefill(state.battle, fromTracker, blank, f, state.campaign) : blank;
+  });
   const [applied, setApplied] = useState<BattleOutcome | null>(null);
 
   const campaign = state.campaign;
@@ -99,6 +106,10 @@ export default function BattleWizard({ forceId }: { forceId: string }) {
         const sec = d.campaign?.sectors.find((x) => x.id === input.sectorId);
         if (sec) sec.rewardClaimed = true;
       });
+    if (fromTracker)
+      update((d) => {
+        if (d.battle && !d.battle.recorded.includes(fromTracker)) d.battle.recorded.push(fromTracker);
+      });
     setApplied(preview);
     toast('Battle recorded.');
   };
@@ -116,6 +127,13 @@ export default function BattleWizard({ forceId }: { forceId: string }) {
           <button onClick={() => confirmAction('Discard this battle report?') && go(href.force(f.id))}>Cancel</button>
         </div>
       </div>
+
+      {fromTracker && state.battle && (
+        <p className="panel notice small">
+          Filled in from the <a href={href.tracker()}>battle tracker</a> ({state.battle.mission.name}). Check the details, then add XP and rewards.
+          {' '}<button className="ghost small" onClick={() => setInput(initialInput(f, forceTotals(f, state.settings).bp))}>Start blank instead</button>
+        </p>
+      )}
 
       <div className="steps">
         {STEPS.map((s, i) => (

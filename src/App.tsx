@@ -8,6 +8,8 @@ import BooksPage from './components/BooksPage';
 import CampaignPage from './components/CampaignPage';
 import ListPage from './components/ListPage';
 import SettingsPage from './components/SettingsPage';
+import BattleTracker from './components/BattleTracker';
+import MissionLibrary from './components/MissionLibrary';
 import { Toaster } from './components/ui';
 import AccountButton from './cloud/AccountButton';
 
@@ -25,6 +27,9 @@ export default function App() {
         <nav>
           <a className={route.page === 'forces' || route.page === 'force' || route.page === 'unit' || route.page === 'battle' || route.page === 'list' ? 'active' : ''} href={href.forces()}>
             Forces
+          </a>
+          <a className={route.page === 'tracker' || route.page === 'missions' ? 'active' : ''} href={href.tracker()}>
+            Battle
           </a>
           <a className={route.page === 'campaign' ? 'active' : ''} href={href.campaign()}>
             Nexus Wars
@@ -45,6 +50,8 @@ export default function App() {
         {route.page === 'unit' && <UnitSheet forceId={route.forceId} unitId={route.unitId} />}
         {route.page === 'battle' && <BattleWizard key={route.forceId} forceId={route.forceId} />}
         {route.page === 'list' && <ListPage forceId={route.forceId} listId={route.listId} />}
+        {route.page === 'tracker' && <BattleTracker />}
+        {route.page === 'missions' && <MissionLibrary />}
         {route.page === 'campaign' && <CampaignPage />}
         {route.page === 'books' && <BooksPage />}
         {route.page === 'settings' && <SettingsPage />}

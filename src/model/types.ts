@@ -1,4 +1,6 @@
 import type { Category, RelicTier } from '../rules/data';
+import type { MissionDef } from '../rules/missions';
+import type { TrackedBattle } from '../rules/tracker';
 
 export interface WeaponTrait {
   id: string;
@@ -315,4 +317,8 @@ export interface AppState {
   campaign?: Campaign;
   /** OPR core rule descriptions (AP, Tough, Hero…), imported from Army Forge for list glossaries. */
   coreRules?: RuleText[];
+  /** Missions the group made in the Mission Library (shared with every player). */
+  customMissions?: MissionDef[];
+  /** The game being played right now, on this device. */
+  battle?: TrackedBattle;
 }

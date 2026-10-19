@@ -14,6 +14,7 @@ export const COLLECTIONS = ['forces', 'campaign', 'books', 'shared'] as const;
 export const CAMPAIGN_PATH = 'campaign/current';
 export const SETTINGS_PATH = 'shared/settings';
 export const CORE_RULES_PATH = 'shared/coreRules';
+export const MISSIONS_PATH = 'shared/missions';
 
 const hashes = new Map<string, string>();
 
@@ -82,6 +83,11 @@ export function localDocs(state: AppState, who: Who, images: Map<string, string>
   for (const b of state.books) docs.push({ path: `books/${b.uid}`, json: toCloudJson(b, images), updatedAt: b.updatedAt ?? '', canWrite: true });
   docs.push({ path: SETTINGS_PATH, json: JSON.stringify(sharedSettings(state.settings)), updatedAt: '', canWrite: who.isGm });
   if (state.coreRules) docs.push({ path: CORE_RULES_PATH, json: JSON.stringify(state.coreRules), updatedAt: '', canWrite: true });
+  const missions = state.customMissions;
+  if (missions) {
+    const updatedAt = missions.reduce((t, m) => (m.updatedAt && m.updatedAt > t ? m.updatedAt : t), '');
+    docs.push({ path: MISSIONS_PATH, json: JSON.stringify(missions), updatedAt, canWrite: true });
+  }
   return docs;
 }
 
@@ -103,5 +109,7 @@ export function applyDoc(d: AppState, path: string, value: unknown): void {
     if (value !== null) d.settings = { ...d.settings, ...(value as ReturnType<typeof sharedSettings>) };
   } else if (path === CORE_RULES_PATH) {
     d.coreRules = value === null ? undefined : (value as AppState['coreRules']);
+  } else if (path === MISSIONS_PATH) {
+    d.customMissions = value === null ? undefined : (value as AppState['customMissions']);
   }
 }

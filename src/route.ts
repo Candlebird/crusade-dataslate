@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 
-/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle , #/force/:id/list/:lid , #/campaign , #/books , #/settings */
+/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle , #/force/:id/list/:lid , #/battle , #/missions , #/campaign , #/books , #/settings */
 export type Route =
   | { page: 'forces' }
   | { page: 'force'; forceId: string }
   | { page: 'unit'; forceId: string; unitId: string }
   | { page: 'battle'; forceId: string }
   | { page: 'list'; forceId: string; listId: string }
+  | { page: 'tracker' }
+  | { page: 'missions' }
   | { page: 'campaign' }
   | { page: 'books' }
   | { page: 'settings' };
@@ -19,6 +21,8 @@ export function parseRoute(hash: string): Route {
     if (parts[2] === 'battle') return { page: 'battle', forceId: parts[1] };
     return { page: 'force', forceId: parts[1] };
   }
+  if (parts[0] === 'battle') return { page: 'tracker' };
+  if (parts[0] === 'missions') return { page: 'missions' };
   if (parts[0] === 'campaign') return { page: 'campaign' };
   if (parts[0] === 'books') return { page: 'books' };
   if (parts[0] === 'settings') return { page: 'settings' };
@@ -31,6 +35,8 @@ export const href = {
   unit: (forceId: string, unitId: string) => `#/force/${forceId}/unit/${unitId}`,
   battle: (forceId: string) => `#/force/${forceId}/battle`,
   list: (forceId: string, listId: string) => `#/force/${forceId}/list/${listId}`,
+  tracker: () => '#/battle',
+  missions: () => '#/missions',
   campaign: () => '#/campaign',
   books: () => '#/books',
   settings: () => '#/settings',
