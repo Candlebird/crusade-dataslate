@@ -1,13 +1,14 @@
 import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { uid } from '../model/factory';
+import { useStore } from '../model/store';
 import { readImageAsDataUrl } from '../model/io';
 import type { Campaign, Sector, SectorType } from '../model/types';
 import {
   cells, clampToMap, defaultCounts, defaultMap, frontier, generateMap, hexCorners, hexKey, isPlaced, randomSeed, rng, rollSector, toPixel,
   type GenCounts, type GenOptions, type Hex,
 } from '../rules/hexmap';
-import { BENEFITS, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf } from '../rules/nexus';
-import { factionName } from './CampaignPage';
+import { BENEFITS, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionName } from '../rules/nexus';
+import { href } from '../route';
 import { Modal, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
 type SetC = (fn: (c: Campaign) => void) => void;
@@ -331,6 +332,7 @@ function SectorView({ c, s, onEdit, onRecord }: { c: Campaign; s: Sector; onEdit
   const benefit = benefitOf(s);
   const games = c.log.filter((e) => e.sectorId === s.id).slice(-4).reverse();
   const owner = c.factions.find((f) => f.id === s.owner);
+  const running = useStore().state.battle;
   return (
     <>
       {s.image && <img className="sector-art" src={s.image} alt="" />}
@@ -349,8 +351,10 @@ function SectorView({ c, s, onEdit, onRecord }: { c: Campaign; s: Sector; onEdit
           {games.map((e) => <div key={e.id} className="muted">{e.date}: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} — {e.winner ? `${factionName(c, e.winner)} won` : 'draw'}</div>)}
         </div>
       )}
+      {running?.sectorId === s.id && <p className="small">⚔ <a href={href.tracker()}>{running.mission.name}</a> is being fought here, round {running.round}.</p>}
       <div className="row" style={{ marginTop: '0.75rem' }}>
-        <button className="primary" onClick={onRecord}>Record a game here</button>
+        <a className="btn primary" href={href.tracker(s.id)} title="Open the battle tracker set up for this sector; finishing the battle updates the map">⚔ Start a battle here</a>
+        <button onClick={onRecord} title="Log a game you didn't track">Record a game here</button>
         <button onClick={onEdit}>Edit</button>
       </div>
     </>

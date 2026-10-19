@@ -3,7 +3,7 @@ import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import { exportCampaign } from '../model/io';
 import type { Campaign, Sector, SectorType } from '../model/types';
-import { BENEFITS, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, ownedSectors, recordSectorGame } from '../rules/nexus';
+import { BENEFITS, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionName, ownedSectors, recordSectorGame, removeSectorGame, sectorEffect } from '../rules/nexus';
 import { href } from '../route';
 import HexMapPanel from './HexMap';
 import { useImporter } from './importer';
@@ -68,6 +68,7 @@ export default function CampaignPage() {
       <p className="muted small">
         The GM's campaign.json is authoritative: players import the latest copy and report sector games to the GM.
         Benefits from your sectors are applied when you record a battle with a linked force.
+        Pick a sector on the map and <b>Start a battle here</b>: when the battle is finished, its result goes into the log and the map.
       </p>
 
       <FactionsPanel c={c} setC={setC} />
@@ -108,9 +109,6 @@ export default function CampaignPage() {
 }
 
 type SetC = (fn: (c: Campaign) => void) => void;
-
-export const factionName = (c: Campaign, id: string | undefined) =>
-  id === 'ai' ? 'AI' : c.factions.find((f) => f.id === id)?.name ?? (id ? 'Unknown faction' : 'Unclaimed');
 
 function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
   const { state } = useStore();
@@ -241,11 +239,7 @@ function RecordPanel({ c, setC, preset }: { c: Campaign; setC: SetC; preset: { s
   const set = (p: Partial<typeof ev>) => setEv({ ...ev, ...p });
   const ready = sector && ev.attacker && ev.defender !== ev.attacker;
 
-  let effect = '';
-  if (sector && ev.winner && ev.winner !== 'ai') {
-    if (sector.type === 'home') effect = `${factionName(c, ev.winner)} wins the home-sector challenge: the winner gains the loser's faction benefits once; the loser forfeits Nexus benefits for that match. ${sector.name} does not change hands.`;
-    else effect = `${factionName(c, ev.winner)} takes control of ${sector.name}.`;
-  }
+  const effect = sectorEffect(c, ev);
 
   return (
     <div className="panel" id="record-game">
@@ -310,8 +304,9 @@ function LogPanel({ c, setC }: { c: Campaign; setC: SetC }) {
             {e.winner ? <b>{factionName(c, e.winner)} wins</b> : 'draw'}
             {e.notes && <span className="muted"> · {e.notes}</span>}
           </span>
-          <button className="ghost icon" aria-label="Delete log entry" title="Removes the entry only; sector control is not reverted"
-            onClick={() => setC((d) => void (d.log = d.log.filter((x) => x.id !== e.id)))}>✕</button>
+          <button className="ghost icon" aria-label="Delete log entry"
+            title={e.undo ? 'Delete the entry and put the sector back, unless a later game changed it' : 'Delete the entry'}
+            onClick={() => confirmAction(`Delete this ${sectorName(e.sectorId)} game from the log?${e.undo ? ' The sector goes back to how the game found it.' : ''}`) && setC((d) => removeSectorGame(d, e.id))}>✕</button>
         </div>
       ))}
     </div>

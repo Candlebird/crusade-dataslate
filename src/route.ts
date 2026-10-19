@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 
-/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle , #/missions , #/campaign , #/books , #/settings , #/guide */
+/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle[/sector/:sectorId] , #/missions , #/campaign , #/books , #/settings , #/guide */
 export type Route =
   | { page: 'forces' }
   | { page: 'force'; forceId: string }
   | { page: 'unit'; forceId: string; unitId: string }
   | { page: 'battle'; forceId: string; battleId?: string; sideId?: string }
   | { page: 'list'; forceId: string; listId: string }
-  | { page: 'tracker' }
+  | { page: 'tracker'; sectorId?: string }
   | { page: 'missions' }
   | { page: 'campaign' }
   | { page: 'books' }
@@ -22,7 +22,7 @@ export function parseRoute(hash: string): Route {
     if (parts[2] === 'battle') return { page: 'battle', forceId: parts[1], battleId: parts[3], sideId: parts[4] };
     return { page: 'force', forceId: parts[1] };
   }
-  if (parts[0] === 'battle') return { page: 'tracker' };
+  if (parts[0] === 'battle') return { page: 'tracker', sectorId: parts[1] === 'sector' ? parts[2] : undefined };
   if (parts[0] === 'missions') return { page: 'missions' };
   if (parts[0] === 'campaign') return { page: 'campaign' };
   if (parts[0] === 'books') return { page: 'books' };
@@ -38,7 +38,8 @@ export const href = {
   /** The record wizard; with a past battle and side, filled in from it to claim that side's rewards. */
   battle: (forceId: string, battleId?: string, sideId?: string) => `#/force/${forceId}/battle${battleId && sideId ? `/${battleId}/${sideId}` : ''}`,
   list: (forceId: string, listId: string) => `#/force/${forceId}/list/${listId}`,
-  tracker: () => '#/battle',
+  /** The battle tracker; with a sector, a new battle is set up to be fought over it. */
+  tracker: (sectorId?: string) => (sectorId ? `#/battle/sector/${sectorId}` : '#/battle'),
   missions: () => '#/missions',
   campaign: () => '#/campaign',
   books: () => '#/books',

@@ -1,4 +1,4 @@
-import type { ArmyList, BattleResult, Campaign, Force, Settings, Unit } from '../model/types';
+import type { ArmyList, BattleResult, Campaign, CampaignEvent, Force, Settings, Unit } from '../model/types';
 import { battlePoints } from './engine';
 import { listUnits } from './lists';
 import { emptyUnitBattle, unitName, type BattleInput } from './battle';
@@ -278,6 +278,56 @@ export function nexusNotes(b: TrackedBattle, c: Campaign | undefined, forces: Fo
     }
   }
   return notes;
+}
+
+/** The Nexus faction a team plays for: its first force linked to a faction, else 'ai' for an AI team, else ''. */
+export function teamFaction(b: TrackedBattle, t: TeamKey, c: Campaign, forces: Force[]): string {
+  for (const x of membersOf(b, t)) {
+    const id = forces.find((f) => f.id === x.forceId)?.nexus?.factionId;
+    if (id && c.factions.some((f) => f.id === id)) return id;
+  }
+  return membersOf(b, t).some((x) => x.ai) ? 'ai' : '';
+}
+
+/**
+ * Set a new battle up to be fought over a sector: team A attacks for a faction, team B defends.
+ * A team's first player gets their faction's force loaded when the faction has exactly one.
+ */
+export function atSector(b: TrackedBattle, c: Campaign, forces: Force[], s: Settings, sectorId: string, attacker: string) {
+  b.sectorId = sectorId;
+  b.attacker = 'A';
+  const owner = c.sectors.find((x) => x.id === sectorId)?.owner;
+  const load = (t: TeamKey, factionId: string | undefined) => {
+    const side = membersOf(b, t).find((x) => !x.ai);
+    const theirs = forces.filter((f) => factionId && f.nexus?.factionId === factionId);
+    if (side && theirs.length === 1) loadForce(side, theirs[0], undefined, s);
+  };
+  load('A', attacker);
+  if (owner !== attacker) load('B', owner);
+}
+
+export type SectorGame = { event: Omit<CampaignEvent, 'id' | 'date'> } | { problem: string };
+
+/**
+ * The campaign log entry a battle over a Nexus sector makes when it's finished, or why it can't make one.
+ * Undefined when the battle isn't fought over a sector. The defender is the team holding the sector, if one does.
+ */
+export function sectorGame(b: TrackedBattle, c: Campaign | undefined, forces: Force[]): SectorGame | undefined {
+  if (!c || !b.sectorId) return undefined;
+  const sector = c.sectors.find((s) => s.id === b.sectorId);
+  if (!sector) return { problem: 'The sector fought over is no longer in the campaign.' };
+  if (!b.attacker) return { problem: 'Pick the attacking team under Setup to update the Nexus map.' };
+  const faction = (t: TeamKey) => teamFaction(b, t, c, forces);
+  const attacker = faction(b.attacker);
+  if (!attacker) return { problem: `${teamName(b, b.attacker)} isn't playing for a Nexus faction: load a force linked to one, or set the side to the AI.` };
+  const defenders = teamsOf(b).filter((t) => t !== b.attacker).map(faction);
+  const defender = defenders.find((x) => x && x === sector.owner) ?? defenders.find(Boolean) ?? sector.owner ?? '';
+  const w = winner(b);
+  const won = w === 'draw' ? '' : faction(w);
+  if (w !== 'draw' && !won) return { problem: `${teamName(b, w)} won but isn't playing for a Nexus faction, so the map can't tell who takes ${sector.name}.` };
+  const sc = score(b);
+  const notes = `${b.mission.name}: ${teamsOf(b).map((t) => `${teamName(b, t)} ${sc[t]!.total}`).join(', ')} VP.`;
+  return { event: { sectorId: sector.id, attacker, defender, winner: won, notes, battleId: b.id } };
 }
 
 /** What the post-battle wizard can fill in for one side of a tracked battle. */

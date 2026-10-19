@@ -288,6 +288,10 @@ export interface CampaignEvent {
   /** Faction id, 'ai', or '' for a draw. */
   winner: string;
   notes: string;
+  /** The tracked battle this game was recorded from, if any. */
+  battleId?: string;
+  /** What the game changed, so deleting the entry can put the sector back. */
+  undo?: { owner?: string; rewardClaimed?: boolean };
 }
 
 export interface CampaignMap {

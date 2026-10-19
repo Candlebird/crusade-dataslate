@@ -26,13 +26,47 @@ export function unlockedTables(n: ForceNexus): Category[] {
 export const ownedSectors = (c: Campaign, factionId: string) => c.sectors.filter((s) => s.owner === factionId);
 export const homeOf = (c: Campaign, factionId: string) => c.sectors.find((s) => s.type === 'home' && s.owner === factionId);
 
+export const factionName = (c: Campaign, id: string | undefined) =>
+  id === 'ai' ? 'AI' : c.factions.find((f) => f.id === id)?.name ?? (id ? 'Unknown faction' : 'Unclaimed');
+
+/** What a sector game's result does to the map, in words ('' when nothing changes). */
+export function sectorEffect(c: Campaign, e: Pick<CampaignEvent, 'sectorId' | 'winner'>): string {
+  const s = c.sectors.find((x) => x.id === e.sectorId);
+  if (!s || !e.winner || e.winner === 'ai') return '';
+  if (s.type === 'home')
+    return `${factionName(c, e.winner)} wins the home-sector challenge: the winner gains the loser's faction benefits once; the loser forfeits Nexus benefits for that match. ${s.name} does not change hands.`;
+  return s.owner === e.winner ? `${factionName(c, e.winner)} holds ${s.name}.` : `${factionName(c, e.winner)} takes control of ${s.name}.`;
+}
+
 /** Apply a reported sector game to the campaign. Home sectors never change hands. */
 export function recordSectorGame(c: Campaign, e: CampaignEvent) {
   c.log.push(e);
   const s = c.sectors.find((x) => x.id === e.sectorId);
   if (!s || !e.winner || e.winner === 'ai') return;
-  if (s.type !== 'home') s.owner = e.winner;
-  if (s.type === 'void' && e.defender === 'ai') s.rewardClaimed = true;
+  const undo: NonNullable<CampaignEvent['undo']> = {};
+  if (s.type !== 'home' && s.owner !== e.winner) {
+    undo.owner = s.owner ?? '';
+    s.owner = e.winner;
+  }
+  if (s.type === 'void' && e.defender === 'ai' && !s.rewardClaimed) {
+    undo.rewardClaimed = true;
+    s.rewardClaimed = true;
+  }
+  if (Object.keys(undo).length) e.undo = undo;
+}
+
+/** Delete a log entry. If nothing has changed the sector since, put it back the way the game found it. */
+export function removeSectorGame(c: Campaign, id: string) {
+  const i = c.log.findIndex((x) => x.id === id);
+  if (i < 0) return;
+  const [e] = c.log.splice(i, 1);
+  const s = c.sectors.find((x) => x.id === e.sectorId);
+  if (!s || !e.undo || c.log.slice(i).some((x) => x.sectorId === e.sectorId && x.undo)) return;
+  if (e.undo.owner !== undefined && s.owner === e.winner) {
+    if (e.undo.owner) s.owner = e.undo.owner;
+    else delete s.owner;
+  }
+  if (e.undo.rewardClaimed) delete s.rewardClaimed;
 }
 
 // ---- after-match generation ----

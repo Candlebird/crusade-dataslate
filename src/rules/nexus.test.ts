@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
 import type { Campaign } from '../model/types';
 import { emptyUnitBattle, resolveBattle, type BattleInput } from './battle';
-import { emptyNexus, nexusAccess, nexusGeneration, recordSectorGame } from './nexus';
+import { emptyNexus, nexusAccess, nexusGeneration, recordSectorGame, removeSectorGame } from './nexus';
 
 function campaign(): Campaign {
   return {
@@ -125,5 +125,20 @@ describe('sector games', () => {
     recordSectorGame(c, ev('an', 'B', 'A', ''));
     expect(c.sectors[4].owner).toBe('A');
     expect(c.log).toHaveLength(4);
+  });
+
+  it('puts the sector back when its latest game is deleted', () => {
+    const c = campaign();
+    recordSectorGame(c, { ...ev('p2', 'A', 'B', 'A'), id: 'e1' });
+    recordSectorGame(c, { ...ev('v', 'B', 'ai', 'B'), id: 'e2' });
+    recordSectorGame(c, { ...ev('p2', 'B', 'A', 'B'), id: 'e3' });
+    removeSectorGame(c, 'e1'); // a later game changed p2, so it stays
+    expect(c.sectors[3].owner).toBe('B');
+    removeSectorGame(c, 'e3');
+    expect(c.sectors[3].owner).toBe('A');
+    removeSectorGame(c, 'e2');
+    expect(c.sectors[5].owner).toBeUndefined();
+    expect(c.sectors[5].rewardClaimed).toBeUndefined();
+    expect(c.log).toHaveLength(0);
   });
 });

@@ -5,12 +5,13 @@ import type { Force } from '../model/types';
 import { go, href } from '../route';
 import { useCloud } from '../cloud/CloudSync';
 import { AGENDAS, MAX_AGENDAS } from '../rules/data';
-import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES } from '../rules/nexus';
+import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES, factionName, recordSectorGame, sectorEffect } from '../rules/nexus';
 import { DEPLOYMENT_STYLES, SEIZE_RULE, allMissions, rollAdvancedMission, rollDeployment, type MissionDef } from '../rules/missions';
 import {
   FORMATS,
   TEAMS,
   addSide,
+  atSector,
   cycleHolder,
   held,
   leaders,
@@ -33,7 +34,9 @@ import {
   finishBattle,
   resultFor,
   resultTitle,
+  sectorGame,
   type FinishedBattle,
+  type SectorGame,
   type Holder,
   type TeamKey,
   type TrackedBattle,
@@ -42,12 +45,14 @@ import {
 } from '../rules/tracker';
 import { AI_TREES } from '../rules/aiTrees';
 import AiActivation from './AiActivation';
-import { Stepper, TextArea, TextField, confirmAction } from './ui';
+import { Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
-export default function BattleTracker() {
+/** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
+export default function BattleTracker({ sectorId }: { sectorId?: string }) {
   const { state, update } = useStore();
   const b = state.battle;
-  if (!b) return <StartBattle />;
+  const sector = state.campaign?.sectors.find((s) => s.id === sectorId);
+  if (!b) return <StartBattle sectorId={sector?.id} />;
 
   const set = (fn: (d: TrackedBattle) => void) => update((s) => void (s.battle && fn(s.battle)));
   const sc = score(b);
@@ -58,11 +63,19 @@ export default function BattleTracker() {
   const holderName = (h: Holder) => (h === '' ? 'Nobody' : h === 'x' ? 'Contested' : teamName(b, h));
   const showRoles = !!b.attacker && !!(b.mission.roles || b.sectorId);
   const adjust = (t: TeamKey) => membersOf(b, t).reduce((n, x) => n + x.vpAdjust, 0);
+  const game = sectorGame(b, state.campaign, state.forces);
   const finish = () => {
     update((s) => {
       s.battleHistory = [finishBattle(b, nowIso()), ...(s.battleHistory ?? [])];
       delete s.battle;
+      // The Nexus map follows the result; a battle is only ever logged once.
+      if (game && 'event' in game && s.campaign && !s.campaign.log.some((e) => e.battleId === b.id)) {
+        recordSectorGame(s.campaign, { id: uid(), date: nowIso().slice(0, 10), ...game.event });
+        s.campaign.updatedAt = nowIso();
+      }
     });
+    if (game && 'event' in game) toast(`Result added to the Nexus Wars log.${state.campaign ? ` ${sectorEffect(state.campaign, game.event)}` : ''}`);
+    go(href.tracker());
   };
 
   return (
@@ -79,7 +92,20 @@ export default function BattleTracker() {
         </div>
       </div>
 
-      {b.ended && <Result b={b} set={set} onFinish={finish} />}
+      {sector && b.sectorId !== sector.id && (
+        <div className="panel">
+          <p>
+            You came from the Nexus Wars map to fight over <b>{sector.name}</b>, but this battle is still running.
+            Finish or discard it first, or fight this one over {sector.name}.
+          </p>
+          <div className="row">
+            <button className="primary" onClick={() => { set((d) => void (d.sectorId = sector.id)); go(href.tracker()); }}>Fight this battle over {sector.name}</button>
+            <a className="btn" href={href.tracker()}>Keep it as it is</a>
+          </div>
+        </div>
+      )}
+
+      {b.ended && <Result b={b} set={set} onFinish={finish} game={game} />}
 
       <div className={`panel scoreboard${teams.length === 2 ? ' duel' : ''}`}>
         {teams.map((t) => (
@@ -240,11 +266,18 @@ function objectiveScoring(m: MissionDef): string {
   return `${base}${bonus}.`;
 }
 
-function StartBattle() {
+function StartBattle({ sectorId }: { sectorId?: string }) {
   const { state, update } = useStore();
+  const cloud = useCloud();
+  const c = state.campaign;
+  const sector = c?.sectors.find((s) => s.id === sectorId);
+  // Attack for my own force's faction if I have one, else for anyone but the sector's owner.
+  const myFaction = state.forces.find((f) => f.nexus?.factionId && f.nexus.factionId !== sector?.owner && (!f.owner || f.owner === cloud.email))?.nexus?.factionId;
+  const [attacker, setAttacker] = useState(() => myFaction ?? c?.factions.find((f) => f.id !== sector?.owner)?.id ?? '');
   const missions = allMissions(state.customMissions);
   const [id, setId] = useState(missions[0]?.id ?? '');
-  const [format, setFormat] = useState(0);
+  // An unclaimed or void sector is held by the AI; a claimed one by its faction's player.
+  const [format, setFormat] = useState(() => (sector && (!sector.owner || sector.type === 'void') ? FORMATS.findIndex((f) => f.label === '1 v AI') : 0));
   const m = missions.find((x) => x.id === id) ?? missions[0];
   const groups: [string, MissionDef[]][] = [];
   for (const x of missions) {
@@ -253,7 +286,14 @@ function StartBattle() {
     if (hit) hit[1].push(x);
     else groups.push([g, [x]]);
   }
-  const start = (mission: MissionDef) => update((s) => void (s.battle = newBattle(mission, uid(), nowIso(), Math.random, FORMATS[format])));
+  const start = (mission: MissionDef) => {
+    update((s) => {
+      const b = newBattle(mission, uid(), nowIso(), Math.random, FORMATS[format]);
+      if (sector && s.campaign) atSector(b, s.campaign, s.forces, s.settings, sector.id, attacker);
+      s.battle = b;
+    });
+    if (sector) go(href.tracker());
+  };
   return (
     <div>
       <div className="page-head">
@@ -263,6 +303,22 @@ function StartBattle() {
       <div className="panel">
         <div className="panel-title"><h2>Start a battle</h2></div>
         <p className="muted">Pick who's playing and a mission, then load each side's force on the next screen. The battle is kept on this device until you finish or discard it.</p>
+        {c && sector && (
+          <>
+            <h3>Nexus Wars</h3>
+            <p className="small">
+              Fighting over <b>{sector.name}</b> <span className="tag">{SECTOR_TYPES[sector.type].label}</span>, held by <b>{factionName(c, sector.owner)}</b>.
+              Team A attacks; everyone else defends. When you finish, the result goes into the campaign log and the map.
+            </p>
+            <label className="field">
+              <span>Attacking faction</span>
+              <select value={attacker} onChange={(e) => setAttacker(e.target.value)}>
+                {c.factions.map((f) => <option key={f.id} value={f.id} disabled={f.id === sector.owner}>{f.name}</option>)}
+              </select>
+            </label>
+            <p className="muted small">A faction with just one force here gets it loaded for you. <a href={href.tracker()}>Start an ordinary battle instead</a></p>
+          </>
+        )}
         <h3>Players</h3>
         <div className="row">
           {FORMATS.map((f, i) => (
@@ -378,7 +434,9 @@ function Claim({ battle, side, claimed, by, mine }: { battle: FinishedBattle; si
   );
 }
 
-function Result({ b, set, onFinish }: { b: TrackedBattle; set: Set; onFinish: () => void }) {
+function Result({ b, set, onFinish, game }: { b: TrackedBattle; set: Set; onFinish: () => void; game?: SectorGame }) {
+  const { state } = useStore();
+  const c = state.campaign;
   const sc = score(b);
   const teams = teamsOf(b);
   const title = resultTitle(b);
@@ -396,6 +454,14 @@ function Result({ b, set, onFinish }: { b: TrackedBattle; set: Set; onFinish: ()
           return <a key={s.id} className="btn primary" href={href.battle(s.forceId)}>⚔ Record battle for {s.name}</a>;
         })}
       </div>
+      {c && game && (
+        <p className="small" style={{ marginTop: '0.75rem' }}>
+          <b>Nexus Wars.</b>{' '}
+          {'problem' in game
+            ? <span style={{ color: 'var(--warn)' }}>{game.problem} Until then, finishing won't touch the campaign: you can still record it by hand on the Nexus Wars page.</span>
+            : <>Finishing adds this to the campaign log: {factionName(c, game.event.attacker)} attacking {factionName(c, game.event.defender)}, {game.event.winner ? `${factionName(c, game.event.winner)} wins` : 'a draw'}. {sectorEffect(c, game.event) || "The sector doesn't change hands."}</>}
+        </p>
+      )}
       <div className="row" style={{ marginTop: '0.75rem' }}>
         <span className="muted small">Done? Finishing shares the battle with the group under Past battles, where anyone who hasn't recorded it yet can still claim their rewards.</span>
         <span className="spacer" />

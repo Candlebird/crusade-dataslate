@@ -1,11 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
-import { DEFAULT_SETTINGS } from '../model/types';
+import { DEFAULT_SETTINGS, type Campaign } from '../model/types';
+import { emptyNexus, recordSectorGame } from './nexus';
 import { emptyUnitBattle, resolveBattle, type BattleInput } from './battle';
 import { ADVANCED_MISSION_TABLE, BUILTIN_MISSIONS, DEPLOYMENT_STYLES, EXAMPLE_MISSION, STANDARD_MISSION, allMissions, rollAdvancedMission, rollDeployment } from './missions';
 import {
   FORMATS,
   addSide,
+  atSector,
+  sectorGame,
   cycleHolder,
   leaders,
   loadForce,
@@ -246,5 +249,79 @@ describe('battle tracker', () => {
     expect(claims(done, [f, g])).toEqual({ s2: g });
     done.recorded.push('s1');
     expect(claims(done, [f, g])).toEqual({ s1: f, s2: g });
+  });
+});
+
+describe('battles over a Nexus sector', () => {
+  const campaign = (): Campaign => ({
+    id: 'c', name: 'Test', updatedAt: '',
+    factions: [{ id: 'red', name: 'Red', player: '', color: '#f00' }, { id: 'blue', name: 'Blue', player: '', color: '#00f' }],
+    sectors: [
+      { id: 'p', name: 'Planet', type: 'planet', benefit: 'shardMine', owner: 'blue', notes: '' },
+      { id: 'v', name: 'Hulk', type: 'void', notes: '' },
+    ],
+    log: [],
+  });
+  const forces = () => {
+    const red = newForce('Red Host');
+    red.nexus = emptyNexus('red');
+    red.units.push(newUnit({ name: 'Warriors', status: 'active' }));
+    const blue = newForce('Blue Host');
+    blue.nexus = emptyNexus('blue');
+    return [red, blue];
+  };
+
+  it("sets a battle up at a sector with each faction's only force loaded", () => {
+    const c = campaign();
+    const [red, blue] = forces();
+    const b = newBattle(STANDARD_MISSION, 'b', '', () => 0);
+    atSector(b, c, [red, blue], DEFAULT_SETTINGS, 'p', 'red');
+    expect(b).toMatchObject({ sectorId: 'p', attacker: 'A' });
+    expect(b.sides.map((x) => x.forceId)).toEqual([red.id, blue.id]);
+    expect(b.sides[0].units).toHaveLength(1);
+  });
+
+  it('turns the result into a campaign log entry that moves the sector', () => {
+    const c = campaign();
+    const fs = forces();
+    const b = newBattle(STANDARD_MISSION, 'b', '', () => 0);
+    atSector(b, c, fs, DEFAULT_SETTINGS, 'p', 'red');
+    setHolder(b, 0, 'A');
+    const game = sectorGame(b, c, fs);
+    expect(game).toEqual({ event: expect.objectContaining({ sectorId: 'p', attacker: 'red', defender: 'blue', winner: 'red', battleId: 'b' }) });
+    recordSectorGame(c, { id: 'e', date: '', ...(game as { event: any }).event });
+    expect(c.sectors[0].owner).toBe('red');
+
+    setHolder(b, 0, 'B');
+    setHolder(b, 1, 'B');
+    expect(sectorGame(b, c, fs)).toMatchObject({ event: { winner: 'blue' } });
+    setHolder(b, 1, 'A');
+    expect(sectorGame(b, c, fs)).toMatchObject({ event: { winner: '' } });
+  });
+
+  it('counts an AI team as the AI, and an AI win changes nothing', () => {
+    const c = campaign();
+    const fs = forces();
+    const b = newBattle(STANDARD_MISSION, 'b', '', () => 0, FORMATS.find((f) => f.label === '1 v AI'));
+    atSector(b, c, fs, DEFAULT_SETTINGS, 'v', 'red');
+    setHolder(b, 0, 'B');
+    expect(sectorGame(b, c, fs)).toMatchObject({ event: { attacker: 'red', defender: 'ai', winner: 'ai' } });
+  });
+
+  it("explains when the result can't be mapped onto the campaign", () => {
+    const c = campaign();
+    const fs = forces();
+    const b = newBattle(STANDARD_MISSION, 'b', '', () => 0);
+    expect(sectorGame(b, c, fs)).toBeUndefined();
+    b.sectorId = 'p';
+    expect(sectorGame(b, c, fs)).toMatchObject({ problem: expect.stringContaining('attacking team') });
+    b.attacker = 'A';
+    expect(sectorGame(b, c, fs)).toMatchObject({ problem: expect.stringContaining("isn't playing for a Nexus faction") });
+    loadForce(b.sides[0], fs[0], undefined, DEFAULT_SETTINGS);
+    setHolder(b, 0, 'B');
+    expect(sectorGame(b, c, fs)).toMatchObject({ problem: expect.stringContaining('won but') });
+    setHolder(b, 0, 'A');
+    // An unlinked defender: the sector's owner defends it.
+    expect(sectorGame(b, c, fs)).toMatchObject({ event: { attacker: 'red', defender: 'blue', winner: 'red' } });
   });
 });
