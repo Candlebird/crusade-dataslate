@@ -7,6 +7,10 @@ import { forceArmyUrl } from '../armyforge/book';
 import { go, href } from '../route';
 import AddUnitModal from './AddUnitModal';
 import RequisitionShop from './RequisitionShop';
+import UmbraShop from './UmbraShop';
+import type { Force } from '../model/types';
+import { CATEGORIES, type Category } from '../rules/data';
+import { SECTOR_TYPES, benefitOf, emptyNexus, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
 import { RESULT_LABEL } from '../rules/battle';
 import { Stepper, TextArea, TextField, XpBar, toast } from './ui';
 
@@ -15,6 +19,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const [adding, setAdding] = useState(false);
   const [showRemoved, setShowRemoved] = useState(false);
   const [shopping, setShopping] = useState(false);
+  const [umbra, setUmbra] = useState(false);
   const f = state.forces.find((x) => x.id === forceId);
   if (!f) return <div className="panel empty">Force not found. <a href={href.forces()}>Back to forces</a></div>;
 
@@ -139,7 +144,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
               <div className="table-wrap">
                 <table>
                   <thead>
-                    <tr><th>Date</th><th>Entry</th><th className="num">RP</th><th className="num">Supply</th><th /></tr>
+                    <tr><th>Date</th><th>Entry</th><th className="num">RP</th><th className="num">Supply</th><th className="num">US</th><th /></tr>
                   </thead>
                   <tbody>
                     {f.ledger.map((e, i) => (
@@ -148,6 +153,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                         <td><TextField className="wide" value={e.label} onCommit={(v) => set((d) => void (d.ledger[i].label = v))} /></td>
                         <td className="num"><input type="number" value={e.rp} onChange={(ev) => set((d) => void (d.ledger[i].rp = Number(ev.target.value) || 0))} /></td>
                         <td className="num"><input type="number" step={50} value={e.supply} onChange={(ev) => set((d) => void (d.ledger[i].supply = Number(ev.target.value) || 0))} /></td>
+                        <td className="num small" title="Umbra Shards (history only — the balance is set in Force details)">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
                         <td><button className="ghost icon" onClick={() => set((d) => void d.ledger.splice(i, 1))} aria-label="Delete entry">✕</button></td>
                       </tr>
                     ))}
@@ -170,6 +176,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                   <summary className="row">
                     <span className={`tag ${b.result === 'win' ? 'green' : b.result === 'loss' ? 'red' : 'gold'}`}>{RESULT_LABEL[b.result]}</span>
                     <b>vs {b.opponent || 'unknown'}{b.vsAi ? ' (AI)' : ''}</b>
+                    {b.sectorName && <span className="tag cyan">{b.sectorName}</span>}
                     <span className="muted small">{b.date} · {b.myBp} vs {b.oppBp} BP{b.agendas.length ? ` · ${b.agendas.join(', ')}` : ''}</span>
                   </summary>
                   <ul className="small">{b.summary.map((line, i) => <li key={i}>{line}</li>)}</ul>
@@ -199,6 +206,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
               <label className="field span-all">Description / lore<TextArea rows={5} value={f.description} onCommit={(v) => set((d) => void (d.description = v))} /></label>
             </div>
           </div>
+          <NexusPanel f={f} onShop={() => setUmbra(true)} />
           <div className="panel">
             <div className="panel-title"><h3>Danger zone</h3></div>
             <button
@@ -216,6 +224,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
         </div>
       </div>
 
+      {umbra && <UmbraShop force={f} onClose={() => setUmbra(false)} />}
       {shopping && <RequisitionShop force={f} onClose={() => setShopping(false)} />}
       {adding && (
         <AddUnitModal
@@ -252,6 +261,80 @@ export function ForceImage({ image, onChange }: { image?: string; onChange: (img
         </label>
         {image && <button className="ghost" onClick={() => onChange(undefined)}>Remove</button>}
       </div>
+    </div>
+  );
+}
+
+function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
+  const { state, updateForce } = useStore();
+  const c = state.campaign;
+  const set = (fn: Parameters<typeof updateForce>[1]) => updateForce(f.id, fn);
+  const n = f.nexus;
+  const faction = n && c?.factions.find((x) => x.id === n.factionId);
+  const home = c && n ? homeOf(c, n.factionId) : undefined;
+  const researchHome = home?.benefit === 'researchStation';
+
+  return (
+    <div className="panel">
+      <div className="panel-title">
+        <h3>Nexus Wars</h3>
+        <button className="primary" onClick={onShop}>Umbra shards…</button>
+      </div>
+      {!c ? (
+        <p className="muted small">No campaign loaded. <a href={href.campaign()}>Import or start one</a> to link this force to a faction.</p>
+      ) : (
+        <div className="fields">
+          <label className="field span-all">
+            Campaign faction
+            <select value={n?.factionId ?? ''} onChange={(e) => set((d) => {
+              const id = e.target.value;
+              if (!id) d.nexus = undefined;
+              else if (d.nexus) d.nexus.factionId = id;
+              else d.nexus = emptyNexus(id);
+            })}>
+              <option value="">Not linked</option>
+              {c.factions.map((x) => <option key={x.id} value={x.id}>{x.name}{x.player ? ` (${x.player})` : ''}</option>)}
+            </select>
+          </label>
+          {n && !faction && <p className="span-all small" style={{ color: 'var(--warn)', margin: 0 }}>This faction is not in the loaded campaign.</p>}
+          {n && faction && (
+            <>
+              <div className="span-all small">
+                <div className="muted">Controlled sectors</div>
+                {ownedSectors(c, n.factionId).map((s) => (
+                  <div key={s.id} title={benefitOf(s)?.desc ?? SECTOR_TYPES[s.type].desc}>
+                    <b>{s.name}</b> <span className="muted">— {benefitOf(s)?.name ?? SECTOR_TYPES[s.type].label}{s.reinforced ? ' · reinforced' : ''}</span>
+                  </div>
+                ))}
+              </div>
+              {researchHome && (
+                <label className="field span-all">
+                  Research Station: permanent table
+                  <select value={n.permanentTables[0] ?? ''} onChange={(e) => set((d) => void (d.nexus!.permanentTables = e.target.value ? [e.target.value as Category] : []))}>
+                    <option value="">— choose —</option>
+                    {CATEGORIES.map((x) => <option key={x} value={x}>{x}</option>)}
+                  </select>
+                </label>
+              )}
+              <div className="span-all small">
+                <span className="muted">Unlocked Nexus tables: </span>
+                {unlockedTables(n).length ? unlockedTables(n).join(', ') : 'none'}
+                {n.tempTables === 'all' || n.tempTables.length ? <span className="muted"> (temporary ones expire next match)</span> : null}
+              </div>
+              <label className="field span-all">Trait tokens<Stepper value={n.traitTokens} min={0} onChange={(v) => set((d) => void (d.nexus!.traitTokens = v))} /></label>
+              <div className="span-all small">
+                <div className="muted">Pending for next match</div>
+                {n.pending.length === 0 ? <span className="muted">Nothing.</span> : n.pending.map((p, i) => (
+                  <div key={i} className="row">
+                    <span className="grow">{p}</span>
+                    <button className="ghost icon" aria-label="Remove" onClick={() => set((d) => void d.nexus!.pending.splice(i, 1))}>✕</button>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }

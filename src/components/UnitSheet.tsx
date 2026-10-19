@@ -29,6 +29,7 @@ import {
   upgradesUsed,
   validateUnit,
 } from '../rules/engine';
+import { nexusAccess } from '../rules/nexus';
 import { unitBookUrl } from '../armyforge/book';
 import { go, href } from '../route';
 import { ForceImage } from './ForceView';
@@ -71,6 +72,8 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       if (!d.categoryOverridden) d.category = detectCategory({ rules, size: d.size, tough: d.tough, name: d.unitType });
     });
 
+  const access = nexusAccess(f, u.category);
+
   const pickerGroups = (): PickGroup[] => {
     if (!picker) return [];
     if (picker.kind === 'trait') {
@@ -78,7 +81,12 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
         key: `normal:${k}`, label: k, entries: TRAIT_TABLES[k] ?? [], rollable: true,
       }));
       groups.push({ key: 'unique', label: 'Unique', entries: UNIQUE_TRAIT_TABLES[u.category] ?? [], rollable: true });
-      groups.push({ key: 'nexus', label: 'Nexus', entries: (NEXUS_TRAITS[u.category] ?? []).map((name) => ({ name })) });
+      const locked = access === null ? `The ${u.category} Nexus table is locked — unlock it in Nexus Wars or earn a trait token` : undefined;
+      groups.push({
+        key: 'nexus',
+        label: access === 'token' ? 'Nexus (uses a token)' : 'Nexus',
+        entries: (NEXUS_TRAITS[u.category] ?? []).map((name) => ({ name, disabled: locked })),
+      });
       return groups;
     }
     if (picker.kind === 'weaponTrait') {
@@ -110,7 +118,13 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
     if (!picker) return;
     if (picker.kind === 'trait') {
       const unique = p.group === 'unique' || p.group === 'nexus';
-      set((d) => void d.upgrades.push({ id: uid(), name: p.name, unique, nexus: p.group === 'nexus' || undefined, free: p.free || undefined }));
+      const token = p.group === 'nexus' && access === 'token';
+      updateForce(f.id, (fd) => {
+        const d = fd.units.find((x) => x.id === u.id);
+        d?.upgrades.push({ id: uid(), name: p.name, unique, nexus: p.group === 'nexus' || undefined, free: p.free || undefined });
+        if (token && fd.nexus) fd.nexus.traitTokens -= 1;
+      });
+      if (token) toast('Used a Nexus trait token.');
     } else if (picker.kind === 'weaponTrait') {
       set((d) => {
         const w = d.weapons.find((x) => x.id === picker.weaponId);

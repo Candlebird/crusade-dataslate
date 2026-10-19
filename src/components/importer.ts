@@ -4,7 +4,7 @@ import { asCopy, readJsonFile } from '../model/io';
 import { DEFAULT_SETTINGS } from '../model/types';
 import { toast } from './ui';
 
-/** Handle dropped JSON files: forces, full backups, or raw Army Forge books. */
+/** Handle dropped JSON files: forces, campaigns, full backups, or raw Army Forge books. */
 export function useImporter() {
   const { state, update, addBook, replaceState } = useStore();
 
@@ -28,6 +28,15 @@ export function useImporter() {
               });
             } else update((d) => void d.forces.push(got.force));
             toast(`Force "${got.force.name}" imported.`);
+          } else if (got.kind === 'campaign') {
+            const cur = state.campaign;
+            if (cur && !window.confirm(
+              cur.id === got.campaign.id
+                ? `Replace your copy of "${cur.name}" with this file (updated ${got.campaign.updatedAt.slice(0, 10)})?`
+                : `Replace the campaign "${cur.name}" with "${got.campaign.name}"? Forces linked to the old campaign's factions will need re-linking.`,
+            )) continue;
+            update((d) => void (d.campaign = got.campaign));
+            toast(`Campaign "${got.campaign.name}" loaded (${got.campaign.sectors.length} sectors).`);
           } else {
             if (!window.confirm('Restore this backup? It replaces ALL forces, books and settings in this browser.')) continue;
             replaceState({ ...got.state, settings: { ...DEFAULT_SETTINGS, ...got.state.settings } });
@@ -38,6 +47,6 @@ export function useImporter() {
         }
       }
     },
-    [state.forces, update, addBook, replaceState],
+    [state.forces, state.campaign, update, addBook, replaceState],
   );
 }

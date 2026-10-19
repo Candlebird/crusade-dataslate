@@ -1,6 +1,8 @@
 import type { BattleResult, Force, Unit } from '../model/types';
 import {
   BATTLE_RP,
+  CATEGORIES,
+  RELICS,
   MARKED_XP,
   NO_AGENDA_XP,
   PARTICIPATION_XP,
@@ -10,6 +12,7 @@ import {
   type RewardTableKey,
 } from './data';
 import { applyScar, levelForXp, previousBracketXp, sufferingRolls, type DeathOutcome, type ScarResult } from './engine';
+import { MANIPULATION_PREFIX, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
 
 // Post-battle resolution ("Gaining Experience", "Gaining RP", "Deaths").
 // resolveBattle() mutates a force draft, so the wizard can preview on a clone and apply the same code for real.
@@ -57,6 +60,12 @@ export interface BattleInput {
   agendaRp: number;
   units: Record<string, UnitBattle>;
   rewards: Record<string, RewardPick>;
+  /** Nexus Wars: the sector fought over ('' = none). */
+  sectorId?: string;
+  sectorName?: string;
+  /** What the force's faction earns this match (from nexusGeneration). */
+  nexus?: NexusContext;
+  nexusPicks?: Record<string, NexusPick>;
 }
 
 export interface RewardRow {
@@ -155,9 +164,12 @@ export interface UnitOutcome {
 
 export interface BattleOutcome {
   units: UnitOutcome[];
-  ledger: { label: string; rp: number; supply: number }[];
+  ledger: { label: string; rp: number; supply: number; us?: number }[];
   rp: number;
   supply: number;
+  us: number;
+  /** Nexus Wars lines (rolls, unlocks, relics). */
+  nexus: string[];
   warnings: string[];
   summary: string[];
 }
@@ -172,7 +184,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
   const free: Record<string, string[]> = {};
   const byId = new Map(units.map((u) => [u.id, u]));
 
-  const ledger = [{
+  const ledger: BattleOutcome['ledger'] = [{
     label: `Battle vs ${input.opponent || 'unknown'} — ${RESULT_LABEL[input.result]}${input.vsAi ? ' (AI)' : ''}`,
     rp: BATTLE_RP + input.agendaRp,
     supply: 0,
@@ -221,6 +233,90 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
       if (byId.has(pick.target)) (free[pick.target] ??= []).push(e.free);
       else warnings.push(`${row.source}: choose a unit for the ${e.free.toLowerCase()}.`);
     }
+  }
+
+  // ---- Nexus Wars ----
+  const nexusLines: string[] = [];
+  const relicGains: { unitId: string; name: string }[] = [];
+  let us = 0;
+  if (force.nexus) {
+    const n = force.nexus;
+    expireNexus(n);
+    nexusLines.push(...(input.nexus?.notes ?? []));
+    const addUs = (source: string, k: number) => {
+      us += k;
+      ledger.push({ label: `Nexus — ${source}`, rp: 0, supply: 0, us: k });
+    };
+    const addSupply = (source: string, k: number) => ledger.push({ label: `Nexus — ${source}`, rp: 0, supply: k });
+    const relic = (source: string, pick: NexusPick) => {
+      if (pick.choice && byId.has(pick.target)) relicGains.push({ unitId: pick.target, name: pick.choice });
+      else warnings.push(`${source}: choose a relic and a unit.`);
+    };
+    for (const item of input.nexus?.items ?? []) {
+      const pick = input.nexusPicks?.[item.key] ?? emptyNexusPick();
+      const src = item.source;
+      switch (item.kind) {
+        case 'us': addUs(src, item.us ?? 0); break;
+        case 'supply': addSupply(src, item.supply ?? 0); break;
+        case 'shardRoll':
+          if (!pick.roll) warnings.push(`${src}: not rolled yet.`);
+          else if (pick.roll >= 4) addUs(`${src} (rolled ${pick.roll})`, 1);
+          else nexusLines.push(`${src}: rolled ${pick.roll} — no shard.`);
+          break;
+        case 'relicRoll':
+          if (!pick.roll) warnings.push(`${src}: not rolled yet.`);
+          else if (pick.roll === 6) relic(src, pick);
+          else nexusLines.push(`${src}: rolled ${pick.roll} — no relic.`);
+          break;
+        case 'research':
+          if (!CATEGORIES.includes(pick.choice as never)) warnings.push(`${src}: choose a Nexus Traits table.`);
+          else {
+            if (n.tempTables !== 'all' && !n.tempTables.includes(pick.choice as never)) n.tempTables.push(pick.choice as never);
+            nexusLines.push(`${src}: ${pick.choice} Nexus traits unlocked until the next match.`);
+          }
+          break;
+        case 'manipulation':
+          n.pending.push(`${MANIPULATION_PREFIX}: ${pick.choice || 'any'} (free)`);
+          nexusLines.push(`${src}: a free Combat Manipulation for the next match.`);
+          break;
+        case 'anomaly':
+        case 'void': {
+          const e = nexusEntry(item, pick);
+          if (!e) {
+            warnings.push(`${src}: not rolled yet.`);
+            break;
+          }
+          const label = `${src} (${pick.roll}): ${e.text}`;
+          if (e.us) addUs(label, e.us);
+          if (e.supply) addSupply(label, e.supply);
+          if (e.xp) {
+            let given = 0;
+            for (const [id, xp] of Object.entries(pick.alloc)) {
+              if (xp > 0 && byId.has(id)) {
+                addXp(id, src, xp);
+                given += xp;
+              }
+            }
+            if (given !== e.xp) warnings.push(`${src}: ${given} of ${e.xp} XP distributed.`);
+          }
+          if (e.removeScar) {
+            const [id, scarId] = pick.target.split(':');
+            if (id && byId.has(id) && scarId) (removeScars[id] ??= []).push(scarId);
+            else warnings.push(`${src}: choose a scar to remove.`);
+          }
+          if (e.free) {
+            if (byId.has(pick.target)) (free[pick.target] ??= []).push(e.free);
+            else warnings.push(`${src}: choose a unit for the ${e.free.toLowerCase()}.`);
+          }
+          if (e.nexusRelic) relic(src, pick);
+          if (e.unlockAll) n.tempTables = 'all';
+          if (e.traitToken) n.traitTokens += 1;
+          if (!e.us && !e.supply) nexusLines.push(label);
+          break;
+        }
+      }
+    }
+    force.umbraShards += us;
   }
 
   const part = participationXp(input);
@@ -275,6 +371,13 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
     outcomes.push(o);
   }
 
+  for (const g of relicGains) {
+    const u = byId.get(g.unitId)!;
+    const def = RELICS.find((r) => r.name === g.name);
+    u.relics.push({ id: newId(), name: g.name, tier: def?.tier ?? 'Common', profile: def?.profile, note: def?.note });
+    nexusLines.push(`${unitName(u)} gains ${g.name}.`);
+  }
+
   force.battles += 1;
   if (input.result === 'win') force.wins += 1;
   for (const l of ledger) force.ledger.push({ id: newId(), date: input.date, ...l });
@@ -295,13 +398,15 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
   }
   const rp = ledger.reduce((n, l) => n + l.rp, 0);
   const supply = ledger.reduce((n, l) => n + l.supply, 0);
-  summary.push(`Force: +${rp} RP${supply ? `, +${supply} Supply Limit` : ''}`);
+  summary.push(...nexusLines);
+  summary.push(`Force: +${rp} RP${supply ? `, +${supply} Supply Limit` : ''}${us ? `, +${us} Umbra Shard${us > 1 ? 's' : ''}` : ''}`);
 
   force.battleLog ??= [];
   force.battleLog.push({
     id: newId(), date: input.date, opponent: input.opponent, result: input.result, vsAi: input.vsAi,
     agendas: input.agendas, myBp: input.myBp, oppBp: input.oppBp, summary, notes: input.notes,
+    sectorId: input.sectorId || undefined, sectorName: input.sectorId ? input.sectorName : undefined,
   });
 
-  return { units: outcomes, ledger, rp, supply, warnings, summary };
+  return { units: outcomes, ledger, rp, supply, us, nexus: nexusLines, warnings, summary };
 }

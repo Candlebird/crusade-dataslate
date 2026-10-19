@@ -1,8 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../model/store';
 import { uid } from '../model/factory';
-import type { BattleResult, Force, Unit } from '../model/types';
-import { AGENDAS, MARKED_XP, MAX_AGENDAS, REWARD_TABLES, SCAR_TABLE, type RewardTableKey } from '../rules/data';
+import type { BattleResult, Campaign, Force, Unit } from '../model/types';
+import { AGENDAS, CATEGORIES, MARKED_XP, MAX_AGENDAS, RELICS, REWARD_TABLES, SCAR_TABLE, type RewardTableKey } from '../rules/data';
+import {
+  ANOMALY_TABLE,
+  COMBAT_MANIPULATIONS,
+  ROLL_SIDES,
+  VOID_TABLE,
+  emptyNexusPick,
+  nexusEntry,
+  nexusGeneration,
+  type NexusContext,
+  type NexusItem,
+  type NexusPick,
+} from '../rules/nexus';
 import { deathDiceCount, deathOutcome, forceTotals, levelForXp, rollDice, rollDie, type DeathOutcome } from '../rules/engine';
 import {
   RESULT_LABEL,
@@ -39,19 +51,27 @@ function initialInput(f: Force, bp: number): BattleInput {
 }
 
 export default function BattleWizard({ forceId }: { forceId: string }) {
-  const { state, updateForce } = useStore();
+  const { state, update, updateForce } = useStore();
   const f = state.forces.find((x) => x.id === forceId);
   const [step, setStep] = useState(0);
   const [input, setInput] = useState<BattleInput | null>(() => (f ? initialInput(f, forceTotals(f, state.settings).bp) : null));
   const [applied, setApplied] = useState<BattleOutcome | null>(null);
 
-  const preview = useMemo(() => {
-    if (!f || !input) return null;
-    let n = 0;
-    return resolveBattle(structuredClone(f), input, () => `preview${n++}`);
-  }, [f, input]);
+  const campaign = state.campaign;
+  const factionId = f?.nexus?.factionId;
+  const nexus = useMemo(
+    () => nexusGeneration(campaign, factionId, input?.sectorId ?? '', input?.result ?? 'draw', !!input?.vsAi),
+    [campaign, factionId, input?.sectorId, input?.result, input?.vsAi],
+  );
+  const full = useMemo(() => (input ? { ...input, nexus } : null), [input, nexus]);
 
-  if (!f || !input || !preview) return <div className="panel empty">Force not found. <a href={href.forces()}>Back to forces</a></div>;
+  const preview = useMemo(() => {
+    if (!f || !full) return null;
+    let n = 0;
+    return resolveBattle(structuredClone(f), full, () => `preview${n++}`);
+  }, [f, full]);
+
+  if (!f || !input || !full || !preview) return <div className="panel empty">Force not found. <a href={href.forces()}>Back to forces</a></div>;
 
   const units = f.units.filter((u) => input.units[u.id]);
   const set = (patch: Partial<BattleInput>) => setInput({ ...input, ...patch });
@@ -63,13 +83,22 @@ export default function BattleWizard({ forceId }: { forceId: string }) {
   };
   const setPick = (key: string, patch: Partial<RewardPick>) =>
     set({ rewards: { ...input.rewards, [key]: { ...(input.rewards[key] ?? emptyPick()), ...patch } } });
+  const setNexusPick = (key: string, patch: Partial<NexusPick>) =>
+    set({ nexusPicks: { ...input.nexusPicks, [key]: { ...(input.nexusPicks?.[key] ?? emptyNexusPick()), ...patch } } });
+  const linked = !!(campaign && f.nexus && campaign.factions.some((x) => x.id === f.nexus!.factionId));
 
   const apply = () => {
     const msg = preview.warnings.length
       ? `There are ${preview.warnings.length} unresolved item(s):\n\n${preview.warnings.join('\n')}\n\nApply anyway?`
       : `Apply this battle to ${f.name}? This updates XP, scars, RP and Supply.`;
     if (!confirmAction(msg)) return;
-    updateForce(f.id, (d) => void resolveBattle(d, input, uid));
+    updateForce(f.id, (d) => void resolveBattle(d, full, uid));
+    const voidItem = nexus.items.find((i) => i.kind === 'void');
+    if (voidItem && nexusEntry(voidItem, input.nexusPicks?.void))
+      update((d) => {
+        const sec = d.campaign?.sectors.find((x) => x.id === input.sectorId);
+        if (sec) sec.rewardClaimed = true;
+      });
     setApplied(preview);
     toast('Battle recorded.');
   };
@@ -96,10 +125,11 @@ export default function BattleWizard({ forceId }: { forceId: string }) {
         ))}
       </div>
 
-      {step === 0 && <SetupStep input={input} set={set} />}
+      {step === 0 && <SetupStep input={input} set={set} campaign={linked ? campaign : undefined} />}
       {step === 1 && <UnitsStep units={units} input={input} setUnit={setUnit} />}
       {step === 2 && <DeathsStep units={units} input={input} setUnit={setUnit} />}
       {step === 3 && <RewardsStep units={units} input={input} set={set} setPick={setPick} />}
+      {step === 3 && linked && <NexusRewards units={units} input={input} nexus={nexus} setPick={setNexusPick} />}
       {step === 4 && <SummaryStep outcome={preview} />}
 
       <div className="row">
@@ -114,7 +144,7 @@ export default function BattleWizard({ forceId }: { forceId: string }) {
 
 // ---- Step 1: setup ----
 
-function SetupStep({ input, set }: { input: BattleInput; set: (p: Partial<BattleInput>) => void }) {
+function SetupStep({ input, set, campaign }: { input: BattleInput; set: (p: Partial<BattleInput>) => void; campaign?: Campaign }) {
   const toggleAgenda = (name: string) =>
     set({ agendas: input.agendas.includes(name) ? input.agendas.filter((a) => a !== name) : [...input.agendas, name] });
   const suffering = sufferingCount(input);
@@ -135,6 +165,18 @@ function SetupStep({ input, set }: { input: BattleInput; set: (p: Partial<Battle
             Opponent type
             <span className="row"><input type="checkbox" checked={input.vsAi} onChange={(e) => set({ vsAi: e.target.checked })} /> Solo / AI opponent</span>
           </label>
+          {campaign && (
+            <label className="field span-all">
+              Nexus Wars sector
+              <select value={input.sectorId ?? ''} onChange={(e) => {
+                const sec = campaign.sectors.find((x) => x.id === e.target.value);
+                set({ sectorId: sec?.id, sectorName: sec?.name, nexusPicks: {} });
+              }}>
+                <option value="">Not a sector game</option>
+                {campaign.sectors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+              </select>
+            </label>
+          )}
           <label className="field">Your Battle Points<Stepper value={input.myBp} min={0} onChange={(n) => set({ myBp: n })} /></label>
           <label className="field">Opponent Battle Points<Stepper value={input.oppBp} min={0} onChange={(n) => set({ oppBp: n })} /></label>
           <label className="field span-all">
@@ -402,6 +444,130 @@ function UnitSelect({ label, units, value, onChange, empty }: { label: string; u
   );
 }
 
+function NexusRewards({ units, input, nexus, setPick }: {
+  units: Unit[];
+  input: BattleInput;
+  nexus: NexusContext;
+  setPick: (key: string, p: Partial<NexusPick>) => void;
+}) {
+  return (
+    <div className="panel">
+      <div className="panel-title">
+        <h2>Nexus Wars</h2>
+        <span className="muted small">From your faction's sectors{input.sectorName ? ` · fought over ${input.sectorName}` : ''}</span>
+      </div>
+      {nexus.notes.map((n, i) => <p key={i} className="small"><span className="tag gold">Note</span> {n}</p>)}
+      {nexus.items.length === 0 && <p className="muted small">Nothing generated this match.</p>}
+      {nexus.items.map((item) => (
+        <NexusBox key={item.key} item={item} units={units} input={input} pick={input.nexusPicks?.[item.key] ?? emptyNexusPick()} setPick={(p) => setPick(item.key, p)} />
+      ))}
+    </div>
+  );
+}
+
+function NexusBox({ item, units, input, pick, setPick }: {
+  item: NexusItem;
+  units: Unit[];
+  input: BattleInput;
+  pick: NexusPick;
+  setPick: (p: Partial<NexusPick>) => void;
+}) {
+  const sides = ROLL_SIDES[item.kind];
+  const table = item.kind === 'anomaly' ? ANOMALY_TABLE : item.kind === 'void' ? VOID_TABLE : null;
+  const e = nexusEntry(item, pick);
+  const fighters = units.filter((u) => input.units[u.id]?.in);
+  const given = Object.values(pick.alloc).reduce((n, x) => n + x, 0);
+  const wantsRelic = (item.kind === 'relicRoll' && pick.roll === 6) || !!e?.nexusRelic;
+  const relics = item.kind === 'relicRoll'
+    ? RELICS.filter((r) => r.tier === 'Common' && !r.nexus)
+    : RELICS.filter((r) => r.nexus && r.tier !== 'Legendary');
+
+  let fixed = '';
+  if (item.kind === 'us') fixed = `+${item.us} Umbra Shard${item.us === 1 ? '' : 's'}`;
+  if (item.kind === 'supply') fixed = `+${item.supply} Supply`;
+
+  return (
+    <div className="reward">
+      <div className="reward-head">
+        <h4>{item.source}</h4>
+        <span className="spacer" />
+        {fixed && <span className="tag green">{fixed}</span>}
+        {sides && (
+          <>
+            {item.kind === 'shardRoll' && <span className="muted small">4+ = 1 shard</span>}
+            {item.kind === 'relicRoll' && <span className="muted small">6 = Common relic</span>}
+            <button onClick={() => setPick({ roll: rollDie(sides) })}>🎲 Roll D{sides}</button>
+            <select value={pick.roll ?? ''} onChange={(ev) => setPick({ roll: Number(ev.target.value) || null })}>
+              <option value="">— result —</option>
+              {Array.from({ length: sides }, (_, i) => <option key={i} value={i + 1}>{i + 1}{table ? `. ${table[i].text}` : ''}</option>)}
+            </select>
+          </>
+        )}
+      </div>
+      {e && <div style={{ marginTop: '0.35rem' }}><b className="cat">{e.text}</b></div>}
+
+      {item.kind === 'research' && (
+        <div className="row" style={{ marginTop: '0.5rem' }}>
+          <span className="small">Unlock until next match</span>
+          <select value={pick.choice} onChange={(ev) => setPick({ choice: ev.target.value })}>
+            <option value="">— choose a table —</option>
+            {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+      )}
+
+      {item.kind === 'manipulation' && (
+        <div className="row" style={{ marginTop: '0.5rem' }}>
+          <span className="small">Free manipulation</span>
+          <select value={pick.choice} onChange={(ev) => setPick({ choice: ev.target.value })}>
+            <option value="">Decide later</option>
+            {COMBAT_MANIPULATIONS.map((m) => <option key={m.name} value={m.name}>{m.name} — {m.desc}</option>)}
+          </select>
+        </div>
+      )}
+
+      {e?.xp && (
+        <>
+          <div className="small" style={{ marginTop: '0.35rem' }}>
+            Distribute {e.xp} XP · <span className={given > e.xp ? 'tag red' : given === e.xp ? 'tag green' : 'tag gold'}>{e.xp - given} left</span>
+          </div>
+          <div className="alloc">
+            {fighters.map((u) => (
+              <label key={u.id}>
+                <span>{unitName(u)}</span>
+                <Stepper value={pick.alloc[u.id] ?? 0} min={0} onChange={(n) => setPick({ alloc: { ...pick.alloc, [u.id]: n } })} />
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+
+      {e?.removeScar && (
+        <div className="row" style={{ marginTop: '0.5rem' }}>
+          <span className="small">Remove</span>
+          <select value={pick.target} onChange={(ev) => setPick({ target: ev.target.value })}>
+            <option value="">— choose a scar —</option>
+            {units.flatMap((u) => u.scars.map((s) => <option key={`${u.id}:${s.id}`} value={`${u.id}:${s.id}`}>{unitName(u)} — {s.name}</option>))}
+          </select>
+        </div>
+      )}
+
+      {(e?.free || wantsRelic) && (
+        <div className="row" style={{ marginTop: '0.5rem' }}>
+          {wantsRelic && (
+            <select value={pick.choice} onChange={(ev) => setPick({ choice: ev.target.value })}>
+              <option value="">— choose a relic —</option>
+              {relics.map((r) => <option key={r.name} value={r.name}>{r.name} ({r.tier})</option>)}
+            </select>
+          )}
+          <UnitSelect label={e?.free ? `${e.free} for` : 'for'} units={units} value={pick.target} onChange={(target) => setPick({ target })} empty="No units" />
+        </div>
+      )}
+      {e?.nexusRelic && <p className="muted small" style={{ margin: '0.35rem 0 0' }}>Common Nexus relic — take a Rare one only if no Common one is available.</p>}
+    </div>
+  );
+}
+
 // ---- Step 5: summary ----
 
 function SummaryStep({ outcome }: { outcome: BattleOutcome }) {
@@ -437,12 +603,13 @@ function SummaryStep({ outcome }: { outcome: BattleOutcome }) {
       </div>
       <div>
         <div className="panel">
-          <div className="panel-title"><h3>Requisition</h3><b>+{outcome.rp} RP{outcome.supply ? ` · +${outcome.supply} Supply` : ''}</b></div>
+          <div className="panel-title"><h3>Requisition</h3><b>+{outcome.rp} RP{outcome.supply ? ` · +${outcome.supply} Supply` : ''}{outcome.us ? ` · +${outcome.us} US` : ''}</b></div>
           {outcome.ledger.map((l, i) => (
             <div key={i} className="list-item small">
               <span className="grow">{l.label}</span>
               {l.rp !== 0 && <span className="tag gold">{l.rp > 0 ? '+' : ''}{l.rp} RP</span>}
               {l.supply !== 0 && <span className="tag">+{l.supply}</span>}
+              {!!l.us && <span className="tag cyan">+{l.us} US</span>}
             </div>
           ))}
         </div>

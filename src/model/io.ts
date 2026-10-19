@@ -1,10 +1,11 @@
-import type { AppState, Force } from './types';
+import type { AppState, Campaign, Force } from './types';
 import { normalizeBook } from '../armyforge/book';
 import type { CatalogBook } from './types';
 import { uid } from './factory';
 
 const FORCE_KIND = 'opr-crusade-force';
 const BACKUP_KIND = 'opr-crusade-backup';
+const CAMPAIGN_KIND = 'opr-crusade-campaign';
 
 export function downloadJson(filename: string, data: unknown) {
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -25,20 +26,26 @@ export function exportBackup(s: AppState) {
   downloadJson(`crusade-backup-${new Date().toISOString().slice(0, 10)}.json`, { kind: BACKUP_KIND, ...s });
 }
 
+export function exportCampaign(c: Campaign) {
+  downloadJson('campaign.json', { kind: CAMPAIGN_KIND, version: 1, exportedAt: new Date().toISOString(), campaign: c });
+}
+
 export type Imported =
   | { kind: 'force'; force: Force }
   | { kind: 'backup'; state: AppState }
-  | { kind: 'book'; book: CatalogBook };
+  | { kind: 'book'; book: CatalogBook }
+  | { kind: 'campaign'; campaign: Campaign };
 
 /** Detect what a dropped JSON file is: a force, a full backup, or a raw Army Forge army book. */
 export function interpretJson(data: any): Imported {
   if (data?.kind === FORCE_KIND && data.force) return { kind: 'force', force: data.force };
+  if (data?.kind === CAMPAIGN_KIND && Array.isArray(data.campaign?.sectors)) return { kind: 'campaign', campaign: data.campaign };
   if (data?.kind === BACKUP_KIND && Array.isArray(data.forces)) {
     const { kind: _k, ...state } = data;
     return { kind: 'backup', state: state as AppState };
   }
   if (Array.isArray(data?.units) && Array.isArray(data?.upgradePackages)) return { kind: 'book', book: normalizeBook(data) };
-  throw new Error('Unrecognized file. Expected a .force.json, a backup, or an Army Forge army book.');
+  throw new Error('Unrecognized file. Expected a .force.json, a campaign.json, a backup, or an Army Forge army book.');
 }
 
 export async function readJsonFile(file: File): Promise<Imported> {

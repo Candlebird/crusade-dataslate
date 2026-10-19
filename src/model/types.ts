@@ -86,6 +86,8 @@ export interface RpEntry {
   label: string;
   rp: number;
   supply: number;
+  /** Umbra Shards gained or spent (history only — the force's umbraShards is the balance). */
+  us?: number;
 }
 
 export type BattleResult = 'win' | 'loss' | 'draw';
@@ -102,6 +104,22 @@ export interface BattleRecord {
   /** Human-readable lines describing what was applied. */
   summary: string[];
   notes: string;
+  /** Nexus Wars sector fought over. */
+  sectorId?: string;
+  sectorName?: string;
+}
+
+/** A force's Nexus Wars state (only once it is linked to a campaign faction). */
+export interface ForceNexus {
+  factionId: string;
+  /** Tables unlocked for good (home Research Station). */
+  permanentTables: Category[];
+  /** Tables unlocked until the next match ('all' = Anomaly 6). */
+  tempTables: Category[] | 'all';
+  /** "Any Nexus trait when levelling up" (Void result 3). */
+  traitTokens: number;
+  /** Bought or granted for the next match: Combat Manipulations, Organized Strike. */
+  pending: string[];
 }
 
 export interface Force {
@@ -120,6 +138,7 @@ export interface Force {
   units: Unit[];
   /** Umbra Shards (Nexus Wars). */
   umbraShards: number;
+  nexus?: ForceNexus;
   battleLog?: BattleRecord[];
   createdAt: string;
   updatedAt: string;
@@ -195,9 +214,61 @@ export interface CatalogBook {
   spells: { name: string; threshold: number; effect: string }[];
 }
 
+// ---- Nexus Wars campaign (kept by the GM, imported by players) ----
+
+export type SectorType = 'home' | 'planet' | 'research' | 'void' | 'anomaly' | 'empty';
+
+export interface Sector {
+  id: string;
+  name: string;
+  type: SectorType;
+  /** Home / planet benefit id (see rules/nexus BENEFITS). */
+  benefit?: string;
+  /** Controlling faction id; a home sector's owner never changes. */
+  owner?: string;
+  /** Reinforce Sector: +200 supply when defending it. */
+  reinforced?: boolean;
+  /** Void one-off reward already taken. */
+  rewardClaimed?: boolean;
+  /** Hex coordinates for the Phase 4 map. */
+  q?: number;
+  r?: number;
+  notes: string;
+}
+
+export interface CampaignFaction {
+  id: string;
+  name: string;
+  player: string;
+  color: string;
+}
+
+export interface CampaignEvent {
+  id: string;
+  date: string;
+  sectorId: string;
+  /** Faction id or 'ai'. */
+  attacker: string;
+  /** Faction id, 'ai', or '' for an unclaimed sector. */
+  defender: string;
+  /** Faction id, 'ai', or '' for a draw. */
+  winner: string;
+  notes: string;
+}
+
+export interface Campaign {
+  id: string;
+  name: string;
+  updatedAt: string;
+  factions: CampaignFaction[];
+  sectors: Sector[];
+  log: CampaignEvent[];
+}
+
 export interface AppState {
   version: 1;
   forces: Force[];
   books: CatalogBook[];
   settings: Settings;
+  campaign?: Campaign;
 }

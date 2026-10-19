@@ -1,0 +1,200 @@
+import { useState } from 'react';
+import { useStore } from '../model/store';
+import { uid } from '../model/factory';
+import type { Force, Unit } from '../model/types';
+import { NEXUS_TRAITS, RELICS, REQUISITIONS, type RelicTier } from '../rules/data';
+import { forceTotals } from '../rules/engine';
+import { unitName } from '../rules/battle';
+import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, UMBRA_SHOP, ownedSectors, type UmbraBuy } from '../rules/nexus';
+import { Modal, toast } from './ui';
+
+const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
+const relicRp = (t: RelicTier) => REQUISITIONS.find((r) => r.name === `${t} Relic`)?.cost ?? 0;
+const NEEDS_UNIT = new Set<UmbraBuy>(['knowledge', 'relic', 'evolution']);
+
+export default function UmbraShop({ force, onClose }: { force: Force; onClose: () => void }) {
+  const { state, update } = useStore();
+  const c = state.campaign;
+  const fid = force.nexus?.factionId;
+  const us = force.umbraShards;
+  const rp = forceTotals(force, state.settings).rp;
+  const [sel, setSel] = useState<UmbraBuy | null>(null);
+  const [unitId, setUnitId] = useState('');
+  const [choice, setChoice] = useState('');
+  const [tier, setTier] = useState<RelicTier>('Common');
+  const [result, setResult] = useState<string | null>(null);
+
+  const item = UMBRA_SHOP.find((x) => x.key === sel);
+  const units = force.units.filter((u) => u.status !== 'removed');
+  const unit = units.find((u) => u.id === unitId);
+  const rpCost = sel === 'relic' ? relicRp(tier) : 0;
+
+  const sectorChoices =
+    !c || !fid ? [] : sel === 'reinforce' ? ownedSectors(c, fid).filter((s) => !s.reinforced) : sel === 'expansion' ? c.sectors.filter((s) => !s.owner && s.type !== 'home') : [];
+
+  const pick = (k: UmbraBuy) => {
+    setSel(k);
+    setUnitId('');
+    setChoice('');
+    setResult(null);
+  };
+
+  const problem = (): string | null => {
+    if (!item) return 'Choose something to buy.';
+    if (item.cost > us) return `Needs ${item.cost} Umbra Shards (you have ${us}).`;
+    if (rpCost > rp) return `Also needs ${rpCost} RP for the relic (you have ${rp}).`;
+    if (NEEDS_UNIT.has(item.key) && !unit) return 'Choose a unit.';
+    if ((item.key === 'manipulation' || item.key === 'relic' || item.key === 'evolution') && !choice) return 'Make a choice.';
+    if ((item.key === 'reinforce' || item.key === 'expansion') && !choice) return c && fid ? 'Choose a sector.' : 'Link this force to a campaign faction first.';
+    return null;
+  };
+  const why = problem();
+
+  const buy = () => {
+    if (!item || why) return;
+    const today = new Date().toISOString().slice(0, 10);
+    let label = `Umbra: ${item.name}`;
+    let rpDelta = 0;
+    let outcome = `${item.name} purchased.`;
+    let mutate: ((f: Force, u: Unit | undefined) => void) | null = null;
+    let sectorFn: ((d: NonNullable<typeof c>) => void) | null = null;
+    const sector = c?.sectors.find((s) => s.id === choice);
+
+    switch (item.key) {
+      case 'rp':
+        rpDelta = 1;
+        outcome = '+1 RP.';
+        break;
+      case 'knowledge':
+        label += ` — ${unitName(unit!)}: +3 XP`;
+        mutate = (_f, u) => void (u!.xp += 3);
+        outcome = `${unitName(unit!)} gains 3 XP.`;
+        break;
+      case 'manipulation':
+        label += `: ${choice}`;
+        mutate = (f) => void f.nexus?.pending.push(`${MANIPULATION_PREFIX}: ${choice}`);
+        outcome = `${choice} is ready for your next match.`;
+        break;
+      case 'strike':
+        mutate = (f) => void f.nexus?.pending.push('Organized Strike (+200 Supply Limit when attacking)');
+        outcome = 'Organized Strike ready: +200 Supply Limit for one sector attack. Remove it from Pending once used.';
+        break;
+      case 'reinforce':
+        label += `: ${sector?.name}`;
+        sectorFn = (d) => void (d.sectors.find((s) => s.id === choice)!.reinforced = true);
+        outcome = `${sector?.name} is reinforced. Tell the GM so the campaign file is updated.`;
+        break;
+      case 'expansion':
+        label += `: ${sector?.name}`;
+        sectorFn = (d) => void (d.sectors.find((s) => s.id === choice)!.owner = fid);
+        outcome = `You take ${sector?.name}. Tell the GM so the campaign file is updated.`;
+        break;
+      case 'relic': {
+        const def = RELICS.find((r) => r.name === choice);
+        rpDelta = -rpCost;
+        label += ` — ${unitName(unit!)}: ${choice}`;
+        mutate = (_f, u) => void u!.relics.push({ id: uid(), name: choice, tier, profile: def?.profile, note: def?.note });
+        outcome = `${unitName(unit!)} gains ${choice}.`;
+        break;
+      }
+      case 'evolution':
+        label += ` — ${unitName(unit!)}: ${choice}`;
+        mutate = (_f, u) => void u!.upgrades.push({ id: uid(), name: choice, unique: true, nexus: true, free: true });
+        outcome = `${unitName(unit!)} evolves: ${choice}.`;
+        break;
+    }
+
+    update((d) => {
+      const f = d.forces.find((x) => x.id === force.id);
+      if (!f) return;
+      f.umbraShards -= item.cost;
+      f.ledger.push({ id: uid(), date: today, label, rp: rpDelta, supply: 0, us: -item.cost });
+      mutate?.(f, f.units.find((u) => u.id === unitId));
+      f.updatedAt = new Date().toISOString();
+      if (sectorFn && d.campaign) sectorFn(d.campaign);
+    });
+    setResult(outcome);
+    setChoice('');
+    toast(outcome);
+  };
+
+  return (
+    <Modal title={`Umbra Shards — ${us} available`} onClose={onClose} wide
+      footer={<><span className="muted small grow">{why}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>Buy{item ? ` (${item.cost} US${rpCost ? ` + ${rpCost} RP` : ''})` : ''}</button></>}>
+      <div className="cols-2">
+        <div>
+          {UMBRA_SHOP.map((x) => (
+            <div key={x.key} className={`shop-item${sel === x.key ? ' selected' : ''}${x.cost > us ? ' disabled' : ''}`} onClick={() => pick(x.key)}>
+              <span className="cost">{x.cost} US</span>
+              <div className="grow"><b>{x.name}</b><div className="muted small">{x.desc}</div></div>
+            </div>
+          ))}
+        </div>
+        <div>
+          {!item && <p className="muted">Choose something to buy.</p>}
+          {item && (
+            <div className="fields">
+              <h3 className="span-all" style={{ margin: 0 }}>{item.name}</h3>
+              <p className="span-all muted small" style={{ margin: 0 }}>{item.desc}</p>
+              {NEEDS_UNIT.has(item.key) && (
+                <label className="field span-all">
+                  Unit
+                  <select value={unitId} onChange={(e) => { setUnitId(e.target.value); if (item.key === 'evolution') setChoice(''); }}>
+                    <option value="">— choose —</option>
+                    {units.map((u) => <option key={u.id} value={u.id}>{unitName(u)} ({u.xp} XP)</option>)}
+                  </select>
+                </label>
+              )}
+              {item.key === 'manipulation' && (
+                <label className="field span-all">
+                  Manipulation
+                  <select value={choice} onChange={(e) => setChoice(e.target.value)}>
+                    <option value="">— choose —</option>
+                    {COMBAT_MANIPULATIONS.map((m) => <option key={m.name} value={m.name} title={m.desc}>{m.name} — {m.desc}</option>)}
+                  </select>
+                </label>
+              )}
+              {item.key === 'relic' && (
+                <>
+                  <label className="field">
+                    Tier
+                    <select value={tier} onChange={(e) => { setTier(e.target.value as RelicTier); setChoice(''); }}>
+                      {TIERS.map((t) => <option key={t} value={t}>{t} (+{relicRp(t)} RP)</option>)}
+                    </select>
+                  </label>
+                  <label className="field">
+                    Nexus relic
+                    <select value={choice} onChange={(e) => setChoice(e.target.value)}>
+                      <option value="">— choose —</option>
+                      {RELICS.filter((r) => r.nexus && r.tier === tier).map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
+                    </select>
+                  </label>
+                </>
+              )}
+              {item.key === 'evolution' && unit && (
+                <label className="field span-all">
+                  {unit.category} Nexus trait
+                  <select value={choice} onChange={(e) => setChoice(e.target.value)}>
+                    <option value="">— choose —</option>
+                    {(NEXUS_TRAITS[unit.category] ?? []).filter((n) => !unit.upgrades.some((x) => x.name === n)).map((n) => <option key={n} value={n}>{n}</option>)}
+                  </select>
+                </label>
+              )}
+              {(item.key === 'reinforce' || item.key === 'expansion') && (
+                <label className="field span-all">
+                  Sector
+                  <select value={choice} onChange={(e) => setChoice(e.target.value)} disabled={!c || !fid}>
+                    <option value="">— choose —</option>
+                    {sectorChoices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                  <span className="muted small">Changes your copy of the campaign — report it to the GM.</span>
+                </label>
+              )}
+              {result && <div className="span-all panel" style={{ margin: 0 }}>✓ {result}</div>}
+            </div>
+          )}
+        </div>
+      </div>
+    </Modal>
+  );
+}
