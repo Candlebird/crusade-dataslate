@@ -3,7 +3,7 @@ import { useStore } from '../model/store';
 import { useCloud } from '../cloud/CloudSync';
 import { exportForce, readImageAsDataUrl } from '../model/io';
 import { uid } from '../model/factory';
-import { battlePoints, forceTotals, levelForXp, validateUnit } from '../rules/engine';
+import { battlePoints, forceTotals, levelForXp, pendingLevels, validateUnit } from '../rules/engine';
 import { forceArmyUrl } from '../armyforge/book';
 import { go, href } from '../route';
 import AddUnitModal from './AddUnitModal';
@@ -71,6 +71,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const units = listed.filter((u) => matchesTags(unitTags(u, state.books), tagFilter));
   const removedCount = f.units.filter((u) => u.status === 'removed').length;
   const theirs = !!cloud.email && !!f.owner && f.owner !== cloud.email;
+  const levelling = f.units.filter((u) => pendingLevels(u) > 0);
 
   const addLedger = (label: string, rp: number, supply: number) =>
     set((d) => void d.ledger.push({ id: uid(), date: new Date().toISOString().slice(0, 10), label, rp, supply }));
@@ -93,6 +94,26 @@ export default function ForceView({ forceId }: { forceId: string }) {
       {theirs && (
         <div className="panel notice">
           This is <b>{f.owner}</b>'s force. You can look and print lists, but changes you make here are undone — only its owner can edit it.
+        </div>
+      )}
+
+      {!theirs && levelling.length > 0 && (
+        <div className="panel notice">
+          <div className="panel-title">
+            <h3>⬆ {levelling.length === 1 ? '1 unit needs' : `${levelling.length} units need`} to finish levelling up</h3>
+          </div>
+          {levelling.map((u) => {
+            const n = pendingLevels(u);
+            return (
+              <div key={u.id} className="list-item">
+                <span className="grow">
+                  <b>{u.name || u.unitType}</b>{' '}
+                  <span className="muted small">level {levelForXp(u.xp)} · {n} upgrade{n > 1 ? 's' : ''} to pick</span>
+                </span>
+                <a className="btn primary" href={href.unit(f.id, u.id)}>Level up</a>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -161,6 +182,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                           <td className="num" data-label="Pts">{u.points}</td>
                           <td className="num" data-label="BP">{battlePoints(u, s)}</td>
                           <td className="s-full">
+                            {pendingLevels(u) > 0 && <span className="tag gold" title="Level-ups waiting to be picked">⬆ Level up</span>}
                             {u.status === 'comatose' && <span className="tag cyan">Comatose</span>}
                             {u.status === 'removed' && <span className="tag red">Fallen</span>}
                             {u.scars.length > 0 && <span className="tag red">{u.scars.length} scar{u.scars.length > 1 ? 's' : ''}</span>}

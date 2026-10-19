@@ -1,7 +1,7 @@
 import { useStore } from '../model/store';
 import { newForce } from '../model/factory';
 import { exportBackup } from '../model/io';
-import { forceTotals } from '../rules/engine';
+import { forceTotals, pendingLevels } from '../rules/engine';
 import { go, href } from '../route';
 import { Dropzone } from './ui';
 import { useImporter } from './importer';
@@ -55,11 +55,15 @@ export default function ForceList() {
       <div className="grid grid-cards">
         {state.forces.map((f) => {
           const t = forceTotals(f, state.settings);
+          const levelling = f.units.filter((u) => pendingLevels(u) > 0).length;
           return (
             <a key={f.id} className="card" href={href.force(f.id)}>
               {f.image && <img src={f.image} alt="" style={{ width: '100%', height: 110, objectFit: 'cover', marginBottom: 8 }} />}
               <h3>{f.name}</h3>
               {cloud.email && f.owner && f.owner !== cloud.email && <div className="tag">{f.owner.split('@')[0]}'s force</div>}
+              {levelling > 0 && (!cloud.email || !f.owner || f.owner === cloud.email) && (
+                <div className="tag gold">⬆ {levelling} unit{levelling > 1 ? 's' : ''} to level up</div>
+              )}
               <div className="sub">
                 {f.faction || 'Unknown faction'}
                 {f.player && <> · {f.player}</>}

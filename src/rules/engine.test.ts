@@ -6,6 +6,7 @@ import {
   deathOutcome,
   detectCategory,
   levelForXp,
+  pendingLevels,
   previousBracketXp,
   relicSlots,
   sufferingRolls,
@@ -30,6 +31,18 @@ describe('levels', () => {
   it('tracks progress and post-170 replacements', () => {
     expect(xpProgress(30)).toMatchObject({ level: 2, floor: 20, next: 40, pct: 0.5 });
     expect(xpProgress(215)).toMatchObject({ level: 7, next: null, replacements: 2 });
+  });
+});
+
+describe('pending level-ups', () => {
+  it('counts levels earned but not spent', () => {
+    expect(pendingLevels(unit({ xp: 25 }))).toBe(2);
+    expect(pendingLevels(unit({ xp: 25, upgrades: [{ id: 't', name: 'Tough', unique: false }] }))).toBe(1);
+  });
+  it('ignores free traits, overspending and fallen units', () => {
+    expect(pendingLevels(unit({ xp: 10, upgrades: [{ id: 't', name: 'Gift', unique: false, free: true }] }))).toBe(1);
+    expect(pendingLevels(unit({ xp: 0, upgrades: [{ id: 't', name: 'Tough', unique: false }] }))).toBe(0);
+    expect(pendingLevels(unit({ xp: 40, status: 'removed' }))).toBe(0);
   });
 });
 

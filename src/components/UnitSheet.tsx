@@ -23,6 +23,7 @@ import {
   battlePoints,
   detectCategory,
   levelForXp,
+  pendingLevels,
   relicSlots,
   relicTierAllowed,
   ruleRating,
@@ -63,6 +64,8 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
   const issues = validateUnit(u);
   const earned = levelForXp(u.xp);
   const used = upgradesUsed(u);
+  const pending = pendingLevels(u);
+  const canRelic = (u.category === 'Hero' || !!u.heroicRise) && u.relics.length < relicSlots(u.xp);
   const normalCount = u.upgrades.filter((x) => !x.unique).length;
   const uniqueCount = u.upgrades.filter((x) => x.unique).length;
 
@@ -172,6 +175,25 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           </select>
         </div>
       </div>
+
+      {pending > 0 && (
+        <div className="panel notice">
+          <div className="panel-title">
+            <h3>⬆ Level {earned} reached — {pending} upgrade{pending > 1 ? 's' : ''} to pick</h3>
+          </div>
+          <p className="muted small" style={{ marginTop: 0 }}>Each level buys one trait, weapon trait or relic. This goes away once every level is spent.</p>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            <button className="primary" onClick={() => setPicker({ kind: 'trait' })}>Roll a trait</button>
+            {u.weapons.length > 0 && (
+              <select value="" onChange={(e) => e.target.value && setPicker({ kind: 'weaponTrait', weaponId: e.target.value })} aria-label="Add a weapon trait">
+                <option value="">Weapon trait for…</option>
+                {u.weapons.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+              </select>
+            )}
+            {canRelic && <button onClick={() => setPicker({ kind: 'relic' })}>Relic</button>}
+          </div>
+        </div>
+      )}
 
       <div className="cols-main">
         <div>

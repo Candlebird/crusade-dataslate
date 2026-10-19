@@ -112,6 +112,12 @@ export function upgradesUsed(u: Unit): number {
   return unitUps + weaponUps + u.relics.length;
 }
 
+/** Levels earned but not yet spent on an upgrade: the unit still has to finish levelling up. Fallen units have none. */
+export function pendingLevels(u: Unit): number {
+  if (u.status === 'removed') return 0;
+  return Math.max(0, levelForXp(u.xp) - upgradesUsed(u));
+}
+
 export function battlePoints(u: Unit, s: Settings): number {
   const infantry = u.category === 'Infantry';
   let bp = 0;
