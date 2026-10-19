@@ -26,13 +26,17 @@ export interface Picked {
 }
 
 /** A modal for choosing (or rolling) an entry from one of several homebrew tables, or typing a custom one. */
-export default function TablePicker({ title, groups, onPick, onClose, allowFree = true, customLabel = 'Custom' }: {
+export default function TablePicker({ title, groups, onPick, onClose, allowFree = true, freeLabel, customLabel = 'Custom', check }: {
   title: string;
   groups: PickGroup[];
   onPick: (p: Picked) => void;
   onClose: () => void;
   allowFree?: boolean;
+  /** Overrides the "Free (doesn't use a level)" checkbox text. */
+  freeLabel?: string;
   customLabel?: string;
+  /** Why the current choice can't be taken yet (e.g. not enough RP), shown in the footer; null when it can. */
+  check?: (entry: PickEntry | null, free: boolean) => string | null;
 }) {
   const [groupKey, setGroupKey] = useState(groups[0]?.key ?? '');
   const [selected, setSelected] = useState<number | null>(null);
@@ -56,7 +60,9 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
     }
   };
 
-  const canConfirm = custom.trim() !== '' || (selected != null && !group?.entries[selected]?.disabled);
+  const chosen = custom.trim() ? { name: custom.trim() } : group && selected != null ? group.entries[selected] : null;
+  const blocked = chosen && check ? check(chosen, free) : null;
+  const canConfirm = !blocked && (custom.trim() !== '' || (selected != null && !group?.entries[selected]?.disabled));
 
   return (
     <Modal
@@ -67,10 +73,11 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
           {allowFree && (
             <label className="row small muted" title="Free upgrades (e.g. from a reward roll) still add BP but don't use a level.">
               <input type="checkbox" checked={free} onChange={(e) => setFree(e.target.checked)} />
-              Free (doesn't use a level)
+              {freeLabel ?? "Free (doesn't use a level)"}
             </label>
           )}
           <span className="spacer" />
+          {blocked && <span className="small" style={{ color: 'var(--warn)' }}>{blocked}</span>}
           <button onClick={onClose}>Cancel</button>
           <button className="primary" disabled={!canConfirm} onClick={confirm}>Take it</button>
         </>

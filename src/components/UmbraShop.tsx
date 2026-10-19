@@ -2,14 +2,13 @@ import { useState } from 'react';
 import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { Force, Unit } from '../model/types';
-import { NEXUS_TRAITS, RELICS, REQUISITIONS, type RelicTier } from '../rules/data';
-import { forceTotals } from '../rules/engine';
+import { NEXUS_TRAITS, RELICS, type RelicTier } from '../rules/data';
+import { forceTotals, relicCost as relicRp } from '../rules/engine';
 import { unitName } from '../rules/battle';
 import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, UMBRA_SHOP, ownedSectors, type UmbraBuy } from '../rules/nexus';
 import { Modal, toast } from './ui';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
-const relicRp = (t: RelicTier) => REQUISITIONS.find((r) => r.name === `${t} Relic`)?.cost ?? 0;
 const NEEDS_UNIT = new Set<UmbraBuy>(['knowledge', 'relic', 'evolution']);
 
 export default function UmbraShop({ force, onClose }: { force: Force; onClose: () => void }) {

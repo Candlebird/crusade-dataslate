@@ -11,6 +11,7 @@ import {
   POST_MAX_REPLACE_STEP,
   RELIC_SLOTS,
   RELIC_TIER_MIN_XP,
+  REQUISITIONS,
   SUFFERING_BP_STEP,
 } from './data';
 
@@ -47,6 +48,11 @@ export function relicSlots(xp: number): number {
   let slots = 0;
   for (const [min, s] of RELIC_SLOTS) if (xp >= min) slots = s;
   return slots;
+}
+
+/** RP a relic of this tier costs: the price of its "<tier> Relic" requisition. */
+export function relicCost(tier: RelicTier): number {
+  return REQUISITIONS.find((r) => r.name === `${tier} Relic`)?.cost ?? 0;
 }
 
 export function relicTierAllowed(tier: RelicTier, xp: number): boolean {

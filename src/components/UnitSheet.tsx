@@ -21,9 +21,11 @@ import {
 import {
   applyScar,
   battlePoints,
+  forceTotals,
   detectCategory,
   levelForXp,
   pendingLevels,
+  relicCost,
   relicSlots,
   relicTierAllowed,
   ruleRating,
@@ -31,10 +33,11 @@ import {
   validateUnit,
 } from '../rules/engine';
 import { nexusAccess } from '../rules/nexus';
+import { unitName } from '../rules/battle';
 import { unitBookUrl } from '../armyforge/book';
 import { go, href } from '../route';
 import { ForceImage } from './ForceView';
-import TablePicker, { type PickGroup, type Picked } from './TablePicker';
+import TablePicker, { type PickEntry, type PickGroup, type Picked } from './TablePicker';
 import { traitMark } from './marks';
 import { Issues, Stepper, TextArea, TextField, XpBar, toast } from './ui';
 
@@ -66,6 +69,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
   const used = upgradesUsed(u);
   const pending = pendingLevels(u);
   const canRelic = (u.category === 'Hero' || !!u.heroicRise) && u.relics.length < relicSlots(u.xp);
+  const rp = forceTotals(f, s).rp;
   const normalCount = u.upgrades.filter((x) => !x.unique).length;
   const uniqueCount = u.upgrades.filter((x) => x.unique).length;
 
@@ -107,7 +111,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       label,
       entries: list.map((r) => ({
         name: r.name,
-        desc: [r.profile, r.desc, r.note].filter(Boolean).join(' · '),
+        desc: [`${relicCost(r.tier)} RP`, r.profile, r.desc, r.note].filter(Boolean).join(' · '),
         disabled: relicTierAllowed(r.tier, u.xp) ? undefined : `${r.tier} relics need ${RELIC_TIER_MIN_XP[r.tier]}+ XP`,
         meta: r,
       })),
@@ -116,6 +120,13 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       ...TIERS.map((t) => relicGroup(t, t, RELICS.filter((r) => r.tier === t && !r.nexus))),
       relicGroup('nexus', 'Nexus', RELICS.filter((r) => r.nexus)),
     ];
+  };
+
+  /** Relics are bought with RP at their tier's requisition price, unless taken free (e.g. as a reward). */
+  const relicCheck = (e: PickEntry | null, free: boolean): string | null => {
+    if (!e || free) return null;
+    const cost = relicCost((e.meta as (typeof RELICS)[number] | undefined)?.tier ?? 'Common');
+    return cost > rp ? `Needs ${cost} RP (the force has ${rp}).` : null;
   };
 
   const onPick = (p: Picked) => {
@@ -141,7 +152,13 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       if (result === 'removed') toast(`A 4th scar — ${u.name || u.unitType} is removed from the army.`, 'error');
     } else {
       const def = p.meta as (typeof RELICS)[number] | undefined;
-      set((d) => void d.relics.push({ id: uid(), name: p.name, tier: def?.tier ?? 'Common', profile: def?.profile, note: def?.note }));
+      const tier = def?.tier ?? 'Common';
+      const cost = p.free ? 0 : relicCost(tier);
+      updateForce(f.id, (fd) => {
+        fd.units.find((x) => x.id === u.id)?.relics.push({ id: uid(), name: p.name, tier, profile: def?.profile, note: def?.note });
+        if (cost) fd.ledger.push({ id: uid(), date: new Date().toISOString().slice(0, 10), label: `${tier} Relic — ${unitName(u)}: ${p.name}`, rp: -cost, supply: 0 });
+      });
+      if (cost) toast(`${unitName(u)} gains ${p.name} for ${cost} RP.`);
     }
     setPicker(null);
   };
@@ -185,12 +202,21 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <button className="primary" onClick={() => setPicker({ kind: 'trait' })}>Roll a trait</button>
             {u.weapons.length > 0 && (
+              <>
+              <b className="muted small">OR</b>
               <select value="" onChange={(e) => e.target.value && setPicker({ kind: 'weaponTrait', weaponId: e.target.value })} aria-label="Add a weapon trait">
                 <option value="">Weapon trait for…</option>
                 {u.weapons.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
+              </>
             )}
-            {canRelic && <button onClick={() => setPicker({ kind: 'relic' })}>Relic</button>}
+            {canRelic && (
+              <>
+                <b className="muted small">OR</b>
+                <button onClick={() => setPicker({ kind: 'relic' })}>Buy a relic (from {relicCost('Common')} RP)</button>
+                <span className="muted small">{rp} RP available</span>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -405,7 +431,9 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
         <TablePicker
           title={{ trait: 'Choose a trait', weaponTrait: 'Choose a weapon trait', scar: 'Battle scar', relic: 'Choose a relic' }[picker.kind]}
           groups={pickerGroups()}
-          allowFree={picker.kind === 'trait' || picker.kind === 'weaponTrait'}
+          allowFree={picker.kind !== 'scar'}
+          freeLabel={picker.kind === 'relic' ? 'Free (no RP, e.g. a reward)' : undefined}
+          check={picker.kind === 'relic' ? relicCheck : undefined}
           onPick={onPick}
           onClose={() => setPicker(null)}
         />
