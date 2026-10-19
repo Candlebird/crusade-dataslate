@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../model/store';
-import { CORE_RULES_URL, bookApiUrl, bookPageUrl, fetchBook, fetchCoreRules, parseBookUid } from '../armyforge/book';
+import { CORE_RULES_URL, bookApiUrl, bookPageUrl, fetchBook, fetchCoreRules, parseBookUid, proxyOf } from '../armyforge/book';
 import { interpretJson } from '../model/io';
 import { href } from '../route';
 import { datasheetTags, matchesTags, tagsIn } from '../model/tags';
@@ -12,37 +12,45 @@ export default function BooksPage() {
   const { state, update, addBook } = useStore();
   const importFiles = useImporter();
   const [link, setLink] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(state.books[0]?.uid ?? null);
   const bookUid = parseBookUid(link);
-  const proxy = state.settings.armyForgeProxy;
+  const proxy = proxyOf(state.settings);
+  const have = state.books.find((b) => b.uid === bookUid);
 
-  const fetchDirect = async () => {
-    if (!bookUid) return;
-    setBusy(true);
+  /** Fetch a book from Army Forge and save it (a fresh copy keeps the book's unit tags). */
+  const fetchInto = async (uid: string) => {
+    const old = state.books.find((b) => b.uid === uid);
+    setBusy(uid);
     try {
-      const book = await fetchBook(bookUid, proxy);
+      const book = await fetchBook(uid, proxy);
       addBook(book);
       setOpenId(book.uid);
-      toast(`Army book "${book.name}" imported (${book.units.length} datasheets).`);
+      if (!old) {
+        setLink('');
+        toast(`Army book "${book.name}" imported (${book.units.length} datasheets).`);
+      } else
+        toast(old.version === book.version
+          ? `"${book.name}" is up to date (v${book.version}).`
+          : `"${book.name}" updated from v${old.version} to v${book.version}.`);
     } catch (e) {
-      toast(`Direct fetch failed: ${e instanceof Error ? e.message : e}. Use the download link instead.`, 'error');
+      toast(`Couldn't fetch the book: ${e instanceof Error ? e.message : e}.`, 'error');
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
   const fetchCore = async () => {
-    setBusy(true);
+    setBusy('core');
     try {
       const got = interpretJson(await fetchCoreRules(proxy));
       if (got.kind !== 'coreRules') throw new Error('unexpected response');
       update((d) => void (d.coreRules = got.rules));
       toast(`Core rules imported (${got.rules.length} rules).`);
     } catch (e) {
-      toast(`Direct fetch failed: ${e instanceof Error ? e.message : e}. Use the download link instead.`, 'error');
+      toast(`Couldn't fetch the core rules: ${e instanceof Error ? e.message : e}.`, 'error');
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
@@ -55,61 +63,61 @@ export default function BooksPage() {
         </div>
       </div>
 
-      <div className="cols-2">
-        <div className="panel">
-          <div className="panel-title"><h2>Import from Army Forge</h2></div>
-          <ol className="small" style={{ paddingLeft: '1.2rem', lineHeight: 1.6 }}>
-            <li>Open the army book on Army Forge and copy the page link (or just its ID).</li>
-            <li>Paste it below and click the download link — your browser saves the book's JSON.</li>
-            <li>Drop that file in the box on the right.</li>
-          </ol>
-          <label className="field">
-            Army Forge link
-            <input
-              value={link}
-              placeholder="https://army-forge.onepagerules.com/army-info/grimdark-future/…"
-              onChange={(e) => setLink(e.target.value)}
-            />
-          </label>
-          {link && !bookUid && <p className="small" style={{ color: 'var(--warn)' }}>That doesn't look like an army book link.</p>}
+      <div className="panel">
+        <div className="panel-title"><h2>Add an army book</h2></div>
+        <p className="small" style={{ marginTop: 0 }}>
+          On Army Forge, open the army and use <b>Share</b> (or copy the page address), then paste the link here. The book is saved for the
+          whole group, and <b>Refresh</b> pulls in later changes.
+        </p>
+        <div className="row">
+          <input
+            value={link}
+            style={{ flex: 1, minWidth: '12rem' }}
+            placeholder="https://army-forge.onepagerules.com/army-info/grimdark-future/…"
+            onChange={(e) => setLink(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && bookUid && proxy && !busy && fetchInto(bookUid)}
+          />
+          <button className="primary" disabled={!bookUid || !proxy || !!busy} onClick={() => bookUid && fetchInto(bookUid)}>
+            {busy && busy === bookUid ? 'Fetching…' : have ? 'Refresh' : 'Import'}
+          </button>
+        </div>
+        {link && !bookUid && <p className="small" style={{ color: 'var(--warn)' }}>That doesn't look like an army book link.</p>}
+        {have && <p className="muted small">"{have.name}" is already imported. Importing again refreshes it.</p>}
+        {!proxy && (
+          <p className="small" style={{ color: 'var(--warn)' }}>
+            Fetching from Army Forge needs the proxy, which isn't set up yet (see <a href={href.settings()}>Settings</a>). Import by file below instead.
+          </p>
+        )}
+        <details style={{ marginTop: '0.75rem' }}>
+          <summary className="small">Private book, or the fetch fails? Import by file</summary>
+          <p className="muted small">
+            Army Forge only shares a private book with its creator. Make it public or unlisted in the Army Forge book editor, or, while
+            signed in to Army Forge as its creator, save the book's JSON and drop it here.
+          </p>
           {bookUid && (
-            <div className="row" style={{ marginTop: '0.75rem' }}>
-              <a className="btn primary" href={bookApiUrl(bookUid)} target="_blank" rel="noreferrer" download={`${bookUid}.json`}>
-                Download book JSON
-              </a>
-              {proxy && (
-                <button disabled={busy} onClick={fetchDirect}>
-                  {busy ? 'Fetching…' : 'Fetch directly'}
-                </button>
-              )}
-            </div>
-          )}
-          {!proxy && (
-            <p className="muted small" style={{ marginTop: '0.75rem' }}>
-              Tip: with a proxy configured in <a href={href.settings()}>Settings</a> you can skip the download and fetch books in one click.
+            <p>
+              <a className="btn" href={bookApiUrl(bookUid)} target="_blank" rel="noreferrer" download={`${bookUid}.json`}>Download book JSON</a>
             </p>
           )}
-        </div>
-        <div className="panel">
-          <div className="panel-title"><h2>Drop book file</h2></div>
           <Dropzone accept=".json,application/json" onFiles={importFiles}>
-            Drop the downloaded <b>Army Forge book JSON</b> (or core rules JSON) here — or click to choose.
+            Drop an <b>Army Forge book JSON</b> (or core rules JSON) here, or click to choose.
           </Dropzone>
-        </div>
+        </details>
       </div>
 
       <div className="panel">
         <div className="panel-title">
           <h2>Core rules</h2>
           <div className="row">
-            <a className="btn" href={CORE_RULES_URL} target="_blank" rel="noreferrer" download="core-rules.json">Download core rules JSON</a>
-            {proxy && <button disabled={busy} onClick={fetchCore}>{busy ? 'Fetching…' : 'Fetch directly'}</button>}
+            {proxy
+              ? <button disabled={!!busy} onClick={fetchCore}>{busy === 'core' ? 'Fetching…' : state.coreRules?.length ? 'Refresh' : 'Fetch core rules'}</button>
+              : <a className="btn" href={CORE_RULES_URL} target="_blank" rel="noreferrer" download="core-rules.json">Download core rules JSON</a>}
           </div>
         </div>
         <p className="small" style={{ margin: 0 }}>
           {state.coreRules?.length
             ? <><span className="tag green">Imported</span> {state.coreRules.length} core rules (AP, Tough, Hero, Fearless…) are printed in battle list glossaries.</>
-            : <>Army books only describe their own rules. For the full <b>Special Rules</b> section on printed lists, download the core rules once and drop the file in the box above.</>}
+            : <>Army books only describe their own rules. Fetch the core rules once for the full <b>Special Rules</b> section on printed lists.</>}
         </p>
       </div>
 
@@ -121,10 +129,15 @@ export default function BooksPage() {
             <div className="grow">
               <b>{b.name}</b>
               <div className="muted small">
-                {b.faction && `${b.faction} · `}v{b.version} · {b.units.length} datasheets · {b.rules.length} rules · {b.spells.length} spells · imported {b.importedAt.slice(0, 10)}
+                {b.faction && `${b.faction} · `}v{b.version} · {b.units.length} datasheets · {b.rules.length} rules · {b.spells.length} spells · fetched {b.importedAt.slice(0, 10)}
               </div>
             </div>
             <a className="btn" href={bookPageUrl(b.uid, b.name)} target="_blank" rel="noreferrer">Army Forge ↗</a>
+            {proxy && (
+              <button disabled={!!busy} onClick={() => fetchInto(b.uid)} title="Fetch the latest version from Army Forge">
+                {busy === b.uid ? 'Refreshing…' : 'Refresh'}
+              </button>
+            )}
             <button onClick={() => setOpenId(openId === b.uid ? null : b.uid)}>{openId === b.uid ? 'Hide' : 'Browse'}</button>
             <button
               className="ghost icon"

@@ -125,12 +125,25 @@ export function normalizeBook(raw: Raw): CatalogBook {
   };
 }
 
-/** Fetch a book directly (needs a CORS proxy since Army Forge sends no CORS headers). */
+/**
+ * The group's CORS proxy (proxy/worker.js deployed as a Cloudflare Worker). Army Forge sends no
+ * CORS headers, so the browser can only fetch books through it. Settings can override it per device.
+ */
+export const DEFAULT_PROXY = 'https://crusade-dataslate-proxy.brestel-jason-e99.workers.dev';
+
+export const proxyOf = (s: { armyForgeProxy: string }) => s.armyForgeProxy || DEFAULT_PROXY;
+
+const viaProxy = (target: string, proxy: string) => `${proxy.replace(/\/$/, '')}/?url=${encodeURIComponent(target)}`;
+
+/** Fetch a book from Army Forge through the proxy. */
 export async function fetchBook(uid: string, proxy: string): Promise<CatalogBook> {
-  const target = bookApiUrl(uid);
-  const url = proxy ? `${proxy.replace(/\/$/, '')}/?url=${encodeURIComponent(target)}` : target;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Army Forge returned ${res.status}`);
+  if (!proxy) throw new Error('No Army Forge proxy is set up (see Settings)');
+  const res = await fetch(viaProxy(bookApiUrl(uid), proxy));
+  // Army Forge answers 500 for a book only its creator may see.
+  if (!res.ok)
+    throw new Error(res.status >= 500 || res.status === 404 || res.status === 403
+      ? 'Army Forge would not share this book. It may be private: its creator can make it public or unlisted in the Army Forge book editor'
+      : `Army Forge returned ${res.status}`);
   return normalizeBook(await res.json());
 }
 
@@ -138,7 +151,8 @@ export async function fetchBook(uid: string, proxy: string): Promise<CatalogBook
 export const CORE_RULES_URL = 'https://army-forge.onepagerules.com/api/rules/common/2';
 
 export async function fetchCoreRules(proxy: string): Promise<unknown> {
-  const res = await fetch(`${proxy.replace(/\/$/, '')}/?url=${encodeURIComponent(CORE_RULES_URL)}`);
+  if (!proxy) throw new Error('No Army Forge proxy is set up (see Settings)');
+  const res = await fetch(viaProxy(CORE_RULES_URL, proxy));
   if (!res.ok) throw new Error(`Army Forge returned ${res.status}`);
   return res.json();
 }

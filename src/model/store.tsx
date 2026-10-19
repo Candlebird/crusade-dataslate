@@ -83,8 +83,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       update((d) => {
         const old = d.books.find((b) => b.uid === book.uid);
         // A fresh copy from Army Forge has no tags: keep the ones already given.
-        const keep = !book.unitTags && old?.unitTags ? { unitTags: old.unitTags, updatedAt: old.updatedAt } : {};
-        d.books = [...d.books.filter((b) => b.uid !== book.uid), { ...book, ...keep }];
+        const keep = !book.unitTags && old?.unitTags ? { unitTags: old.unitTags } : {};
+        d.books = [...d.books.filter((b) => b.uid !== book.uid), { ...book, ...keep, updatedAt: new Date().toISOString() }];
       }),
     [update],
   );

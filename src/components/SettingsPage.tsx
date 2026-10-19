@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../model/types';
 import { Dropzone, Stepper, TextField, toast } from './ui';
 import { useImporter } from './importer';
 import { useCloud } from '../cloud/CloudSync';
+import { DEFAULT_PROXY } from '../armyforge/book';
 
 const BP_LABELS: [keyof Settings['bp'], string][] = [
   ['normal', 'Normal trait'],
@@ -66,11 +67,11 @@ export default function SettingsPage() {
             <div className="panel-title"><h2>Army Forge proxy</h2></div>
             <label className="field">
               Proxy URL (optional)
-              <TextField value={s.armyForgeProxy} placeholder="https://your-worker.workers.dev" onCommit={(v) => set((d) => void (d.armyForgeProxy = v.trim()))} />
+              <TextField value={s.armyForgeProxy} placeholder={DEFAULT_PROXY || "https://your-worker.workers.dev"} onCommit={(v) => set((d) => void (d.armyForgeProxy = v.trim()))} />
             </label>
             <p className="muted small">
-              Army Forge doesn't allow other sites to fetch books directly. A small CORS proxy (e.g. a free Cloudflare Worker) enables one-click
-              "Fetch directly" on the Army Books page. Leave blank to use the download-and-drop method.
+              Army Forge doesn't let other sites fetch its books, so the app fetches them through a small proxy (proxy/worker.js, a free
+              Cloudflare Worker). {DEFAULT_PROXY ? 'The group proxy is built in; set a URL here only to use a different one.' : 'Paste its URL here.'}
             </p>
           </div>
 

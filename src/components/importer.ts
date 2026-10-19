@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useStore } from '../model/store';
 import { asCopy, readJsonFile } from '../model/io';
 import { DEFAULT_SETTINGS, type CatalogBook } from '../model/types';
-import { fetchBook, normalizeBook } from '../armyforge/book';
+import { fetchBook, normalizeBook, proxyOf } from '../armyforge/book';
 import { listBookUids, listToForce } from '../armyforge/list';
 import rawDothea from '../data/spears-of-dothea.raw.json';
 import { toast } from './ui';
@@ -35,7 +35,7 @@ export function useImporter() {
             addBook(got.book);
             toast(`Army book "${got.book.name}" imported (${got.book.units.length} datasheets).`);
           } else if (got.kind === 'armyList') {
-            const fetched = await missingBooks(got.raw, state.books, state.settings.armyForgeProxy);
+            const fetched = await missingBooks(got.raw, state.books, proxyOf(state.settings));
             const force = listToForce(got.raw, [...state.books, ...fetched]);
             fetched.forEach(addBook);
             update((d) => void d.forces.push(force));
