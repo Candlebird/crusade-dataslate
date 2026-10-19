@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle , #/missions , #/campaign , #/books , #/settings */
+/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle , #/missions , #/campaign , #/books , #/settings , #/guide */
 export type Route =
   | { page: 'forces' }
   | { page: 'force'; forceId: string }
@@ -11,7 +11,8 @@ export type Route =
   | { page: 'missions' }
   | { page: 'campaign' }
   | { page: 'books' }
-  | { page: 'settings' };
+  | { page: 'settings' }
+  | { page: 'guide' };
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
@@ -26,6 +27,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'campaign') return { page: 'campaign' };
   if (parts[0] === 'books') return { page: 'books' };
   if (parts[0] === 'settings') return { page: 'settings' };
+  if (parts[0] === 'guide') return { page: 'guide' };
   return { page: 'forces' };
 }
 
@@ -41,6 +43,7 @@ export const href = {
   campaign: () => '#/campaign',
   books: () => '#/books',
   settings: () => '#/settings',
+  guide: () => '#/guide',
 };
 
 export function go(h: string) {

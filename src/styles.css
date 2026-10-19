@@ -626,3 +626,15 @@ fieldset.fields:disabled { opacity: 0.6; }
   .marker { min-width: 0; flex: 1 1 4.5rem; }
   .tally { flex-wrap: wrap; }
 }
+
+/* ---- guide ---- */
+.guide-toc { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; margin-top: 0.75rem; }
+.guide-step { display: flex; gap: 0.85rem; align-items: flex-start; padding: 0.6rem 0; border-top: 1px solid var(--line); }
+.guide-step:first-of-type { border-top: 0; }
+.guide-step h3 { margin: 0.1rem 0 0.15rem; }
+.guide-step p { margin: 0.4rem 0 0; }
+.guide-num {
+  flex: none; width: 1.8rem; height: 1.8rem; display: grid; place-items: center;
+  border: 1px solid var(--gold-dim); color: var(--gold); font-weight: 700; border-radius: 50%;
+}
+.guide-step code { font-size: 0.85em; color: var(--gold); }

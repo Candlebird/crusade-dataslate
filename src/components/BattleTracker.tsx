@@ -297,16 +297,35 @@ function StartBattle() {
 function PastBattles() {
   const { state, update } = useStore();
   const cloud = useCloud();
-  const past = state.battleHistory ?? [];
+  const [onlyMine, setOnlyMine] = useState(false);
+  const all = state.battleHistory ?? [];
   // Forces this player can record into: their own, or ones kept only on this device.
   const mine = state.forces.filter((f) => !f.owner || f.owner === cloud.email);
+  // Battles one of my forces fought in without claiming its side yet.
+  const waiting = all.filter((x) => {
+    const done = claims(x, state.forces);
+    return x.sides.some((side) => !side.ai && !(side.id in done) && mine.some((f) => f.id === side.forceId));
+  });
+  const past = onlyMine ? waiting : all;
   const remove = (x: FinishedBattle) =>
     confirmAction(`Delete ${x.mission.name} from ${x.finishedAt.slice(0, 10)} for the whole group? Rewards already claimed stay in each force's log.`) &&
     update((s) => void (s.battleHistory = s.battleHistory?.filter((y) => y.id !== x.id)));
   return (
     <div className="panel">
-      <div className="panel-title"><h2>Past battles</h2><span className="muted small">{past.length} finished</span></div>
-      {!past.length && <p className="muted">No finished battles yet. End a battle, then <b>Finish & save result</b> to keep it here for everyone.</p>}
+      <div className="panel-title">
+        <h2>Past battles</h2>
+        <span className="muted small">
+          {all.length} finished{waiting.length ? ` · ${waiting.length} waiting on you` : ''}
+          {all.length > 0 && (
+            <label className="row" style={{ display: 'inline-flex', marginLeft: '0.75rem' }}>
+              <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} />
+              Only waiting on me
+            </label>
+          )}
+        </span>
+      </div>
+      {!all.length && <p className="muted">No finished battles yet. End a battle, then <b>Finish & save result</b> to keep it here for everyone.</p>}
+      {all.length > 0 && !past.length && <p className="muted">Nothing waiting on you. Every battle your forces played has been claimed.</p>}
       {past.map((x) => {
         const sc = score(x);
         const done = claims(x, state.forces);

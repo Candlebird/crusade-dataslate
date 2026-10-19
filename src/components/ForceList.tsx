@@ -50,7 +50,7 @@ export default function ForceList() {
         </div>
       )}
 
-      {state.forces.length === 0 && <div className="panel empty">No forces yet. Create one, or drop a shared force file below.</div>}
+      {state.forces.length === 0 && <div className="panel empty">No forces yet. Create one, or drop a shared force file below. New here? Follow the <a href={href.guide()}>getting started guide</a>.</div>}
 
       <div className="grid grid-cards">
         {state.forces.map((f) => {

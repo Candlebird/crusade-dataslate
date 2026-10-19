@@ -10,6 +10,7 @@ import ListPage from './components/ListPage';
 import SettingsPage from './components/SettingsPage';
 import BattleTracker from './components/BattleTracker';
 import MissionLibrary from './components/MissionLibrary';
+import GuidePage from './components/GuidePage';
 import { Toaster } from './components/ui';
 import AccountButton from './cloud/AccountButton';
 import { JoinPanel } from './cloud/Players';
@@ -41,6 +42,9 @@ export default function App() {
           <a className={route.page === 'settings' ? 'active' : ''} href={href.settings()}>
             Settings
           </a>
+          <a className={route.page === 'guide' ? 'active' : ''} href={href.guide()}>
+            Guide
+          </a>
           <DiceRoller />
           <AccountButton />
         </nav>
@@ -57,6 +61,7 @@ export default function App() {
         {route.page === 'campaign' && <CampaignPage />}
         {route.page === 'books' && <BooksPage />}
         {route.page === 'settings' && <SettingsPage />}
+        {route.page === 'guide' && <GuidePage />}
       </main>
       <Toaster />
       <footer className="footer">++ Data is kept in this browser, and shared with the other players while you're signed in. ++</footer>
