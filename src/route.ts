@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 
-/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle , #/force/:id/list/:lid , #/battle , #/missions , #/campaign , #/books , #/settings */
+/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle , #/missions , #/campaign , #/books , #/settings */
 export type Route =
   | { page: 'forces' }
   | { page: 'force'; forceId: string }
   | { page: 'unit'; forceId: string; unitId: string }
-  | { page: 'battle'; forceId: string }
+  | { page: 'battle'; forceId: string; battleId?: string; sideId?: string }
   | { page: 'list'; forceId: string; listId: string }
   | { page: 'tracker' }
   | { page: 'missions' }
@@ -18,7 +18,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'force' && parts[1]) {
     if (parts[2] === 'unit' && parts[3]) return { page: 'unit', forceId: parts[1], unitId: parts[3] };
     if (parts[2] === 'list' && parts[3]) return { page: 'list', forceId: parts[1], listId: parts[3] };
-    if (parts[2] === 'battle') return { page: 'battle', forceId: parts[1] };
+    if (parts[2] === 'battle') return { page: 'battle', forceId: parts[1], battleId: parts[3], sideId: parts[4] };
     return { page: 'force', forceId: parts[1] };
   }
   if (parts[0] === 'battle') return { page: 'tracker' };
@@ -33,7 +33,8 @@ export const href = {
   forces: () => '#/',
   force: (id: string) => `#/force/${id}`,
   unit: (forceId: string, unitId: string) => `#/force/${forceId}/unit/${unitId}`,
-  battle: (forceId: string) => `#/force/${forceId}/battle`,
+  /** The record wizard; with a past battle and side, filled in from it to claim that side's rewards. */
+  battle: (forceId: string, battleId?: string, sideId?: string) => `#/force/${forceId}/battle${battleId && sideId ? `/${battleId}/${sideId}` : ''}`,
   list: (forceId: string, listId: string) => `#/force/${forceId}/list/${listId}`,
   tracker: () => '#/battle',
   missions: () => '#/missions',

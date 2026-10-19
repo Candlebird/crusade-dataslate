@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../model/store';
-import { sideOfForce, wizardPrefill } from '../rules/tracker';
+import { claims, sideOfForce, wizardPrefill } from '../rules/tracker';
 import { uid } from '../model/factory';
 import type { BattleResult, Campaign, Force, Unit } from '../model/types';
 import { AGENDAS, CATEGORIES, MARKED_XP, MAX_AGENDAS, RELICS, REWARD_TABLES, SCAR_TABLE, type RewardTableKey } from '../rules/data';
@@ -51,16 +51,21 @@ function initialInput(f: Force, bp: number): BattleInput {
   };
 }
 
-export default function BattleWizard({ forceId }: { forceId: string }) {
+export default function BattleWizard({ forceId, battleId, sideId }: { forceId: string; battleId?: string; sideId?: string }) {
   const { state, update, updateForce } = useStore();
   const f = state.forces.find((x) => x.id === forceId);
   const [step, setStep] = useState(0);
-  // An ended game in the battle tracker that this force played fills the report in.
-  const [fromTracker] = useState(() => sideOfForce(state.battle, forceId));
+  // A past battle being claimed, or an ended game in the battle tracker that this force played, fills the report in.
+  const [source] = useState(() => {
+    const past = battleId ? state.battleHistory?.find((b) => b.id === battleId) : undefined;
+    if (past) return past.sides.some((x) => x.id === sideId) ? { battle: past, side: sideId!, past: past.finishedAt } : undefined;
+    const side = sideOfForce(state.battle, forceId);
+    return side && state.battle ? { battle: state.battle, side, past: '' } : undefined;
+  });
   const [input, setInput] = useState<BattleInput | null>(() => {
     if (!f) return null;
     const blank = initialInput(f, forceTotals(f, state.settings).bp);
-    return fromTracker && state.battle ? wizardPrefill(state.battle, fromTracker, blank, f, state.campaign) : blank;
+    return source ? wizardPrefill(source.battle, source.side, blank, f, state.campaign) : blank;
   });
   const [applied, setApplied] = useState<BattleOutcome | null>(null);
 
@@ -81,6 +86,7 @@ export default function BattleWizard({ forceId }: { forceId: string }) {
   if (!f || !input || !full || !preview) return <div className="panel empty">Force not found. <a href={href.forces()}>Back to forces</a></div>;
 
   const units = f.units.filter((u) => input.units[u.id]);
+  const claimedBy = source ? claims(source.battle, state.forces)[source.side] : undefined;
   const set = (patch: Partial<BattleInput>) => setInput({ ...input, ...patch });
   const setUnit = (id: string, patch: Partial<UnitBattle>) => {
     const next = { ...input.units };
@@ -106,9 +112,9 @@ export default function BattleWizard({ forceId }: { forceId: string }) {
         const sec = d.campaign?.sectors.find((x) => x.id === input.sectorId);
         if (sec) sec.rewardClaimed = true;
       });
-    if (fromTracker)
+    if (source && !source.past)
       update((d) => {
-        if (d.battle && !d.battle.recorded.includes(fromTracker)) d.battle.recorded.push(fromTracker);
+        if (d.battle?.id === source.battle.id && !d.battle.recorded.includes(source.side)) d.battle.recorded.push(source.side);
       });
     setApplied(preview);
     toast('Battle recorded.');
@@ -128,10 +134,16 @@ export default function BattleWizard({ forceId }: { forceId: string }) {
         </div>
       </div>
 
-      {fromTracker && state.battle && (
+      {source && (
         <p className="panel notice small">
-          Filled in from the <a href={href.tracker()}>battle tracker</a> ({state.battle.mission.name}). Check the details, then add XP and rewards.
-          {' '}<button className="ghost small" onClick={() => setInput(initialInput(f, forceTotals(f, state.settings).bp))}>Start blank instead</button>
+          Filled in from {source.past ? 'past battle' : 'the battle tracker'} <a href={href.tracker()}>{source.battle.mission.name}</a>
+          {source.past && ` (${source.past.slice(0, 10)}, as ${source.battle.sides.find((x) => x.id === source.side)?.name})`}. Check the details, then add XP and rewards.
+          {' '}<button className="ghost small" onClick={() => setInput({ ...initialInput(f, forceTotals(f, state.settings).bp), from: input.from })}>Start blank instead</button>
+        </p>
+      )}
+      {source && claimedBy && (
+        <p className="panel notice small" style={{ borderColor: 'var(--red)' }}>
+          {source.battle.sides.find((x) => x.id === source.side)?.name}'s rewards from this battle were already claimed by <b>{claimedBy.name}</b>. Applying again records the battle twice.
         </p>
       )}
 

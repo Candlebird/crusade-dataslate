@@ -276,6 +276,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
       {shopping && <RequisitionShop force={f} onClose={() => setShopping(false)} />}
       {adding && (
         <AddUnitModal
+          budget={t.supplyLimit - t.pointsUsed}
           onClose={() => setAdding(false)}
           onAdd={(newUnits) => {
             set((d) => void d.units.push(...newUnits));

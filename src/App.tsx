@@ -48,7 +48,7 @@ export default function App() {
         {route.page === 'forces' && <ForceList />}
         {route.page === 'force' && <ForceView forceId={route.forceId} />}
         {route.page === 'unit' && <UnitSheet forceId={route.forceId} unitId={route.unitId} />}
-        {route.page === 'battle' && <BattleWizard key={route.forceId} forceId={route.forceId} />}
+        {route.page === 'battle' && <BattleWizard key={`${route.forceId}/${route.battleId}/${route.sideId}`} forceId={route.forceId} battleId={route.battleId} sideId={route.sideId} />}
         {route.page === 'list' && <ListPage forceId={route.forceId} listId={route.listId} />}
         {route.page === 'tracker' && <BattleTracker />}
         {route.page === 'missions' && <MissionLibrary />}

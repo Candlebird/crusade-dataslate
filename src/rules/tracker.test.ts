@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
 import { DEFAULT_SETTINGS } from '../model/types';
-import { emptyUnitBattle, type BattleInput } from './battle';
+import { emptyUnitBattle, resolveBattle, type BattleInput } from './battle';
 import { ADVANCED_MISSION_TABLE, BUILTIN_MISSIONS, DEPLOYMENT_STYLES, EXAMPLE_MISSION, STANDARD_MISSION, allMissions, rollAdvancedMission, rollDeployment } from './missions';
 import {
   FORMATS,
@@ -20,6 +20,9 @@ import {
   setObjectives,
   setTeam,
   sideOfForce,
+  claims,
+  finishBattle,
+  resultTitle,
   teamName,
   winner,
   wizardPrefill,
@@ -224,5 +227,24 @@ describe('battle tracker', () => {
     expect('vsAi' in b).toBe(false);
     expect(migrateBattle(b)).toBe(b);
     expect(migrateBattle(undefined)).toBeUndefined();
+  });
+
+  it('shares a finished battle, and a side is claimed by the battle log entry that records it', () => {
+    const b = newBattle(EXAMPLE_MISSION, 'b', '2026-10-19', Math.random, format('2 v 1'));
+    const f = newForce('Iron Host');
+    const g = newForce('Ash Legion');
+    b.sides[0].forceId = f.id;
+    setHolder(b, 0, 'B');
+    const done = finishBattle(b, '2026-10-20T10:00:00Z');
+    expect(done).toMatchObject({ id: 'b', ended: true, finishedAt: '2026-10-20T10:00:00Z' });
+    expect(resultTitle(done)).toBe('Player 3 wins');
+    expect(claims(done, [f, g])).toEqual({});
+    const input = wizardPrefill(done, 's2', blankInput(), g);
+    expect(input.from).toEqual({ battleId: 'b', sideId: 's2' });
+    resolveBattle(g, input, () => 'r1');
+    expect(g.battleLog?.[0]).toMatchObject({ battleId: 'b', sideId: 's2', result: 'loss' });
+    expect(claims(done, [f, g])).toEqual({ s2: g });
+    done.recorded.push('s1');
+    expect(claims(done, [f, g])).toEqual({ s1: f, s2: g });
   });
 });

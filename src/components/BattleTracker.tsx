@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import type { Force } from '../model/types';
-import { href } from '../route';
+import { go, href } from '../route';
+import { useCloud } from '../cloud/CloudSync';
 import { AGENDAS, MAX_AGENDAS } from '../rules/data';
 import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES } from '../rules/nexus';
 import { DEPLOYMENT_STYLES, SEIZE_RULE, allMissions, rollAdvancedMission, rollDeployment, type MissionDef } from '../rules/missions';
@@ -28,7 +29,11 @@ import {
   setTeam,
   teamName,
   teamsOf,
-  winner,
+  claims,
+  finishBattle,
+  resultFor,
+  resultTitle,
+  type FinishedBattle,
   type Holder,
   type TeamKey,
   type TrackedBattle,
@@ -51,6 +56,12 @@ export default function BattleTracker() {
   const holderName = (h: Holder) => (h === '' ? 'Nobody' : h === 'x' ? 'Contested' : teamName(b, h));
   const showRoles = !!b.attacker && !!(b.mission.roles || b.sectorId);
   const adjust = (t: TeamKey) => membersOf(b, t).reduce((n, x) => n + x.vpAdjust, 0);
+  const finish = () => {
+    update((s) => {
+      s.battleHistory = [finishBattle(b, nowIso()), ...(s.battleHistory ?? [])];
+      delete s.battle;
+    });
+  };
 
   return (
     <div>
@@ -66,7 +77,7 @@ export default function BattleTracker() {
         </div>
       </div>
 
-      {b.ended && <Result b={b} set={set} />}
+      {b.ended && <Result b={b} set={set} onFinish={finish} />}
 
       <div className={`panel scoreboard${teams.length === 2 ? ' duel' : ''}`}>
         {teams.map((t) => (
@@ -249,7 +260,7 @@ function StartBattle() {
       </div>
       <div className="panel">
         <div className="panel-title"><h2>Start a battle</h2></div>
-        <p className="muted">Pick who's playing and a mission, then load each side's force on the next screen. The battle is kept on this device until you discard it.</p>
+        <p className="muted">Pick who's playing and a mission, then load each side's force on the next screen. The battle is kept on this device until you finish or discard it.</p>
         <h3>Players</h3>
         <div className="row">
           {FORMATS.map((f, i) => (
@@ -278,16 +289,78 @@ function StartBattle() {
           <button onClick={() => setId(rollAdvancedMission().id)} title="Roll the mission type (1-2 Face-Off, 3-4 Progressive, 5-6 Attack & Defend), then a D6">🎲 Random OPR mission</button>
         </div>
       </div>
+      <PastBattles />
     </div>
   );
 }
 
-function Result({ b, set }: { b: TrackedBattle; set: Set }) {
+function PastBattles() {
+  const { state, update } = useStore();
+  const cloud = useCloud();
+  const past = state.battleHistory ?? [];
+  // Forces this player can record into: their own, or ones kept only on this device.
+  const mine = state.forces.filter((f) => !f.owner || f.owner === cloud.email);
+  const remove = (x: FinishedBattle) =>
+    confirmAction(`Delete ${x.mission.name} from ${x.finishedAt.slice(0, 10)} for the whole group? Rewards already claimed stay in each force's log.`) &&
+    update((s) => void (s.battleHistory = s.battleHistory?.filter((y) => y.id !== x.id)));
+  return (
+    <div className="panel">
+      <div className="panel-title"><h2>Past battles</h2><span className="muted small">{past.length} finished</span></div>
+      {!past.length && <p className="muted">No finished battles yet. End a battle, then <b>Finish & save result</b> to keep it here for everyone.</p>}
+      {past.map((x) => {
+        const sc = score(x);
+        const done = claims(x, state.forces);
+        return (
+          <div key={x.id} className="list-item past-battle">
+            <div className="grow">
+              <div>
+                <b>{x.mission.name}</b>{' '}
+                <span className="muted small">
+                  · {x.finishedAt.slice(0, 10)} · {x.round} round{x.round === 1 ? '' : 's'}
+                  {x.sectorId ? ` · ${state.campaign?.sectors.find((s) => s.id === x.sectorId)?.name ?? 'Nexus sector'}` : ''}
+                </span>
+              </div>
+              <div className="small"><b>{resultTitle(x)}</b> · {teamsOf(x).map((t) => sc[t]!.total).join('–')} VP</div>
+              <div className="past-sides">
+                {x.sides.map((side) => (
+                  <div key={side.id} className="row small">
+                    <span className={`tag team-${side.team}`}>{side.name}</span>
+                    <span className="muted">{resultFor(x, side.id)}</span>
+                    <span className="spacer" />
+                    <Claim battle={x} side={side} claimed={side.id in done} by={done[side.id]} mine={mine} />
+                  </div>
+                ))}
+              </div>
+              {x.notes && <div className="muted small">{x.notes}</div>}
+            </div>
+            <button className="ghost icon" aria-label="Delete this battle" onClick={() => remove(x)}>✕</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Claim one side's rewards: open the record wizard for one of my forces, filled in from the battle. */
+function Claim({ battle, side, claimed, by, mine }: { battle: FinishedBattle; side: TrackerSide; claimed: boolean; by?: Force; mine: Force[] }) {
+  if (claimed) return <span className="tag green">✓ claimed{by ? ` by ${by.name}` : ''}</span>;
+  if (side.ai) return null;
+  const own = mine.find((f) => f.id === side.forceId);
+  if (own) return <a className="btn primary small" href={href.battle(own.id, battle.id, side.id)}>Claim rewards</a>;
+  if (side.forceId) return <span className="muted">waiting for its player</span>;
+  if (!mine.length) return null;
+  return (
+    <select value="" onChange={(e) => e.target.value && go(href.battle(e.target.value, battle.id, side.id))} aria-label={`Claim ${side.name}'s rewards as`}>
+      <option value="">Claim as…</option>
+      {mine.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+    </select>
+  );
+}
+
+function Result({ b, set, onFinish }: { b: TrackedBattle; set: Set; onFinish: () => void }) {
   const sc = score(b);
-  const w = winner(b);
   const teams = teamsOf(b);
-  const drawn = leaders(b);
-  const title = w !== 'draw' ? `${teamName(b, w)} ${membersOf(b, w).length > 1 ? 'win' : 'wins'}` : drawn.length < teams.length ? `Draw: ${drawn.map((t) => teamName(b, t)).join(' and ')}` : 'Draw';
+  const title = resultTitle(b);
   return (
     <div className="panel result-panel">
       <div className="panel-title">
@@ -301,6 +374,11 @@ function Result({ b, set }: { b: TrackedBattle; set: Set }) {
           if (b.recorded.includes(s.id)) return <span key={s.id} className="tag green">{s.name} recorded ✓</span>;
           return <a key={s.id} className="btn primary" href={href.battle(s.forceId)}>⚔ Record battle for {s.name}</a>;
         })}
+      </div>
+      <div className="row" style={{ marginTop: '0.75rem' }}>
+        <span className="muted small">Done? Finishing shares the battle with the group under Past battles, where anyone who hasn't recorded it yet can still claim their rewards.</span>
+        <span className="spacer" />
+        <button className="primary" onClick={onFinish}>✓ Finish & save result</button>
       </div>
     </div>
   );

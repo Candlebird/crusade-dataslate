@@ -1,6 +1,6 @@
 import type { Category, RelicTier } from '../rules/data';
 import type { MissionDef } from '../rules/missions';
-import type { TrackedBattle } from '../rules/tracker';
+import type { FinishedBattle, TrackedBattle } from '../rules/tracker';
 
 export interface WeaponTrait {
   id: string;
@@ -109,6 +109,9 @@ export interface BattleRecord {
   /** Nexus Wars sector fought over. */
   sectorId?: string;
   sectorName?: string;
+  /** The tracked battle and side this record claimed (see rules/tracker claims). */
+  battleId?: string;
+  sideId?: string;
 }
 
 /** A force's Nexus Wars state (only once it is linked to a campaign faction). */
@@ -321,4 +324,6 @@ export interface AppState {
   customMissions?: MissionDef[];
   /** The game being played right now, on this device. */
   battle?: TrackedBattle;
+  /** Finished battles, shared with the group, so players can look back and claim their rewards. */
+  battleHistory?: FinishedBattle[];
 }

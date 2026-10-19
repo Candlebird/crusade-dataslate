@@ -531,6 +531,10 @@ fieldset.fields:disabled { opacity: 0.6; }
 .tracker-units tr.dead td { opacity: 0.4; text-decoration: line-through; }
 .tracker-units tr.dead td .stepper, .tracker-units tr.dead td input { text-decoration: none; }
 .result-panel { border-color: var(--gold); }
+.past-battle { align-items: flex-start; padding: 0.5rem 0; }
+.past-sides { display: grid; gap: 0.25rem; margin: 0.35rem 0; }
+.past-sides select { width: auto; }
+.tag[class*='team-'] { border-color: var(--team); color: var(--team); }
 .mission-rule { padding: 0.4rem 0; border-bottom: 1px solid var(--line); }
 .mission-rule textarea { width: 100%; margin-top: 0.3rem; }
 

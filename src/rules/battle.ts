@@ -66,6 +66,8 @@ export interface BattleInput {
   /** What the force's faction earns this match (from nexusGeneration). */
   nexus?: NexusContext;
   nexusPicks?: Record<string, NexusPick>;
+  /** The tracked battle and side this report claims the rewards of. */
+  from?: { battleId: string; sideId: string };
 }
 
 export interface RewardRow {
@@ -406,6 +408,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
     id: newId(), date: input.date, opponent: input.opponent, result: input.result, vsAi: input.vsAi,
     agendas: input.agendas, myBp: input.myBp, oppBp: input.oppBp, summary, notes: input.notes,
     sectorId: input.sectorId || undefined, sectorName: input.sectorId ? input.sectorName : undefined,
+    ...(input.from ? { battleId: input.from.battleId, sideId: input.from.sideId } : {}),
   });
 
   return { units: outcomes, ledger, rp, supply, us, nexus: nexusLines, warnings, summary };

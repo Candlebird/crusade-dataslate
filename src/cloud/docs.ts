@@ -4,12 +4,13 @@
  * would go over it. In the cloud copy each picture is replaced by "img:<hash>".
  */
 import type { AppState, Force, Settings } from '../model/types';
+import type { FinishedBattle } from '../rules/tracker';
 import type { LocalDoc } from './sync';
 
 export const IMG_PREFIX = 'img:';
 
 /** Collections the app listens to (pictures are fetched on demand). */
-export const COLLECTIONS = ['forces', 'campaign', 'books', 'shared'] as const;
+export const COLLECTIONS = ['forces', 'campaign', 'books', 'shared', 'battles'] as const;
 
 export const CAMPAIGN_PATH = 'campaign/current';
 export const SETTINGS_PATH = 'shared/settings';
@@ -88,6 +89,8 @@ export function localDocs(state: AppState, who: Who, images: Map<string, string>
     const updatedAt = missions.reduce((t, m) => (m.updatedAt && m.updatedAt > t ? m.updatedAt : t), '');
     docs.push({ path: MISSIONS_PATH, json: JSON.stringify(missions), updatedAt, canWrite: true });
   }
+  // Finished battles are shared with the group; rewards are claimed in each player's own force.
+  for (const b of state.battleHistory ?? []) docs.push({ path: `battles/${b.id}`, json: JSON.stringify(b), updatedAt: b.finishedAt, canWrite: true });
   return docs;
 }
 
@@ -100,6 +103,10 @@ export function applyDoc(d: AppState, path: string, value: unknown): void {
       if (i >= 0) d.forces.splice(i, 1);
     } else if (i >= 0) d.forces[i] = value as Force;
     else d.forces.push(value as Force);
+  } else if (col === 'battles') {
+    const rest = (d.battleHistory ?? []).filter((b) => b.id !== id);
+    if (value !== null) rest.push(value as FinishedBattle);
+    d.battleHistory = rest.sort((a, b) => b.finishedAt.localeCompare(a.finishedAt));
   } else if (col === 'books') {
     d.books = d.books.filter((b) => b.uid !== id);
     if (value !== null) d.books.push(value as AppState['books'][number]);

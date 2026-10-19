@@ -26,6 +26,8 @@ service cloud.firestore {
 
     match /books/{id} { allow read, write: if player(); }
     match /images/{id} { allow read, write: if player(); }
+    // Finished battles everyone can look back on and claim their rewards from.
+    match /battles/{id} { allow read, write: if player(); }
 
     // House rules are the GM's; core rule texts anyone can import.
     match /shared/{id} {

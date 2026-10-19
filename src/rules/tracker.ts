@@ -313,6 +313,7 @@ export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInp
       b.notes,
     ].filter(Boolean).join(' '),
     units,
+    from: { battleId: b.id, sideId },
   };
 }
 
@@ -320,4 +321,32 @@ export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInp
 export function sideOfForce(b: TrackedBattle | undefined, forceId: string): string | undefined {
   if (!b?.ended) return undefined;
   return b.sides.find((x) => x.forceId === forceId && !b.recorded.includes(x.id))?.id;
+}
+
+// ---- Finished battles ----
+
+/** A finished battle, shared with the group so each player can claim their rewards from it later. */
+export interface FinishedBattle extends TrackedBattle {
+  finishedAt: string;
+}
+
+export const finishBattle = (b: TrackedBattle, finishedAt: string): FinishedBattle => ({ ...structuredClone(b), ended: true, finishedAt });
+
+/**
+ * Sides whose rewards have been claimed, with the force that claimed them. A claim is the battle log entry
+ * the record wizard writes into the player's own force, so players never write to the same document.
+ */
+export function claims(b: TrackedBattle, forces: Force[]): Record<string, Force | undefined> {
+  const out: Record<string, Force | undefined> = {};
+  for (const id of b.recorded) out[id] = forces.find((f) => f.id === b.sides.find((x) => x.id === id)?.forceId);
+  for (const f of forces) for (const r of f.battleLog ?? []) if (r.battleId === b.id && r.sideId) out[r.sideId] = f;
+  return out;
+}
+
+/** "Team A wins", "Draw: A and B"… */
+export function resultTitle(b: TrackedBattle): string {
+  const w = winner(b);
+  const drawn = leaders(b);
+  if (w !== 'draw') return `${teamName(b, w)} ${membersOf(b, w).length > 1 ? 'win' : 'wins'}`;
+  return drawn.length < teamsOf(b).length ? `Draw: ${drawn.map((t) => teamName(b, t)).join(' and ')}` : 'Draw';
 }

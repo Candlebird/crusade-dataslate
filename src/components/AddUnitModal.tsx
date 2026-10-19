@@ -11,7 +11,8 @@ import { Modal, Stepper } from './ui';
 
 type Tab = 'catalog' | 'text' | 'blank';
 
-export default function AddUnitModal({ onAdd, onClose }: { onAdd: (units: Unit[]) => void; onClose: () => void }) {
+/** `budget` = supply points the force has left; when given, the catalog can be limited to what fits. */
+export default function AddUnitModal({ onAdd, onClose, budget }: { onAdd: (units: Unit[]) => void; onClose: () => void; budget?: number }) {
   const { state } = useStore();
   const [tab, setTab] = useState<Tab>(state.books.length ? 'catalog' : 'blank');
 
@@ -22,18 +23,19 @@ export default function AddUnitModal({ onAdd, onClose }: { onAdd: (units: Unit[]
         <button className={tab === 'text' ? 'primary' : ''} onClick={() => setTab('text')}>Paste list text</button>
         <button className={tab === 'blank' ? 'primary' : ''} onClick={() => setTab('blank')}>Blank sheet</button>
       </div>
-      {tab === 'catalog' && <CatalogTab onAdd={onAdd} />}
+      {tab === 'catalog' && <CatalogTab onAdd={onAdd} budget={budget} />}
       {tab === 'text' && <TextTab onAdd={onAdd} />}
       {tab === 'blank' && <BlankTab onAdd={onAdd} />}
     </Modal>
   );
 }
 
-function CatalogTab({ onAdd }: { onAdd: (u: Unit[]) => void }) {
+function CatalogTab({ onAdd, budget }: { onAdd: (u: Unit[]) => void; budget?: number }) {
   const { state } = useStore();
   const [bookId, setBookId] = useState(state.books[0]?.uid ?? '');
   const [query, setQuery] = useState('');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [affordable, setAffordable] = useState(false);
   const [unitId, setUnitId] = useState<string | null>(null);
   const [sel, setSel] = useState<Selection>({});
   const [name, setName] = useState('');
@@ -42,9 +44,12 @@ function CatalogTab({ onAdd }: { onAdd: (u: Unit[]) => void }) {
   const units = useMemo(
     () =>
       (book?.units ?? []).filter(
-        (u) => u.name.toLowerCase().includes(query.toLowerCase()) && matchesTags(datasheetTags(book, u.name), tagFilter),
+        (u) =>
+          u.name.toLowerCase().includes(query.toLowerCase()) &&
+          matchesTags(datasheetTags(book, u.name), tagFilter) &&
+          !(affordable && budget !== undefined && u.cost > budget),
       ),
-    [book, query, tagFilter],
+    [book, query, tagFilter, affordable, budget],
   );
   const unit = book?.units.find((u) => u.id === unitId);
   const loadout = unit ? applySelection(unit, sel) : null;
@@ -71,6 +76,12 @@ function CatalogTab({ onAdd }: { onAdd: (u: Unit[]) => void }) {
           {book && <a href={bookPageUrl(book.uid, book.name)} target="_blank" rel="noreferrer" title="Open this army on Army Forge">↗</a>}
           <input placeholder="Search datasheets…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1 }} />
         </div>
+        {budget !== undefined && (
+          <label className="row small" style={{ marginBottom: '0.5rem' }}>
+            <input type="checkbox" checked={affordable} onChange={(e) => setAffordable(e.target.checked)} />
+            Only what I can afford ({budget} pts of supply left)
+          </label>
+        )}
         {book && <TagFilter tags={tagsIn(Object.values(book.unitTags ?? {}))} value={tagFilter} onChange={setTagFilter} />}
         <div className="pick-list">
           {units.map((u) => (
@@ -138,6 +149,9 @@ function CatalogTab({ onAdd }: { onAdd: (u: Unit[]) => void }) {
                 </div>
               ))}
               <div className="row" style={{ marginTop: '0.75rem' }}>
+                {budget !== undefined && loadout.cost > budget && (
+                  <span className="small" style={{ color: 'var(--red)' }}>{loadout.cost - budget} pts over your supply limit</span>
+                )}
                 <span className="spacer" />
                 <button className="primary" onClick={() => onAdd([unitFromCatalog(unit, loadout, book!, name.trim())])}>
                   Add to force
