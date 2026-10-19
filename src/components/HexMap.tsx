@@ -7,7 +7,8 @@ import {
   cells, clampToMap, defaultCounts, defaultMap, frontier, generateMap, hexCorners, hexKey, isPlaced, randomSeed, rng, rollSector, toPixel,
   type GenCounts, type GenOptions, type Hex,
 } from '../rules/hexmap';
-import { BENEFITS, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionName } from '../rules/nexus';
+import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionColor, factionName, isStronghold, sidesOf } from '../rules/nexus';
+import { pickSpread, spreadInto, spreadTargets } from '../rules/voidspawn';
 import { href } from '../route';
 import { Modal, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
@@ -15,7 +16,7 @@ type SetC = (fn: (c: Campaign) => void) => void;
 type Tool = 'select' | 'type' | 'owner' | 'move' | 'unplace';
 
 const SIZE = 40;
-const GLYPH: Record<SectorType, string> = { home: '♜', planet: '◉', research: '⌬', void: '✠', anomaly: '✺', empty: '·' };
+const GLYPH: Record<SectorType, string> = { home: '♜', planet: '◉', research: '⌬', void: '✠', anomaly: '✺', empty: '·', voidspawn: '☣' };
 const TOOLS: { key: Tool; label: string; hint: string }[] = [
   { key: 'select', label: 'Select', hint: 'Click a hex to see or edit it' },
   { key: 'type', label: 'Paint type', hint: 'Click hexes to set their type (creates a sector on empty space)' },
@@ -78,7 +79,7 @@ function MapEditor({ c, setC, onRecord }: { c: Campaign; setC: SetC; onRecord: (
   const bySector = new Map(c.sectors.filter(isPlaced).map((s) => [hexKey(s.q, s.r), s]));
   const front = viewAs ? frontier(c, viewAs) : null;
   const unplaced = c.sectors.filter((s) => !isPlaced(s));
-  const color = (id?: string) => c.factions.find((f) => f.id === id)?.color;
+  const color = (id?: string) => factionColor(c, id);
   const selSector = sel ? bySector.get(hexKey(sel.q, sel.r)) : undefined;
 
   const vw = bounds.w / zoom, vh = bounds.h / zoom;
@@ -97,13 +98,14 @@ function MapEditor({ c, setC, onRecord }: { c: Campaign; setC: SetC; onRecord: (
         if (s) setSector(s.id, (d) => {
           d.type = paintType;
           if (!BENEFITS.some((b) => b.type === d.type && b.id === d.benefit)) d.benefit = undefined;
+          if (d.type === 'voidspawn') d.owner = ECHOES.id;
         });
         else setC((d) => void d.sectors.push({ id: uid(), type: paintType, q: h.q, r: h.r, ...rollSector(paintType) }));
         setSel(h);
         break;
       case 'owner':
-        if (s && s.type !== 'home') setSector(s.id, (d) => void (d.owner = paintOwner || undefined));
-        else if (s) toast('Home sectors always belong to their faction.', 'error');
+        if (s && !isStronghold(s)) setSector(s.id, (d) => void (d.owner = paintOwner || undefined));
+        else if (s) toast(s.type === 'home' ? 'Home sectors always belong to their faction.' : `Voidspawns always belong to the ${ECHOES.name}.`, 'error');
         break;
       case 'move':
         if (!moving) {
@@ -199,6 +201,7 @@ function MapEditor({ c, setC, onRecord }: { c: Campaign; setC: SetC; onRecord: (
         <h2>Sector map</h2>
         <div className="row">
           <button onClick={() => setGenOpen(true)}>Generate…</button>
+          <SpreadButton c={c} setC={setC} />
           <button onClick={exportPng} title="Download the whole map as a picture">Export PNG</button>
         </div>
       </div>
@@ -217,7 +220,7 @@ function MapEditor({ c, setC, onRecord }: { c: Campaign; setC: SetC; onRecord: (
         {tool === 'owner' && (
           <select value={paintOwner} onChange={(e) => setPaintOwner(e.target.value)} aria-label="Owner to paint">
             <option value="">Unclaimed</option>
-            {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            {sidesOf(c).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
           </select>
         )}
         <span className="spacer" />
@@ -306,7 +309,7 @@ function MapEditor({ c, setC, onRecord }: { c: Campaign; setC: SetC; onRecord: (
         {SECTOR_TYPE_KEYS.map((t) => <span key={t} title={SECTOR_TYPES[t].desc}>{GLYPH[t]} {SECTOR_TYPES[t].label}</span>)}
         <span>⛨ Reinforced</span>
         <span>✓ Reward claimed</span>
-        {c.factions.map((f) => <span key={f.id}><i className="swatch" style={{ background: f.color }} /> {f.name}</span>)}
+        {sidesOf(c).map((f) => <span key={f.id}><i className="swatch" style={{ background: f.color }} /> {f.name}</span>)}
       </div>
 
       {genOpen && <GenerateDialog c={c} setC={setC} onClose={() => setGenOpen(false)} />}
@@ -319,8 +322,9 @@ function SideIntro({ c, unplaced }: { c: Campaign; unplaced: Sector[] }) {
     <>
       <h3>{c.name}</h3>
       <p className="muted small">Click a hex to see its sector. Drag to pan; scroll or use the buttons to zoom.</p>
-      {c.factions.map((f) => {
+      {sidesOf(c).map((f) => {
         const n = c.sectors.filter((s) => s.owner === f.id).length;
+        if (f.id === ECHOES.id && !n) return null;
         return <div key={f.id} className="row small"><i className="swatch" style={{ background: f.color }} /> <b>{f.name}</b> <span className="muted">{n} sector{n === 1 ? '' : 's'}</span></div>;
       })}
       {unplaced.length > 0 && <p className="small" style={{ color: 'var(--warn)' }}>{unplaced.length} sector{unplaced.length === 1 ? ' is' : 's are'} not on the map: {unplaced.map((s) => s.name).join(', ')}. Click an empty hex to place one.</p>}
@@ -331,7 +335,7 @@ function SideIntro({ c, unplaced }: { c: Campaign; unplaced: Sector[] }) {
 function SectorView({ c, s, onEdit, onRecord }: { c: Campaign; s: Sector; onEdit: () => void; onRecord: () => void }) {
   const benefit = benefitOf(s);
   const games = c.log.filter((e) => e.sectorId === s.id).slice(-4).reverse();
-  const owner = c.factions.find((f) => f.id === s.owner);
+  const ownerColor = factionColor(c, s.owner);
   const running = useStore().state.battle;
   return (
     <>
@@ -339,7 +343,7 @@ function SectorView({ c, s, onEdit, onRecord }: { c: Campaign; s: Sector; onEdit
       <h3 style={{ marginBottom: 0 }}>{s.name}</h3>
       <div className="small">
         <span className="tag">{GLYPH[s.type]} {SECTOR_TYPES[s.type].label}</span>
-        <span className="tag" style={owner ? { borderColor: owner.color, color: owner.color } : undefined}>{factionName(c, s.owner)}</span>
+        <span className="tag" style={ownerColor ? { borderColor: ownerColor, color: ownerColor } : undefined}>{factionName(c, s.owner)}</span>
         {s.reinforced && <span className="tag">⛨ Reinforced</span>}
         {s.type === 'void' && s.rewardClaimed && <span className="tag">✓ Reward claimed</span>}
       </div>
@@ -374,15 +378,16 @@ function SectorEditor({ c, s, setSector, setC, onDone, onDeleted }: {
         <select value={s.type} onChange={(e) => setSector((d) => {
           d.type = e.target.value as SectorType;
           if (!BENEFITS.some((b) => b.type === d.type && b.id === d.benefit)) d.benefit = undefined;
+          if (d.type === 'voidspawn') d.owner = ECHOES.id;
         })}>
           {SECTOR_TYPE_KEYS.map((t) => <option key={t} value={t}>{SECTOR_TYPES[t].label}</option>)}
         </select>
       </label>
       <label className="field">
         Controlled by
-        <select value={s.owner ?? ''} onChange={(e) => setSector((d) => void (d.owner = e.target.value || undefined))}>
+        <select value={s.owner ?? ''} disabled={s.type === 'voidspawn'} onChange={(e) => setSector((d) => void (d.owner = e.target.value || undefined))}>
           <option value="">Unclaimed</option>
-          {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          {sidesOf(c).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
       </label>
       {benefits.length > 0 && (
@@ -471,16 +476,16 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
   const base = c.map ?? defaultMap(c.factions.length);
   const [o, setO] = useState<GenOptions>({
     cols: base.cols, rows: base.rows, seed: randomSeed(), counts: defaultCounts(c.factions.length), startingSectors: 1,
-    replace: c.sectors.some((s) => s.type !== 'home'),
+    replace: c.sectors.some((s) => !isStronghold(s)),
   });
   const set = (p: Partial<GenOptions>) => setO({ ...o, ...p });
   const setCount = (t: keyof GenCounts, n: number) => set({ counts: { ...o.counts, [t]: n } });
   const total = c.factions.length + Object.values(o.counts).reduce((a, b) => a + b, 0);
   const tooSmall = total > o.cols * o.rows;
-  const keep = c.sectors.filter((s) => s.type !== 'home').length;
+  const keep = c.sectors.filter((s) => !isStronghold(s)).length;
 
   const run = () => {
-    if (o.replace && keep && !confirmAction(`Replace mode deletes ${keep} non-home sector${keep === 1 ? '' : 's'} (with their lore and art). Continue?`)) return;
+    if (o.replace && keep && !confirmAction(`Replace mode deletes ${keep} sector${keep === 1 ? '' : 's'} (with their lore and art). Continue?`)) return;
     setC((d) => generateMap(d, o));
     toast('Map generated.');
     onClose();
@@ -511,7 +516,7 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
           ))}
           <label className="span-all row small">
             <input type="checkbox" checked={o.replace} onChange={(e) => set({ replace: e.target.checked })} />
-            Replace existing sectors (keeps factions' home sectors)
+            Replace existing sectors (keeps home sectors and Voidspawns)
           </label>
           {!o.replace && <p className="span-all muted small" style={{ margin: 0 }}>Existing sectors stay where they are and count toward the totals; only the gaps are filled.</p>}
         </div>
@@ -531,3 +536,22 @@ const MAP_EXPORT_CSS = `
   .hex-name { fill: #d9d4c7; font: 600 7.5px 'Segoe UI', sans-serif; text-anchor: middle; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }
   .hex-mark { fill: #d9d4c7; font: 11px sans-serif; text-anchor: middle; }
 `;
+
+/** Let the Void Echoes spread one sector by hand (it also happens when the GM opens the next round of orders). */
+function SpreadButton({ c, setC }: { c: Campaign; setC: SetC }) {
+  if (!c.sectors.some((s) => s.owner === ECHOES.id)) return null;
+  const options = spreadTargets(c);
+  const spread = () => {
+    if (!confirmAction(`Let the ${ECHOES.name} spread into a random neighbouring sector?`)) return;
+    const target = pickSpread(c);
+    if (!target) return;
+    setC((d) => void spreadInto(d, target.id));
+    toast(`The ${ECHOES.name} spread to ${target.name}.`);
+  };
+  return (
+    <button onClick={spread} disabled={!options.length}
+      title={options.length ? `Spread into one of ${options.length} neighbouring sector${options.length === 1 ? '' : 's'} at random` : 'No sector next to their territory to spread into'}>
+      ☣ {ECHOES.name} spread
+    </button>
+  );
+}

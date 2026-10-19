@@ -1,6 +1,6 @@
 import type { BattleResult, Campaign, CampaignEvent, Force, ForceNexus, Sector } from '../model/types';
 import { CATEGORIES, type Category } from './data';
-import { ANOMALY_TABLE, BENEFITS, MANIPULATION_PREFIX, VOID_TABLE, type NexusTableEntry } from './nexusData';
+import { ANOMALY_TABLE, BENEFITS, ECHOES, MANIPULATION_PREFIX, STRONGHOLDS, VOID_TABLE, type NexusTableEntry } from './nexusData';
 
 // Nexus Wars: what a faction earns after each match. The tables and costs live in nexusData.ts.
 
@@ -27,24 +27,33 @@ export const ownedSectors = (c: Campaign, factionId: string) => c.sectors.filter
 export const homeOf = (c: Campaign, factionId: string) => c.sectors.find((s) => s.type === 'home' && s.owner === factionId);
 
 export const factionName = (c: Campaign, id: string | undefined) =>
-  id === 'ai' ? 'AI' : c.factions.find((f) => f.id === id)?.name ?? (id ? 'Unknown faction' : 'Unclaimed');
+  id === ECHOES.id ? ECHOES.name : c.factions.find((f) => f.id === id)?.name ?? (id ? 'Unknown faction' : 'Unclaimed');
+
+export const factionColor = (c: Campaign, id: string | undefined) => (id === ECHOES.id ? ECHOES.color : c.factions.find((f) => f.id === id)?.color);
+
+/** Everyone who can hold sectors: the campaign's factions, then the Void Echoes. */
+export const sidesOf = (c: Campaign) => [...c.factions.map((f) => ({ id: f.id, name: f.name, color: f.color })), ECHOES];
+
+/** Home sectors and Voidspawns can be attacked but never change hands. */
+export const isStronghold = (s: Sector) => STRONGHOLDS.includes(s.type);
 
 /** What a sector game's result does to the map, in words ('' when nothing changes). */
 export function sectorEffect(c: Campaign, e: Pick<CampaignEvent, 'sectorId' | 'winner'>): string {
   const s = c.sectors.find((x) => x.id === e.sectorId);
   if (!s || !e.winner || e.winner === 'ai') return '';
+  if (s.type === 'voidspawn') return `${factionName(c, e.winner)} beats back the ${ECHOES.name}. ${s.name} does not change hands.`;
   if (s.type === 'home')
     return `${factionName(c, e.winner)} wins the home-sector challenge: the winner gains the loser's faction benefits once; the loser forfeits Nexus benefits for that match. ${s.name} does not change hands.`;
   return s.owner === e.winner ? `${factionName(c, e.winner)} holds ${s.name}.` : `${factionName(c, e.winner)} takes control of ${s.name}.`;
 }
 
-/** Apply a reported sector game to the campaign. Home sectors never change hands. */
+/** Apply a reported sector game to the campaign. Home sectors and Voidspawns never change hands. */
 export function recordSectorGame(c: Campaign, e: CampaignEvent) {
   c.log.push(e);
   const s = c.sectors.find((x) => x.id === e.sectorId);
   if (!s || !e.winner || e.winner === 'ai') return;
   const undo: NonNullable<CampaignEvent['undo']> = {};
-  if (s.type !== 'home' && s.owner !== e.winner) {
+  if (!isStronghold(s) && s.owner !== e.winner) {
     undo.owner = s.owner ?? '';
     s.owner = e.winner;
   }

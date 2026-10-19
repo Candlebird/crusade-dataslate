@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useCloud } from '../cloud/CloudSync';
+import { nowIso } from '../model/factory';
 import { useStore } from '../model/store';
 import type { Campaign } from '../model/types';
-import { factionName } from '../rules/nexus';
+import { ECHOES, factionName } from '../rules/nexus';
 import { HOLD, attackTargets, myFactions, playedFactions, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
+import { pickSpread, spreadInto } from '../rules/voidspawn';
 import { href } from '../route';
 import { confirmAction, toast } from './ui';
 
@@ -13,7 +15,7 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message : String
 
 /** Sealed attack orders: every player picks a target (or holds) per faction; the GM reveals them all at once. */
 export default function OrdersPanel({ c }: { c: Campaign }) {
-  const { state } = useStore();
+  const { state, update } = useStore();
   const cloud = useCloud();
   const online = cloud.status === 'synced' || cloud.status === 'syncing';
   const [fb, setFb] = useState<Firebase | null>(null);
@@ -85,6 +87,19 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     else delete picks[factionId];
     fb.saveOrders(cloud.email!, current.round, picks).catch(fail('save your orders'));
   };
+  // The round is over: the Void Echoes spread before the next one opens.
+  const openNext = () => {
+    if (!confirmAction(`Open orders for the next game? These orders will be hidden again${pickSpread(c) ? `, and the ${ECHOES.name} spread into a random neighbouring sector` : ''}.`)) return;
+    const target = pickSpread(c);
+    if (target) {
+      update((d) => {
+        if (!d.campaign || !spreadInto(d.campaign, target.id)) return;
+        d.campaign.updatedAt = nowIso();
+      });
+      toast(`The ${ECHOES.name} spread to ${target.name}.`);
+    }
+    open();
+  };
   const reveal = () => {
     const who = waiting.map((f) => factionName(c, f)).join(', ');
     if (waiting.length && !confirmAction(`${who} ${waiting.length === 1 ? "hasn't" : "haven't"} declared yet. Reveal anyway?`)) return;
@@ -131,7 +146,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
       {revealed && <RevealedOrders c={c} orders={orders} round={current.round} />}
       {revealed && cloud.isGm && (
         <div className="row" style={{ marginTop: 8 }}>
-          <button onClick={() => confirmAction('Open orders for the next game? These orders will be hidden again.') && open()}>Open orders for the next game</button>
+          <button onClick={openNext}>Open orders for the next game</button>
         </div>
       )}
     </div>

@@ -249,7 +249,7 @@ export interface CatalogBook {
 
 // ---- Nexus Wars campaign (kept by the GM, imported by players) ----
 
-export type SectorType = 'home' | 'planet' | 'research' | 'void' | 'anomaly' | 'empty';
+export type SectorType = 'home' | 'planet' | 'research' | 'void' | 'anomaly' | 'empty' | 'voidspawn';
 
 export interface Sector {
   id: string;
@@ -292,6 +292,8 @@ export interface CampaignEvent {
   notes: string;
   /** The tracked battle this game was recorded from, if any. */
   battleId?: string;
+  /** Not a game: the Void Echoes spread into the sector at the end of a round. */
+  spread?: boolean;
   /** What the game changed, so deleting the entry can put the sector back. */
   undo?: { owner?: string; rewardClaimed?: boolean };
 }

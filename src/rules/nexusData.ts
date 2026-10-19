@@ -11,8 +11,17 @@ export const SECTOR_TYPES: Record<SectorType, { label: string; desc: string }> =
   void: { label: 'Void / Space hulk', desc: 'Defeat an AI opponent here for a one-off D6 reward.' },
   anomaly: { label: 'Anomaly', desc: 'Roll a D6 on the Anomaly table after each match.' },
   empty: { label: 'Empty space', desc: 'No benefit.' },
+  voidspawn: { label: 'Voidspawn', desc: "The Void Echoes' home sector. It can be attacked but never controlled. Each round the Echoes spread from it." },
 };
 export const SECTOR_TYPE_KEYS = Object.keys(SECTOR_TYPES) as SectorType[];
+
+/** Sectors that can be attacked but never change hands. */
+export const STRONGHOLDS: SectorType[] = ['home', 'voidspawn'];
+
+/** The Void Echoes, the AI force: they hold the Voidspawns and spread from them. Their id is the AI's. */
+export const ECHOES = { id: 'ai', name: 'Void Echoes', color: '#7d3cff' };
+/** Sector types the Void Echoes never spread into (strongholds are never taken either). */
+export const ECHOES_SKIP: SectorType[] = ['empty'];
 
 export interface Benefit {
   id: string;

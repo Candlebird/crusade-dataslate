@@ -3,7 +3,7 @@ import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import { exportCampaign } from '../model/io';
 import type { Campaign, Sector, SectorType } from '../model/types';
-import { BENEFITS, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionName, ownedSectors, recordSectorGame, removeSectorGame, sectorEffect } from '../rules/nexus';
+import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionColor, factionName, ownedSectors, recordSectorGame, removeSectorGame, sectorEffect, sidesOf } from '../rules/nexus';
 import { href } from '../route';
 import HexMapPanel from './HexMap';
 import OrdersPanel from './NexusOrders';
@@ -180,7 +180,6 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
             <thead><tr><th>Name</th><th>Type</th><th>Benefit</th><th>Controlled by</th><th>Flags</th><th>Lore</th><th /></tr></thead>
             <tbody>
               {c.sectors.map((s, i) => {
-                const owner = c.factions.find((f) => f.id === s.owner);
                 const benefits = BENEFITS.filter((b) => b.type === s.type);
                 return (
                   <tr key={s.id}>
@@ -192,6 +191,7 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                       <select value={s.type} title={SECTOR_TYPES[s.type].desc} onChange={(e) => setS(i, (d) => {
                         d.type = e.target.value as SectorType;
                         if (!BENEFITS.some((b) => b.type === d.type && b.id === d.benefit)) d.benefit = undefined;
+                        if (d.type === 'voidspawn') d.owner = ECHOES.id;
                       })}>
                         {SECTOR_TYPE_KEYS.map((t) => <option key={t} value={t}>{SECTOR_TYPES[t].label}</option>)}
                       </select>
@@ -206,10 +206,10 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                     </td>
                     <td className="s-2" data-label="Controlled by">
                       <span className="row" style={{ flexWrap: 'nowrap' }}>
-                        <span style={{ flex: 'none', width: 10, height: 10, borderRadius: 2, background: owner?.color ?? 'transparent', border: '1px solid currentColor' }} />
-                        <select value={s.owner ?? ''} onChange={(e) => setS(i, (d) => void (d.owner = e.target.value || undefined))}>
+                        <span style={{ flex: 'none', width: 10, height: 10, borderRadius: 2, background: factionColor(c, s.owner) ?? 'transparent', border: '1px solid currentColor' }} />
+                        <select value={s.owner ?? ''} disabled={s.type === 'voidspawn'} onChange={(e) => setS(i, (d) => void (d.owner = e.target.value || undefined))}>
                           <option value="">Unclaimed</option>
-                          {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                          {sidesOf(c).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                         </select>
                       </span>
                     </td>
@@ -237,7 +237,7 @@ function RecordPanel({ c, setC, preset }: { c: Campaign; setC: SetC; preset: { s
     if (preset.n) setEv((e) => ({ ...e, sectorId: preset.sectorId, defender: c.sectors.find((s) => s.id === preset.sectorId)?.owner ?? 'ai', winner: '' }));
   }, [preset.n]);
   const sector = c.sectors.find((s) => s.id === ev.sectorId);
-  const sides = [...c.factions.map((f) => ({ id: f.id, name: f.name })), { id: 'ai', name: 'AI' }];
+  const sides = sidesOf(c);
   const set = (p: Partial<typeof ev>) => setEv({ ...ev, ...p });
   const ready = sector && ev.attacker && ev.defender !== ev.attacker;
 
@@ -302,13 +302,15 @@ function LogPanel({ c, setC }: { c: Campaign; setC: SetC }) {
         <div key={e.id} className="list-item small">
           <span className="muted">{e.date}</span>
           <span className="grow">
-            <b>{sectorName(e.sectorId)}</b>: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} —{' '}
-            {e.winner ? <b>{factionName(c, e.winner)} wins</b> : 'draw'}
+            {e.spread ? <>☣ <b>{factionName(c, e.winner)}</b> spread to <b>{sectorName(e.sectorId)}</b>{e.defender && <> from {factionName(c, e.defender)}</>}</> : <>
+              <b>{sectorName(e.sectorId)}</b>: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} —{' '}
+              {e.winner ? <b>{factionName(c, e.winner)} wins</b> : 'draw'}
+            </>}
             {e.notes && <span className="muted"> · {e.notes}</span>}
           </span>
           <button className="ghost icon" aria-label="Delete log entry"
             title={e.undo ? 'Delete the entry and put the sector back, unless a later game changed it' : 'Delete the entry'}
-            onClick={() => confirmAction(`Delete this ${sectorName(e.sectorId)} game from the log?${e.undo ? ' The sector goes back to how the game found it.' : ''}`) && setC((d) => removeSectorGame(d, e.id))}>✕</button>
+            onClick={() => confirmAction(`Delete this ${sectorName(e.sectorId)} ${e.spread ? 'spread' : 'game'} from the log?${e.undo ? ` The sector goes back to how the ${e.spread ? 'spread' : 'game'} found it.` : ''}`) && setC((d) => removeSectorGame(d, e.id))}>✕</button>
         </div>
       ))}
     </div>

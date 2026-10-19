@@ -1,6 +1,6 @@
 import { uid } from '../model/factory';
 import type { Campaign, CampaignMap, Sector, SectorType } from '../model/types';
-import { BENEFITS } from './nexus';
+import { BENEFITS, ECHOES, isStronghold } from './nexus';
 
 // Pointy-top hexes in axial coordinates (q, r), laid out as an "odd-r" rectangle.
 
@@ -86,7 +86,7 @@ export function rng(seed: string): () => number {
   };
 }
 
-type Rand = () => number;
+export type Rand = () => number;
 const pick = <T,>(rand: Rand, xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)];
 function shuffle<T>(rand: Rand, xs: T[]): T[] {
   for (let i = xs.length - 1; i > 0; i--) {
@@ -120,6 +120,8 @@ function nameFor(rand: Rand, type: SectorType): string {
       return pick(rand, [`${n} Expanse`, `${n} Deep`, `Dust of ${n}`, `The ${n} Reach`]);
     case 'home':
       return `${n} Bastion`;
+    case 'voidspawn':
+      return pick(rand, [`The ${n} Wound`, `${n} Hollow`, `Maw of ${n}`, `The Echoing ${pick(rand, ['Dark', 'Choir', 'Deep', 'Silence'])}`]);
   }
 }
 
@@ -148,14 +150,23 @@ const LORE: Record<SectorType, [string[], string[]]> = {
     ['A fortified stronghold', 'A sprawling fortress-world', 'An armoured citadel'],
     ['that has never fallen.', 'from which the faction wages its war.'],
   ],
+  voidspawn: [
+    ['A festering breach in the Nexus', 'A world hollowed out by the Echoes', 'A pulsing mass of void-flesh'],
+    ['from which the Void Echoes pour forth.', 'that swallows the light of nearby stars.', 'whose whispers grow louder every cycle.'],
+  ],
 };
 
 const loreFor = (rand: Rand, type: SectorType) => `${pick(rand, LORE[type][0])} ${pick(rand, LORE[type][1])}`;
 
-/** A fresh random name, lore line and (for planets) benefit for a sector of the given type. */
-export function rollSector(type: SectorType, rand: Rand = Math.random): Pick<Sector, 'name' | 'notes' | 'benefit'> {
+/** A fresh random name, lore line and (for planets) benefit for a sector of the given type. Voidspawns belong to the Void Echoes. */
+export function rollSector(type: SectorType, rand: Rand = Math.random): Pick<Sector, 'name' | 'notes' | 'benefit' | 'owner'> {
   const benefits = BENEFITS.filter((b) => b.type === type);
-  return { name: nameFor(rand, type), notes: loreFor(rand, type), benefit: type === 'planet' && benefits.length ? pick(rand, benefits).id : undefined };
+  return {
+    name: nameFor(rand, type),
+    notes: loreFor(rand, type),
+    benefit: type === 'planet' && benefits.length ? pick(rand, benefits).id : undefined,
+    owner: type === 'voidspawn' ? ECHOES.id : undefined,
+  };
 }
 
 // ---- generation ----
@@ -170,13 +181,13 @@ export interface GenOptions {
   counts: GenCounts;
   /** Nearby sectors handed to each faction at the start. */
   startingSectors: number;
-  /** Delete every non-home sector first; otherwise keep placed sectors where they are. */
+  /** Delete every sector but the homes and Voidspawns first; otherwise keep placed sectors where they are. */
   replace: boolean;
 }
 
 export function defaultCounts(factions: number): GenCounts {
   const f = Math.max(2, factions);
-  return { planet: 2 * f + 1, research: Math.ceil(f / 2), void: Math.ceil(f / 2) + 1, anomaly: Math.ceil(f / 2), empty: 2 * f };
+  return { planet: 2 * f + 1, research: Math.ceil(f / 2), void: Math.ceil(f / 2) + 1, anomaly: Math.ceil(f / 2), empty: 2 * f, voidspawn: 1 };
 }
 
 /** Cells on the straight hex line from a to b, inclusive. */
@@ -208,10 +219,24 @@ export function generateMap(c: Campaign, o: GenOptions) {
   c.map = map;
   const all = cells(map);
   if (o.replace) {
-    c.sectors = c.sectors.filter((s) => s.type === 'home');
+    c.sectors = c.sectors.filter(isStronghold);
     for (const s of c.sectors) s.q = s.r = undefined;
   }
   clampToMap(c);
+  const used = new Set(c.sectors.map((s) => s.name));
+  const make = (type: SectorType): Sector => {
+    let name = nameFor(rand, type);
+    for (let i = 0; i < 20 && used.has(name); i++) name = nameFor(rand, type);
+    used.add(name);
+    const benefits = BENEFITS.filter((b) => b.type === type);
+    const s: Sector = { id: uid(), name, type, notes: loreFor(rand, type) };
+    if (type === 'planet' && benefits.length) s.benefit = pick(rand, benefits).id;
+    if (type === 'voidspawn') s.owner = ECHOES.id;
+    c.sectors.push(s);
+    return s;
+  };
+  // Voidspawns are laid out like homes, so add any still missing now.
+  for (let i = c.sectors.filter((s) => s.type === 'voidspawn').length; i < o.counts.voidspawn; i++) make('voidspawn');
 
   const taken = new Map<string, Sector>();
   for (const s of c.sectors) if (isPlaced(s)) taken.set(hexKey(s.q, s.r), s);
@@ -223,8 +248,8 @@ export function generateMap(c: Campaign, o: GenOptions) {
   };
   const edge = (h: Hex) => Math.min(colOf(h), map.cols - 1 - colOf(h), h.r, map.rows - 1 - h.r);
 
-  // Homes: farthest-point spread, kept off the very edge where possible.
-  const homes = c.sectors.filter((s) => s.type === 'home');
+  // Homes and Voidspawns: farthest-point spread, kept off the very edge where possible.
+  const homes = c.sectors.filter(isStronghold);
   for (const h of homes.filter((s) => !isPlaced(s))) {
     const placed = homes.filter(isPlaced);
     const options = all.filter(free);
@@ -236,21 +261,11 @@ export function generateMap(c: Campaign, o: GenOptions) {
   // The pool of new sectors still needed to reach the target counts.
   const pool: SectorType[] = [];
   for (const t of Object.keys(o.counts) as (keyof GenCounts)[]) {
+    if (t === 'voidspawn') continue;
     const have = c.sectors.filter((s) => s.type === t).length;
     for (let i = have; i < o.counts[t]; i++) pool.push(t);
   }
   shuffle(rand, pool);
-  const used = new Set(c.sectors.map((s) => s.name));
-  const make = (type: SectorType): Sector => {
-    let name = nameFor(rand, type);
-    for (let i = 0; i < 20 && used.has(name); i++) name = nameFor(rand, type);
-    used.add(name);
-    const benefits = BENEFITS.filter((b) => b.type === type);
-    const s: Sector = { id: uid(), name, type, notes: loreFor(rand, type) };
-    if (type === 'planet' && benefits.length) s.benefit = pick(rand, benefits).id;
-    c.sectors.push(s);
-    return s;
-  };
   const next = (): Sector => make(pool.pop() ?? 'empty');
 
   // Chains from each home to the centre keep the map connected and contested in the middle.
@@ -284,7 +299,7 @@ export function generateMap(c: Campaign, o: GenOptions) {
   for (let round = 0; round < o.startingSectors; round++) {
     for (const h of placedHomes) {
       if (!h.owner) continue;
-      const open = c.sectors.filter((s) => isPlaced(s) && !s.owner && s.type !== 'void' && s.type !== 'home');
+      const open = c.sectors.filter((s) => isPlaced(s) && !s.owner && s.type !== 'void' && !isStronghold(s));
       if (!open.length) break;
       const near = open.reduce((a, b) => (hexDistance(h as Hex, a as Hex) <= hexDistance(h as Hex, b as Hex) ? a : b));
       near.owner = h.owner;

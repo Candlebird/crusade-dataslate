@@ -398,6 +398,7 @@ table.compact .stepper input { width: 2.6rem; }
 .hex-research .hex-glyph { fill: #8fc1e3; }
 .hex-void .hex-glyph { fill: var(--cyan); }
 .hex-anomaly .hex-glyph { fill: #b583d6; }
+.hex-voidspawn .hex-glyph { fill: #a66bff; }
 .hex-empty .hex-glyph { fill: #666; }
 .hex-name { fill: var(--text); font: 600 7.5px var(--sans); text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }
 .hex-mark { fill: var(--text); font: 11px var(--sans); text-anchor: middle; }
