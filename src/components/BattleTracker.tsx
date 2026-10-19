@@ -16,6 +16,8 @@ import {
   held,
   leaders,
   loadForce,
+  loadUnits,
+  sidePoints,
   membersOf,
   newBattle,
   nexusNotes,
@@ -44,6 +46,9 @@ import {
   type TrackerUnit,
 } from '../rules/tracker';
 import { AI_TREES } from '../rules/aiTrees';
+import { echoesBook, randomEchoes } from '../rules/echoForce';
+import { ECHOES } from '../rules/nexusData';
+import { forceTotals } from '../rules/engine';
 import { MAX_PLAYERS, randomForces, randomFormat, type Format } from '../rules/randomBattle';
 import AiActivation from './AiActivation';
 import { Stepper, TextArea, TextField, confirmAction, toast } from './ui';
@@ -354,7 +359,7 @@ function StartBattle({ sectorId, preset }: { sectorId?: string; preset?: string 
           <label className="row"><input type="checkbox" checked={pickMission} onChange={(e) => setPickMission(e.target.checked)} />Random mission</label>
           <button onClick={randomize} title="Split the players into random teams (or all against the AI), and roll forces and a mission if ticked">🎲 Randomize</button>
         </div>
-        {forces.length > 0 && <p className="small">Forces, in side order: {forces.map((f) => f.name).join(', ')}. You can swap them once the battle starts.</p>}
+        {forces.length > 0 && <p className="small">Forces, in side order: {forces.map((f) => { const t = forceTotals(f, state.settings); return `${f.name} (${t.pointsUsed} pts, ${t.bp} BP)`; }).join(', ')}. You can swap them once the battle starts.</p>}
         <p className="muted small">Teams share objectives and VP. You can add, remove or regroup players once the battle starts.</p>
         {groups.map(([group, list]) => (
           <div key={group}>
@@ -519,6 +524,18 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
     setSide((s) => void s.units.push({ id: uid(), name, maxWounds: 1, wounds: 1, shaken: false, activated: false, destroyed: false, kills: 0 }));
   };
 
+  // The AI can field a random Void Echoes army, sized to match the sides it's up against.
+  const book = echoesBook(state.books);
+  const enemies = b.sides.filter((x) => x.team !== side.team).reduce((n, x) => n + sidePoints(x), 0);
+  const [target, setTarget] = useState(() => enemies || 1000);
+  const generate = () => {
+    if (!book) return;
+    const units = randomEchoes(book, target);
+    if (side.units.length && !confirmAction(`Replace ${side.name}'s ${side.units.length} units with a random ${ECHOES.name} army?`)) return;
+    setSide((s) => loadUnits(s, ECHOES.name, units));
+    toast(`${ECHOES.name}: ${units.length} units, ${units.reduce((n, u) => n + u.points, 0)} pts.`);
+  };
+
   const pickForce = (forceId: string, listId: string) => {
     const f = forces.find((x) => x.id === forceId);
     if (!f) return setSide((s) => Object.assign(s, { forceId: undefined, listId: undefined, units: [], bp: 0, manipulations: [] }));
@@ -530,7 +547,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
       <div className="panel-title">
         <h2><TextField value={side.name} onCommit={(v) => setSide((s) => void (s.name = v || (s.ai ? 'AI' : 'Player')))} /></h2>
         <span className="row small muted">
-          {side.bp ? `${side.bp} BP · ` : ''}{alive}/{side.units.length} units
+          {sidePoints(side) ? `${sidePoints(side)} pts · ` : ''}{side.units.length ? `${side.bp} BP · ` : ''}{alive}/{side.units.length} units
           {b.sides.length > 2 && (
             <button className="ghost icon" aria-label={`Remove ${side.name}`} onClick={() => confirmAction(`Remove ${side.name} from this battle?`) && set((d) => removeSide(d, id))}>✕</button>
           )}
@@ -563,6 +580,21 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
               {force.lists!.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </label>
+        )}
+        {side.ai && (
+          <div className="field">
+            <span>{ECHOES.name} army</span>
+            {book ? (
+              <div className="row">
+                <Stepper value={target} step={50} min={50} onChange={setTarget} />
+                <span className="small muted">pts</span>
+                <button onClick={generate} title="Build a random army from the Void Echoes book, up to the target points">🎲 Generate</button>
+                {enemies > 0 && enemies !== target && <button className="ghost small" onClick={() => setTarget(enemies)}>Match {enemies} pts</button>}
+              </div>
+            ) : (
+              <span className="muted small">Import the {ECHOES.name} army book on the <a href={href.books()}>Books page</a> to generate an army.</span>
+            )}
+          </div>
         )}
         <label className="field">
           <span>VP adjustment</span>

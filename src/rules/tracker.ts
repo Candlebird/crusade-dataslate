@@ -41,6 +41,8 @@ export interface TrackerUnit {
   activated: boolean;
   destroyed: boolean;
   kills: number;
+  /** The unit's points cost, when it came from a force or the army book. */
+  points?: number;
   /** Which AI decision tree the unit follows when its side is run by the AI (hybrid if unset). */
   aiStyle?: AiStyle;
 }
@@ -124,6 +126,14 @@ function cleanTeams(b: TrackedBattle) {
 }
 
 /** The teams in play, in A, B, C order. */
+/** The side's points: every unit it started with. */
+export const sidePoints = (side: TrackerSide) => side.units.reduce((n, u) => n + (u.points ?? 0), 0);
+
+/** Load a generated army (no crusade force) into a side. */
+export function loadUnits(side: TrackerSide, name: string, units: Unit[]) {
+  Object.assign(side, { name, forceId: undefined, listId: undefined, units: units.map(trackerUnit), bp: 0, manipulations: [] });
+}
+
 export const teamsOf = (b: TrackedBattle): TeamKey[] => TEAMS.filter((t) => b.sides.some((x) => x.team === t));
 export const membersOf = (b: TrackedBattle, t: TeamKey) => b.sides.filter((x) => x.team === t);
 export const teamName = (b: TrackedBattle, t: TeamKey) => membersOf(b, t).map((x) => x.name).join(' & ') || `Team ${t}`;
@@ -162,7 +172,7 @@ export function migrateBattle(b: any): TrackedBattle | undefined {
 
 export function trackerUnit(u: Unit): TrackerUnit {
   const maxWounds = Math.max(1, u.size) * Math.max(1, u.tough || 1);
-  return { id: u.id, unitId: u.id, name: unitName(u), maxWounds, wounds: maxWounds, shaken: false, activated: false, destroyed: false, kills: 0, aiStyle: aiStyleFor(u) };
+  return { id: u.id, unitId: u.id, name: unitName(u), maxWounds, wounds: maxWounds, shaken: false, activated: false, destroyed: false, kills: 0, points: u.points, aiStyle: aiStyleFor(u) };
 }
 
 /** Fill a side from a force (and one of its lists, or every active unit). */
