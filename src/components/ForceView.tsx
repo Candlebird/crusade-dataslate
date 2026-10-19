@@ -14,6 +14,8 @@ import { CATEGORIES, type Category } from '../rules/data';
 import { SECTOR_TYPES, benefitOf, emptyNexus, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
 import { RESULT_LABEL } from '../rules/battle';
 import { listTotals, newList } from '../rules/lists';
+import { matchesTags, tagsIn, unitTags } from '../model/tags';
+import { TagFilter, UnitTags } from './Tags';
 import { Stepper, TextArea, TextField, XpBar, toast } from './ui';
 
 export default function ForceView({ forceId }: { forceId: string }) {
@@ -23,6 +25,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const [showRemoved, setShowRemoved] = useState(false);
   const [shopping, setShopping] = useState(false);
   const [umbra, setUmbra] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const f = state.forces.find((x) => x.id === forceId);
   if (!f) return <div className="panel empty">Force not found. <a href={href.forces()}>Back to forces</a></div>;
 
@@ -30,7 +33,8 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const armyUrl = forceArmyUrl(f, state.books);
   const t = forceTotals(f, s);
   const set = (fn: Parameters<typeof updateForce>[1]) => updateForce(f.id, fn);
-  const units = f.units.filter((u) => showRemoved || u.status !== 'removed');
+  const listed = f.units.filter((u) => showRemoved || u.status !== 'removed');
+  const units = listed.filter((u) => matchesTags(unitTags(u, state.books), tagFilter));
   const removedCount = f.units.filter((u) => u.status === 'removed').length;
   const theirs = !!cloud.email && !!f.owner && f.owner !== cloud.email;
 
@@ -85,10 +89,13 @@ export default function ForceView({ forceId }: { forceId: string }) {
                 </label>
               )}
             </div>
-            {units.length === 0 ? (
+            <TagFilter tags={tagsIn(listed.map((u) => unitTags(u, state.books)))} value={tagFilter} onChange={setTagFilter} />
+            {listed.length === 0 ? (
               <div className="empty">
                 No units yet. <button onClick={() => setAdding(true)}>+ Add the first one</button>
               </div>
+            ) : units.length === 0 ? (
+              <div className="empty">No units carry all of those tags.</div>
             ) : (
               <div className="table-wrap">
                 <table>
@@ -96,6 +103,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                     <tr>
                       <th>Unit</th>
                       <th>Category</th>
+                      <th>Tags</th>
                       <th style={{ minWidth: 110 }}>XP</th>
                       <th className="num">Lvl</th>
                       <th className="num">Pts</th>
@@ -113,6 +121,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                             {u.name && <div className="muted small">{u.unitType}</div>}
                           </td>
                           <td className="cat">{u.category}</td>
+                          <td><UnitTags unit={u} /></td>
                           <td><XpBar xp={u.xp} mini /><span className="small muted">{u.xp} XP</span></td>
                           <td className="num">{levelForXp(u.xp)}</td>
                           <td className="num">{u.points}</td>

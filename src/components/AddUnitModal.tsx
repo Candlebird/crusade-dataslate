@@ -5,6 +5,8 @@ import { newUnit, uid, unitFromCatalog } from '../model/factory';
 import type { CatalogUnit, Unit } from '../model/types';
 import { detectCategory, ruleRating } from '../rules/engine';
 import { href } from '../route';
+import { datasheetTags, matchesTags, tagsIn } from '../model/tags';
+import { DatasheetTags, TagFilter } from './Tags';
 import { Modal, Stepper } from './ui';
 
 type Tab = 'catalog' | 'text' | 'blank';
@@ -31,14 +33,18 @@ function CatalogTab({ onAdd }: { onAdd: (u: Unit[]) => void }) {
   const { state } = useStore();
   const [bookId, setBookId] = useState(state.books[0]?.uid ?? '');
   const [query, setQuery] = useState('');
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [unitId, setUnitId] = useState<string | null>(null);
   const [sel, setSel] = useState<Selection>({});
   const [name, setName] = useState('');
 
   const book = state.books.find((b) => b.uid === bookId);
   const units = useMemo(
-    () => (book?.units ?? []).filter((u) => u.name.toLowerCase().includes(query.toLowerCase())),
-    [book, query],
+    () =>
+      (book?.units ?? []).filter(
+        (u) => u.name.toLowerCase().includes(query.toLowerCase()) && matchesTags(datasheetTags(book, u.name), tagFilter),
+      ),
+    [book, query, tagFilter],
   );
   const unit = book?.units.find((u) => u.id === unitId);
   const loadout = unit ? applySelection(unit, sel) : null;
@@ -65,12 +71,14 @@ function CatalogTab({ onAdd }: { onAdd: (u: Unit[]) => void }) {
           {book && <a href={bookPageUrl(book.uid, book.name)} target="_blank" rel="noreferrer" title="Open this army on Army Forge">↗</a>}
           <input placeholder="Search datasheets…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1 }} />
         </div>
+        {book && <TagFilter tags={tagsIn(Object.values(book.unitTags ?? {}))} value={tagFilter} onChange={setTagFilter} />}
         <div className="pick-list">
           {units.map((u) => (
             <div key={u.id} className={`pick${u.id === unitId ? ' selected' : ''}`} onClick={() => pick(u)}>
               <div style={{ flex: 1 }}>
                 <b>{u.name}</b> <span className="muted small">[{u.size}] Q{u.quality}+ D{u.defense}+</span>
                 <div className="muted small">{u.rules.join(', ')}</div>
+                <DatasheetTags book={book!} name={u.name} />
               </div>
               <span className="cost" style={{ color: 'var(--gold)' }}>{u.cost}pts</span>
             </div>

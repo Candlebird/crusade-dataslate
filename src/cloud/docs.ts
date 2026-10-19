@@ -79,7 +79,7 @@ export function localDocs(state: AppState, who: Who, images: Map<string, string>
   if (c) {
     docs.push({ path: CAMPAIGN_PATH, json: toCloudJson(c, images), updatedAt: c.updatedAt, canWrite: who.isGm || c.id === who.cloudCampaignId, fields: { id: c.id } });
   }
-  for (const b of state.books) docs.push({ path: `books/${b.uid}`, json: toCloudJson(b, images), updatedAt: '', canWrite: true });
+  for (const b of state.books) docs.push({ path: `books/${b.uid}`, json: toCloudJson(b, images), updatedAt: b.updatedAt ?? '', canWrite: true });
   docs.push({ path: SETTINGS_PATH, json: JSON.stringify(sharedSettings(state.settings)), updatedAt: '', canWrite: who.isGm });
   if (state.coreRules) docs.push({ path: CORE_RULES_PATH, json: JSON.stringify(state.coreRules), updatedAt: '', canWrite: true });
   return docs;

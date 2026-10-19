@@ -1,16 +1,19 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { ArmyList, CatalogBook, Force, RuleText, Settings, Unit } from '../model/types';
 import { battlePoints, hasRule, levelForXp } from '../rules/engine';
 import { glossary, isHero, joinedTo, label, listIssues, listSpells, listTotals, listUnits, weaponColumns } from '../rules/lists';
 import { go, href } from '../route';
+import { matchesTags, tagsIn, unitTags } from '../model/tags';
+import { TagFilter, UnitTags } from './Tags';
 import { Issues, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
 export default function ListPage({ forceId, listId }: { forceId: string; listId: string }) {
   const { state, updateForce } = useStore();
   const f = state.forces.find((x) => x.id === forceId);
   const l = f?.lists?.find((x) => x.id === listId);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
 
   // The browser uses the page title as the default PDF file name.
   useEffect(() => {
@@ -57,7 +60,8 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
     go(href.force(f.id));
   };
 
-  const units = f.units.filter((u) => u.status !== 'removed' || selected.has(u.id));
+  const listed = f.units.filter((u) => u.status !== 'removed' || selected.has(u.id));
+  const units = listed.filter((u) => matchesTags(unitTags(u, state.books), tagFilter));
 
   return (
     <>
@@ -80,13 +84,16 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
               <h2>Units</h2>
               <span className="muted small">{t.units} selected</span>
             </div>
-            {units.length === 0 ? (
+            <TagFilter tags={tagsIn(listed.map((u) => unitTags(u, state.books)))} value={tagFilter} onChange={setTagFilter} />
+            {listed.length === 0 ? (
               <div className="empty">This force has no units yet.</div>
+            ) : units.length === 0 ? (
+              <div className="empty">No units carry all of those tags.</div>
             ) : (
               <div className="table-wrap">
                 <table>
                   <thead>
-                    <tr><th /><th>Unit</th><th>Category</th><th className="num">Pts</th><th className="num">BP</th><th>Joins</th></tr>
+                    <tr><th /><th>Unit</th><th>Category</th><th>Tags</th><th className="num">Pts</th><th className="num">BP</th><th>Joins</th></tr>
                   </thead>
                   <tbody>
                     {units.map((u) => {
@@ -103,6 +110,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
                             {u.status === 'comatose' && <span className="tag cyan">Comatose</span>}
                             {u.status === 'removed' && <span className="tag red">Fallen</span>}
                           </td>
+                          <td><UnitTags unit={u} editable={false} /></td>
                           <td className="num">{u.points}</td>
                           <td className="num">{battlePoints(u, s)}</td>
                           <td onClick={(e) => e.stopPropagation()}>

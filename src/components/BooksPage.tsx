@@ -3,6 +3,8 @@ import { useStore } from '../model/store';
 import { CORE_RULES_URL, bookApiUrl, bookPageUrl, fetchBook, fetchCoreRules, parseBookUid } from '../armyforge/book';
 import { interpretJson } from '../model/io';
 import { href } from '../route';
+import { datasheetTags, matchesTags, tagsIn } from '../model/tags';
+import { DatasheetTags, TagFilter } from './Tags';
 import { Dropzone, toast } from './ui';
 import { useImporter } from './importer';
 
@@ -128,7 +130,7 @@ export default function BooksPage() {
               className="ghost icon"
               aria-label={`Remove ${b.name}`}
               onClick={() => {
-                if (!window.confirm(`Remove "${b.name}"? Units already built from it are kept.`)) return;
+                if (!window.confirm(`Remove "${b.name}"? Units already built from it are kept, but its unit tags are lost.`)) return;
                 update((d) => void (d.books = d.books.filter((x) => x.uid !== b.uid)));
               }}
             >
@@ -147,9 +149,13 @@ function BookBrowser({ uid }: { uid: string }) {
   const { state } = useStore();
   const [tab, setTab] = useState<'units' | 'rules' | 'spells'>('units');
   const [query, setQuery] = useState('');
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const book = state.books.find((b) => b.uid === uid);
   const q = query.toLowerCase();
-  const units = useMemo(() => (book?.units ?? []).filter((u) => u.name.toLowerCase().includes(q)), [book, q]);
+  const units = useMemo(
+    () => (book?.units ?? []).filter((u) => u.name.toLowerCase().includes(q) && matchesTags(datasheetTags(book, u.name), tagFilter)),
+    [book, q, tagFilter],
+  );
   const rules = useMemo(() => (book?.rules ?? []).filter((r) => (r.name + r.desc).toLowerCase().includes(q)), [book, q]);
   if (!book) return null;
 
@@ -164,16 +170,18 @@ function BookBrowser({ uid }: { uid: string }) {
           <input placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
       </div>
+      {tab === 'units' && <TagFilter tags={tagsIn(Object.values(book.unitTags ?? {}))} value={tagFilter} onChange={setTagFilter} />}
       {tab === 'units' && (
         <div className="table-wrap">
           <table>
             <thead>
-              <tr><th>Datasheet</th><th className="num">Size</th><th className="num">Q</th><th className="num">D</th><th>Rules</th><th>Weapons</th><th className="num">Pts</th></tr>
+              <tr><th>Datasheet</th><th>Tags</th><th className="num">Size</th><th className="num">Q</th><th className="num">D</th><th>Rules</th><th>Weapons</th><th className="num">Pts</th></tr>
             </thead>
             <tbody>
               {units.map((u) => (
                 <tr key={u.id}>
                   <td><b>{u.name}</b></td>
+                  <td><DatasheetTags book={book} name={u.name} /></td>
                   <td className="num">{u.size}</td>
                   <td className="num">{u.quality}+</td>
                   <td className="num">{u.defense}+</td>

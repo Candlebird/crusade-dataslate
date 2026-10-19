@@ -482,3 +482,13 @@ fieldset.fields:disabled { opacity: 0.6; }
 .account .dot.synced { background: #9cc274; }
 .account .dot.syncing { background: var(--gold); }
 .account .dot.error { background: var(--red); }
+
+/* ---- custom unit tags ---- */
+.tag.utag { border-color: #4b4570; color: #bdb2e6; }
+.tag-editor { display: inline-flex; flex-wrap: wrap; align-items: center; }
+.tag-editor .tag-add { cursor: pointer; color: var(--muted); border-style: dashed; font: inherit; font-size: 0.78rem; }
+.tag-editor .tag-add:hover { color: var(--text); border-color: var(--gold-dim); }
+.tag-input { width: 8rem; padding: 0.1rem 0.35rem; font-size: 0.8rem; margin: 0 0.25rem 0.25rem 0; }
+.tag-filter { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center; margin-bottom: 0.5rem; }
+.chip { font-size: 0.78rem; padding: 0.1rem 0.5rem; border-radius: 999px; }
+.chip.on { border-color: #8a7cd0; background: rgba(138, 124, 208, 0.22); color: #ddd5ff; }
