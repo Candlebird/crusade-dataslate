@@ -134,6 +134,15 @@ export async function fetchBook(uid: string, proxy: string): Promise<CatalogBook
   return normalizeBook(await res.json());
 }
 
+/** OPR core rule descriptions for Grimdark Future. */
+export const CORE_RULES_URL = 'https://army-forge.onepagerules.com/api/rules/common/2';
+
+export async function fetchCoreRules(proxy: string): Promise<unknown> {
+  const res = await fetch(`${proxy.replace(/\/$/, '')}/?url=${encodeURIComponent(CORE_RULES_URL)}`);
+  if (!res.ok) throw new Error(`Army Forge returned ${res.status}`);
+  return res.json();
+}
+
 // ---- Applying upgrade options to a catalog unit ----
 
 /** Selected option quantities, keyed by `${sectionId}:${optionId}`. */

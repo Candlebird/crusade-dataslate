@@ -12,6 +12,7 @@ import type { Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
 import { SECTOR_TYPES, benefitOf, emptyNexus, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
 import { RESULT_LABEL } from '../rules/battle';
+import { listTotals, newList } from '../rules/lists';
 import { Stepper, TextArea, TextField, XpBar, toast } from './ui';
 
 export default function ForceView({ forceId }: { forceId: string }) {
@@ -119,6 +120,35 @@ export default function ForceView({ forceId }: { forceId: string }) {
                   </tbody>
                 </table>
               </div>
+            )}
+          </div>
+
+          <div className="panel">
+            <div className="panel-title">
+              <h2>Battle lists</h2>
+              <button
+                className="primary"
+                onClick={() => {
+                  const l = newList(f, uid());
+                  set((d) => void (d.lists = [...(d.lists ?? []), l]));
+                  go(href.list(f.id, l.id));
+                }}
+              >
+                + New list
+              </button>
+            </div>
+            {!f.lists?.length ? (
+              <p className="muted small">Pick units for a game and print them with their stats, traits, relics and rules.</p>
+            ) : (
+              f.lists.map((l) => {
+                const lt = listTotals(f, l, s);
+                return (
+                  <div key={l.id} className="list-item">
+                    <a className="grow" href={href.list(f.id, l.id)}><b>{l.name}</b></a>
+                    <span className={`small ${lt.points > l.pointsLimit ? 'tag red' : 'muted'}`}>{lt.points} / {l.pointsLimit} pts · {lt.units} units</span>
+                  </div>
+                );
+              })
             )}
           </div>
 

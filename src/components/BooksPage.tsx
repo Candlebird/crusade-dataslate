@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../model/store';
-import { bookApiUrl, bookPageUrl, fetchBook, parseBookUid } from '../armyforge/book';
+import { CORE_RULES_URL, bookApiUrl, bookPageUrl, fetchBook, fetchCoreRules, parseBookUid } from '../armyforge/book';
+import { interpretJson } from '../model/io';
 import { href } from '../route';
 import { Dropzone, toast } from './ui';
 import { useImporter } from './importer';
@@ -22,6 +23,20 @@ export default function BooksPage() {
       addBook(book);
       setOpenId(book.uid);
       toast(`Army book "${book.name}" imported (${book.units.length} datasheets).`);
+    } catch (e) {
+      toast(`Direct fetch failed: ${e instanceof Error ? e.message : e}. Use the download link instead.`, 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fetchCore = async () => {
+    setBusy(true);
+    try {
+      const got = interpretJson(await fetchCoreRules(proxy));
+      if (got.kind !== 'coreRules') throw new Error('unexpected response');
+      update((d) => void (d.coreRules = got.rules));
+      toast(`Core rules imported (${got.rules.length} rules).`);
     } catch (e) {
       toast(`Direct fetch failed: ${e instanceof Error ? e.message : e}. Use the download link instead.`, 'error');
     } finally {
@@ -76,9 +91,24 @@ export default function BooksPage() {
         <div className="panel">
           <div className="panel-title"><h2>Drop book file</h2></div>
           <Dropzone accept=".json,application/json" onFiles={importFiles}>
-            Drop the downloaded <b>Army Forge book JSON</b> here — or click to choose.
+            Drop the downloaded <b>Army Forge book JSON</b> (or core rules JSON) here — or click to choose.
           </Dropzone>
         </div>
+      </div>
+
+      <div className="panel">
+        <div className="panel-title">
+          <h2>Core rules</h2>
+          <div className="row">
+            <a className="btn" href={CORE_RULES_URL} target="_blank" rel="noreferrer" download="core-rules.json">Download core rules JSON</a>
+            {proxy && <button disabled={busy} onClick={fetchCore}>{busy ? 'Fetching…' : 'Fetch directly'}</button>}
+          </div>
+        </div>
+        <p className="small" style={{ margin: 0 }}>
+          {state.coreRules?.length
+            ? <><span className="tag green">Imported</span> {state.coreRules.length} core rules (AP, Tough, Hero, Fearless…) are printed in battle list glossaries.</>
+            : <>Army books only describe their own rules. For the full <b>Special Rules</b> section on printed lists, download the core rules once and drop the file in the box above.</>}
+        </p>
       </div>
 
       <div className="panel">

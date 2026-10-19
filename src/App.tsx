@@ -6,6 +6,7 @@ import BattleWizard from './components/BattleWizard';
 import DiceRoller from './components/DiceRoller';
 import BooksPage from './components/BooksPage';
 import CampaignPage from './components/CampaignPage';
+import ListPage from './components/ListPage';
 import SettingsPage from './components/SettingsPage';
 import { Toaster } from './components/ui';
 
@@ -21,7 +22,7 @@ export default function App() {
           </span>
         </a>
         <nav>
-          <a className={route.page === 'forces' || route.page === 'force' || route.page === 'unit' || route.page === 'battle' ? 'active' : ''} href={href.forces()}>
+          <a className={route.page === 'forces' || route.page === 'force' || route.page === 'unit' || route.page === 'battle' || route.page === 'list' ? 'active' : ''} href={href.forces()}>
             Forces
           </a>
           <a className={route.page === 'campaign' ? 'active' : ''} href={href.campaign()}>
@@ -41,6 +42,7 @@ export default function App() {
         {route.page === 'force' && <ForceView forceId={route.forceId} />}
         {route.page === 'unit' && <UnitSheet forceId={route.forceId} unitId={route.unitId} />}
         {route.page === 'battle' && <BattleWizard key={route.forceId} forceId={route.forceId} />}
+        {route.page === 'list' && <ListPage forceId={route.forceId} listId={route.listId} />}
         {route.page === 'campaign' && <CampaignPage />}
         {route.page === 'books' && <BooksPage />}
         {route.page === 'settings' && <SettingsPage />}

@@ -1,4 +1,4 @@
-import type { AppState, Campaign, Force } from './types';
+import type { AppState, Campaign, Force, RuleText } from './types';
 import { normalizeBook } from '../armyforge/book';
 import type { CatalogBook } from './types';
 import { uid } from './factory';
@@ -34,7 +34,8 @@ export type Imported =
   | { kind: 'force'; force: Force }
   | { kind: 'backup'; state: AppState }
   | { kind: 'book'; book: CatalogBook }
-  | { kind: 'campaign'; campaign: Campaign };
+  | { kind: 'campaign'; campaign: Campaign }
+  | { kind: 'coreRules'; rules: RuleText[] };
 
 /** Detect what a dropped JSON file is: a force, a full backup, or a raw Army Forge army book. */
 export function interpretJson(data: any): Imported {
@@ -45,7 +46,15 @@ export function interpretJson(data: any): Imported {
     return { kind: 'backup', state: state as AppState };
   }
   if (Array.isArray(data?.units) && Array.isArray(data?.upgradePackages)) return { kind: 'book', book: normalizeBook(data) };
-  throw new Error('Unrecognized file. Expected a .force.json, a campaign.json, a backup, or an Army Forge army book.');
+  if (Array.isArray(data?.rules) && Array.isArray(data?.traits) && !data.units) return { kind: 'coreRules', rules: normalizeCoreRules(data) };
+  throw new Error('Unrecognized file. Expected a .force.json, a campaign.json, a backup, an Army Forge army book, or the Army Forge core rules.');
+}
+
+/** Army Forge's common rules file (`/api/rules/common/2`). Its official campaign traits are skipped: the house tables cover those. */
+export function normalizeCoreRules(data: any): RuleText[] {
+  return data.rules
+    .filter((r: any) => typeof r?.name === 'string' && typeof r?.description === 'string' && !/REMOVE/.test(r.name))
+    .map((r: any) => ({ name: r.name.trim(), desc: r.description.trim() }));
 }
 
 export async function readJsonFile(file: File): Promise<Imported> {

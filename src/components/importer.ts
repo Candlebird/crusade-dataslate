@@ -16,6 +16,9 @@ export function useImporter() {
           if (got.kind === 'book') {
             addBook(got.book);
             toast(`Army book "${got.book.name}" imported (${got.book.units.length} datasheets).`);
+          } else if (got.kind === 'coreRules') {
+            update((d) => void (d.coreRules = got.rules));
+            toast(`Core rules imported (${got.rules.length} rules). List glossaries will now include them.`);
           } else if (got.kind === 'force') {
             const existing = state.forces.find((f) => f.id === got.force.id);
             if (existing) {

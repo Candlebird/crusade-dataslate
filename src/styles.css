@@ -413,3 +413,62 @@ table.compact .stepper input { width: 2.6rem; }
   .map-side { border-left: 0; padding-left: 0; border-top: 1px solid var(--line); padding-top: 0.75rem; }
   .hexmap { height: 60vh; }
 }
+
+/* ---- battle lists ---- */
+tr.unpicked td { opacity: 0.6; }
+.sheet-label { margin-top: 0.5rem; }
+/* The sheet is paper on screen too, so the preview matches the print. */
+.sheet {
+  --ink: #111;
+  --ink-2: #555;
+  --rule: #bbb;
+  background: #fff;
+  color: var(--ink);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  font-size: 12.5px;
+  line-height: 1.35;
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+  color-scheme: light;
+}
+.sheet h1, .sheet h2 { color: var(--ink); font-family: var(--serif); letter-spacing: 0.04em; }
+.sheet h1 { font-size: 1.4rem; margin: 0; }
+.sheet h2 { font-size: 1rem; margin: 0 0 0.4rem; border-bottom: 2px solid var(--ink); padding-bottom: 2px; }
+.sheet-head { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-bottom: 2px solid var(--ink); padding-bottom: 6px; margin-bottom: 8px; }
+.sheet-totals { text-align: right; color: var(--ink-2); }
+.sheet-totals b { color: var(--ink); font-size: 1.05rem; }
+.sheet-notes { border: 1px solid var(--rule); padding: 4px 8px; margin-bottom: 8px; white-space: pre-wrap; }
+.sheet-notes p { margin: 2px 0; }
+.sheet-empty { color: var(--ink-2); text-align: center; padding: 1.5rem; }
+.sheet-units { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.sheet.compact .sheet-units { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.sheet-card { border: 1px solid var(--ink); break-inside: avoid; page-break-inside: avoid; }
+.sheet-card.joined { border-left-width: 4px; }
+.card-head { display: flex; justify-content: space-between; gap: 0.5rem; background: #e6e6e6; padding: 3px 6px; border-bottom: 1px solid var(--ink); print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.card-head b { font-size: 1.02rem; }
+.card-type { color: var(--ink-2); }
+.card-stats { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; padding: 3px 6px; border-bottom: 1px solid var(--rule); }
+.card-flag { font-weight: 700; text-transform: uppercase; }
+.card-line { padding: 2px 6px; }
+.card-weapons { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 2px 0; font-size: inherit; }
+.card-weapons th, .card-weapons td { border: 0; border-bottom: 1px solid var(--rule); padding: 2px 6px; text-align: left; color: var(--ink); background: none; vertical-align: top; }
+.card-weapons th { font-weight: 700; text-transform: none; letter-spacing: 0; font-size: inherit; }
+.card-weapons td:nth-child(2), .card-weapons td:nth-child(3), .card-weapons td:nth-child(4) { white-space: nowrap; }
+.sheet-rules { margin-top: 12px; break-inside: auto; }
+.sheet-rule-cols { columns: 2; column-gap: 18px; }
+.sheet-rule-cols p { margin: 0 0 4px; break-inside: avoid; }
+@media (max-width: 700px) {
+  .sheet { padding: 12px; }
+  .sheet.compact .sheet-units { grid-template-columns: minmax(0, 1fr); }
+  .sheet-rule-cols { columns: 1; }
+}
+@media print {
+  @page { margin: 10mm; }
+  body { background: #fff; }
+  .topbar, .footer, .no-print, .toast { display: none !important; }
+  .content { max-width: none; padding: 0; }
+  .sheet { box-shadow: none; padding: 0; border-radius: 0; }
+  .sheet.compact .sheet-units { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sheet-rule-cols { columns: 2; }
+}

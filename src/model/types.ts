@@ -122,6 +122,23 @@ export interface ForceNexus {
   pending: string[];
 }
 
+/** A battle list: a printable selection of the force's units for one game. */
+export interface ArmyList {
+  id: string;
+  name: string;
+  /** Game size in points. */
+  pointsLimit: number;
+  /** Selected unit ids, in print order. */
+  unitIds: string[];
+  /** Hero unit id -> id of the unit it joins. */
+  joins: Record<string, string>;
+  notes: string;
+  /** Print the special rules glossary and spells. */
+  glossary: boolean;
+  /** Print two unit cards side by side. */
+  compact: boolean;
+}
+
 export interface Force {
   id: string;
   name: string;
@@ -140,6 +157,7 @@ export interface Force {
   umbraShards: number;
   nexus?: ForceNexus;
   battleLog?: BattleRecord[];
+  lists?: ArmyList[];
   createdAt: string;
   updatedAt: string;
 }
@@ -276,10 +294,17 @@ export interface Campaign {
   map?: CampaignMap;
 }
 
+export interface RuleText {
+  name: string;
+  desc: string;
+}
+
 export interface AppState {
   version: 1;
   forces: Force[];
   books: CatalogBook[];
   settings: Settings;
   campaign?: Campaign;
+  /** OPR core rule descriptions (AP, Tough, Hero…), imported from Army Forge for list glossaries. */
+  coreRules?: RuleText[];
 }
