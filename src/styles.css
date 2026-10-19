@@ -535,6 +535,10 @@ fieldset.fields:disabled { opacity: 0.6; }
 .tracker-units tr.done td { opacity: 0.6; }
 .tracker-units tr.dead td { opacity: 0.4; text-decoration: line-through; }
 .tracker-units tr.dead td .stepper, .tracker-units tr.dead td input { text-decoration: none; }
+.ai-activation { border: 1px solid var(--gold-dim); border-radius: 6px; padding: 0.6rem 0.75rem; margin-bottom: 0.75rem; }
+.ai-path { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+.ai-question { margin: 0.6rem 0 0.4rem; font-weight: 600; }
+.ai-order { margin: 0.6rem 0 0.5rem; font-size: 1.15rem; font-weight: 700; color: var(--gold); }
 .result-panel { border-color: var(--gold); }
 .past-battle { align-items: flex-start; padding: 0.5rem 0; }
 .past-sides { display: grid; gap: 0.25rem; margin: 0.35rem 0; }

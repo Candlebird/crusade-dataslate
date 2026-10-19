@@ -4,6 +4,7 @@ import { listUnits } from './lists';
 import { emptyUnitBattle, unitName, type BattleInput } from './battle';
 import { benefitOf, ORGANIZED_STRIKE, ownedSectors } from './nexus';
 import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
+import { aiStyleFor, type AiStyle } from './aiTrees';
 
 // The battle tracker: one game in progress, scored from the mission it was started with.
 // The mission is copied in, so editing the library mid-game doesn't change a running battle.
@@ -40,6 +41,8 @@ export interface TrackerUnit {
   activated: boolean;
   destroyed: boolean;
   kills: number;
+  /** Which AI decision tree the unit follows when its side is run by the AI (hybrid if unset). */
+  aiStyle?: AiStyle;
 }
 
 export interface TrackerAgenda {
@@ -159,7 +162,7 @@ export function migrateBattle(b: any): TrackedBattle | undefined {
 
 export function trackerUnit(u: Unit): TrackerUnit {
   const maxWounds = Math.max(1, u.size) * Math.max(1, u.tough || 1);
-  return { id: u.id, unitId: u.id, name: unitName(u), maxWounds, wounds: maxWounds, shaken: false, activated: false, destroyed: false, kills: 0 };
+  return { id: u.id, unitId: u.id, name: unitName(u), maxWounds, wounds: maxWounds, shaken: false, activated: false, destroyed: false, kills: 0, aiStyle: aiStyleFor(u) };
 }
 
 /** Fill a side from a force (and one of its lists, or every active unit). */

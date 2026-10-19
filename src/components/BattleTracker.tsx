@@ -40,6 +40,8 @@ import {
   type TrackerSide,
   type TrackerUnit,
 } from '../rules/tracker';
+import { AI_TREES } from '../rules/aiTrees';
+import AiActivation from './AiActivation';
 import { Stepper, TextArea, TextField, confirmAction } from './ui';
 
 export default function BattleTracker() {
@@ -413,6 +415,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
   const alive = side.units.filter((u) => !u.destroyed).length;
   const takenForces = new Set(b.sides.filter((x) => x.id !== id).map((x) => x.forceId));
   const [adding, setAdding] = useState('');
+  const [aiUnit, setAiUnit] = useState<string | null>(null);
   const addUnit = () => {
     const name = adding.trim();
     if (!name) return;
@@ -511,6 +514,13 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
         {COMBAT_MANIPULATIONS.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
       </select>
 
+      {side.ai && side.units.length > 0 && (
+        <>
+          <h3>AI activation</h3>
+          <AiActivation key={aiUnit ?? ''} side={side} unitId={aiUnit} onPick={setAiUnit} setUnit={setUnit} />
+        </>
+      )}
+
       <h3>Units</h3>
       {side.units.length === 0 && <p className="muted small">Load a crusade force above, or add units by hand.</p>}
       {side.units.length > 0 && (
@@ -520,7 +530,15 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
             <tbody>
               {side.units.map((u) => (
                 <tr key={u.id} className={u.destroyed ? 'dead' : u.activated ? 'done' : ''}>
-                  <td className="s-2"><b>{u.name}</b></td>
+                  <td className="s-2">
+                    <b>{u.name}</b>
+                    {side.ai && !u.destroyed && (
+                      <div className="row small">
+                        <span className="muted">{AI_TREES[u.aiStyle ?? 'hybrid'].label}</span>
+                        <button className="ghost small" onClick={() => setAiUnit(u.id)}>Decide</button>
+                      </div>
+                    )}
+                  </td>
                   <td className="num s-end" data-label="Wounds">
                     <Stepper value={u.wounds} min={0} onChange={(n) => setUnit(u.id, (x) => { if (!x.unitId) x.maxWounds = Math.max(x.maxWounds, n); x.wounds = Math.min(x.maxWounds, n); x.destroyed = x.wounds === 0; })} />
                     <span className="small muted"> / {u.maxWounds}</span>
