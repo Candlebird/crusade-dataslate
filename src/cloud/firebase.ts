@@ -1,7 +1,7 @@
 /** Everything that touches the Firebase SDK. Loaded on demand so the app starts without it. */
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
-import { collection, doc, getDoc, getFirestore, onSnapshot, writeBatch } from 'firebase/firestore';
+import { collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, setDoc, writeBatch } from 'firebase/firestore';
 import { firebaseConfig } from './config';
 import { imageRefs } from './docs';
 import type { LocalDoc, RemoteDoc } from './sync';
@@ -68,3 +68,34 @@ export async function fetchImage(hash: string): Promise<string | undefined> {
   uploaded.add(hash);
   return data;
 }
+
+/** Someone on the campaign (members/<email>) or asking to join it (requests/<email>). */
+export interface Person {
+  email: string;
+  name: string;
+  at: string;
+}
+
+const toPerson = (id: string, v: Record<string, unknown>): Person => ({ email: id, name: String(v.name ?? ''), at: String(v.at ?? '') });
+
+export function watchPeople(name: 'members' | 'requests', cb: (people: Person[]) => void, onError: (err: Error) => void): () => void {
+  return onSnapshot(collection(db, name), (snap) => cb(snap.docs.map((d) => toPerson(d.id, d.data()))), onError);
+}
+
+/** Whether this user's own member / request document exists. */
+export function watchOwn(name: 'members' | 'requests', email: string, cb: (exists: boolean) => void, onError: (err: Error) => void): () => void {
+  return onSnapshot(doc(db, name, email), (snap) => cb(snap.exists()), onError);
+}
+
+export const requestToJoin = (email: string, name: string) => setDoc(doc(db, 'requests', email), { email, name, at: new Date().toISOString() });
+export const withdrawRequest = (email: string) => deleteDoc(doc(db, 'requests', email));
+
+/** GM only: let someone in, clearing their request if they made one. */
+export async function addMember(email: string, name: string): Promise<void> {
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'members', email), { email, name, at: new Date().toISOString() });
+  batch.delete(doc(db, 'requests', email));
+  await batch.commit();
+}
+
+export const removeMember = (email: string) => deleteDoc(doc(db, 'members', email));

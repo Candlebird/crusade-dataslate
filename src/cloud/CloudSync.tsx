@@ -1,13 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useStore } from '../model/store';
 import { toast } from '../components/ui';
-import { GM_EMAIL, PLAYER_EMAILS } from './config';
-import { applyDoc, CAMPAIGN_PATH, COLLECTIONS, fromCloudJson, imageRefs, localDocs, SETTINGS_PATH } from './docs';
+import { GM_EMAIL } from './config';
+import { applyDoc, CAMPAIGN_PATH, COLLECTIONS, fromCloudJson, imageRefs, localDocs, SETTINGS_PATH, toCloudJson } from './docs';
 import { SyncEngine } from './sync';
 
 type Firebase = typeof import('./firebase');
+export type { Person } from './firebase';
+type Person = import('./firebase').Person;
 
-export type CloudStatus = 'loading' | 'signed-out' | 'syncing' | 'synced' | 'error';
+/** not-member: signed in, but the GM hasn't let this account into the campaign (yet). */
+export type CloudStatus = 'loading' | 'signed-out' | 'not-member' | 'syncing' | 'synced' | 'error';
 
 interface Cloud {
   status: CloudStatus;
@@ -17,6 +20,21 @@ interface Cloud {
   isGm: boolean;
   signIn: () => void;
   signOut: () => void;
+  /** Hands one of your forces to another player; it comes back to you read-only. */
+  transfer: (forceId: string, to: string) => Promise<void>;
+  /** Everyone in the campaign, GM first. */
+  players: string[];
+  members: Person[];
+  /** People asking to join; only the GM sees these. */
+  requests: Person[];
+  /** This account has asked to join and is waiting for the GM. */
+  requested: boolean;
+  requestJoin: () => Promise<void>;
+  withdrawRequest: () => Promise<void>;
+  /** GM only. */
+  addPlayer: (email: string, name?: string) => Promise<void>;
+  denyRequest: (email: string) => Promise<void>;
+  removePlayer: (email: string) => Promise<void>;
 }
 
 const Ctx = createContext<Cloud | null>(null);
@@ -39,10 +57,16 @@ export function CloudProvider({ children }: { children: ReactNode }) {
   const [fb, setFb] = useState<Firebase | null>(null);
   const [user, setUser] = useState<{ email: string; name: string | null } | null | undefined>(undefined);
   const [status, setStatus] = useState<CloudStatus>('loading');
+  /** Whether the GM has let this account in; undefined while checking. */
+  const [member, setMember] = useState<boolean | undefined>(undefined);
+  const [requested, setRequested] = useState(false);
+  const [members, setMembers] = useState<Person[]>([]);
+  const [requests, setRequests] = useState<Person[]>([]);
   const stateRef = useRef(state);
   stateRef.current = state;
   /** Local changes not yet handed to the engine; flushed before every remote snapshot. */
   const flushRef = useRef<(() => void) | null>(null);
+  const transferRef = useRef<((forceId: string, to: string) => Promise<void>) | null>(null);
 
   useEffect(() => {
     let off: (() => void) | undefined;
@@ -67,14 +91,36 @@ export function CloudProvider({ children }: { children: ReactNode }) {
   const email = user?.email ?? null;
   const isGm = email === GM_EMAIL;
 
+  // Is this account in the campaign? The GM always is; anyone else once the GM lets them in.
+  useEffect(() => {
+    setMember(undefined);
+    setRequested(false);
+    if (!fb || !email) return;
+    if (email === GM_EMAIL) return setMember(true);
+    const fail = (err: Error) => {
+      console.error(err);
+      setStatus('error');
+      toast(`Couldn't check campaign membership: ${err.message}`, 'error');
+    };
+    const offs = [fb.watchOwn('members', email, setMember, fail), fb.watchOwn('requests', email, setRequested, fail)];
+    return () => offs.forEach((o) => o());
+  }, [fb, email]);
+
+  useEffect(() => {
+    setMembers([]);
+    setRequests([]);
+    if (!fb || !member) return;
+    const fail = (err: Error) => console.error(err);
+    const offs = [fb.watchPeople('members', setMembers, fail)];
+    if (isGm) offs.push(fb.watchPeople('requests', setRequests, fail));
+    return () => offs.forEach((o) => o());
+  }, [fb, member, isGm]);
+
   useEffect(() => {
     if (!fb || user === undefined) return;
     if (!user) return setStatus('signed-out');
-    if (!PLAYER_EMAILS.includes(user.email)) {
-      setStatus('error');
-      toast(`${user.email} isn't on the campaign's player list. Ask the GM to add it.`, 'error');
-      return;
-    }
+    if (member === undefined) return setStatus('loading');
+    if (!member) return setStatus('not-member');
     const me = user.email;
     const images = new Map<string, string>();
     let cloudCampaignId: string | undefined;
@@ -123,6 +169,19 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     };
     flush();
 
+    // Written straight to the cloud: once the owner changes, the sync won't push this force any more.
+    // The engine then pulls the new version back like any other remote change.
+    transferRef.current = async (forceId, to) => {
+      flush();
+      const f = stateRef.current.forces.find((x) => x.id === forceId);
+      if (!f || f.owner !== me) throw new Error("That force isn't yours to hand over.");
+      const moved = { ...f, owner: to, updatedAt: new Date().toISOString() };
+      await fb.push(
+        { path: `forces/${f.id}`, json: toCloudJson(moved, images), updatedAt: moved.updatedAt, canWrite: true, fields: { owner: to } },
+        images,
+      );
+    };
+
     setStatus('syncing');
     const ready = new Set<string>();
     const offs = COLLECTIONS.map((name) =>
@@ -156,9 +215,10 @@ export function CloudProvider({ children }: { children: ReactNode }) {
       stopped = true;
       clearTimeout(timer);
       flushRef.current = null;
+      transferRef.current = null;
       offs.forEach((o) => o());
     };
-  }, [fb, user, update]);
+  }, [fb, user, member, update]);
 
   useEffect(() => {
     flushRef.current?.();
@@ -170,9 +230,33 @@ export function CloudProvider({ children }: { children: ReactNode }) {
     });
   }, [fb]);
   const signOut = useCallback(() => void fb?.signOutUser(), [fb]);
+  const transfer = useCallback(async (forceId: string, to: string) => {
+    if (!transferRef.current) throw new Error('Sign in to hand a force over.');
+    await transferRef.current(forceId, to);
+  }, []);
+
+  const need = <T,>(v: T | null | undefined): T => {
+    if (!v) throw new Error('Not signed in.');
+    return v;
+  };
+  const requestJoin = useCallback(async () => void (await need(fb).requestToJoin(need(email), user?.name ?? '')), [fb, email, user]);
+  const withdrawRequest = useCallback(async () => void (await need(fb).withdrawRequest(need(email))), [fb, email]);
+  const addPlayer = useCallback(async (e: string, name?: string) => {
+    const who = e.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(who)) throw new Error(`"${e}" isn't an email address.`);
+    await need(fb).addMember(who, name ?? requests.find((r) => r.email === who)?.name ?? '');
+  }, [fb, requests]);
+  const denyRequest = useCallback(async (e: string) => void (await need(fb).withdrawRequest(e)), [fb]);
+  const removePlayer = useCallback(async (e: string) => void (await need(fb).removeMember(e)), [fb]);
+  const players = [GM_EMAIL, ...members.map((m) => m.email).filter((e) => e !== GM_EMAIL)];
 
   return (
-    <Ctx.Provider value={{ status: fb ? status : 'loading', email, name: user?.name ?? null, isGm, signIn, signOut }}>
+    <Ctx.Provider
+      value={{
+        status: fb ? status : 'loading', email, name: user?.name ?? null, isGm, signIn, signOut, transfer,
+        players, members, requests, requested, requestJoin, withdrawRequest, addPlayer, denyRequest, removePlayer,
+      }}
+    >
       {children}
     </Ctx.Provider>
   );

@@ -1,9 +1,11 @@
 import { confirmAction } from '../components/ui';
+import { href } from '../route';
 import { useCloud } from './CloudSync';
 
 const STATUS_TEXT = {
   loading: 'Connecting…',
   'signed-out': 'Not signed in',
+  'not-member': 'Waiting to join the campaign',
   syncing: 'Syncing…',
   synced: 'Synced with the campaign',
   error: 'Not syncing',
@@ -11,7 +13,7 @@ const STATUS_TEXT = {
 
 /** Sign-in / account link for the top bar. */
 export default function AccountButton() {
-  const { status, email, name, isGm, signIn, signOut } = useCloud();
+  const { status, email, name, isGm, signIn, signOut, requests } = useCloud();
   if (status === 'loading' && !email) return null;
   if (!email) {
     return (
@@ -22,6 +24,12 @@ export default function AccountButton() {
   }
   const who = name?.split(' ')[0] || email.split('@')[0];
   return (
+    <>
+    {isGm && requests.length > 0 && (
+      <a className="join-badge" href={href.settings()} title="People asking to join the campaign">
+        {requests.length} to approve
+      </a>
+    )}
     <a
       href="#"
       className="account"
@@ -35,5 +43,6 @@ export default function AccountButton() {
       {who}
       {isGm && ' (GM)'}
     </a>
+    </>
   );
 }

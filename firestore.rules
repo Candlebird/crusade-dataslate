@@ -1,20 +1,33 @@
 // Security rules for the crusade-dataslate Firestore database.
 // Not deployed automatically: paste into Firebase console → Firestore → Rules → Publish.
-// Keep the player list in step with src/cloud/config.ts.
+// Keep the GM's email in step with src/cloud/config.ts. Players are the GM plus everyone in members/.
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null && request.auth.token.email_verified == true; }
     function email() { return request.auth.token.email; }
-    function player() { return signedIn() && email() in ['brestel.jason@gmail.com', 'leif.brestel@gmail.com']; }
+    function isPlayer(e) { return e == 'brestel.jason@gmail.com' || exists(/databases/$(database)/documents/members/$(e)); }
+    function player() { return signedIn() && isPlayer(email()); }
     function gm() { return signedIn() && email() == 'brestel.jason@gmail.com'; }
+    function own(id) { return signedIn() && id == email(); }
 
-    // Each force is edited only by the player who owns it.
+    // Each force is edited only by the player who owns it, who can also hand it to another player.
     match /forces/{id} {
       allow read: if player();
       allow create: if player() && request.resource.data.owner == email();
-      allow update: if player() && resource.data.owner == email() && request.resource.data.owner == email();
+      allow update: if player() && resource.data.owner == email() && (request.resource.data.owner == email() || isPlayer(request.resource.data.owner));
       allow delete: if player() && resource.data.owner == email();
+    }
+
+    // The GM lets people in; anyone signed in can ask to join, and see whether they've been let in.
+    match /members/{id} {
+      allow read: if player() || own(id);
+      allow write: if gm();
+    }
+    match /requests/{id} {
+      allow read: if gm() || own(id);
+      allow create, update: if own(id) && request.resource.data.email == email();
+      allow delete: if gm() || own(id);
     }
 
     // Players update the campaign after battles; only the GM starts or ends one.

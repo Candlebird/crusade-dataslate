@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, type Settings } from '../model/types';
 import { Dropzone, Stepper, TextField, toast } from './ui';
 import { useImporter } from './importer';
 import { useCloud } from '../cloud/CloudSync';
+import { PlayersPanel } from '../cloud/Players';
 import { DEFAULT_PROXY } from '../armyforge/book';
 
 const BP_LABELS: [keyof Settings['bp'], string][] = [
@@ -63,6 +64,7 @@ export default function SettingsPage() {
         </div>
 
         <div>
+          <PlayersPanel />
           <div className="panel">
             <div className="panel-title"><h2>Army Forge proxy</h2></div>
             <label className="field">

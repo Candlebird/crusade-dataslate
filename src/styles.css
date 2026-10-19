@@ -482,6 +482,10 @@ fieldset.fields:disabled { opacity: 0.6; }
 .account .dot.synced { background: #9cc274; }
 .account .dot.syncing { background: var(--gold); }
 .account .dot.error { background: var(--red); }
+.account .dot.not-member { background: var(--gold-dim); }
+.join-badge { background: var(--gold); color: var(--bg); border-radius: 999px; padding: 0.1rem 0.55rem; font-size: 0.8rem; font-weight: 600; }
+.person { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; border-bottom: 1px solid var(--line); }
+.person:last-child { border-bottom: 0; }
 
 /* ---- custom unit tags ---- */
 .tag.utag { border-color: #4b4570; color: #bdb2e6; }

@@ -18,6 +18,40 @@ import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
 import { Stepper, TextArea, TextField, XpBar, toast } from './ui';
 
+/** Hands the force to another player on the campaign, e.g. when you've been looking after their army. */
+function TransferForce({ f }: { f: Force }) {
+  const cloud = useCloud();
+  const others = cloud.players.filter((e) => e !== cloud.email);
+  const [picked, setTo] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (!others.length) return null;
+  const to = others.includes(picked) ? picked : others[0];
+  return (
+    <div className="row" style={{ marginBottom: '0.75rem' }}>
+      <select value={to} onChange={(e) => setTo(e.target.value)}>
+        {others.map((e) => <option key={e} value={e}>{e}</option>)}
+      </select>
+      <button
+        disabled={busy || cloud.status !== 'synced'}
+        onClick={async () => {
+          if (!window.confirm(`Hand "${f.name}" over to ${to}? They become its owner and you can only look at it afterwards.`)) return;
+          setBusy(true);
+          try {
+            await cloud.transfer(f.id, to);
+            toast(`${f.name} now belongs to ${to}.`);
+          } catch (err) {
+            toast(`Couldn't hand it over: ${err instanceof Error ? err.message : String(err)}`, 'error');
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        Transfer to player
+      </button>
+    </div>
+  );
+}
+
 export default function ForceView({ forceId }: { forceId: string }) {
   const { state, update, updateForce } = useStore();
   const cloud = useCloud();
@@ -257,6 +291,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
           <NexusPanel f={f} onShop={() => setUmbra(true)} />
           {theirs ? null : <div className="panel">
             <div className="panel-title"><h3>Danger zone</h3></div>
+            {cloud.email && f.owner === cloud.email && <TransferForce f={f} />}
             <button
               className="danger"
               onClick={() => {

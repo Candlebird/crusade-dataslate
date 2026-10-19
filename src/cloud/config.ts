@@ -8,6 +8,5 @@ export const firebaseConfig = {
   appId: '1:765607704790:web:cc6bc5539e268daacdb177',
 };
 
-/** Keep in step with firestore.rules, which is what actually enforces these. */
+/** Keep in step with firestore.rules. Other players are let in by the GM from the Settings page. */
 export const GM_EMAIL = 'brestel.jason@gmail.com';
-export const PLAYER_EMAILS = [GM_EMAIL, 'leif.brestel@gmail.com'];

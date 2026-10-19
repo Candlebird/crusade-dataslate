@@ -12,6 +12,7 @@ import BattleTracker from './components/BattleTracker';
 import MissionLibrary from './components/MissionLibrary';
 import { Toaster } from './components/ui';
 import AccountButton from './cloud/AccountButton';
+import { JoinPanel } from './cloud/Players';
 
 export default function App() {
   const route = useRoute();
@@ -45,6 +46,7 @@ export default function App() {
         </nav>
       </header>
       <main className="content">
+        <JoinPanel />
         {route.page === 'forces' && <ForceList />}
         {route.page === 'force' && <ForceView forceId={route.forceId} />}
         {route.page === 'unit' && <UnitSheet forceId={route.forceId} unitId={route.unitId} />}

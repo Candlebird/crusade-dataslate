@@ -66,6 +66,16 @@ describe('SyncEngine', () => {
     expect(b.log).toEqual(['apply forces/a theirs']);
   });
 
+  it('takes back a force handed to another player without undoing anything', () => {
+    const { engine, log } = setup();
+    engine.setLocal([L('a', 'mine')]);
+    engine.setRemote('forces', [R('a', 'mine')], false);
+    engine.setRemote('forces', [R('a', 'given', '2026-02-01', 'other')], false);
+    engine.setLocal([L('a', 'given', '2026-02-01', false)]);
+    engine.setLocal([L('a', 'given', '2026-02-01', false)]);
+    expect(log).toEqual(['apply forces/a given']);
+  });
+
   it('undoes edits to things this user cannot change', () => {
     const { engine, log } = setup();
     engine.setLocal([L('a', '1', '', false)]);
