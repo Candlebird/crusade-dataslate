@@ -7,6 +7,7 @@
   --line-2: #4a525c;
   --text: #d9d4c7;
   --muted: #8d8778;
+  --muted-2: #aaa496; /* lighter muted, for small labels on dark panels */
   --gold: #c9a24a;
   --gold-dim: #8a6e2e;
   --red: #b3352b;
@@ -172,12 +173,12 @@ h3 { font-size: 1rem; text-transform: uppercase; }
 }
 a.card:hover { border-color: var(--gold); color: var(--text); transform: translateY(-1px); }
 .card h3 { margin-bottom: 0.2rem; }
-.card .sub { color: var(--muted); font-size: 0.9rem; }
+.card .sub { color: var(--muted-2); font-size: 0.95rem; }
 
 .stats { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.6rem; }
 .stat { display: flex; flex-direction: column; min-width: 3.5rem; }
 .stat b { font-family: var(--serif); font-size: 1.25rem; color: var(--text); }
-.stat span { font-size: 0.72rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; }
+.stat span { font-size: 0.8rem; color: var(--muted-2); text-transform: uppercase; letter-spacing: 0.12em; }
 .stat.over b { color: var(--red); }
 
 /* ---- buttons & inputs ---- */
