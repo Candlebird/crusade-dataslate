@@ -538,7 +538,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
 
   const pickForce = (forceId: string, listId: string) => {
     const f = forces.find((x) => x.id === forceId);
-    if (!f) return setSide((s) => Object.assign(s, { forceId: undefined, listId: undefined, units: [], bp: 0, manipulations: [] }));
+    if (!f) return setSide((s) => Object.assign(s, { forceId: undefined, listId: undefined, units: [], roster: undefined, bp: 0, manipulations: [] }));
     setSide((s) => loadForce(s, f, f.lists?.find((l) => l.id === listId), state.settings));
   };
 
@@ -590,6 +590,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
                 <span className="small muted">pts</span>
                 <button onClick={generate} title="Build a random army from the Void Echoes book, up to the target points">🎲 Generate</button>
                 {enemies > 0 && enemies !== target && <button className="ghost small" onClick={() => setTarget(enemies)}>Match {enemies} pts</button>}
+                {!!side.roster?.length && <a className="btn" href={href.sideSheet(side.id)}>📄 Army sheet</a>}
               </div>
             ) : (
               <span className="muted small">Import the {ECHOES.name} army book on the <a href={href.books()}>Books page</a> to generate an army.</span>

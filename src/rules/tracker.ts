@@ -69,6 +69,8 @@ export interface TrackerSide {
   /** Combat Manipulations and other one-use effects for this match. */
   manipulations: { text: string; used: boolean }[];
   units: TrackerUnit[];
+  /** A generated army's full units (no crusade force to look them up in), for its printable sheet. */
+  roster?: Unit[];
 }
 
 export interface TrackedBattle {
@@ -131,7 +133,7 @@ export const sidePoints = (side: TrackerSide) => side.units.reduce((n, u) => n +
 
 /** Load a generated army (no crusade force) into a side. */
 export function loadUnits(side: TrackerSide, name: string, units: Unit[]) {
-  Object.assign(side, { name, forceId: undefined, listId: undefined, units: units.map(trackerUnit), bp: 0, manipulations: [] });
+  Object.assign(side, { name, forceId: undefined, listId: undefined, units: units.map(trackerUnit), roster: structuredClone(units), bp: 0, manipulations: [] });
 }
 
 export const teamsOf = (b: TrackedBattle): TeamKey[] => TEAMS.filter((t) => b.sides.some((x) => x.team === t));
@@ -181,6 +183,7 @@ export function loadForce(side: TrackerSide, f: Force, list: ArmyList | undefine
   side.name = f.name;
   side.forceId = f.id;
   side.listId = list?.id;
+  side.roster = undefined;
   side.units = units.map(trackerUnit);
   side.bp = units.reduce((n, u) => n + battlePoints(u, s), 0);
   side.manipulations = (f.nexus?.pending ?? []).map((text) => ({ text, used: false }));

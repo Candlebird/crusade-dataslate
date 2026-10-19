@@ -9,6 +9,7 @@ import CampaignPage from './components/CampaignPage';
 import ListPage from './components/ListPage';
 import SettingsPage from './components/SettingsPage';
 import BattleTracker from './components/BattleTracker';
+import SideSheet from './components/SideSheet';
 import MissionLibrary from './components/MissionLibrary';
 import GuidePage from './components/GuidePage';
 import { Toaster } from './components/ui';
@@ -30,7 +31,7 @@ export default function App() {
           <a className={route.page === 'forces' || route.page === 'force' || route.page === 'unit' || route.page === 'battle' || route.page === 'list' ? 'active' : ''} href={href.forces()}>
             Forces
           </a>
-          <a className={route.page === 'tracker' || route.page === 'missions' ? 'active' : ''} href={href.tracker()}>
+          <a className={route.page === 'tracker' || route.page === 'sideSheet' || route.page === 'missions' ? 'active' : ''} href={href.tracker()}>
             Battle
           </a>
           <a className={route.page === 'campaign' ? 'active' : ''} href={href.campaign()}>
@@ -57,6 +58,7 @@ export default function App() {
         {route.page === 'battle' && <BattleWizard key={`${route.forceId}/${route.battleId}/${route.sideId}`} forceId={route.forceId} battleId={route.battleId} sideId={route.sideId} />}
         {route.page === 'list' && <ListPage forceId={route.forceId} listId={route.listId} />}
         {route.page === 'tracker' && <BattleTracker key={`${route.sectorId}/${route.attacker}`} sectorId={route.sectorId} attacker={route.attacker} />}
+        {route.page === 'sideSheet' && <SideSheet sideId={route.sideId} />}
         {route.page === 'missions' && <MissionLibrary />}
         {route.page === 'campaign' && <CampaignPage />}
         {route.page === 'books' && <BooksPage />}
