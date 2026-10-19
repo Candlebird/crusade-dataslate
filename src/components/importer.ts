@@ -1,10 +1,28 @@
 import { useCallback } from 'react';
 import { useStore } from '../model/store';
 import { asCopy, readJsonFile } from '../model/io';
-import { DEFAULT_SETTINGS } from '../model/types';
+import { DEFAULT_SETTINGS, type CatalogBook } from '../model/types';
+import { fetchBook, normalizeBook } from '../armyforge/book';
+import { listBookUids, listToForce } from '../armyforge/list';
+import rawDothea from '../data/spears-of-dothea.raw.json';
 import { toast } from './ui';
 
-/** Handle dropped JSON files: forces, campaigns, full backups, or raw Army Forge books. */
+const BUNDLED_UID = 'ykNPXx5YgsdGWqJi';
+
+/** Fetch army books a list needs that aren't imported yet: the bundled one, else Army Forge via the proxy. */
+async function missingBooks(raw: any, have: CatalogBook[], proxy: string): Promise<CatalogBook[]> {
+  const out: CatalogBook[] = [];
+  for (const id of listBookUids(raw).filter((id) => !have.some((b) => b.uid === id))) {
+    if (id === BUNDLED_UID) out.push(normalizeBook(rawDothea));
+    else if (proxy) {
+      const book = await fetchBook(id, proxy).catch(() => undefined);
+      if (book) out.push(book);
+    }
+  }
+  return out;
+}
+
+/** Handle dropped JSON files: forces, campaigns, full backups, raw Army Forge books, or Army Forge lists. */
 export function useImporter() {
   const { state, update, addBook, replaceState } = useStore();
 
@@ -16,6 +34,12 @@ export function useImporter() {
           if (got.kind === 'book') {
             addBook(got.book);
             toast(`Army book "${got.book.name}" imported (${got.book.units.length} datasheets).`);
+          } else if (got.kind === 'armyList') {
+            const fetched = await missingBooks(got.raw, state.books, state.settings.armyForgeProxy);
+            const force = listToForce(got.raw, [...state.books, ...fetched]);
+            fetched.forEach(addBook);
+            update((d) => void d.forces.push(force));
+            toast(`Force "${force.name}" created from the Army Forge list (${force.units.length} units, ${force.units.reduce((n, u) => n + u.points, 0)} pts).`);
           } else if (got.kind === 'coreRules') {
             update((d) => void (d.coreRules = got.rules));
             toast(`Core rules imported (${got.rules.length} rules). List glossaries will now include them.`);
@@ -50,6 +74,6 @@ export function useImporter() {
         }
       }
     },
-    [state.forces, state.campaign, update, addBook, replaceState],
+    [state.forces, state.campaign, state.books, state.settings.armyForgeProxy, update, addBook, replaceState],
   );
 }

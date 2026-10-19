@@ -82,7 +82,7 @@ export default function ForceList() {
       <div className="panel" style={{ marginTop: '1.5rem' }}>
         <div className="panel-title"><h3>Import</h3></div>
         <Dropzone accept=".json,application/json" onFiles={importFiles}>
-          Drop a <b>.force.json</b> from a teammate, a <b>backup</b>, or an <b>Army Forge book</b> JSON here — or click to choose.
+          Drop a <b>.force.json</b> from a teammate, a <b>backup</b>, an <b>Army Forge list</b> (builds a force with full stats), or an <b>Army Forge book</b> JSON here — or click to choose.
         </Dropzone>
       </div>
     </>
