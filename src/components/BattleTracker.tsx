@@ -44,6 +44,7 @@ import {
   type TrackerUnit,
 } from '../rules/tracker';
 import { AI_TREES } from '../rules/aiTrees';
+import { MAX_PLAYERS, randomForces, randomFormat, type Format } from '../rules/randomBattle';
 import AiActivation from './AiActivation';
 import { Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
@@ -277,7 +278,23 @@ function StartBattle({ sectorId, preset }: { sectorId?: string; preset?: string 
   const missions = allMissions(state.customMissions);
   const [id, setId] = useState(missions[0]?.id ?? '');
   // An unclaimed or void sector is held by the AI; a claimed one by its faction's player.
-  const [format, setFormat] = useState(() => (sector && (!sector.owner || sector.type === 'void') ? FORMATS.findIndex((f) => f.label === '1 v AI') : 0));
+  const [format, setFormat] = useState<Format>(() => FORMATS.find((f) => f.label === (sector && (!sector.owner || sector.type === 'void') ? '1 v AI' : '1 v 1'))!);
+  // The randomizer's options, and the forces it picked for each side in turn.
+  const [players, setPlayers] = useState(2);
+  const [withAi, setWithAi] = useState(false);
+  const [pickForces, setPickForces] = useState(true);
+  const [pickMission, setPickMission] = useState(true);
+  const [forces, setForces] = useState<Force[]>([]);
+  const randomize = () => {
+    const f = randomFormat(players, withAi);
+    setFormat(f);
+    if (pickMission) setId(rollAdvancedMission().id);
+    setForces(pickForces ? randomForces(state.forces, f.teams.flat().length) : []);
+  };
+  const choose = (f: Format) => {
+    setFormat(f);
+    setForces([]);
+  };
   const m = missions.find((x) => x.id === id) ?? missions[0];
   const groups: [string, MissionDef[]][] = [];
   for (const x of missions) {
@@ -288,8 +305,12 @@ function StartBattle({ sectorId, preset }: { sectorId?: string; preset?: string 
   }
   const start = (mission: MissionDef) => {
     update((s) => {
-      const b = newBattle(mission, uid(), nowIso(), Math.random, FORMATS[format]);
+      const b = newBattle(mission, uid(), nowIso(), Math.random, format);
       if (sector && s.campaign) atSector(b, s.campaign, s.forces, s.settings, sector.id, attacker);
+      // Randomly picked forces fill the sides nothing was loaded into, players first.
+      const open = [...b.sides.filter((x) => !x.ai), ...b.sides.filter((x) => x.ai)].filter((x) => !x.forceId);
+      const left = forces.filter((f) => !b.sides.some((x) => x.forceId === f.id));
+      open.forEach((side, i) => left[i] && loadForce(side, left[i], undefined, s.settings));
       s.battle = b;
     });
     if (sector) go(href.tracker());
@@ -321,10 +342,19 @@ function StartBattle({ sectorId, preset }: { sectorId?: string; preset?: string 
         )}
         <h3>Players</h3>
         <div className="row">
-          {FORMATS.map((f, i) => (
-            <button key={f.label} className={i === format ? 'primary' : ''} onClick={() => setFormat(i)}>{f.label}</button>
+          {FORMATS.map((f) => (
+            <button key={f.label} className={f.label === format.label ? 'primary' : ''} onClick={() => choose(f)}>{f.label}</button>
           ))}
+          {!FORMATS.some((f) => f.label === format.label) && <button className="primary">{format.label}</button>}
         </div>
+        <div className="row randomizer">
+          <span className="row"><span>Players</span><Stepper value={players} min={withAi ? 1 : 2} onChange={(n) => setPlayers(Math.min(MAX_PLAYERS, n))} /></span>
+          <label className="row"><input type="checkbox" checked={withAi} onChange={(e) => { setWithAi(e.target.checked); if (!e.target.checked) setPlayers((n) => Math.max(2, n)); }} />Include AI</label>
+          <label className="row"><input type="checkbox" checked={pickForces} onChange={(e) => setPickForces(e.target.checked)} />Random forces</label>
+          <label className="row"><input type="checkbox" checked={pickMission} onChange={(e) => setPickMission(e.target.checked)} />Random mission</label>
+          <button onClick={randomize} title="Split the players into random teams (or all against the AI), and roll forces and a mission if ticked">🎲 Randomize</button>
+        </div>
+        {forces.length > 0 && <p className="small">Forces, in side order: {forces.map((f) => f.name).join(', ')}. You can swap them once the battle starts.</p>}
         <p className="muted small">Teams share objectives and VP. You can add, remove or regroup players once the battle starts.</p>
         {groups.map(([group, list]) => (
           <div key={group}>
