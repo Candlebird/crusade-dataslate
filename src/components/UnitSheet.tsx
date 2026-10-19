@@ -85,7 +85,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       groups.push({
         key: 'nexus',
         label: access === 'token' ? 'Nexus (uses a token)' : 'Nexus',
-        entries: (NEXUS_TRAITS[u.category] ?? []).map((name) => ({ name, disabled: locked })),
+        entries: (NEXUS_TRAITS[u.category] ?? []).map((t) => ({ name: t.name, desc: t.desc, disabled: locked })),
       });
       return groups;
     }
@@ -103,7 +103,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       label,
       entries: list.map((r) => ({
         name: r.name,
-        desc: [r.profile, r.note].filter(Boolean).join(' · '),
+        desc: [r.profile, r.desc, r.note].filter(Boolean).join(' · '),
         disabled: relicTierAllowed(r.tier, u.xp) ? undefined : `${r.tier} relics need ${RELIC_TIER_MIN_XP[r.tier]}+ XP`,
         meta: r,
       })),

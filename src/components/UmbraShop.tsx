@@ -176,7 +176,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
                   {unit.category} Nexus trait
                   <select value={choice} onChange={(e) => setChoice(e.target.value)}>
                     <option value="">— choose —</option>
-                    {(NEXUS_TRAITS[unit.category] ?? []).filter((n) => !unit.upgrades.some((x) => x.name === n)).map((n) => <option key={n} value={n}>{n}</option>)}
+                    {(NEXUS_TRAITS[unit.category] ?? []).map((t) => t.name).filter((n) => !unit.upgrades.some((x) => x.name === n)).map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </label>
               )}

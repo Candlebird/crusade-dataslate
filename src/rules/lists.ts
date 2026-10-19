@@ -1,5 +1,5 @@
 import type { ArmyList, CatalogBook, Force, RuleText, Settings, Unit, Weapon } from '../model/types';
-import { SCAR_TABLE, TRAIT_TABLES, UNIQUE_TRAIT_TABLES, UNIQUE_WEAPON_TRAIT_TABLES, WEAPON_TRAIT_TABLES, type TableEntry } from './data';
+import { NEXUS_TRAITS, RELIC_WEAPON_RULES, RELICS, SCAR_TABLE, TRAIT_TABLES, UNIQUE_TRAIT_TABLES, UNIQUE_WEAPON_TRAIT_TABLES, WEAPON_TRAIT_TABLES, type TableEntry } from './data';
 import { battlePoints, hasRule, type Issue } from './engine';
 
 export function newList(f: Force, id: string): ArmyList {
@@ -96,7 +96,7 @@ export function weaponColumns(w: Weapon): { ap: string; special: string[] } {
   return { ap: ap ? ap.slice(3, -1) : '', special: w.rules.filter((r) => r !== ap) };
 }
 
-/** Rule names in a relic profile such as 'Melee, A6, AP(2), Magma'. */
+/** Rule names in a relic profile such as 'Melee, A6, AP(2), Demolish'. */
 function profileRules(profile: string): string[] {
   return profile.split(',').map((p) => p.trim()).filter((p) => p && p !== 'Melee' && !/^\d+"$/.test(p) && !/^A\s?\S+$/.test(p));
 }
@@ -117,7 +117,10 @@ export function glossary(units: Unit[], books: CatalogBook[], coreRules: RuleTex
       w.rules.forEach((r) => names.add(ruleName(r)));
       w.traits.forEach((x) => names.add(ruleName(x.name)));
     }
-    u.relics.forEach((r) => r.profile && profileRules(r.profile).forEach((x) => names.add(ruleName(x))));
+    for (const r of u.relics) {
+      names.add(r.name);
+      if (r.profile) profileRules(r.profile).forEach((x) => names.add(ruleName(x)));
+    }
   }
   const descs = new Map<string, string>();
   const add = (name: string, desc?: string) => {
@@ -132,8 +135,10 @@ export function glossary(units: Unit[], books: CatalogBook[], coreRules: RuleTex
   const tables: TableEntry[][] = [
     ...Object.values(TRAIT_TABLES), ...Object.values(UNIQUE_TRAIT_TABLES),
     ...Object.values(WEAPON_TRAIT_TABLES), ...Object.values(UNIQUE_WEAPON_TRAIT_TABLES), SCAR_TABLE,
+    RELIC_WEAPON_RULES, ...Object.values(NEXUS_TRAITS),
   ];
   for (const t of tables) t.forEach((e) => add(ruleName(e.name), e.desc));
+  RELICS.forEach((r) => add(r.name, r.desc));
   return [...names]
     .filter((n) => descs.has(n.toLowerCase()))
     .sort((a, b) => a.localeCompare(b))

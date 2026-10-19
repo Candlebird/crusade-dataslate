@@ -36,8 +36,8 @@ export function buildSeedState(): AppState {
       ? {
           ...w,
           traits: [
-            { id: uid(), name: 'Quickened Blade (+1 A, Lance)', unique: false },
-            { id: uid(), name: 'Precise Blade (First Strike, Lance)', unique: false },
+            { id: uid(), name: 'Quickened Blade (+1 A, Thrust)', unique: false },
+            { id: uid(), name: 'Precise Blade (First Strike, Thrust)', unique: false },
           ],
         }
       : w,

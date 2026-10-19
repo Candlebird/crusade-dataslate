@@ -1,6 +1,7 @@
 import type { CatalogUnit, Force, Unit } from './types';
 import type { Loadout } from '../armyforge/book';
 import { STARTING_SUPPLY } from '../rules/data';
+import { RULES_VERSION } from '../rules/migrate';
 import { detectCategory, ruleRating } from '../rules/engine';
 
 export const uid = () => crypto.randomUUID().slice(0, 12);
@@ -9,7 +10,7 @@ export const nowIso = () => new Date().toISOString();
 export function newForce(name = 'New Force'): Force {
   return {
     id: uid(), name, faction: '', player: '', description: '', startingSupply: STARTING_SUPPLY,
-    battles: 0, wins: 0, ledger: [], units: [], umbraShards: 0, createdAt: nowIso(), updatedAt: nowIso(),
+    battles: 0, wins: 0, ledger: [], units: [], umbraShards: 0, rulesVersion: RULES_VERSION, createdAt: nowIso(), updatedAt: nowIso(),
   };
 }
 

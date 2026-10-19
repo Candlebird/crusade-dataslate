@@ -84,7 +84,7 @@ export function detectCategory(u: { rules: string[]; size: number; tough?: numbe
 const VEHICLE_NAME = /walker|tank|turret|vehicle|speeder|gunship|bike|quad|cannon|dreadnought|monster|beast|carnifex|tyrant/i;
 
 function hasVehicleHint(rules: string[]): boolean {
-  return ['Transport', 'Fly', 'Impact', 'Walker', 'Vehicle', 'Monster'].some((r) => hasRule(rules, r));
+  return ['Transport', 'Fly', 'Flying', 'Impact', 'Walker', 'Vehicle', 'Monster'].some((r) => hasRule(rules, r));
 }
 
 /** Number of weapon "upgrades" spent on a weapon's traits (infantry upgrades grant 2 traits each). */

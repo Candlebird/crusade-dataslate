@@ -55,7 +55,7 @@ describe('category detection', () => {
 describe('battle points', () => {
   it('counts upgrades, relics and scars', () => {
     const u = unit({
-      upgrades: [{ id: '1', name: 'Takedown', unique: false }, { id: '2', name: 'Crazed', unique: true }],
+      upgrades: [{ id: '1', name: 'Takedown Strike', unique: false }, { id: '2', name: 'Crazed', unique: true }],
       relics: [{ id: 'r', name: 'Oblivion Orb', tier: 'Legendary' }],
       scars: [{ id: 's', name: 'Faulty Aim' }],
     });
@@ -65,7 +65,7 @@ describe('battle points', () => {
     const u = unit({
       category: 'Infantry',
       weapons: [{ id: 'w', name: 'Blade', count: 5, range: 0, attacks: 2, rules: [],
-        traits: [{ id: 'a', name: '+1 A', unique: false }, { id: 'b', name: 'Lance', unique: false }] }],
+        traits: [{ id: 'a', name: '+1 A', unique: false }, { id: 'b', name: 'Thrust', unique: false }] }],
     });
     expect(battlePoints(u, DEFAULT_SETTINGS)).toBe(1);
     expect(upgradesUsed(u)).toBe(1);

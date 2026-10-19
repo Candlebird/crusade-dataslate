@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { DEFAULT_SETTINGS, type AppState, type CatalogBook, type Force, type Unit } from './types';
 import { buildSeedState } from './seed';
+import { migrateForce } from '../rules/migrate';
 import { nowIso } from './factory';
 import { toast } from '../components/ui';
 
@@ -13,6 +14,7 @@ function load(): AppState {
       const parsed = JSON.parse(raw) as AppState;
       return {
         ...parsed,
+        forces: parsed.forces.map(migrateForce),
         settings: { ...DEFAULT_SETTINGS, ...parsed.settings, bp: { ...DEFAULT_SETTINGS.bp, ...parsed.settings?.bp } },
       };
     }

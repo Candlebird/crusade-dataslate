@@ -65,7 +65,7 @@ export const COMBAT_MANIPULATIONS = [
   { name: 'Umbral Fog of War', desc: 'Up to 3 units may hold deployment.' },
   { name: 'From the Shadows', desc: 'One unit gains Ambush.' },
   { name: 'Bombardment', desc: 'At the end of round 1, one enemy unit takes a Dangerous Terrain test.' },
-  { name: 'Dark Shroud', desc: 'The first damage dealt to one unit is reduced to 0.' },
+  { name: 'Dark Shroud', desc: 'The first time one chosen unit takes wounds, ignore them.' },
 ];
 export const MANIPULATION_PREFIX = 'Combat Manipulation';
 export const ORGANIZED_STRIKE = 'Organized Strike';

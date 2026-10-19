@@ -158,6 +158,8 @@ export interface Force {
   nexus?: ForceNexus;
   battleLog?: BattleRecord[];
   lists?: ArmyList[];
+  /** Version of the trait and relic names it was saved with (see rules/migrate.ts). */
+  rulesVersion?: number;
   createdAt: string;
   updatedAt: string;
 }

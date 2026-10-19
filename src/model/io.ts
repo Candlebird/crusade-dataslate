@@ -2,6 +2,7 @@ import type { AppState, Campaign, Force, RuleText } from './types';
 import { normalizeBook } from '../armyforge/book';
 import type { CatalogBook } from './types';
 import { uid } from './factory';
+import { migrateForce } from '../rules/migrate';
 
 const FORCE_KIND = 'opr-crusade-force';
 const BACKUP_KIND = 'opr-crusade-backup';
@@ -39,11 +40,11 @@ export type Imported =
 
 /** Detect what a dropped JSON file is: a force, a full backup, or a raw Army Forge army book. */
 export function interpretJson(data: any): Imported {
-  if (data?.kind === FORCE_KIND && data.force) return { kind: 'force', force: data.force };
+  if (data?.kind === FORCE_KIND && data.force) return { kind: 'force', force: migrateForce(data.force) };
   if (data?.kind === CAMPAIGN_KIND && Array.isArray(data.campaign?.sectors)) return { kind: 'campaign', campaign: data.campaign };
   if (data?.kind === BACKUP_KIND && Array.isArray(data.forces)) {
     const { kind: _k, ...state } = data;
-    return { kind: 'backup', state: state as AppState };
+    return { kind: 'backup', state: { ...state, forces: state.forces.map(migrateForce) } as AppState };
   }
   if (Array.isArray(data?.units) && Array.isArray(data?.upgradePackages)) return { kind: 'book', book: normalizeBook(data) };
   if (Array.isArray(data?.rules) && Array.isArray(data?.traits) && !data.units) return { kind: 'coreRules', rules: normalizeCoreRules(data) };
