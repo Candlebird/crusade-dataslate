@@ -5,7 +5,7 @@ import { DEFAULT_SETTINGS, type CatalogBook } from '../model/types';
 import { fetchBook, normalizeBook, proxyOf } from '../armyforge/book';
 import { listBookUids, listToForce } from '../armyforge/list';
 import rawDothea from '../data/spears-of-dothea.raw.json';
-import { toast } from './ui';
+import { confirmAction, toast } from './ui';
 
 const BUNDLED_UID = 'ykNPXx5YgsdGWqJi';
 
@@ -32,6 +32,8 @@ export function useImporter() {
         try {
           const got = await readJsonFile(file);
           if (got.kind === 'book') {
+            const old = state.books.find((b) => b.uid === got.book.uid);
+            if (old?.edited && !confirmAction(`"${old.name}" has datasheets edited in the app. Importing it again replaces them with the file's. Continue?`)) continue;
             addBook(got.book);
             toast(`Army book "${got.book.name}" imported (${got.book.units.length} datasheets).`);
           } else if (got.kind === 'armyList') {

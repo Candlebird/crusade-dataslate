@@ -5,7 +5,10 @@ import { interpretJson } from '../model/io';
 import { href } from '../route';
 import { datasheetTags, matchesTags, tagsIn } from '../model/tags';
 import { DatasheetTags, TagFilter } from './Tags';
-import { Dropzone, toast } from './ui';
+import { Dropzone, confirmAction, toast } from './ui';
+import { DatasheetEditor } from './BookEditor';
+import { blankDatasheet, removeDatasheet, saveDatasheet } from '../model/bookEdit';
+import type { CatalogBook, CatalogUnit } from '../model/types';
 import { useImporter } from './importer';
 
 export default function BooksPage() {
@@ -21,6 +24,7 @@ export default function BooksPage() {
   /** Fetch a book from Army Forge and save it (a fresh copy keeps the book's unit tags). */
   const fetchInto = async (uid: string) => {
     const old = state.books.find((b) => b.uid === uid);
+    if (old?.edited && !confirmAction(`"${old.name}" has datasheets edited in the app. Refreshing replaces them with Army Forge's. Continue?`)) return;
     setBusy(uid);
     try {
       const book = await fetchBook(uid, proxy);
@@ -129,7 +133,7 @@ export default function BooksPage() {
             <div className="grow">
               <b>{b.name}</b>
               <div className="muted small">
-                {b.faction && `${b.faction} · `}v{b.version} · {b.units.length} datasheets · {b.rules.length} rules · {b.spells.length} spells · fetched {b.importedAt.slice(0, 10)}
+                {b.faction && `${b.faction} · `}v{b.version}{b.edited ? ' (edited)' : ''} · {b.units.length} datasheets · {b.rules.length} rules · {b.spells.length} spells · fetched {b.importedAt.slice(0, 10)}
               </div>
             </div>
             <a className="btn" href={bookPageUrl(b.uid, b.name)} target="_blank" rel="noreferrer">Army Forge ↗</a>
@@ -159,7 +163,16 @@ export default function BooksPage() {
 }
 
 function BookBrowser({ uid }: { uid: string }) {
-  const { state } = useStore();
+  const { state, update } = useStore();
+  const [editMode, setEditMode] = useState(false);
+  const [editing, setEditing] = useState<CatalogUnit | null>(null);
+  const changeBook = (fn: (b: CatalogBook) => void) =>
+    update((d) => {
+      const b = d.books.find((x) => x.uid === uid);
+      if (!b) return;
+      fn(b);
+      b.updatedAt = new Date().toISOString();
+    });
   const [tab, setTab] = useState<'units' | 'rules' | 'spells'>('units');
   const [query, setQuery] = useState('');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
@@ -181,14 +194,36 @@ function BookBrowser({ uid }: { uid: string }) {
             <button key={t} className={tab === t ? 'primary' : ''} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
           ))}
           <input placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
+          {tab === 'units' && (
+            <button className={editMode ? 'primary' : ''} onClick={() => setEditMode(!editMode)} title="Change, add or remove datasheets by hand">
+              {editMode ? 'Done editing' : 'Edit units'}
+            </button>
+          )}
         </div>
       </div>
+      {tab === 'units' && editMode && (
+        <div className="row" style={{ marginBottom: 8 }}>
+          <button onClick={() => setEditing(blankDatasheet())}>+ Add datasheet</button>
+          <span className="muted small">Edits are shared with the group. Units already built from a datasheet keep their own values.</span>
+        </div>
+      )}
+      {editing && (
+        <DatasheetEditor
+          unit={editing}
+          onClose={() => setEditing(null)}
+          onSave={(u) => {
+            changeBook((b) => saveDatasheet(b, u));
+            setEditing(null);
+            toast(`${u.name} saved.`);
+          }}
+        />
+      )}
       {tab === 'units' && <TagFilter tags={tagsIn(Object.values(book.unitTags ?? {}))} value={tagFilter} onChange={setTagFilter} />}
       {tab === 'units' && (
         <div className="table-wrap">
           <table className="stack">
             <thead>
-              <tr><th>Datasheet</th><th>Tags</th><th className="num">Size</th><th className="num">Q</th><th className="num">D</th><th>Rules</th><th>Weapons</th><th className="num">Pts</th></tr>
+              <tr><th>Datasheet</th><th>Tags</th><th className="num">Size</th><th className="num">Q</th><th className="num">D</th><th>Rules</th><th>Weapons</th><th className="num">Pts</th>{editMode && <th />}</tr>
             </thead>
             <tbody>
               {units.map((u) => (
@@ -207,6 +242,15 @@ function BookBrowser({ uid }: { uid: string }) {
                     ))}
                   </td>
                   <td className="num s-end" data-label="Pts">{u.cost}</td>
+                  {editMode && (
+                    <td className="s-end">
+                      <div className="row" style={{ flexWrap: 'nowrap' }}>
+                        <button className="ghost icon" aria-label={`Edit ${u.name}`} title="Edit" onClick={() => setEditing(u)}>✎</button>
+                        <button className="ghost icon" aria-label={`Remove ${u.name}`} title="Remove"
+                          onClick={() => confirmAction(`Remove ${u.name} from ${book.name}? Units already built from it are kept.`) && changeBook((b) => removeDatasheet(b, u.id))}>✕</button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

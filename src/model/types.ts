@@ -241,8 +241,10 @@ export interface CatalogBook {
   spells: { name: string; threshold: number; effect: string }[];
   /** Custom tags per datasheet name (see model/tags.ts); kept when the book is imported again. */
   unitTags?: Record<string, string[]>;
-  /** When the tags were last changed. */
+  /** When the tags or datasheets were last changed. */
   updatedAt?: string;
+  /** Datasheets were changed by hand in the app; importing the book again would undo that. */
+  edited?: boolean;
 }
 
 // ---- Nexus Wars campaign (kept by the GM, imported by players) ----
