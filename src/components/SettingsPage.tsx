@@ -4,6 +4,7 @@ import { buildSeedState } from '../model/seed';
 import { DEFAULT_SETTINGS, type Settings } from '../model/types';
 import { Dropzone, Stepper, TextField, toast } from './ui';
 import { useImporter } from './importer';
+import { useCloud } from '../cloud/CloudSync';
 
 const BP_LABELS: [keyof Settings['bp'], string][] = [
   ['normal', 'Normal trait'],
@@ -17,6 +18,8 @@ const BP_LABELS: [keyof Settings['bp'], string][] = [
 export default function SettingsPage() {
   const { state, update, replaceState } = useStore();
   const importFiles = useImporter();
+  const cloud = useCloud();
+  const locked = !!cloud.email && !cloud.isGm;
   const s = state.settings;
   const set = (fn: (d: Settings) => void) => update((d) => fn(d.settings));
 
@@ -33,11 +36,11 @@ export default function SettingsPage() {
         <div className="panel">
           <div className="panel-title">
             <h2>House rules</h2>
-            <button className="ghost" onClick={() => set((d) => Object.assign(d, structuredClone(DEFAULT_SETTINGS), { armyForgeProxy: d.armyForgeProxy }))}>
+            <button className="ghost" disabled={locked} onClick={() => set((d) => Object.assign(d, structuredClone(DEFAULT_SETTINGS), { armyForgeProxy: d.armyForgeProxy }))}>
               Reset to defaults
             </button>
           </div>
-          <div className="fields">
+          <fieldset className="fields" disabled={locked}>
             <label className="field span-all">
               Supply per Requisition Point
               <Stepper value={s.supplyPerRp} step={50} min={0} onChange={(n) => set((d) => void (d.supplyPerRp = n))} />
@@ -48,9 +51,13 @@ export default function SettingsPage() {
                 <Stepper value={s.bp[k]} onChange={(n) => set((d) => void (d.bp[k] = n))} />
               </label>
             ))}
-          </div>
+          </fieldset>
           <p className="muted small" style={{ marginTop: '0.75rem' }}>
-            These apply to everyone viewing forces in this browser. Agree them as a group — force files don't carry settings.
+            {locked
+              ? 'Set by the GM for everyone in the campaign.'
+              : cloud.isGm
+                ? 'You are the GM: these apply to every player in the campaign.'
+                : "These apply to everyone viewing forces in this browser. Sign in to use the GM's house rules."}
           </p>
         </div>
 
@@ -69,7 +76,11 @@ export default function SettingsPage() {
 
           <div className="panel">
             <div className="panel-title"><h2>Data</h2></div>
-            <p className="muted small">Everything is stored in this browser only. Export a backup regularly, especially before clearing browser data.</p>
+            <p className="muted small">
+              {cloud.email
+                ? 'Your data is kept in this browser and in the campaign database. Export a backup now and then anyway.'
+                : 'Everything is stored in this browser only. Export a backup regularly, especially before clearing browser data.'}
+            </p>
             <div className="row" style={{ margin: '0.5rem 0 0.75rem' }}>
               <button className="primary" onClick={() => exportBackup(state)}>Export backup</button>
             </div>
@@ -80,9 +91,13 @@ export default function SettingsPage() {
 
           <div className="panel">
             <div className="panel-title"><h3>Danger zone</h3></div>
+            {cloud.email && (
+              <p className="muted small">Sign out first: while you're signed in, these would also delete your forces and the shared books for every player.</p>
+            )}
             <div className="row">
               <button
                 className="danger"
+                disabled={!!cloud.email}
                 onClick={() => {
                   if (!window.confirm('Replace ALL data in this browser with the starter forces? Export a backup first if unsure.')) return;
                   replaceState(buildSeedState());
@@ -93,6 +108,7 @@ export default function SettingsPage() {
               </button>
               <button
                 className="danger"
+                disabled={!!cloud.email}
                 onClick={() => {
                   if (!window.confirm('Delete ALL forces and books in this browser? Export a backup first if unsure.')) return;
                   replaceState({ version: 1, forces: [], books: [], settings: structuredClone(s) });

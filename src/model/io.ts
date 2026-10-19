@@ -71,7 +71,7 @@ export async function readJsonFile(file: File): Promise<Imported> {
 
 /** Give an imported force fresh ids if one with the same id already exists (keeps both copies). */
 export function asCopy(f: Force): Force {
-  return { ...f, id: uid(), name: `${f.name} (copy)`, units: f.units.map((u) => ({ ...u, id: uid() })) };
+  return { ...f, id: uid(), owner: undefined, name: `${f.name} (copy)`, units: f.units.map((u) => ({ ...u, id: uid() })) };
 }
 
 export function readImageAsDataUrl(file: File, maxSize = 512): Promise<string> {

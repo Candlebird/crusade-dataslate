@@ -472,3 +472,13 @@ tr.unpicked td { opacity: 0.6; }
   .sheet.compact .sheet-units { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .sheet-rule-cols { columns: 2; }
 }
+
+/* ---- cloud ---- */
+.panel.notice { border-color: var(--gold-dim); }
+fieldset.fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+fieldset.fields:disabled { opacity: 0.6; }
+.account { display: inline-flex; align-items: center; gap: 0.4rem; }
+.account .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
+.account .dot.synced { background: #9cc274; }
+.account .dot.syncing { background: var(--gold); }
+.account .dot.error { background: var(--red); }

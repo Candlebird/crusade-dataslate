@@ -9,6 +9,7 @@ import CampaignPage from './components/CampaignPage';
 import ListPage from './components/ListPage';
 import SettingsPage from './components/SettingsPage';
 import { Toaster } from './components/ui';
+import AccountButton from './cloud/AccountButton';
 
 export default function App() {
   const route = useRoute();
@@ -35,6 +36,7 @@ export default function App() {
             Settings
           </a>
           <DiceRoller />
+          <AccountButton />
         </nav>
       </header>
       <main className="content">
@@ -48,7 +50,7 @@ export default function App() {
         {route.page === 'settings' && <SettingsPage />}
       </main>
       <Toaster />
-      <footer className="footer">++ Data persists in this browser. Export forces to share them via Drive. ++</footer>
+      <footer className="footer">++ Data is kept in this browser, and shared with the other players while you're signed in. ++</footer>
     </div>
   );
 }

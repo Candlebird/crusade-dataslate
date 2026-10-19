@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../model/store';
+import { useCloud } from '../cloud/CloudSync';
 import { exportForce, readImageAsDataUrl } from '../model/io';
 import { uid } from '../model/factory';
 import { battlePoints, forceTotals, levelForXp, validateUnit } from '../rules/engine';
@@ -17,6 +18,7 @@ import { Stepper, TextArea, TextField, XpBar, toast } from './ui';
 
 export default function ForceView({ forceId }: { forceId: string }) {
   const { state, update, updateForce } = useStore();
+  const cloud = useCloud();
   const [adding, setAdding] = useState(false);
   const [showRemoved, setShowRemoved] = useState(false);
   const [shopping, setShopping] = useState(false);
@@ -30,6 +32,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const set = (fn: Parameters<typeof updateForce>[1]) => updateForce(f.id, fn);
   const units = f.units.filter((u) => showRemoved || u.status !== 'removed');
   const removedCount = f.units.filter((u) => u.status === 'removed').length;
+  const theirs = !!cloud.email && !!f.owner && f.owner !== cloud.email;
 
   const addLedger = (label: string, rp: number, supply: number) =>
     set((d) => void d.ledger.push({ id: uid(), date: new Date().toISOString().slice(0, 10), label, rp, supply }));
@@ -48,6 +51,12 @@ export default function ForceView({ forceId }: { forceId: string }) {
           <button className="primary" onClick={() => go(href.battle(f.id))}>⚔ Record battle</button>
         </div>
       </div>
+
+      {theirs && (
+        <div className="panel notice">
+          This is <b>{f.owner}</b>'s force. You can look and print lists, but changes you make here are undone — only its owner can edit it.
+        </div>
+      )}
 
       <div className="cols-main">
         <div>
@@ -237,12 +246,12 @@ export default function ForceView({ forceId }: { forceId: string }) {
             </div>
           </div>
           <NexusPanel f={f} onShop={() => setUmbra(true)} />
-          <div className="panel">
+          {theirs ? null : <div className="panel">
             <div className="panel-title"><h3>Danger zone</h3></div>
             <button
               className="danger"
               onClick={() => {
-                if (!window.confirm(`Delete "${f.name}" and all its units? Export it first if you want a copy.`)) return;
+                if (!window.confirm(`Delete "${f.name}" and all its units${f.owner && cloud.email ? ' for every player' : ''}? Export it first if you want a copy.`)) return;
                 update((d) => void (d.forces = d.forces.filter((x) => x.id !== f.id)));
                 toast(`Deleted ${f.name}.`);
                 go(href.forces());
@@ -250,7 +259,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
             >
               Delete force
             </button>
-          </div>
+          </div>}
         </div>
       </div>
 

@@ -144,6 +144,8 @@ export interface Force {
   name: string;
   faction: string;
   player: string;
+  /** Google account of the player who owns it in the cloud; unset = only on this device. */
+  owner?: string;
   description: string;
   image?: string;
   /** Army Forge link for the force's army (falls back to its units' book). */

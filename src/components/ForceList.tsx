@@ -5,13 +5,19 @@ import { forceTotals } from '../rules/engine';
 import { go, href } from '../route';
 import { Dropzone } from './ui';
 import { useImporter } from './importer';
+import { useCloud } from '../cloud/CloudSync';
 
 export default function ForceList() {
   const { state, update } = useStore();
   const importFiles = useImporter();
+  const cloud = useCloud();
+  const local = cloud.email ? state.forces.filter((f) => !f.owner) : [];
+  const claim = (ids: string[]) =>
+    update((d) => d.forces.forEach((f) => ids.includes(f.id) && (f.owner = cloud.email ?? undefined)));
 
   const create = () => {
     const f = newForce();
+    if (cloud.email) f.owner = cloud.email;
     update((d) => void d.forces.push(f));
     go(href.force(f.id));
   };
@@ -29,6 +35,21 @@ export default function ForceList() {
         </div>
       </div>
 
+      {local.length > 0 && (
+        <div className="panel notice">
+          <div className="panel-title">
+            <h3>{local.length === 1 ? '1 force is' : `${local.length} forces are`} only on this device</h3>
+            {local.length > 1 && <button className="primary" onClick={() => claim(local.map((f) => f.id))}>Upload all as mine</button>}
+          </div>
+          <p className="muted small">Upload your own forces so the other players can see them. Leave copies of other players' forces here.</p>
+          <div className="row" style={{ flexWrap: 'wrap' }}>
+            {local.map((f) => (
+              <button key={f.id} onClick={() => claim([f.id])}>Upload “{f.name}” as mine</button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {state.forces.length === 0 && <div className="panel empty">No forces yet. Create one, or drop a shared force file below.</div>}
 
       <div className="grid grid-cards">
@@ -38,6 +59,7 @@ export default function ForceList() {
             <a key={f.id} className="card" href={href.force(f.id)}>
               {f.image && <img src={f.image} alt="" style={{ width: '100%', height: 110, objectFit: 'cover', marginBottom: 8 }} />}
               <h3>{f.name}</h3>
+              {cloud.email && f.owner && f.owner !== cloud.email && <div className="tag">{f.owner.split('@')[0]}'s force</div>}
               <div className="sub">
                 {f.faction || 'Unknown faction'}
                 {f.player && <> · {f.player}</>}
