@@ -226,7 +226,7 @@ function UnitsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInpu
         <span className="muted small">Kill XP: 1 per wound of each model destroyed (½ per model in 10+ model, 1-wound units)</span>
       </div>
       <div className="table-wrap">
-        <table className="compact">
+        <table className="compact stack">
           <thead>
             <tr>
               <th>Fought</th><th>Unit</th><th>Destroyed</th><th title="Marked for Greatness">Marked</th><th title="Holding an objective at the end">Holding</th>
@@ -240,18 +240,18 @@ function UnitsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInpu
               const total = r.in ? part + (r.marked ? MARKED_XP : 0) + r.killXp + r.bonusXp : 0;
               return (
                 <tr key={u.id} className={r.in ? '' : 'removed'}>
-                  <td><input type="checkbox" checked={r.in} onChange={(e) => setUnit(u.id, { in: e.target.checked })} /></td>
-                  <td>
+                  <td data-label="Fought"><input type="checkbox" checked={r.in} onChange={(e) => setUnit(u.id, { in: e.target.checked })} /></td>
+                  <td className="s-2">
                     <b>{unitName(u)}</b>
                     <div className="muted small">{u.name && u.unitType} {comatose && <span className="tag cyan" title="Sits this battle out; recovers afterwards">Comatose</span>}</div>
                   </td>
-                  <td><input type="checkbox" disabled={!r.in} checked={r.destroyed} onChange={(e) => setUnit(u.id, { destroyed: e.target.checked, death: e.target.checked ? r.death : null })} /></td>
-                  <td><input type="radio" name="marked" disabled={!r.in} checked={r.marked} onChange={() => setUnit(u.id, { marked: true })} onClick={() => r.marked && setUnit(u.id, { marked: false })} /></td>
-                  <td><input type="checkbox" disabled={!r.in} checked={r.holding} onChange={(e) => setUnit(u.id, { holding: e.target.checked })} /></td>
-                  <td className="num"><Stepper value={r.kills} min={0} onChange={(n) => setUnit(u.id, { kills: n })} /></td>
-                  <td className="num"><Stepper value={r.killXp} min={0} onChange={(n) => setUnit(u.id, { killXp: n })} /></td>
-                  <td className="num"><Stepper value={r.bonusXp} min={0} onChange={(n) => setUnit(u.id, { bonusXp: n })} /></td>
-                  <td className="num"><b>{total}</b></td>
+                  <td data-label="Destroyed"><input type="checkbox" disabled={!r.in} checked={r.destroyed} onChange={(e) => setUnit(u.id, { destroyed: e.target.checked, death: e.target.checked ? r.death : null })} /></td>
+                  <td data-label="Marked"><input type="radio" name="marked" disabled={!r.in} checked={r.marked} onChange={() => setUnit(u.id, { marked: true })} onClick={() => r.marked && setUnit(u.id, { marked: false })} /></td>
+                  <td data-label="Holding"><input type="checkbox" disabled={!r.in} checked={r.holding} onChange={(e) => setUnit(u.id, { holding: e.target.checked })} /></td>
+                  <td className="num" data-label="Kills"><Stepper value={r.kills} min={0} onChange={(n) => setUnit(u.id, { kills: n })} /></td>
+                  <td className="num" data-label="Kill XP"><Stepper value={r.killXp} min={0} onChange={(n) => setUnit(u.id, { killXp: n })} /></td>
+                  <td className="num" data-label="Bonus XP"><Stepper value={r.bonusXp} min={0} onChange={(n) => setUnit(u.id, { bonusXp: n })} /></td>
+                  <td className="num s-full" data-label="Total XP"><b>{total}</b></td>
                 </tr>
               );
             })}
@@ -576,15 +576,15 @@ function SummaryStep({ outcome }: { outcome: BattleOutcome }) {
       <div className="panel">
         <div className="panel-title"><h2>Experience</h2></div>
         <div className="table-wrap">
-          <table className="compact">
+          <table className="compact stack">
             <thead><tr><th>Unit</th><th>Breakdown</th><th className="num">XP</th><th>Outcome</th></tr></thead>
             <tbody>
               {outcome.units.filter((o) => o.played || o.gain || o.wokeUp).map((o) => (
                 <tr key={o.unitId}>
-                  <td><b>{o.name}</b>{!o.played && <div className="muted small">did not fight</div>}</td>
-                  <td className="small">{o.parts.map((p) => `${p.label} +${p.xp}`).join(', ') || '—'}</td>
-                  <td className="num">{o.xpBefore} → <b>{o.xpAfter}</b></td>
-                  <td>
+                  <td className="s-2"><b>{o.name}</b>{!o.played && <div className="muted small">did not fight</div>}</td>
+                  <td className="small s-full" data-label="Breakdown">{o.parts.map((p) => `${p.label} +${p.xp}`).join(', ') || '—'}</td>
+                  <td className="num s-end" data-label="XP">{o.xpBefore} → <b>{o.xpAfter}</b></td>
+                  <td className="s-full">
                     {o.levelsGained > 0 && <span className="tag gold">Level {levelForXp(o.xpAfter)}!</span>}
                     {o.scarUndone && <span className="tag green">{o.scarName} undone</span>}
                     {!o.scarUndone && o.scarResult === 'scarred' && <span className="tag red">{o.scarName}</span>}

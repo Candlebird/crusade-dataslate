@@ -173,27 +173,27 @@ function BookBrowser({ uid }: { uid: string }) {
       {tab === 'units' && <TagFilter tags={tagsIn(Object.values(book.unitTags ?? {}))} value={tagFilter} onChange={setTagFilter} />}
       {tab === 'units' && (
         <div className="table-wrap">
-          <table>
+          <table className="stack">
             <thead>
               <tr><th>Datasheet</th><th>Tags</th><th className="num">Size</th><th className="num">Q</th><th className="num">D</th><th>Rules</th><th>Weapons</th><th className="num">Pts</th></tr>
             </thead>
             <tbody>
               {units.map((u) => (
                 <tr key={u.id}>
-                  <td><b>{u.name}</b></td>
-                  <td><DatasheetTags book={book} name={u.name} /></td>
-                  <td className="num">{u.size}</td>
-                  <td className="num">{u.quality}+</td>
-                  <td className="num">{u.defense}+</td>
-                  <td className="small">{u.rules.join(', ')}</td>
-                  <td className="small">
+                  <td className="s-2"><b>{u.name}</b></td>
+                  <td className="s-full"><DatasheetTags book={book} name={u.name} /></td>
+                  <td className="num" data-label="Size">{u.size}</td>
+                  <td className="num" data-label="Quality">{u.quality}+</td>
+                  <td className="num" data-label="Defense">{u.defense}+</td>
+                  <td className="small s-full" data-label="Rules">{u.rules.join(', ')}</td>
+                  <td className="small s-full" data-label="Weapons">
                     {u.weapons.map((w, i) => (
                       <div key={i}>
                         {w.count > 1 && `${w.count}× `}{w.name} <span className="muted">({w.range ? `${w.range}"` : 'Melee'}, A{w.attacks}{w.rules.length ? `, ${w.rules.join(', ')}` : ''})</span>
                       </div>
                     ))}
                   </td>
-                  <td className="num">{u.cost}</td>
+                  <td className="num s-end" data-label="Pts">{u.cost}</td>
                 </tr>
               ))}
             </tbody>

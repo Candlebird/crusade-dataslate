@@ -7,6 +7,7 @@ import { glossary, isHero, joinedTo, label, listIssues, listSpells, listTotals, 
 import { go, href } from '../route';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
+import { MARKS, traitMark } from './marks';
 import { Issues, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
 export default function ListPage({ forceId, listId }: { forceId: string; listId: string }) {
@@ -91,7 +92,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
               <div className="empty">No units carry all of those tags.</div>
             ) : (
               <div className="table-wrap">
-                <table>
+                <table className="stack">
                   <thead>
                     <tr><th /><th>Unit</th><th>Category</th><th>Tags</th><th className="num">Pts</th><th className="num">BP</th><th>Joins</th></tr>
                   </thead>
@@ -100,8 +101,8 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
                       const on = selected.has(u.id);
                       return (
                         <tr key={u.id} className={`clickable${on ? '' : ' unpicked'}`} onClick={() => toggle(u)}>
-                          <td><input type="checkbox" checked={on} readOnly aria-label={`Include ${label(u)}`} /></td>
-                          <td>
+                          <td className="s-end"><input type="checkbox" checked={on} readOnly aria-label={`Include ${label(u)}`} /></td>
+                          <td className="s-2">
                             <b>{label(u)}</b>
                             {u.name && <div className="muted small">{u.unitType}</div>}
                           </td>
@@ -110,10 +111,10 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
                             {u.status === 'comatose' && <span className="tag cyan">Comatose</span>}
                             {u.status === 'removed' && <span className="tag red">Fallen</span>}
                           </td>
-                          <td><UnitTags unit={u} editable={false} /></td>
-                          <td className="num">{u.points}</td>
-                          <td className="num">{battlePoints(u, s)}</td>
-                          <td onClick={(e) => e.stopPropagation()}>
+                          <td className="s-2"><UnitTags unit={u} editable={false} /></td>
+                          <td className="num" data-label="Pts">{u.points}</td>
+                          <td className="num" data-label="BP">{battlePoints(u, s)}</td>
+                          <td className="s-full" onClick={(e) => e.stopPropagation()}>
                             {on && isHero(u) && (
                               <select
                                 value={l.joins[u.id] ?? ''}
@@ -204,7 +205,7 @@ export function ListSheet({ force: f, list: l, settings: s, books, coreRules }: 
         <div className="sheet-totals">
           <b>{t.points} / {l.pointsLimit} pts</b>
           <div>{t.units} units · {t.models} models · {t.bp} BP</div>
-          <div>{new Date().toLocaleDateString()} · ★ unique · ◆ Nexus</div>
+          <div>{new Date().toLocaleDateString()} · {MARKS.trait} trait · {MARKS.unique} unique · {MARKS.nexus} Nexus · {MARKS.relic} relic</div>
         </div>
       </header>
       {(l.notes || pending.length > 0) && (
@@ -282,7 +283,7 @@ function UnitCard({ u, joined, s }: { u: Unit; joined?: Unit; s: Settings }) {
                     {w.traits.length > 0 && (
                       <>
                         {c.special.length > 0 && ', '}
-                        <i>{w.traits.map((x) => `${x.name}${x.unique ? ' ★' : ''}`).join(', ')}</i>
+                        <i>{w.traits.map((x) => `${x.name} ${traitMark(x)}`).join(', ')}</i>
                       </>
                     )}
                     {!c.special.length && !w.traits.length && '-'}
@@ -300,14 +301,14 @@ function UnitCard({ u, joined, s }: { u: Unit; joined?: Unit; s: Settings }) {
           {u.upgrades.map((x, i) => (
             <span key={x.id}>
               {i > 0 && ', '}
-              {x.name}{x.unique && ' ★'}{x.nexus && ' ◆'}{x.note && <i> ({x.note})</i>}
+              {x.name} {traitMark(x)}{x.note && <i> ({x.note})</i>}
             </span>
           ))}
         </div>
       )}
       {u.relics.map((r) => (
         <div key={r.id} className="card-line">
-          <b>Relic ({r.tier}):</b> {r.name}
+          <b>Relic ({r.tier}):</b> {r.name} {MARKS.relic}
           {r.profile && <> ({r.profile})</>}
           {r.note && <i> {r.note}</i>}
         </div>

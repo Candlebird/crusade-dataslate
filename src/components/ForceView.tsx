@@ -98,7 +98,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
               <div className="empty">No units carry all of those tags.</div>
             ) : (
               <div className="table-wrap">
-                <table>
+                <table className="stack">
                   <thead>
                     <tr>
                       <th>Unit</th>
@@ -116,17 +116,17 @@ export default function ForceView({ forceId }: { forceId: string }) {
                       const issues = validateUnit(u).filter((i) => i.level !== 'info');
                       return (
                         <tr key={u.id} className={`clickable ${u.status === 'removed' ? 'removed' : ''}`} onClick={() => go(href.unit(f.id, u.id))}>
-                          <td>
+                          <td className="s-2">
                             <b>{u.name || u.unitType}</b>
                             {u.name && <div className="muted small">{u.unitType}</div>}
                           </td>
-                          <td className="cat">{u.category}</td>
-                          <td><UnitTags unit={u} /></td>
-                          <td><XpBar xp={u.xp} mini /><span className="small muted">{u.xp} XP</span></td>
-                          <td className="num">{levelForXp(u.xp)}</td>
-                          <td className="num">{u.points}</td>
-                          <td className="num">{battlePoints(u, s)}</td>
-                          <td>
+                          <td className="cat s-end">{u.category}</td>
+                          <td className="s-full"><UnitTags unit={u} /></td>
+                          <td className="s-full"><XpBar xp={u.xp} mini /><span className="small muted">{u.xp} XP</span></td>
+                          <td className="num" data-label="Lvl">{levelForXp(u.xp)}</td>
+                          <td className="num" data-label="Pts">{u.points}</td>
+                          <td className="num" data-label="BP">{battlePoints(u, s)}</td>
+                          <td className="s-full">
                             {u.status === 'comatose' && <span className="tag cyan">Comatose</span>}
                             {u.status === 'removed' && <span className="tag red">Fallen</span>}
                             {u.scars.length > 0 && <span className="tag red">{u.scars.length} scar{u.scars.length > 1 ? 's' : ''}</span>}
@@ -190,19 +190,19 @@ export default function ForceView({ forceId }: { forceId: string }) {
               <p className="muted small">No entries. Starting Supply Limit is {f.startingSupply}.</p>
             ) : (
               <div className="table-wrap">
-                <table>
+                <table className="stack">
                   <thead>
                     <tr><th>Date</th><th>Entry</th><th className="num">RP</th><th className="num">Supply</th><th className="num">US</th><th /></tr>
                   </thead>
                   <tbody>
                     {f.ledger.map((e, i) => (
                       <tr key={e.id}>
-                        <td><input type="date" value={e.date} onChange={(ev) => set((d) => void (d.ledger[i].date = ev.target.value))} /></td>
-                        <td><TextField className="wide" value={e.label} onCommit={(v) => set((d) => void (d.ledger[i].label = v))} /></td>
-                        <td className="num"><input type="number" value={e.rp} onChange={(ev) => set((d) => void (d.ledger[i].rp = Number(ev.target.value) || 0))} /></td>
-                        <td className="num"><input type="number" step={50} value={e.supply} onChange={(ev) => set((d) => void (d.ledger[i].supply = Number(ev.target.value) || 0))} /></td>
-                        <td className="num small" title="Umbra Shards (history only — the balance is set in Force details)">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
-                        <td><button className="ghost icon" onClick={() => set((d) => void d.ledger.splice(i, 1))} aria-label="Delete entry">✕</button></td>
+                        <td className="s-2" data-label="Date"><input type="date" value={e.date} onChange={(ev) => set((d) => void (d.ledger[i].date = ev.target.value))} /></td>
+                        <td className="s-full" data-label="Entry"><TextField className="wide" value={e.label} onCommit={(v) => set((d) => void (d.ledger[i].label = v))} /></td>
+                        <td className="num" data-label="RP"><input type="number" value={e.rp} onChange={(ev) => set((d) => void (d.ledger[i].rp = Number(ev.target.value) || 0))} /></td>
+                        <td className="num" data-label="Supply"><input type="number" step={50} value={e.supply} onChange={(ev) => set((d) => void (d.ledger[i].supply = Number(ev.target.value) || 0))} /></td>
+                        <td className="num small" data-label="US" title="Umbra Shards (history only — the balance is set in Force details)">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
+                        <td className="s-end"><button className="ghost icon" onClick={() => set((d) => void d.ledger.splice(i, 1))} aria-label="Delete entry">✕</button></td>
                       </tr>
                     ))}
                   </tbody>

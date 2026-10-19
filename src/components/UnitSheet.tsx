@@ -34,6 +34,7 @@ import { unitBookUrl } from '../armyforge/book';
 import { go, href } from '../route';
 import { ForceImage } from './ForceView';
 import TablePicker, { type PickGroup, type Picked } from './TablePicker';
+import { traitMark } from './marks';
 import { Issues, Stepper, TextArea, TextField, XpBar, toast } from './ui';
 
 type Picker =
@@ -426,7 +427,7 @@ function WeaponRow({ w, infantry, onChange, onRemove, onAddTrait }: {
       <div className="row" style={{ marginTop: 6 }}>
         {w.traits.map((t, i) => (
           <span key={t.id} className={`tag ${t.unique ? 'gold' : 'green'}`} title={t.free ? 'Free' : undefined}>
-            {t.unique && '★ '}{t.name}{t.free && ' (free)'}
+            {traitMark(t)} {t.name}{t.free && ' (free)'}
             <button aria-label={`Remove ${t.name}`} onClick={() => onChange((x) => void x.traits.splice(i, 1))}>✕</button>
           </span>
         ))}
