@@ -48,11 +48,11 @@ import AiActivation from './AiActivation';
 import { Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
 /** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
-export default function BattleTracker({ sectorId }: { sectorId?: string }) {
+export default function BattleTracker({ sectorId, attacker }: { sectorId?: string; attacker?: string }) {
   const { state, update } = useStore();
   const b = state.battle;
   const sector = state.campaign?.sectors.find((s) => s.id === sectorId);
-  if (!b) return <StartBattle sectorId={sector?.id} />;
+  if (!b) return <StartBattle sectorId={sector?.id} preset={attacker} />;
 
   const set = (fn: (d: TrackedBattle) => void) => update((s) => void (s.battle && fn(s.battle)));
   const sc = score(b);
@@ -266,14 +266,14 @@ function objectiveScoring(m: MissionDef): string {
   return `${base}${bonus}.`;
 }
 
-function StartBattle({ sectorId }: { sectorId?: string }) {
+function StartBattle({ sectorId, preset }: { sectorId?: string; preset?: string }) {
   const { state, update } = useStore();
   const cloud = useCloud();
   const c = state.campaign;
   const sector = c?.sectors.find((s) => s.id === sectorId);
   // Attack for my own force's faction if I have one, else for anyone but the sector's owner.
   const myFaction = state.forces.find((f) => f.nexus?.factionId && f.nexus.factionId !== sector?.owner && (!f.owner || f.owner === cloud.email))?.nexus?.factionId;
-  const [attacker, setAttacker] = useState(() => myFaction ?? c?.factions.find((f) => f.id !== sector?.owner)?.id ?? '');
+  const [attacker, setAttacker] = useState(() => (preset && c?.factions.some((f) => f.id === preset) ? preset : undefined) ?? myFaction ?? c?.factions.find((f) => f.id !== sector?.owner)?.id ?? '');
   const missions = allMissions(state.customMissions);
   const [id, setId] = useState(missions[0]?.id ?? '');
   // An unclaimed or void sector is held by the AI; a claimed one by its faction's player.

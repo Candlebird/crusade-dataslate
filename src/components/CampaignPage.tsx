@@ -6,6 +6,7 @@ import type { Campaign, Sector, SectorType } from '../model/types';
 import { BENEFITS, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionName, ownedSectors, recordSectorGame, removeSectorGame, sectorEffect } from '../rules/nexus';
 import { href } from '../route';
 import HexMapPanel from './HexMap';
+import OrdersPanel from './NexusOrders';
 import { useImporter } from './importer';
 import { Dropzone, TextField, confirmAction, toast } from './ui';
 
@@ -76,6 +77,7 @@ export default function CampaignPage() {
         setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
         setTimeout(() => document.getElementById('record-game')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
       }} />
+      <OrdersPanel c={c} />
       <SectorsPanel c={c} setC={setC} />
       <div className="cols-2">
         <RecordPanel c={c} setC={setC} preset={recordAt} />

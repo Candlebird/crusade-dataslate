@@ -5,6 +5,7 @@ import { collection, deleteDoc, doc, getDoc, getFirestore, onSnapshot, setDoc, w
 import { firebaseConfig } from './config';
 import { imageRefs } from './docs';
 import type { LocalDoc, RemoteDoc } from './sync';
+import type { Declared, OrderRound, PlayerOrders } from '../rules/orders';
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -99,3 +100,37 @@ export async function addMember(email: string, name: string): Promise<void> {
 }
 
 export const removeMember = (email: string) => deleteDoc(doc(db, 'members', email));
+
+// ---- Nexus Wars sealed orders: kept out of the app state so nobody's picks sit on another device before the reveal ----
+
+/** orderRound/current, or null before the GM opens the first round. */
+export function watchRound(cb: (r: OrderRound | null) => void, onError: (err: Error) => void): () => void {
+  return onSnapshot(doc(db, 'orderRound', 'current'), (snap) => cb(snap.exists() ? (snap.data() as OrderRound) : null), onError);
+}
+
+/** This player's own orders (email), or everyone's once revealed (null). */
+export function watchOrders(email: string | null, cb: (orders: PlayerOrders[]) => void, onError: (err: Error) => void): () => void {
+  const toOrders = (id: string, v: Record<string, unknown>): PlayerOrders => ({ email: id, round: Number(v.round ?? 0), picks: (v.picks ?? {}) as Record<string, string> });
+  if (email) return onSnapshot(doc(db, 'orders', email), (snap) => cb(snap.exists() ? [toOrders(snap.id, snap.data())] : []), onError);
+  return onSnapshot(collection(db, 'orders'), (snap) => cb(snap.docs.map((d) => toOrders(d.id, d.data()))), onError);
+}
+
+export function watchDeclared(cb: (d: Declared[]) => void, onError: (err: Error) => void): () => void {
+  return onSnapshot(
+    collection(db, 'declared'),
+    (snap) => cb(snap.docs.map((d) => ({ email: d.id, round: Number(d.data().round ?? 0), factions: (d.data().factions ?? []) as string[] }))),
+    onError,
+  );
+}
+
+/** Seal this player's orders, and tell everyone which factions have declared. */
+export async function saveOrders(email: string, round: number, picks: Record<string, string>): Promise<void> {
+  const at = new Date().toISOString();
+  const batch = writeBatch(db);
+  batch.set(doc(db, 'orders', email), { round, picks, at });
+  batch.set(doc(db, 'declared', email), { round, factions: Object.keys(picks), at });
+  await batch.commit();
+}
+
+/** GM only: open a round, or reveal it. */
+export const setRound = (r: OrderRound) => setDoc(doc(db, 'orderRound', 'current'), r);

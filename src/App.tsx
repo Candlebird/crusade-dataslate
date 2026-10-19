@@ -56,7 +56,7 @@ export default function App() {
         {route.page === 'unit' && <UnitSheet forceId={route.forceId} unitId={route.unitId} />}
         {route.page === 'battle' && <BattleWizard key={`${route.forceId}/${route.battleId}/${route.sideId}`} forceId={route.forceId} battleId={route.battleId} sideId={route.sideId} />}
         {route.page === 'list' && <ListPage forceId={route.forceId} listId={route.listId} />}
-        {route.page === 'tracker' && <BattleTracker key={route.sectorId} sectorId={route.sectorId} />}
+        {route.page === 'tracker' && <BattleTracker key={`${route.sectorId}/${route.attacker}`} sectorId={route.sectorId} attacker={route.attacker} />}
         {route.page === 'missions' && <MissionLibrary />}
         {route.page === 'campaign' && <CampaignPage />}
         {route.page === 'books' && <BooksPage />}
