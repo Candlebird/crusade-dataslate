@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import { exportCampaign } from '../model/io';
 import type { Campaign, Sector, SectorType } from '../model/types';
 import { BENEFITS, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, ownedSectors, recordSectorGame } from '../rules/nexus';
 import { href } from '../route';
+import HexMapPanel from './HexMap';
 import { useImporter } from './importer';
 import { Dropzone, TextField, confirmAction, toast } from './ui';
 
@@ -18,6 +19,7 @@ export default function CampaignPage() {
   const { state, update } = useStore();
   const importFiles = useImporter();
   const c = state.campaign;
+  const [recordAt, setRecordAt] = useState<{ sectorId: string; n: number }>({ sectorId: '', n: 0 });
 
   const importer = (
     <Dropzone accept=".json,application/json" onFiles={importFiles}>
@@ -69,9 +71,13 @@ export default function CampaignPage() {
       </p>
 
       <FactionsPanel c={c} setC={setC} />
+      <HexMapPanel c={c} setC={setC} onRecord={(sectorId) => {
+        setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
+        setTimeout(() => document.getElementById('record-game')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+      }} />
       <SectorsPanel c={c} setC={setC} />
       <div className="cols-2">
-        <RecordPanel c={c} setC={setC} />
+        <RecordPanel c={c} setC={setC} preset={recordAt} />
         <LogPanel c={c} setC={setC} />
       </div>
 
@@ -168,17 +174,20 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
         <h2>Sectors</h2>
         <button onClick={add}>+ Add sector</button>
       </div>
-      {c.sectors.length === 0 ? <p className="muted small">No sectors yet. The hex map editor arrives in Phase 4 — for now, list them here.</p> : (
+      {c.sectors.length === 0 ? <p className="muted small">No sectors yet. Generate a map above, paint sectors onto it, or add them here.</p> : (
         <div className="table-wrap">
           <table className="compact">
-            <thead><tr><th>Name</th><th>Type</th><th>Benefit</th><th>Controlled by</th><th>Flags</th><th>Notes</th><th /></tr></thead>
+            <thead><tr><th>Name</th><th>Type</th><th>Benefit</th><th>Controlled by</th><th>Flags</th><th>Lore</th><th /></tr></thead>
             <tbody>
               {c.sectors.map((s, i) => {
                 const owner = c.factions.find((f) => f.id === s.owner);
                 const benefits = BENEFITS.filter((b) => b.type === s.type);
                 return (
                   <tr key={s.id}>
-                    <td><TextField value={s.name} onCommit={(v) => setS(i, (d) => void (d.name = v))} /></td>
+                    <td>
+                      <TextField value={s.name} onCommit={(v) => setS(i, (d) => void (d.name = v))} />
+                      {c.map && s.q == null && <span className="muted small" title="Place it from the map"> · off map</span>}
+                    </td>
                     <td>
                       <select value={s.type} title={SECTOR_TYPES[s.type].desc} onChange={(e) => setS(i, (d) => {
                         d.type = e.target.value as SectorType;
@@ -221,9 +230,12 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
   );
 }
 
-function RecordPanel({ c, setC }: { c: Campaign; setC: SetC }) {
+function RecordPanel({ c, setC, preset }: { c: Campaign; setC: SetC; preset: { sectorId: string; n: number } }) {
   const blank = () => ({ date: new Date().toISOString().slice(0, 10), sectorId: '', attacker: '', defender: 'ai', winner: '', notes: '' });
   const [ev, setEv] = useState(blank);
+  useEffect(() => {
+    if (preset.n) setEv((e) => ({ ...e, sectorId: preset.sectorId, defender: c.sectors.find((s) => s.id === preset.sectorId)?.owner ?? 'ai', winner: '' }));
+  }, [preset.n]);
   const sector = c.sectors.find((s) => s.id === ev.sectorId);
   const sides = [...c.factions.map((f) => ({ id: f.id, name: f.name })), { id: 'ai', name: 'AI' }];
   const set = (p: Partial<typeof ev>) => setEv({ ...ev, ...p });
@@ -236,7 +248,7 @@ function RecordPanel({ c, setC }: { c: Campaign; setC: SetC }) {
   }
 
   return (
-    <div className="panel">
+    <div className="panel" id="record-game">
       <div className="panel-title"><h2>Record a sector game</h2></div>
       <div className="fields">
         <label className="field">Date<input type="date" value={ev.date} onChange={(e) => set({ date: e.target.value })} /></label>

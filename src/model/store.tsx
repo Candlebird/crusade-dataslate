@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { DEFAULT_SETTINGS, type AppState, type CatalogBook, type Force, type Unit } from './types';
 import { buildSeedState } from './seed';
 import { nowIso } from './factory';
+import { toast } from '../components/ui';
 
 const STORAGE_KEY = 'opr-crusade-tracker:v1';
 
@@ -41,6 +42,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     } catch (e) {
       console.error('Could not save to browser storage', e);
+      toast('Browser storage is full — this change was not saved. Remove some pictures or export a backup.', 'error');
     }
   }, [state]);
 

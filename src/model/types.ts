@@ -230,10 +230,13 @@ export interface Sector {
   reinforced?: boolean;
   /** Void one-off reward already taken. */
   rewardClaimed?: boolean;
-  /** Hex coordinates for the Phase 4 map. */
+  /** Axial hex coordinates on the campaign map; unset = not placed. */
   q?: number;
   r?: number;
+  /** Lore / description, shown on the map. */
   notes: string;
+  /** Sector art as a downscaled data URL. */
+  image?: string;
 }
 
 export interface CampaignFaction {
@@ -256,6 +259,13 @@ export interface CampaignEvent {
   notes: string;
 }
 
+export interface CampaignMap {
+  cols: number;
+  rows: number;
+  /** Seed used for the starfield (and the last generation). */
+  seed: string;
+}
+
 export interface Campaign {
   id: string;
   name: string;
@@ -263,6 +273,7 @@ export interface Campaign {
   factions: CampaignFaction[];
   sectors: Sector[];
   log: CampaignEvent[];
+  map?: CampaignMap;
 }
 
 export interface AppState {

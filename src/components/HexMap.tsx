@@ -1,0 +1,529 @@
+import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { uid } from '../model/factory';
+import { readImageAsDataUrl } from '../model/io';
+import type { Campaign, Sector, SectorType } from '../model/types';
+import {
+  cells, clampToMap, defaultCounts, defaultMap, frontier, generateMap, hexCorners, hexKey, isPlaced, randomSeed, rng, rollSector, toPixel,
+  type GenCounts, type GenOptions, type Hex,
+} from '../rules/hexmap';
+import { BENEFITS, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf } from '../rules/nexus';
+import { factionName } from './CampaignPage';
+import { Modal, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
+
+type SetC = (fn: (c: Campaign) => void) => void;
+type Tool = 'select' | 'type' | 'owner' | 'move' | 'unplace';
+
+const SIZE = 40;
+const GLYPH: Record<SectorType, string> = { home: '♜', planet: '◉', research: '⌬', void: '✠', anomaly: '✺', empty: '·' };
+const TOOLS: { key: Tool; label: string; hint: string }[] = [
+  { key: 'select', label: 'Select', hint: 'Click a hex to see or edit it' },
+  { key: 'type', label: 'Paint type', hint: 'Click hexes to set their type (creates a sector on empty space)' },
+  { key: 'owner', label: 'Paint owner', hint: 'Click sectors to hand them to a faction' },
+  { key: 'move', label: 'Move', hint: 'Click a sector, then click where it goes (swaps with an occupied hex)' },
+  { key: 'unplace', label: 'Take off map', hint: 'Click sectors to take them off the map (they stay in the sector list)' },
+];
+
+export default function HexMapPanel({ c, setC, onRecord }: { c: Campaign; setC: SetC; onRecord: (sectorId: string) => void }) {
+  const [genOpen, setGenOpen] = useState(false);
+  if (!c.map) {
+    return (
+      <div className="panel">
+        <div className="panel-title"><h2>Sector map</h2></div>
+        <p className="muted small">Lay the sectors out on a hex map. Generate one from the factions and sectors you have, or start with an empty grid and paint it yourself.</p>
+        <div className="row">
+          <button className="primary" onClick={() => setGenOpen(true)}>Generate map…</button>
+          <button onClick={() => setC((d) => void (d.map = defaultMap(d.factions.length)))}>Empty grid</button>
+        </div>
+        {genOpen && <GenerateDialog c={c} setC={setC} onClose={() => setGenOpen(false)} />}
+      </div>
+    );
+  }
+  return <MapEditor c={c} setC={setC} onRecord={onRecord} />;
+}
+
+function MapEditor({ c, setC, onRecord }: { c: Campaign; setC: SetC; onRecord: (sectorId: string) => void }) {
+  const map = c.map!;
+  const [tool, setTool] = useState<Tool>('select');
+  const [paintType, setPaintType] = useState<SectorType>('planet');
+  const [paintOwner, setPaintOwner] = useState('');
+  const [viewAs, setViewAs] = useState('');
+  const [sel, setSel] = useState<Hex | null>(null);
+  const [moving, setMoving] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [genOpen, setGenOpen] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const svgRef = useRef<SVGSVGElement>(null);
+  const drag = useRef<{ x: number; y: number; px: number; py: number; moved: boolean } | null>(null);
+
+  const all = useMemo(() => cells(map), [map.cols, map.rows]);
+  const bounds = useMemo(() => {
+    const pts = all.map((h) => toPixel(h, SIZE));
+    const pad = SIZE * 1.2;
+    const x0 = Math.min(...pts.map((p) => p.x)) - pad, y0 = Math.min(...pts.map((p) => p.y)) - pad;
+    return { x0, y0, w: Math.max(...pts.map((p) => p.x)) + pad - x0, h: Math.max(...pts.map((p) => p.y)) + pad - y0 };
+  }, [all]);
+  const stars = useMemo(() => {
+    const rand = rng(map.seed);
+    const n = Math.round((bounds.w * bounds.h) / 900);
+    return Array.from({ length: n }, () => ({ x: bounds.x0 + rand() * bounds.w, y: bounds.y0 + rand() * bounds.h, r: rand() < 0.08 ? 1.4 : 0.4 + rand() * 0.6, o: 0.25 + rand() * 0.6 }));
+  }, [map.seed, bounds]);
+  const nebulae = useMemo(() => {
+    const rand = rng(map.seed + '-neb');
+    const hues = ['#5fb3b3', '#8e44ad', '#b3352b', '#c9a24a'];
+    return Array.from({ length: 3 }, () => ({ x: bounds.x0 + rand() * bounds.w, y: bounds.y0 + rand() * bounds.h, r: (0.25 + rand() * 0.3) * Math.max(bounds.w, bounds.h), c: hues[Math.floor(rand() * hues.length)] }));
+  }, [map.seed, bounds]);
+
+  const bySector = new Map(c.sectors.filter(isPlaced).map((s) => [hexKey(s.q, s.r), s]));
+  const front = viewAs ? frontier(c, viewAs) : null;
+  const unplaced = c.sectors.filter((s) => !isPlaced(s));
+  const color = (id?: string) => c.factions.find((f) => f.id === id)?.color;
+  const selSector = sel ? bySector.get(hexKey(sel.q, sel.r)) : undefined;
+
+  const vw = bounds.w / zoom, vh = bounds.h / zoom;
+  const vx = bounds.x0 + (bounds.w - vw) / 2 + pan.x, vy = bounds.y0 + (bounds.h - vh) / 2 + pan.y;
+
+  const setSector = (id: string, fn: (s: Sector) => void) => setC((d) => { const s = d.sectors.find((x) => x.id === id); if (s) fn(s); });
+
+  const clickHex = (h: Hex) => {
+    const s = bySector.get(hexKey(h.q, h.r));
+    switch (tool) {
+      case 'select':
+        setSel(h);
+        setEditing(false);
+        break;
+      case 'type':
+        if (s) setSector(s.id, (d) => {
+          d.type = paintType;
+          if (!BENEFITS.some((b) => b.type === d.type && b.id === d.benefit)) d.benefit = undefined;
+        });
+        else setC((d) => void d.sectors.push({ id: uid(), type: paintType, q: h.q, r: h.r, ...rollSector(paintType) }));
+        setSel(h);
+        break;
+      case 'owner':
+        if (s && s.type !== 'home') setSector(s.id, (d) => void (d.owner = paintOwner || undefined));
+        else if (s) toast('Home sectors always belong to their faction.', 'error');
+        break;
+      case 'move':
+        if (!moving) {
+          if (s) setMoving(s.id);
+          return;
+        }
+        setC((d) => {
+          const m = d.sectors.find((x) => x.id === moving);
+          const other = d.sectors.find((x) => x.q === h.q && x.r === h.r);
+          if (!m) return;
+          if (other && other !== m) [other.q, other.r] = [m.q, m.r];
+          m.q = h.q;
+          m.r = h.r;
+        });
+        setMoving(null);
+        setSel(h);
+        break;
+      case 'unplace':
+        if (s) setSector(s.id, (d) => void (d.q = d.r = undefined));
+        break;
+    }
+  };
+
+  // Drag to pan; a press that doesn't move is a click on the hex under it.
+  const onDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    drag.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y, moved: false };
+  };
+  const onMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const d = drag.current;
+    if (!d || !svgRef.current) return;
+    const dx = e.clientX - d.x, dy = e.clientY - d.y;
+    if (!d.moved && Math.hypot(dx, dy) < 5) return;
+    if (!d.moved) svgRef.current.setPointerCapture(e.pointerId);
+    d.moved = true;
+    const k = vw / svgRef.current.getBoundingClientRect().width;
+    setPan({ x: d.px - dx * k, y: d.py - dy * k });
+  };
+  const onUp = (e: ReactPointerEvent<SVGSVGElement>) => {
+    const d = drag.current;
+    drag.current = null;
+    if (!d || d.moved) return;
+    const hex = (e.target as Element).closest('[data-q]');
+    if (hex) clickHex({ q: Number(hex.getAttribute('data-q')), r: Number(hex.getAttribute('data-r')) });
+  };
+
+  const resize = (cols: number, rows: number) =>
+    setC((d) => {
+      d.map = { ...d.map!, cols, rows };
+      clampToMap(d);
+    });
+
+  const exportPng = () => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const clone = svg.cloneNode(true) as SVGSVGElement;
+    const scale = 2;
+    clone.setAttribute('viewBox', `${bounds.x0} ${bounds.y0} ${bounds.w} ${bounds.h}`);
+    clone.setAttribute('width', String(bounds.w * scale));
+    clone.setAttribute('height', String(bounds.h * scale));
+    clone.querySelectorAll('.hex-sel, .hex-front').forEach((n) => n.classList.remove('hex-sel', 'hex-front'));
+    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    style.textContent = MAP_EXPORT_CSS;
+    clone.insertBefore(style, clone.firstChild);
+    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: 'image/svg+xml' }));
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = bounds.w * scale;
+      canvas.height = bounds.h * scale;
+      canvas.getContext('2d')!.drawImage(img, 0, 0);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((b) => {
+        if (!b) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(b);
+        a.download = `${c.name.replace(/[^\w-]+/g, '_')}-map.png`;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+      });
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      toast('Could not render the map image.', 'error');
+    };
+    img.src = url;
+  };
+
+  const hint = tool === 'move' && moving ? `Moving ${c.sectors.find((s) => s.id === moving)?.name} — click its new hex.` : TOOLS.find((t) => t.key === tool)!.hint;
+
+  return (
+    <div className="panel">
+      <div className="panel-title">
+        <h2>Sector map</h2>
+        <div className="row">
+          <button onClick={() => setGenOpen(true)}>Generate…</button>
+          <button onClick={exportPng} title="Download the whole map as a picture">Export PNG</button>
+        </div>
+      </div>
+
+      <div className="map-toolbar">
+        <div className="seg">
+          {TOOLS.map((t) => (
+            <button key={t.key} className={tool === t.key ? 'on' : ''} title={t.hint} onClick={() => { setTool(t.key); setMoving(null); }}>{t.label}</button>
+          ))}
+        </div>
+        {tool === 'type' && (
+          <select value={paintType} onChange={(e) => setPaintType(e.target.value as SectorType)} aria-label="Type to paint">
+            {SECTOR_TYPE_KEYS.map((t) => <option key={t} value={t}>{GLYPH[t]} {SECTOR_TYPES[t].label}</option>)}
+          </select>
+        )}
+        {tool === 'owner' && (
+          <select value={paintOwner} onChange={(e) => setPaintOwner(e.target.value)} aria-label="Owner to paint">
+            <option value="">Unclaimed</option>
+            {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        )}
+        <span className="spacer" />
+        <label className="row small">
+          View as
+          <select value={viewAs} onChange={(e) => setViewAs(e.target.value)} title="Highlights the sectors bordering that faction's territory">
+            <option value="">—</option>
+            {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+        </label>
+        <span className="row small">
+          Size <Stepper value={map.cols} min={3} onChange={(n) => resize(Math.min(n, 30), map.rows)} /> × <Stepper value={map.rows} min={3} onChange={(n) => resize(map.cols, Math.min(n, 30))} />
+        </span>
+      </div>
+      <p className="muted small" style={{ margin: '0.25rem 0' }}>{hint}</p>
+
+      <div className="map-wrap">
+        <div className="map-view">
+          <svg
+            ref={svgRef}
+            className={`hexmap tool-${tool}`}
+            viewBox={`${vx} ${vy} ${vw} ${vh}`}
+            xmlns="http://www.w3.org/2000/svg"
+            onPointerDown={onDown}
+            onPointerMove={onMove}
+            onPointerUp={onUp}
+            onPointerLeave={() => (drag.current = null)}
+            onWheel={(e) => setZoom((z) => Math.min(4, Math.max(0.5, z * (e.deltaY < 0 ? 1.15 : 1 / 1.15))))}
+          >
+            <defs>
+              {nebulae.map((n, i) => (
+                <radialGradient key={i} id={`neb${i}`}>
+                  <stop offset="0" stopColor={n.c} stopOpacity="0.22" />
+                  <stop offset="1" stopColor={n.c} stopOpacity="0" />
+                </radialGradient>
+              ))}
+              {c.sectors.filter((s) => isPlaced(s) && s.image).map((s) => {
+                const p = toPixel(s as Hex, SIZE);
+                return <clipPath key={s.id} id={`clip-${s.id}`}><polygon points={hexCorners(p.x, p.y, SIZE - 1)} /></clipPath>;
+              })}
+            </defs>
+            <rect x={bounds.x0 - bounds.w} y={bounds.y0 - bounds.h} width={bounds.w * 3} height={bounds.h * 3} fill="#07080b" />
+            {nebulae.map((n, i) => <circle key={i} cx={n.x} cy={n.y} r={n.r} fill={`url(#neb${i})`} />)}
+            {stars.map((s, i) => <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity={s.o} />)}
+
+            {all.map((h) => {
+              const p = toPixel(h, SIZE);
+              const s = bySector.get(hexKey(h.q, h.r));
+              const isSel = !!sel && sel.q === h.q && sel.r === h.r;
+              if (!s) {
+                return <polygon key={hexKey(h.q, h.r)} data-q={h.q} data-r={h.r} className={`hex hex-blank${isSel ? ' hex-sel' : ''}`} points={hexCorners(p.x, p.y, SIZE - 1)} />;
+              }
+              const col = color(s.owner);
+              const dim = front && s.owner !== viewAs && !front.has(s.id);
+              return (
+                <g key={s.id} data-q={h.q} data-r={h.r} className={`hex hex-${s.type}${isSel ? ' hex-sel' : ''}${front?.has(s.id) ? ' hex-front' : ''}${moving === s.id ? ' hex-moving' : ''}`} opacity={dim ? 0.45 : 1}>
+                  <polygon points={hexCorners(p.x, p.y, SIZE - 1)} className="hex-base" fill={s.type === 'empty' ? '#0e1014' : '#1a1d22'} />
+                  {s.image && <image href={s.image} x={p.x - SIZE} y={p.y - SIZE} width={SIZE * 2} height={SIZE * 2} preserveAspectRatio="xMidYMid slice" clipPath={`url(#clip-${s.id})`} opacity="0.75" />}
+                  {col && <polygon points={hexCorners(p.x, p.y, SIZE - 1)} fill={col} fillOpacity={s.image ? 0.15 : 0.3} />}
+                  <polygon points={hexCorners(p.x, p.y, SIZE - (col ? 3 : 1))} fill="none" className="hex-edge" stroke={col ?? (front?.has(s.id) ? '#5fb3b3' : '#4a525c')} strokeWidth={col || front?.has(s.id) ? 3 : 1} />
+                  <text x={p.x} y={p.y + 3} className="hex-glyph">{GLYPH[s.type]}</text>
+                  <text x={p.x} y={p.y + 21} className="hex-name">{s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name}</text>
+                  {s.reinforced && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Reinforced</title>⛨</text>}
+                  {s.type === 'void' && s.rewardClaimed && <text x={p.x + 15} y={p.y - 17} className="hex-mark"><title>Reward claimed</title>✓</text>}
+                </g>
+              );
+            })}
+          </svg>
+          <div className="map-zoom">
+            <button className="icon" aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(4, z * 1.25))}>+</button>
+            <button className="icon" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}>−</button>
+            <button className="icon" aria-label="Reset view" title="Reset view" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>⟲</button>
+          </div>
+        </div>
+
+        <div className="map-side">
+          {!sel && <SideIntro c={c} unplaced={unplaced} />}
+          {sel && selSector && (editing
+            ? <SectorEditor c={c} s={selSector} setSector={(fn) => setSector(selSector.id, fn)} setC={setC} onDone={() => setEditing(false)} onDeleted={() => setSel(null)} />
+            : <SectorView c={c} s={selSector} onEdit={() => setEditing(true)} onRecord={() => onRecord(selSector.id)} />)}
+          {sel && !selSector && <EmptyHex c={c} h={sel} unplaced={unplaced} setC={setC} />}
+        </div>
+      </div>
+
+      <div className="map-legend small muted">
+        {SECTOR_TYPE_KEYS.map((t) => <span key={t} title={SECTOR_TYPES[t].desc}>{GLYPH[t]} {SECTOR_TYPES[t].label}</span>)}
+        <span>⛨ Reinforced</span>
+        <span>✓ Reward claimed</span>
+        {c.factions.map((f) => <span key={f.id}><i className="swatch" style={{ background: f.color }} /> {f.name}</span>)}
+      </div>
+
+      {genOpen && <GenerateDialog c={c} setC={setC} onClose={() => setGenOpen(false)} />}
+    </div>
+  );
+}
+
+function SideIntro({ c, unplaced }: { c: Campaign; unplaced: Sector[] }) {
+  return (
+    <>
+      <h3>{c.name}</h3>
+      <p className="muted small">Click a hex to see its sector. Drag to pan; scroll or use the buttons to zoom.</p>
+      {c.factions.map((f) => {
+        const n = c.sectors.filter((s) => s.owner === f.id).length;
+        return <div key={f.id} className="row small"><i className="swatch" style={{ background: f.color }} /> <b>{f.name}</b> <span className="muted">{n} sector{n === 1 ? '' : 's'}</span></div>;
+      })}
+      {unplaced.length > 0 && <p className="small" style={{ color: 'var(--warn)' }}>{unplaced.length} sector{unplaced.length === 1 ? ' is' : 's are'} not on the map: {unplaced.map((s) => s.name).join(', ')}. Click an empty hex to place one.</p>}
+    </>
+  );
+}
+
+function SectorView({ c, s, onEdit, onRecord }: { c: Campaign; s: Sector; onEdit: () => void; onRecord: () => void }) {
+  const benefit = benefitOf(s);
+  const games = c.log.filter((e) => e.sectorId === s.id).slice(-4).reverse();
+  const owner = c.factions.find((f) => f.id === s.owner);
+  return (
+    <>
+      {s.image && <img className="sector-art" src={s.image} alt="" />}
+      <h3 style={{ marginBottom: 0 }}>{s.name}</h3>
+      <div className="small">
+        <span className="tag">{GLYPH[s.type]} {SECTOR_TYPES[s.type].label}</span>
+        <span className="tag" style={owner ? { borderColor: owner.color, color: owner.color } : undefined}>{factionName(c, s.owner)}</span>
+        {s.reinforced && <span className="tag">⛨ Reinforced</span>}
+        {s.type === 'void' && s.rewardClaimed && <span className="tag">✓ Reward claimed</span>}
+      </div>
+      <p className="small">{benefit ? <><b>{benefit.name}:</b> {benefit.desc}</> : SECTOR_TYPES[s.type].desc}</p>
+      {s.notes && <p className="small lore">{s.notes}</p>}
+      {games.length > 0 && (
+        <div className="small">
+          <b>Recent games</b>
+          {games.map((e) => <div key={e.id} className="muted">{e.date}: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} — {e.winner ? `${factionName(c, e.winner)} won` : 'draw'}</div>)}
+        </div>
+      )}
+      <div className="row" style={{ marginTop: '0.75rem' }}>
+        <button className="primary" onClick={onRecord}>Record a game here</button>
+        <button onClick={onEdit}>Edit</button>
+      </div>
+    </>
+  );
+}
+
+function SectorEditor({ c, s, setSector, setC, onDone, onDeleted }: {
+  c: Campaign; s: Sector; setSector: (fn: (s: Sector) => void) => void; setC: SetC; onDone: () => void; onDeleted: () => void;
+}) {
+  const benefits = BENEFITS.filter((b) => b.type === s.type);
+  const fileRef = useRef<HTMLInputElement>(null);
+  return (
+    <div className="fields">
+      <label className="field span-all">Name<TextField value={s.name} onCommit={(v) => setSector((d) => void (d.name = v || d.name))} /></label>
+      <label className="field">
+        Type
+        <select value={s.type} onChange={(e) => setSector((d) => {
+          d.type = e.target.value as SectorType;
+          if (!BENEFITS.some((b) => b.type === d.type && b.id === d.benefit)) d.benefit = undefined;
+        })}>
+          {SECTOR_TYPE_KEYS.map((t) => <option key={t} value={t}>{SECTOR_TYPES[t].label}</option>)}
+        </select>
+      </label>
+      <label className="field">
+        Controlled by
+        <select value={s.owner ?? ''} onChange={(e) => setSector((d) => void (d.owner = e.target.value || undefined))}>
+          <option value="">Unclaimed</option>
+          {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+        </select>
+      </label>
+      {benefits.length > 0 && (
+        <label className="field span-all">
+          Benefit
+          <select value={s.benefit ?? ''} onChange={(e) => setSector((d) => void (d.benefit = e.target.value || undefined))}>
+            <option value="">— choose —</option>
+            {benefits.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        </label>
+      )}
+      <div className="span-all row small">
+        <label className="row"><input type="checkbox" checked={!!s.reinforced} onChange={(e) => setSector((d) => void (d.reinforced = e.target.checked || undefined))} /> Reinforced</label>
+        {s.type === 'void' && <label className="row"><input type="checkbox" checked={!!s.rewardClaimed} onChange={(e) => setSector((d) => void (d.rewardClaimed = e.target.checked || undefined))} /> Reward claimed</label>}
+      </div>
+      <label className="field span-all">Lore<TextArea value={s.notes} rows={4} placeholder="Lore, terrain, rumours…" onCommit={(v) => setSector((d) => void (d.notes = v))} /></label>
+      <div className="span-all row">
+        <button onClick={() => setSector((d) => { const r = rollSector(d.type); d.name = r.name; d.notes = r.notes; })} title="Random name and lore">🎲 Reroll name &amp; lore</button>
+      </div>
+      <div className="span-all row">
+        {s.image && <img className="sector-art thumb" src={s.image} alt="" />}
+        <button onClick={() => fileRef.current?.click()}>{s.image ? 'Replace art' : 'Add art'}</button>
+        {s.image && <button className="ghost" onClick={() => setSector((d) => void (d.image = undefined))}>Remove art</button>}
+        <input ref={fileRef} type="file" accept="image/*" hidden onChange={async (e) => {
+          const file = e.target.files?.[0];
+          e.target.value = '';
+          if (!file) return;
+          try {
+            const url = await readImageAsDataUrl(file, 384);
+            setSector((d) => void (d.image = url));
+          } catch (err) {
+            toast((err as Error).message, 'error');
+          }
+        }} />
+      </div>
+      <div className="span-all row">
+        <button className="primary" onClick={onDone}>Done</button>
+        <span className="spacer" />
+        <button className="ghost" onClick={() => setSector((d) => void (d.q = d.r = undefined))} title="Keeps the sector in the list">Take off map</button>
+        <button className="danger" onClick={() => {
+          if (!confirmAction(`Delete ${s.name}? Its log entries stay but will show "Deleted sector".`)) return;
+          setC((d) => void (d.sectors = d.sectors.filter((x) => x.id !== s.id)));
+          onDeleted();
+        }}>Delete</button>
+      </div>
+    </div>
+  );
+}
+
+function EmptyHex({ c, h, unplaced, setC }: { c: Campaign; h: Hex; unplaced: Sector[]; setC: SetC }) {
+  const [type, setType] = useState<SectorType>('planet');
+  const [place, setPlace] = useState('');
+  const col = h.q + Math.floor(h.r / 2) + 1;
+  return (
+    <>
+      <h3>Open space</h3>
+      <p className="muted small">Column {col}, row {h.r + 1}.</p>
+      <div className="fields">
+        <label className="field span-all">
+          New sector
+          <span className="row">
+            <select value={type} onChange={(e) => setType(e.target.value as SectorType)}>
+              {SECTOR_TYPE_KEYS.map((t) => <option key={t} value={t}>{SECTOR_TYPES[t].label}</option>)}
+            </select>
+            <button className="primary" onClick={() => setC((d) => void d.sectors.push({ id: uid(), type, q: h.q, r: h.r, ...rollSector(type) }))}>Create</button>
+          </span>
+        </label>
+        {unplaced.length > 0 && (
+          <label className="field span-all">
+            Place an existing sector
+            <span className="row">
+              <select value={place} onChange={(e) => setPlace(e.target.value)}>
+                <option value="">— choose —</option>
+                {unplaced.map((s) => <option key={s.id} value={s.id}>{s.name} ({factionName(c, s.owner)})</option>)}
+              </select>
+              <button disabled={!place} onClick={() => setC((d) => { const s = d.sectors.find((x) => x.id === place); if (s) [s.q, s.r] = [h.q, h.r]; })}>Place</button>
+            </span>
+          </label>
+        )}
+      </div>
+    </>
+  );
+}
+
+function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose: () => void }) {
+  const base = c.map ?? defaultMap(c.factions.length);
+  const [o, setO] = useState<GenOptions>({
+    cols: base.cols, rows: base.rows, seed: randomSeed(), counts: defaultCounts(c.factions.length), startingSectors: 1,
+    replace: c.sectors.some((s) => s.type !== 'home'),
+  });
+  const set = (p: Partial<GenOptions>) => setO({ ...o, ...p });
+  const setCount = (t: keyof GenCounts, n: number) => set({ counts: { ...o.counts, [t]: n } });
+  const total = c.factions.length + Object.values(o.counts).reduce((a, b) => a + b, 0);
+  const tooSmall = total > o.cols * o.rows;
+  const keep = c.sectors.filter((s) => s.type !== 'home').length;
+
+  const run = () => {
+    if (o.replace && keep && !confirmAction(`Replace mode deletes ${keep} non-home sector${keep === 1 ? '' : 's'} (with their lore and art). Continue?`)) return;
+    setC((d) => generateMap(d, o));
+    toast('Map generated.');
+    onClose();
+  };
+
+  return (
+    <Modal title="Generate sector map" onClose={onClose} wide
+      footer={<><span className="muted small grow">{tooSmall ? `${total} sectors won't fit on a ${o.cols}×${o.rows} grid.` : `${total} sectors on a ${o.cols}×${o.rows} grid.`}</span><button onClick={onClose}>Cancel</button><button className="primary" onClick={run}>Generate</button></>}>
+      {c.factions.length === 0 && <p className="small" style={{ color: 'var(--warn)' }}>Add the factions first — each one's home sector is spread across the map.</p>}
+      <div className="cols-2">
+        <div className="fields">
+          <label className="field">Columns<Stepper value={o.cols} min={3} onChange={(n) => set({ cols: Math.min(n, 30) })} /></label>
+          <label className="field">Rows<Stepper value={o.rows} min={3} onChange={(n) => set({ rows: Math.min(n, 30) })} /></label>
+          <label className="field span-all">
+            Seed
+            <span className="row"><input value={o.seed} onChange={(e) => set({ seed: e.target.value })} /><button onClick={() => set({ seed: randomSeed() })} title="New seed">🎲</button></span>
+            <span className="muted small">The same seed and settings give the same map.</span>
+          </label>
+          <label className="field span-all">
+            Starting sectors per faction
+            <Stepper value={o.startingSectors} min={0} onChange={(n) => set({ startingSectors: n })} />
+            <span className="muted small">Each faction takes its nearest unclaimed sectors (never void sectors).</span>
+          </label>
+        </div>
+        <div className="fields">
+          {(Object.keys(o.counts) as (keyof GenCounts)[]).map((t) => (
+            <label key={t} className="field" title={SECTOR_TYPES[t].desc}>{GLYPH[t]} {SECTOR_TYPES[t].label}<Stepper value={o.counts[t]} min={0} onChange={(n) => setCount(t, n)} /></label>
+          ))}
+          <label className="span-all row small">
+            <input type="checkbox" checked={o.replace} onChange={(e) => set({ replace: e.target.checked })} />
+            Replace existing sectors (keeps factions' home sectors)
+          </label>
+          {!o.replace && <p className="span-all muted small" style={{ margin: 0 }}>Existing sectors stay where they are and count toward the totals; only the gaps are filled.</p>}
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/** Styles inlined into the exported PNG, which can't see the page's stylesheet. */
+const MAP_EXPORT_CSS = `
+  .hex-blank { fill: rgba(255,255,255,0.015); stroke: rgba(255,255,255,0.09); }
+  .hex-glyph { fill: #c9a24a; font: 20px Georgia, serif; text-anchor: middle; }
+  .hex-research .hex-glyph { fill: #8fc1e3; }
+  .hex-void .hex-glyph { fill: #5fb3b3; }
+  .hex-anomaly .hex-glyph { fill: #b583d6; }
+  .hex-empty .hex-glyph { fill: #666; }
+  .hex-name { fill: #d9d4c7; font: 600 7.5px 'Segoe UI', sans-serif; text-anchor: middle; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }
+  .hex-mark { fill: #d9d4c7; font: 11px sans-serif; text-anchor: middle; }
+`;
