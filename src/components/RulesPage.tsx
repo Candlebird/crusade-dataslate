@@ -10,6 +10,7 @@ import {
   ANOMALY_TABLE, BENEFITS, COMBAT_MANIPULATIONS, ECHOES, NEXUS_ROUNDS, SECTOR_TYPES, UMBRA_SHOP, VOID_TABLE,
 } from '../rules/nexusData';
 import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
+import { relicHolderText, relicHolders } from '../rules/engine';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
 
@@ -65,19 +66,10 @@ function Rolls({ title, entries }: { title: string; entries: { text: string }[] 
   );
 }
 
-/** Who carries each relic, across every force here, so the case shows what's been claimed. */
-function useHolders() {
-  const { state } = useStore();
-  const held = new Map<string, { forceId: string; unitId: string; label: string }[]>();
-  for (const f of state.forces)
-    for (const u of f.units)
-      for (const r of u.relics) held.set(r.name, [...(held.get(r.name) ?? []), { forceId: f.id, unitId: u.id, label: `${u.name} (${f.name})` }]);
-  return held;
-}
-
 /** Relics as a display case: a card per relic, grouped by tier, with who carries it. */
 function RelicCase({ relics }: { relics: RelicDef[] }) {
-  const held = useHolders();
+  const { state } = useStore();
+  const held = relicHolders(state.forces, state.campaign);
   return (
     <>
       {TIERS.map((tier) => {
@@ -96,7 +88,7 @@ function RelicCase({ relics }: { relics: RelicDef[] }) {
                     {r.note && <p className="small muted">{r.note}</p>}
                     <div className="relic-held small">
                       {by.length
-                        ? <>Carried by {by.map((h, i) => <span key={i}>{i ? ', ' : ''}<a href={href.unit(h.forceId, h.unitId)}>{h.label}</a></span>)}</>
+                        ? <>Carried by {by.map((h, i) => <span key={i}>{i ? ', ' : ''}<a href={href.unit(h.forceId, h.unitId)}>{relicHolderText(h)}</a></span>)}</>
                         : <span className="muted">Unclaimed</span>}
                     </div>
                   </div>

@@ -3,9 +3,9 @@ import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { Force, Unit } from '../model/types';
 import { RELICS, REQUISITIONS, SCAR_TABLE, type RelicTier, type Requisition } from '../rules/data';
-import { applyScar, forceTotals, hasRule, relicSlots, relicTierAllowed, rollDice, rollDie } from '../rules/engine';
+import { applyScar, forceTotals, hasRule, relicHolders, relicSlots, relicTaken, relicTierAllowed, rollDice, rollDie } from '../rules/engine';
 import { unitName } from '../rules/battle';
-import { Modal, toast } from './ui';
+import { Modal, RelicOption, toast } from './ui';
 
 const RELIC_TIER: Record<string, RelicTier> = { 'Common Relic': 'Common', 'Rare Relic': 'Rare', 'Legendary Relic': 'Legendary' };
 /** Requisitions whose effect the shop applies itself; the rest are recorded in the ledger only. */
@@ -21,6 +21,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
   const [note, setNote] = useState('');
   const [result, setResult] = useState<string | null>(null);
 
+  const held = relicHolders(state.forces, state.campaign);
   const units = force.units.filter((u) => u.status !== 'removed');
   const unit = units.find((u) => u.id === unitId);
   const tier = sel ? RELIC_TIER[sel.name] : undefined;
@@ -168,7 +169,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
                   {tier} relic
                   <select value={choice} onChange={(e) => setChoice(e.target.value)}>
                     <option value="">— choose —</option>
-                    {RELICS.filter((r) => r.tier === tier && !r.nexus).map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
+                    {RELICS.filter((r) => r.tier === tier && !r.nexus).map((r) => <RelicOption key={r.name} name={r.name} taken={relicTaken(held, r.name)} />)}
                   </select>
                 </label>
               )}

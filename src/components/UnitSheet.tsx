@@ -27,6 +27,8 @@ import {
   pendingLevels,
   relicCost,
   relicSlots,
+  relicHolders,
+  relicTaken,
   relicTierAllowed,
   ruleRating,
   upgradesUsed,
@@ -106,13 +108,14 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       ];
     }
     if (picker.kind === 'scar') return [{ key: 'scar', label: 'Battle scars', entries: SCAR_TABLE, rollable: true }];
+    const held = relicHolders(state.forces, state.campaign);
     const relicGroup = (key: string, label: string, list: typeof RELICS): PickGroup => ({
       key,
       label,
       entries: list.map((r) => ({
         name: r.name,
         desc: [`${relicCost(r.tier)} RP`, r.profile, r.desc, r.note].filter(Boolean).join(' · '),
-        disabled: relicTierAllowed(r.tier, u.xp) ? undefined : `${r.tier} relics need ${RELIC_TIER_MIN_XP[r.tier]}+ XP`,
+        disabled: relicTaken(held, r.name) ?? (relicTierAllowed(r.tier, u.xp) ? undefined : `${r.tier} relics need ${RELIC_TIER_MIN_XP[r.tier]}+ XP`),
         meta: r,
       })),
     });

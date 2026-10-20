@@ -3,10 +3,10 @@ import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { Force, Unit } from '../model/types';
 import { NEXUS_TRAITS, RELICS, type RelicTier } from '../rules/data';
-import { forceTotals, relicCost as relicRp } from '../rules/engine';
+import { forceTotals, relicCost as relicRp, relicHolders, relicTaken } from '../rules/engine';
 import { unitName } from '../rules/battle';
 import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_ROUNDS, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
-import { Modal, toast } from './ui';
+import { Modal, RelicOption, toast } from './ui';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
 const NEEDS_UNIT = new Set<UmbraBuy>(['knowledge', 'relic', 'evolution']);
@@ -28,6 +28,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
   const costOf = (x: (typeof UMBRA_SHOP)[number]) => (x.key === 'relic' && collector ? Math.max(0, x.cost - NEXUS_ROUNDS.relicCollectorDiscount) : x.cost);
   const item = UMBRA_SHOP.find((x) => x.key === sel);
   const cost = item ? costOf(item) : 0;
+  const held = relicHolders(state.forces, state.campaign);
   const units = force.units.filter((u) => u.status !== 'removed');
   const unit = units.find((u) => u.id === unitId);
   const rpCost = sel === 'relic' ? relicRp(tier) : 0;
@@ -169,7 +170,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
                     Nexus relic
                     <select value={choice} onChange={(e) => setChoice(e.target.value)}>
                       <option value="">— choose —</option>
-                      {RELICS.filter((r) => r.nexus && r.tier === tier).map((r) => <option key={r.name} value={r.name}>{r.name}</option>)}
+                      {RELICS.filter((r) => r.nexus && r.tier === tier).map((r) => <RelicOption key={r.name} name={r.name} taken={relicTaken(held, r.name)} />)}
                     </select>
                   </label>
                 </>

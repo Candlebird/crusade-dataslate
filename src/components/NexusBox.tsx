@@ -1,9 +1,10 @@
 import type { Unit } from '../model/types';
 import { CATEGORIES, RELICS } from '../rules/data';
 import { ANOMALY_TABLE, COMBAT_MANIPULATIONS, NEXUS_ROUNDS, ROLL_SIDES, VOID_TABLE, nexusEntry, type NexusItem, type NexusPick } from '../rules/nexus';
-import { rollDie } from '../rules/engine';
+import { relicHolders, relicTaken, rollDie } from '../rules/engine';
+import { useStore } from '../model/store';
 import { unitName } from '../rules/battle';
-import { Stepper } from './ui';
+import { RelicOption, Stepper } from './ui';
 
 export function UnitSelect({ label, units, value, onChange, empty }: { label: string; units: Unit[]; value: string; onChange: (id: string) => void; empty: string }) {
   return (
@@ -32,6 +33,8 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
   const table = item.kind === 'anomaly' ? ANOMALY_TABLE : item.kind === 'void' ? VOID_TABLE : null;
   const e = nexusEntry(item, pick);
   const given = Object.values(pick.alloc).reduce((n, x) => n + x, 0);
+  const { state } = useStore();
+  const held = relicHolders(state.forces, state.campaign);
   const wantsRelic = (item.kind === 'relicRoll' && pick.roll === 6) || !!e?.nexusRelic;
   const relics = item.kind === 'relicRoll'
     ? RELICS.filter((r) => r.tier === 'Common' && !r.nexus)
@@ -113,7 +116,7 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
           {wantsRelic && (
             <select value={pick.choice} onChange={(ev) => setPick({ choice: ev.target.value })}>
               <option value="">— choose a relic —</option>
-              {relics.map((r) => <option key={r.name} value={r.name}>{r.name} ({r.tier})</option>)}
+              {relics.map((r) => <RelicOption key={r.name} name={r.name} label={`${r.name} (${r.tier})`} taken={relicTaken(held, r.name)} />)}
             </select>
           )}
           <UnitSelect label={e?.free ? `${e.free} for` : 'for'} units={units} value={pick.target} onChange={(target) => setPick({ target })} empty="No units" />

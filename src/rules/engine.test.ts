@@ -8,13 +8,15 @@ import {
   levelForXp,
   pendingLevels,
   previousBracketXp,
+  relicHolders,
   relicSlots,
+  relicTaken,
   sufferingRolls,
   upgradesUsed,
   validateUnit,
   xpProgress,
 } from './engine';
-import { DEFAULT_SETTINGS, type Unit } from '../model/types';
+import { DEFAULT_SETTINGS, type Campaign, type Force, type Unit } from '../model/types';
 
 const unit = (over: Partial<Unit> = {}): Unit => ({
   id: 'u', name: 'Test', unitType: 'Test', category: 'Hero', categoryOverridden: false,
@@ -139,5 +141,27 @@ describe('heroic rise', () => {
     const base = { category: 'Infantry' as const, xp: 10, relics };
     expect(validateUnit(unit(base)).some((i) => i.text.includes('Heroes only'))).toBe(true);
     expect(validateUnit(unit({ ...base, heroicRise: true })).some((i) => i.text.includes('Heroes only'))).toBe(false);
+  });
+});
+
+describe('relicHolders', () => {
+  const force = (over: Partial<Force>): Force => ({ id: 'f', name: 'Alvaris', faction: 'Battle Brothers', units: [], ...over }) as Force;
+  const rhys = unit({ id: 'r', name: 'Rhys', relics: [{ id: 'x', name: 'Xenotech Digital Laser', tier: 'Rare' }] });
+
+  it('names the unit, force and faction holding a relic', () => {
+    const held = relicHolders([force({ units: [rhys] })]);
+    expect(relicTaken(held, 'Xenotech Digital Laser')).toBe('Held by Rhys — Alvaris (Battle Brothers)');
+    expect(relicTaken(held, 'Something else')).toBeUndefined();
+  });
+
+  it('frees the relics of a removed unit', () => {
+    const held = relicHolders([force({ units: [{ ...rhys, status: 'removed' }] })]);
+    expect(relicTaken(held, 'Xenotech Digital Laser')).toBeUndefined();
+  });
+
+  it('prefers the Nexus Wars faction', () => {
+    const campaign = { factions: [{ id: 'n', name: 'Iron Wolves' }] } as unknown as Campaign;
+    const held = relicHolders([force({ units: [rhys], nexus: { factionId: 'n' } as Force['nexus'] })], campaign);
+    expect(held.get('Xenotech Digital Laser')?.[0]).toMatchObject({ forceId: 'f', unitId: 'r', faction: 'Iron Wolves' });
   });
 });

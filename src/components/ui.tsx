@@ -28,6 +28,11 @@ export function Modal({ title, onClose, children, footer, wide }: {
   );
 }
 
+/** A relic in a dropdown, greyed out with who holds it when it's already claimed. */
+export function RelicOption({ name, label = name, taken }: { name: string; label?: string; taken?: string }) {
+  return <option value={name} disabled={!!taken}>{taken ? `${label} — ${taken.charAt(0).toLowerCase()}${taken.slice(1)}` : label}</option>;
+}
+
 export function Stepper({ value, onChange, step = 1, min }: { value: number; onChange: (n: number) => void; step?: number; min?: number }) {
   const clamp = (n: number) => (min != null ? Math.max(min, n) : n);
   return (

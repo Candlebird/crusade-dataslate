@@ -1,4 +1,4 @@
-import type { Force, Settings, Unit, Weapon } from '../model/types';
+import type { Campaign, Force, Settings, Unit, Weapon } from '../model/types';
 import {
   type Category,
   type RelicTier,
@@ -57,6 +57,41 @@ export function relicCost(tier: RelicTier): number {
 
 export function relicTierAllowed(tier: RelicTier, xp: number): boolean {
   return xp >= RELIC_TIER_MIN_XP[tier];
+}
+
+export interface RelicHolder {
+  forceId: string;
+  unitId: string;
+  unit: string;
+  force: string;
+  /** The force's Nexus Wars faction, else its army's faction ('' if neither). */
+  faction: string;
+}
+
+/** Who carries each relic, by relic name. Only one copy of a relic can exist, so a held relic can't be taken again; a removed unit releases its relics. */
+export function relicHolders(forces: Force[], campaign?: Campaign): Map<string, RelicHolder[]> {
+  const held = new Map<string, RelicHolder[]>();
+  for (const f of forces) {
+    const nexus = f.nexus && campaign?.factions.find((x) => x.id === f.nexus!.factionId)?.name;
+    const faction = nexus || f.faction || '';
+    for (const u of f.units.filter((x) => x.status !== 'removed'))
+      for (const r of u.relics) {
+        const h = { forceId: f.id, unitId: u.id, unit: u.name || u.unitType || 'Unnamed unit', force: f.name, faction };
+        held.set(r.name, [...(held.get(r.name) ?? []), h]);
+      }
+  }
+  return held;
+}
+
+/** "Rhys — Alvaris (Iron Wolves)": the unit, its force, and the faction when that says something more. */
+export function relicHolderText(h: RelicHolder): string {
+  return `${h.unit} — ${h.force}${h.faction && h.faction !== h.force ? ` (${h.faction})` : ''}`;
+}
+
+/** Why a relic can't be taken, if someone already carries it. */
+export function relicTaken(held: Map<string, RelicHolder[]>, name: string): string | undefined {
+  const by = held.get(name);
+  return by?.length ? `Held by ${by.map(relicHolderText).join(', ')}` : undefined;
 }
 
 /** Parse a rule label like "Tough(6)" -> 6. */
