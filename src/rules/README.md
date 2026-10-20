@@ -22,6 +22,6 @@ Scoring that the tracker can't work out from markers alone (Sabotage, Demolition
 
 **Rules page.** `rulesText.ts` reads its numbers from `data.ts` and `nexusData.ts`, so changing a value updates the Rules page too. Only edit it when a rule's wording changes. The round logic itself (ending a round, income, threat) is in `rounds.ts`.
 
-**Renaming things.** Saved forces store trait and relic *names*. When you rename one, add an entry to the rename maps in `migrate.ts` and bump `RULES_VERSION`, so that existing units pick up the new name. Nexus benefits are stored by `id`, so change a benefit's `name` and keep its `id`.
+**Renaming things.** Saved forces store trait and relic *names*. When you rename one, add an entry to the rename maps in `migrate.ts` and bump `RULES_VERSION`, so that existing units pick up the new name. Nexus benefits are stored by `id`, so change a benefit's `name` and keep its `id`. Units also keep a copy of a relic's weapon profile and note, so after changing those, bump `RULES_VERSION` too and add a step in `migrateForce` that runs `syncRelics`.
 
 Run `npx vitest run` after a change. A few tests check specific values and will tell you if a rename broke something.

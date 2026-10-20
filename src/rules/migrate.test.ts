@@ -41,6 +41,18 @@ describe('migrateForce', () => {
     expect(u.scars[0].desc).toBe('Gets -1 to hit rolls in melee.');
   });
 
+  it('refreshes relic profiles from version 2 without renaming again', () => {
+    const f = newForce('Balanced');
+    f.rulesVersion = 2;
+    f.units = [newUnit({ id: 'u', relics: [
+      { id: 'r1', name: 'Fang of the River Goul', tier: 'Common', profile: 'Melee, A6, AP(2), Demolish' },
+      { id: 'r2', name: 'Protected Relic', tier: 'Common', profile: 'Custom' },
+    ] })];
+    const u = migrateForce(f).units[0];
+    expect(u.relics.map((r) => r.profile)).toEqual(['Melee, A4, AP(1), Demolish', 'Custom']);
+    expect(u.relics[1].name).toBe('Protected Relic');
+  });
+
   it('runs only once, so new names are not renamed again', () => {
     const once = migrateForce(oldForce());
     expect(once.rulesVersion).toBe(RULES_VERSION);

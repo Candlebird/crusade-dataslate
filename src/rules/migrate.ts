@@ -1,8 +1,8 @@
 import type { Force, Unit } from '../model/types';
-import { SCAR_TABLE } from './data';
+import { RELICS, SCAR_TABLE } from './data';
 
 /** Bump when saved names need migrating again. Forces without a version predate the 2026 rules update. */
-export const RULES_VERSION = 2;
+export const RULES_VERSION = 3;
 
 /** Homebrew names that now match an official OPR rule (or were reworded). */
 const UNIT_RENAMES: Record<string, string> = {
@@ -60,8 +60,23 @@ function migrateUnit(u: Unit): Unit {
   };
 }
 
+/** Relics copy their profile and note when taken, so refresh them after a balance pass. */
+function syncRelics(u: Unit): Unit {
+  return {
+    ...u,
+    relics: u.relics.map((r) => {
+      const def = RELICS.find((x) => x.name === r.name);
+      return def ? { ...r, profile: def.profile ?? r.profile, note: def.note ?? r.note } : r;
+    }),
+  };
+}
+
 /** Bring a saved force's trait, relic and scar names up to the current rules. */
 export function migrateForce(f: Force): Force {
-  if ((f.rulesVersion ?? 1) >= RULES_VERSION) return f;
-  return { ...f, rulesVersion: RULES_VERSION, units: f.units.map(migrateUnit) };
+  const version = f.rulesVersion ?? 1;
+  if (version >= RULES_VERSION) return f;
+  let units = f.units;
+  if (version < 2) units = units.map(migrateUnit);
+  if (version < 3) units = units.map(syncRelics);
+  return { ...f, rulesVersion: RULES_VERSION, units };
 }
