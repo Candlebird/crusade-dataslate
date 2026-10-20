@@ -5,7 +5,7 @@ import { interpretJson } from '../model/io';
 import { href } from '../route';
 import { datasheetTags, matchesTags, tagsIn } from '../model/tags';
 import { DatasheetTags, TagFilter } from './Tags';
-import { Dropzone, confirmAction, toast } from './ui';
+import { Dropzone, Panel, confirmAction, toast } from './ui';
 import { DatasheetEditor } from './BookEditor';
 import { blankDatasheet, removeDatasheet, saveDatasheet } from '../model/bookEdit';
 import type { CatalogBook, CatalogUnit } from '../model/types';
@@ -67,8 +67,7 @@ export default function BooksPage() {
         </div>
       </div>
 
-      <div className="panel">
-        <div className="panel-title"><h2>Add an army book</h2></div>
+      <Panel id="books.add" title="Add an army book">
         <p className="small" style={{ marginTop: 0 }}>
           On Army Forge, open the army and use <b>Share</b> (or copy the page address), then paste the link here. The book is saved for the
           whole group, and <b>Refresh</b> pulls in later changes.
@@ -107,26 +106,27 @@ export default function BooksPage() {
             Drop an <b>Army Forge book JSON</b> (or core rules JSON) here, or click to choose.
           </Dropzone>
         </details>
-      </div>
+      </Panel>
 
-      <div className="panel">
-        <div className="panel-title">
-          <h2>Core rules</h2>
+      <Panel
+        id="books.core"
+        title="Core rules"
+        extra={
           <div className="row">
             {proxy
               ? <button disabled={!!busy} onClick={fetchCore}>{busy === 'core' ? 'Fetching…' : state.coreRules?.length ? 'Refresh' : 'Fetch core rules'}</button>
               : <a className="btn" href={CORE_RULES_URL} target="_blank" rel="noreferrer" download="core-rules.json">Download core rules JSON</a>}
           </div>
-        </div>
+        }
+      >
         <p className="small" style={{ margin: 0 }}>
           {state.coreRules?.length
             ? <><span className="tag green">Imported</span> {state.coreRules.length} core rules (AP, Tough, Hero, Fearless…) are printed in battle list glossaries.</>
             : <>Army books only describe their own rules. Fetch the core rules once for the full <b>Special Rules</b> section on printed lists.</>}
         </p>
-      </div>
+      </Panel>
 
-      <div className="panel">
-        <div className="panel-title"><h2>Imported books</h2></div>
+      <Panel id="books.imported" title="Imported books">
         {state.books.length === 0 && <p className="muted">None yet.</p>}
         {state.books.map((b) => (
           <div key={b.uid} className="list-item">
@@ -155,7 +155,7 @@ export default function BooksPage() {
             </button>
           </div>
         ))}
-      </div>
+      </Panel>
 
       {openId && <BookBrowser uid={openId} />}
     </>
@@ -186,9 +186,10 @@ function BookBrowser({ uid }: { uid: string }) {
   if (!book) return null;
 
   return (
-    <div className="panel">
-      <div className="panel-title">
-        <h2>{book.name}</h2>
+    <Panel
+      id={`books.book.${book.uid}`}
+      title={book.name}
+      extra={
         <div className="row">
           {(['units', 'rules', 'spells'] as const).map((t) => (
             <button key={t} className={tab === t ? 'primary' : ''} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
@@ -200,7 +201,8 @@ function BookBrowser({ uid }: { uid: string }) {
             </button>
           )}
         </div>
-      </div>
+      }
+    >
       {tab === 'units' && editMode && (
         <div className="row" style={{ marginBottom: 8 }}>
           <button onClick={() => setEditing(blankDatasheet())}>+ Add datasheet</button>
@@ -279,6 +281,6 @@ function BookBrowser({ uid }: { uid: string }) {
           {!book.spells.length && <p className="muted">No spells.</p>}
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

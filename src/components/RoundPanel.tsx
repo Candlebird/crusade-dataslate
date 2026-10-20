@@ -12,7 +12,7 @@ import {
 } from '../rules/rounds';
 import { difficultyLevel, difficultyRange, rateSectors } from '../rules/difficulty';
 import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY } from '../rules/nexusData';
-import { confirmAction, toast } from './ui';
+import { Panel, confirmAction, toast } from './ui';
 
 /** End the current round on a copy of the campaign (the spread is random, so it's rolled once, here) and store the result. */
 export function useEndRound() {
@@ -80,11 +80,8 @@ export default function RoundPanel({ c }: { c: Campaign }) {
   };
 
   return (
-    <div className="panel">
-      <div className="panel-title">
-        <h2>Round {round}</h2>
-        <button className="primary" onClick={endNow} title="When everyone has played what they're going to play this round">End round…</button>
-      </div>
+    <Panel id="campaign.round" title={`Round ${round}`}
+      extra={<button className="primary" onClick={endNow} title="When everyone has played what they're going to play this round">End round…</button>}>
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         <span className="tag red" title={`Up ${NEXUS_ROUNDS.threatPerRound} each round, down ${NEXUS_ROUNDS.threatPerWin} per Battle won against them (${NEXUS_ROUNDS.threatPerVoidspawnWin} at a Voidspawn) and ${NEXUS_ROUNDS.threatPerPatrolWin} per patrol (a skirmish won against them)`}>
           ☣ {ECHOES.name} threat {threat}/{NEXUS_ROUNDS.threatMax}
@@ -127,7 +124,7 @@ export default function RoundPanel({ c }: { c: Campaign }) {
       <EventRow c={c} />
       {crisis && <CrisisRow c={c} />}
       {c.factions.length > 0 && <AssetsRow c={c} />}
-    </div>
+    </Panel>
   );
 }
 

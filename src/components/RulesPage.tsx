@@ -13,6 +13,7 @@ import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
 import { EXPEDITION_SITES } from '../rules/downtimeData';
 import { rewardText } from '../rules/downtime';
 import { relicHolderText, relicHolders } from '../rules/engine';
+import { Panel } from './ui';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
 
@@ -23,10 +24,9 @@ function jump(e: MouseEvent<HTMLAnchorElement>) {
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <section className="panel" id={id}>
-      <div className="panel-title"><h2>{title}</h2></div>
+    <Panel id={`rules.${id}`} domId={id} title={title}>
       {children}
-    </section>
+    </Panel>
   );
 }
 

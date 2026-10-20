@@ -136,6 +136,10 @@ h3 { font-size: 1rem; text-transform: uppercase; }
   margin-bottom: 0.75rem;
 }
 .panel-title h2, .panel-title h3 { margin: 0; }
+.panel-head { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }
+.panel-head button.fold { color: var(--muted); font-size: 1.1rem; line-height: 1; padding: 0.15rem 0.4rem; }
+.panel-head button.fold:hover { color: var(--gold); }
+.panel.collapsed .panel-title { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
 
 .page-head {
   display: flex;

@@ -164,3 +164,63 @@ export function Toaster() {
 }
 
 export const confirmAction = (text: string) => window.confirm(text);
+
+// ---- collapsible panels ----
+
+const COLLAPSED_KEY = 'opr-collapsed-panels';
+
+function readCollapsed(): Record<string, boolean> {
+  try {
+    return JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '{}') as Record<string, boolean>;
+  } catch {
+    return {};
+  }
+}
+
+/** Whether a panel is folded away. Remembered per device, by `id`, so the same panel stays shut on every force or unit. */
+export function useCollapsed(id: string, initial = false): [boolean, () => void] {
+  const [closed, setClosed] = useState<boolean>(() => readCollapsed()[id] ?? initial);
+  const toggle = () => {
+    const next = !closed;
+    setClosed(next);
+    try {
+      const all = readCollapsed();
+      if (next === initial) delete all[id];
+      else all[id] = next;
+      localStorage.setItem(COLLAPSED_KEY, JSON.stringify(all));
+    } catch {
+      // Storage full or blocked: the panel still folds, it just won't be remembered.
+    }
+  };
+  return [closed, toggle];
+}
+
+/** A panel whose body can be folded away with the chevron next to its heading. `extra` stays visible either way. */
+export function Panel({ id, title, extra, h = 2, className, domId, collapsed, children }: {
+  id: string;
+  title: ReactNode;
+  extra?: ReactNode;
+  h?: 2 | 3;
+  className?: string;
+  domId?: string;
+  /** Start folded until the user opens it. */
+  collapsed?: boolean;
+  children: ReactNode;
+}) {
+  const [closed, toggle] = useCollapsed(id, collapsed);
+  const H = h === 2 ? 'h2' : 'h3';
+  return (
+    <div id={domId} className={`panel${className ? ` ${className}` : ''}${closed ? ' collapsed' : ''}`}>
+      <div className="panel-title">
+        <span className="panel-head">
+          <button type="button" className="ghost icon fold" onClick={toggle} aria-expanded={!closed} title={closed ? 'Expand' : 'Collapse'}>
+            {closed ? '▸' : '▾'}
+          </button>
+          <H>{title}</H>
+        </span>
+        {extra}
+      </div>
+      {!closed && children}
+    </div>
+  );
+}

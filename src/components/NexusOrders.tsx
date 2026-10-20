@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useCloud } from '../cloud/CloudSync';
 import { useStore } from '../model/store';
 import type { Campaign, Force } from '../model/types';
@@ -9,7 +9,7 @@ import { HOLD, attackTargets, myDetachments, playedDetachments, revealOrders, ty
 import { spreadsAt, nextThreat } from '../rules/rounds';
 import { href } from '../route';
 import { useEndRound } from './RoundPanel';
-import { confirmAction, toast } from './ui';
+import { Panel, confirmAction, toast } from './ui';
 
 type Firebase = typeof import('../cloud/firebase');
 
@@ -49,16 +49,11 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     return fb.watchOrders(revealed ? null : cloud.email, setOrders, console.error);
   }, [fb, online, cloud.email, revealed]);
 
-  const title = <div className="panel-title"><h2>Sealed orders</h2>{round && round.campaignId === c.id && <span className="muted small">Round {currentRound(c)} · orders #{round.round}{revealed ? ' · revealed' : ' · open'}</span>}</div>;
-  if (!online || !cloud.email) {
-    return (
-      <div className="panel">
-        {title}
-        <p className="muted small">Sign in to the campaign to declare sealed attack orders.</p>
-      </div>
-    );
-  }
-  if (round === undefined || !fb) return <div className="panel">{title}<p className="muted small">Loading orders…</p></div>;
+  const status = round && round.campaignId === c.id && <span className="muted small">Round {currentRound(c)} · orders #{round.round}{revealed ? ' · revealed' : ' · open'}</span>;
+  // Every state renders in the same collapsible panel.
+  const panel = (body: ReactNode) => <Panel id="campaign.orders" title="Sealed orders" extra={status}>{body}</Panel>;
+  if (!online || !cloud.email) return panel(<p className="muted small">Sign in to the campaign to declare sealed attack orders.</p>);
+  if (round === undefined || !fb) return panel(<p className="muted small">Loading orders…</p>);
 
   const current = round && round.campaignId === c.id ? round : null;
   const fail = (what: string) => (err: unknown) => toast(`Couldn't ${what}: ${errorText(err)}`, 'error');
@@ -66,14 +61,13 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
   const open = () => fb.setRound({ campaignId: c.id, round: nextRound(), revealed: false }).then(() => toast('Orders are open. Players can now declare.'), fail('open the round'));
 
   if (!current) {
-    return (
-      <div className="panel">
-        {title}
+    return panel(
+      <>
         <p className="muted small">
           Before each game, every player picks a sector next to their territory to attack, or holds. Nobody sees anyone's picks until the GM reveals them.
         </p>
         {cloud.isGm ? <button className="primary" onClick={open}>Open orders for the next game</button> : <p className="muted small">Waiting for the GM to open orders.</p>}
-      </div>
+      </>
     );
   }
 
@@ -105,9 +99,8 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     fb.setRound({ ...current, revealed: true }).then(() => toast('Orders revealed.'), fail('reveal the orders'));
   };
 
-  return (
-    <div className="panel">
-      {title}
+  return panel(
+    <>
       {!revealed && (
         <>
           <p className="muted small">Your picks are sealed: only you can see them until the GM reveals the round. You can change them until then.</p>
@@ -148,7 +141,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
           <button onClick={openNext}>Open orders for the next game</button>
         </div>
       )}
-    </div>
+    </>
   );
 }
 

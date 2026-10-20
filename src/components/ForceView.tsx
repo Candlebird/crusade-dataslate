@@ -21,7 +21,7 @@ import { RESULT_LABEL } from '../rules/battle';
 import { listTotals, newList } from '../rules/lists';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
-import { Stepper, TextArea, TextField, XpBar, confirmAction, toast } from './ui';
+import { Panel, Stepper, TextArea, TextField, XpBar, confirmAction, toast } from './ui';
 
 /** Hands the force to another player on the campaign, e.g. when you've been looking after their army. */
 function TransferForce({ f }: { f: Force }) {
@@ -139,16 +139,16 @@ export default function ForceView({ forceId }: { forceId: string }) {
             )}
           </div>
 
-          <div className="panel">
-            <div className="panel-title">
-              <h2>Order of Battle</h2>
-              {removedCount > 0 && (
-                <label className="row small muted">
-                  <input type="checkbox" checked={showRemoved} onChange={(e) => setShowRemoved(e.target.checked)} />
-                  Show {removedCount} fallen
-                </label>
-              )}
-            </div>
+          <Panel
+            id="force.units"
+            title="Order of Battle"
+            extra={removedCount > 0 && (
+              <label className="row small muted">
+                <input type="checkbox" checked={showRemoved} onChange={(e) => setShowRemoved(e.target.checked)} />
+                Show {removedCount} fallen
+              </label>
+            )}
+          >
             <TagFilter tags={tagsIn(listed.map((u) => unitTags(u, state.books)))} value={tagFilter} onChange={setTagFilter} />
             {listed.length === 0 ? (
               <div className="empty">
@@ -200,11 +200,12 @@ export default function ForceView({ forceId }: { forceId: string }) {
                 </table>
               </div>
             )}
-          </div>
+          </Panel>
 
-          <div className="panel">
-            <div className="panel-title">
-              <h2>Battle lists</h2>
+          <Panel
+            id="force.lists"
+            title="Battle lists"
+            extra={
               <button
                 className="primary"
                 onClick={() => {
@@ -215,7 +216,8 @@ export default function ForceView({ forceId }: { forceId: string }) {
               >
                 + New list
               </button>
-            </div>
+            }
+          >
             {!f.lists?.length ? (
               <p className="muted small">Pick units for a game and print them with their stats, traits, relics and rules.</p>
             ) : (
@@ -229,11 +231,12 @@ export default function ForceView({ forceId }: { forceId: string }) {
                 );
               })
             )}
-          </div>
+          </Panel>
 
-          <div className="panel">
-            <div className="panel-title">
-              <h2>Requisition ledger</h2>
+          <Panel
+            id="force.ledger"
+            title="Requisition ledger"
+            extra={
               <div className="row">
                 <button className="primary" onClick={() => setShopping(true)}>Requisition…</button>
                 <button onClick={() => addLedger('Battle reward', 1, 0)}>+1 RP</button>
@@ -246,7 +249,8 @@ export default function ForceView({ forceId }: { forceId: string }) {
                 </button>
                 <button onClick={() => addLedger('Adjustment', 0, 0)}>+ Entry</button>
               </div>
-            </div>
+            }
+          >
             {f.ledger.length === 0 ? (
               <p className="muted small">No entries. Starting Supply Limit is {f.startingSupply}.</p>
             ) : (
@@ -270,13 +274,13 @@ export default function ForceView({ forceId }: { forceId: string }) {
                 </table>
               </div>
             )}
-          </div>
+          </Panel>
 
-          <div className="panel">
-            <div className="panel-title">
-              <h2>Battle log</h2>
-              <span className="muted small">{f.wins} win{f.wins === 1 ? '' : 's'} in {f.battles} battle{f.battles === 1 ? '' : 's'}</span>
-            </div>
+          <Panel
+            id="force.log"
+            title="Battle log"
+            extra={<span className="muted small">{f.wins} win{f.wins === 1 ? '' : 's'} in {f.battles} battle{f.battles === 1 ? '' : 's'}</span>}
+          >
             {!f.battleLog?.length ? (
               <p className="muted small">No battles recorded yet. <a href={href.battle(f.id)}>Record one</a> after your next game.</p>
             ) : (
@@ -293,12 +297,11 @@ export default function ForceView({ forceId }: { forceId: string }) {
                 </details>
               ))
             )}
-          </div>
+          </Panel>
         </div>
 
         <div>
-          <div className="panel">
-            <div className="panel-title"><h3>Force details</h3></div>
+          <Panel id="force.details" title="Force details" h={3}>
             <ForceImage image={f.image} onChange={(img) => set((d) => void (d.image = img))} />
             <div className="fields" style={{ marginTop: '0.75rem' }}>
               <label className="field span-all">Name<TextField value={f.name} onCommit={(v) => set((d) => void (d.name = v))} /></label>
@@ -314,7 +317,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
               <label className="field span-all">Umbra shards<Stepper value={f.umbraShards} min={0} onChange={(n) => set((d) => void (d.umbraShards = n))} /></label>
               <label className="field span-all">Description / lore<TextArea rows={5} value={f.description} onCommit={(v) => set((d) => void (d.description = v))} /></label>
             </div>
-          </div>
+          </Panel>
           <NexusPanel f={f} onShop={() => setUmbra(true)} />
           {theirs ? null : <div className="panel">
             <div className="panel-title"><h3>Danger zone</h3></div>
@@ -391,11 +394,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const claimedThrough = n && factionClaimedRound(state.forces, n.factionId);
 
   return (
-    <div className="panel">
-      <div className="panel-title">
-        <h3>Nexus Wars</h3>
-        <button className="primary" onClick={onShop}>Umbra shards…</button>
-      </div>
+    <Panel id="force.nexus" title="Nexus Wars" h={3} extra={<button className="primary" onClick={onShop}>Umbra shards…</button>}>
       {!c ? (
         <p className="muted small">No campaign loaded. <a href={href.campaign()}>Import or start one</a> to link this force to a faction.</p>
       ) : (
@@ -477,6 +476,6 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
           )}
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

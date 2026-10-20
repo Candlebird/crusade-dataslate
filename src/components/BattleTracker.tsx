@@ -57,7 +57,7 @@ import { battlePoints, forceTotals } from '../rules/engine';
 import { SOLO_PATROL } from '../rules/downtimeData';
 import { MAX_PLAYERS, randomForces, randomFormat, type Format } from '../rules/randomBattle';
 import AiActivation from './AiActivation';
-import { Stepper, TextArea, TextField, confirmAction, toast } from './ui';
+import { Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
 /** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
 export default function BattleTracker({ sectorId, attacker, forceId, crisis }: { sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean }) {
@@ -159,9 +159,10 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
       </div>
 
       <div className="cols-main">
-        <div className="panel">
-          <div className="panel-title">
-            <h2>Objectives</h2>
+        <Panel
+          id="battle.objectives"
+          title="Objectives"
+          extra={
             <span className="row small">
               Markers
               <Stepper value={b.objectives} min={0} onChange={(n) => set((d) => setObjectives(d, n))} />
@@ -169,7 +170,8 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
                 <button className="ghost small" onClick={() => set((d) => setObjectives(d, rollObjectives(d.mission.objectives as 'D3+2' | 'D3')))} title={`Reroll ${b.mission.objectives}`}>🎲</button>
               )}
             </span>
-          </div>
+          }
+        >
           <p className="muted small">
             Tap a marker to change who holds it at the end of round {b.round}. {objectiveScoring(b.mission)}
           </p>
@@ -208,10 +210,9 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
               ))}
             </>
           )}
-        </div>
+        </Panel>
 
-        <div className="panel">
-          <div className="panel-title"><h2>Mission</h2></div>
+        <Panel id="battle.mission" title="Mission">
           <p>{b.mission.summary}</p>
           {b.deploymentStyle && <p className="small"><b>Deployment style.</b> {b.deploymentStyle} <span className="muted">(map in the OPR Advanced Rules)</span></p>}
           {b.mission.deployment && <p className="small"><b>Deployment.</b> {b.mission.deployment}</p>}
@@ -225,15 +226,14 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
               {notes.map((n) => <p key={n} className="small">{n}</p>)}
             </>
           )}
-        </div>
+        </Panel>
       </div>
 
       <div className="cols-2">
         {b.sides.map((x) => <SidePanel key={x.id} id={x.id} b={b} set={set} forces={state.forces} />)}
       </div>
 
-      <div className="panel">
-        <div className="panel-title"><h2>Setup</h2></div>
+      <Panel id="battle.setup" title="Setup">
         <div className="fields">
           <div className="field">
             <span>Players</span>
@@ -282,7 +282,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
             <TextArea value={b.notes} onCommit={(v) => set((d) => void (d.notes = v))} placeholder="Twists, house rules, memorable moments…" />
           </label>
         </div>
-      </div>
+      </Panel>
     </div>
   );
 }
@@ -355,8 +355,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
         <div><h1>Battle</h1></div>
         <div className="row"><a className="btn" href={href.missions()}>Mission library</a></div>
       </div>
-      <div className="panel">
-        <div className="panel-title"><h2>Start a battle</h2></div>
+      <Panel id="battle.start" title="Start a battle">
         <p className="muted">Pick who's playing and a mission, then load each side's force on the next screen. The battle is kept on this device until you finish or discard it.</p>
         {c && wantCrisis && !crisis && <p className="small"><span className="tag red">There is no Nexus Crisis this round.</span> <a href={href.tracker()}>Start an ordinary battle</a></p>}
         {c && crisis && (
@@ -438,7 +437,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
           <button className="primary" disabled={!m} onClick={() => m && start(m)}>Start {m ? m.name : 'battle'}</button>
           <button onClick={() => setId(rollAdvancedMission().id)} title="Roll the mission type (1-2 Face-Off, 3-4 Progressive, 5-6 Attack & Defend), then a D6">🎲 Random OPR mission</button>
         </div>
-      </div>
+      </Panel>
       {!sector && !crisis && <SoloPatrol mission={m} />}
       <PastBattles />
     </div>
@@ -466,8 +465,7 @@ function SoloPatrol({ mission }: { mission?: MissionDef }) {
     update((s) => void (s.battle = patrolBattle(mission, uid(), nowIso(), f, picked, s.settings, echoes)));
   };
   return (
-    <div className="panel">
-      <div className="panel-title"><h2>Solo patrol</h2><span className="tag cyan">Downtime</span></div>
+    <Panel id="battle.patrol" title="Solo patrol" extra={<span className="tag cyan">Downtime</span>}>
       <p className="muted small">
         Can't get the group together? Take up to {SOLO_PATROL.points} pts of one force on a quick game against the AI ({mission?.name ?? 'the mission picked above'}).
         Units earn participation and kill XP only — no RP or reward rolls. In a campaign, a win counts as a patrol against the {ECHOES.name} and earns a
@@ -507,7 +505,7 @@ function SoloPatrol({ mission }: { mission?: MissionDef }) {
           {!book && <p className="muted small">Load the {ECHOES.name} army book to have their army generated for you, or fill the AI side in by hand.</p>}
         </>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -528,9 +526,10 @@ function PastBattles() {
     confirmAction(`Delete ${x.mission.name} from ${x.finishedAt.slice(0, 10)} for the whole group? Rewards already claimed stay in each force's log.`) &&
     update((s) => void (s.battleHistory = s.battleHistory?.filter((y) => y.id !== x.id)));
   return (
-    <div className="panel">
-      <div className="panel-title">
-        <h2>Past battles</h2>
+    <Panel
+      id="battle.past"
+      title="Past battles"
+      extra={
         <span className="muted small">
           {all.length} finished{waiting.length ? ` · ${waiting.length} waiting on you` : ''}
           {all.length > 0 && (
@@ -540,7 +539,8 @@ function PastBattles() {
             </label>
           )}
         </span>
-      </div>
+      }
+    >
       {!all.length && <p className="muted">No finished battles yet. End a battle, then <b>Finish & save result</b> to keep it here for everyone.</p>}
       {all.length > 0 && !past.length && <p className="muted">Nothing waiting on you. Every battle your forces played has been claimed.</p>}
       {past.map((x) => {
@@ -573,7 +573,7 @@ function PastBattles() {
           </div>
         );
       })}
-    </div>
+    </Panel>
   );
 }
 

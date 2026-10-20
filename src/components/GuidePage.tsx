@@ -1,5 +1,6 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { href } from '../route';
+import { Panel } from './ui';
 
 /** One numbered tutorial step: a title, the page it happens on, and the instructions. */
 function Step({ n, title, where, children }: { n: number; title: string; where?: ReactNode; children: ReactNode }) {
@@ -39,8 +40,7 @@ export default function GuidePage() {
         </nav>
       </div>
 
-      <section className="panel" id="guide-books">
-        <div className="panel-title"><h2>1 · Import an army book</h2></div>
+      <Panel id="guide.books" domId="guide-books" title="1 · Import an army book">
         <p className="muted small" style={{ marginTop: 0 }}>
           The army book is your faction's catalog of datasheets, rules and spells. The app needs it before it can build your units with full
           stats. A book only has to be imported once, by anyone, and then the whole group has it.
@@ -64,10 +64,9 @@ export default function GuidePage() {
             the fetch fails?</b> and drop the book's JSON file there.
           </p>
         </Step>
-      </section>
+      </Panel>
 
-      <section className="panel" id="guide-force">
-        <div className="panel-title"><h2>2 · Import your force from Army Forge</h2></div>
+      <Panel id="guide.import" domId="guide-force" title="2 · Import your force from Army Forge">
         <p className="muted small" style={{ marginTop: 0 }}>
           If you've already built your list on Army Forge, you don't have to enter it again. Importing it creates a crusade force with every
           unit, upgrade and weapon filled in, plus a matching battle list ready to print.
@@ -92,10 +91,9 @@ export default function GuidePage() {
             of the Forces page so the group can see it and only you can edit it.
           </p>
         </Step>
-      </section>
+      </Panel>
 
-      <section className="panel" id="guide-edit">
-        <div className="panel-title"><h2>3 · Edit your force</h2></div>
+      <Panel id="guide.edit" domId="guide-edit" title="3 · Edit your force">
         <p className="muted small" style={{ marginTop: 0 }}>Click a force card on the <a href={href.forces()}>Forces</a> page to open its Order of Battle.</p>
         <Step n={1} title="Force details" where="Right-hand panel">
           <p>
@@ -125,10 +123,9 @@ export default function GuidePage() {
         <Step n={5} title="Build a battle list" where="Battle lists">
           <p>Press <b>+ New list</b> to pick the units for a game and print them with their stats, traits, relics and rules.</p>
         </Step>
-      </section>
+      </Panel>
 
-      <section className="panel" id="guide-claim">
-        <div className="panel-title"><h2>4 · Claim rewards from past battles</h2></div>
+      <Panel id="guide.claim" domId="guide-claim" title="4 · Claim rewards from past battles">
         <p className="muted small" style={{ marginTop: 0 }}>
           When a game run in the battle tracker is finished, it's shared with the whole group. Each player then claims their own XP, RP and
           rewards from it, whenever they get to it.
@@ -152,7 +149,7 @@ export default function GuidePage() {
             Battles you've already claimed are listed in that force's <b>Battle log</b>.
           </p>
         </Step>
-      </section>
+      </Panel>
     </>
   );
 }

@@ -8,7 +8,7 @@ import { go, href } from '../route';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
 import { MARKS, traitMark } from './marks';
-import { Issues, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
+import { Issues, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
 export default function ListPage({ forceId, listId }: { forceId: string; listId: string }) {
   const { state, updateForce } = useStore();
@@ -80,11 +80,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
         </div>
 
         <div className="cols-main">
-          <div className="panel">
-            <div className="panel-title">
-              <h2>Units</h2>
-              <span className="muted small">{t.units} selected</span>
-            </div>
+          <Panel id="list.units" title="Units" extra={<span className="muted small">{t.units} selected</span>}>
             <TagFilter tags={tagsIn(listed.map((u) => unitTags(u, state.books)))} value={tagFilter} onChange={setTagFilter} />
             {listed.length === 0 ? (
               <div className="empty">This force has no units yet.</div>
@@ -137,7 +133,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
                 </table>
               </div>
             )}
-          </div>
+          </Panel>
 
           <div>
             <div className="panel">
@@ -148,8 +144,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
               </div>
               <div style={{ marginTop: '0.75rem' }}><Issues issues={listIssues(f, l, s)} /></div>
             </div>
-            <div className="panel">
-              <div className="panel-title"><h3>List settings</h3></div>
+            <Panel id="list.settings" title="List settings" h={3}>
               <div className="fields">
                 <label className="field span-all">Name<TextField value={l.name} onCommit={(v) => setList((d) => void (d.name = v || 'Battle list'))} /></label>
                 <label className="field span-all">Game size (pts)<Stepper value={l.pointsLimit} step={50} min={0} onChange={(n) => setList((d) => void (d.pointsLimit = n))} /></label>
@@ -168,7 +163,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
                   Core rules like Hero and Fearless only get descriptions once you import them on the <a href={href.books()}>Army Books</a> page.
                 </p>
               )}
-            </div>
+            </Panel>
           </div>
         </div>
 

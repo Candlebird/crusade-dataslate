@@ -41,7 +41,7 @@ import { go, href } from '../route';
 import { ForceImage } from './ForceView';
 import TablePicker, { type PickEntry, type PickGroup, type Picked } from './TablePicker';
 import { traitMark } from './marks';
-import { Issues, Stepper, TextArea, TextField, XpBar, toast } from './ui';
+import { Issues, Panel, Stepper, TextArea, TextField, XpBar, toast } from './ui';
 
 type Picker =
   | { kind: 'trait' }
@@ -227,8 +227,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       <div className="cols-main">
         <div>
           {/* Profile */}
-          <div className="panel">
-            <div className="panel-title"><h2>Profile</h2></div>
+          <Panel id="unit.profile" title="Profile">
             <div className="fields">
               <label className="field span-2">Crusade name<TextField value={u.name} onCommit={(v) => set((d) => void (d.name = v))} /></label>
               <label className="field span-2">Datasheet<TextField value={u.unitType} onCommit={(v) => set((d) => void (d.unitType = v))} /></label>
@@ -282,14 +281,10 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                 <button type="submit">Add</button>
               </form>
             </div>
-          </div>
+          </Panel>
 
           {/* XP */}
-          <div className="panel">
-            <div className="panel-title">
-              <h2>Experience</h2>
-              <span className="muted small">{used} of {earned} level(s) spent</span>
-            </div>
+          <Panel id="unit.xp" title="Experience" extra={<span className="muted small">{used} of {earned} level(s) spent</span>}>
             <XpBar xp={u.xp} />
             <div className="row" style={{ marginTop: '0.75rem' }}>
               <Stepper value={u.xp} min={0} onChange={(n) => set((d) => void (d.xp = n))} />
@@ -300,17 +295,19 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               <label className="field">Battles<Stepper value={u.battles} min={0} onChange={(n) => set((d) => void (d.battles = n))} /></label>
               <label className="field">Kills<Stepper value={u.kills} min={0} onChange={(n) => set((d) => void (d.kills = n))} /></label>
             </div>
-          </div>
+          </Panel>
 
           {/* Traits */}
-          <div className="panel">
-            <div className="panel-title">
-              <h2>Traits</h2>
+          <Panel
+            id="unit.traits"
+            title="Traits"
+            extra={
               <div className="row">
                 <span className="muted small">{normalCount}/{MAX_NORMAL_TRAITS} normal · {uniqueCount}/{MAX_UNIQUE_TRAITS} unique</span>
                 <button className="primary" onClick={() => setPicker({ kind: 'trait' })}>+ Trait</button>
               </div>
-            </div>
+            }
+          >
             {u.upgrades.length === 0 && <p className="muted small">No traits yet.</p>}
             {u.upgrades.map((up, i) => (
               <div key={up.id} className="list-item">
@@ -327,16 +324,18 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                 <button className="ghost icon" aria-label="Remove trait" onClick={() => set((d) => void d.upgrades.splice(i, 1))}>✕</button>
               </div>
             ))}
-          </div>
+          </Panel>
 
           {/* Weapons */}
-          <div className="panel">
-            <div className="panel-title">
-              <h2>Weapons</h2>
+          <Panel
+            id="unit.weapons"
+            title="Weapons"
+            extra={
               <button onClick={() => set((d) => void d.weapons.push({ id: uid(), name: 'New weapon', count: 1, range: 0, attacks: 1, rules: [], traits: [] }))}>
                 + Weapon
               </button>
-            </div>
+            }
+          >
             {u.weapons.length === 0 && <p className="muted small">No weapons.</p>}
             {u.weapons.map((w, i) => (
               <WeaponRow
@@ -348,18 +347,21 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                 onAddTrait={() => setPicker({ kind: 'weaponTrait', weaponId: w.id })}
               />
             ))}
-          </div>
+          </Panel>
 
           {/* Relics & scars */}
           <div className="cols-2">
-            <div className="panel">
-              <div className="panel-title">
-                <h3>Relics</h3>
+            <Panel
+              id="unit.relics"
+              title="Relics"
+              h={3}
+              extra={
                 <div className="row">
                   <span className="muted small">{u.relics.length}/{relicSlots(u.xp)} slots</span>
                   <button onClick={() => setPicker({ kind: 'relic' })}>+ Relic</button>
                 </div>
-              </div>
+              }
+            >
               {u.relics.length === 0 && <p className="muted small">None.</p>}
               {u.relics.map((r, i) => (
                 <div key={r.id} className="list-item">
@@ -373,12 +375,8 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                   <button className="ghost icon" aria-label="Remove relic" onClick={() => set((d) => void d.relics.splice(i, 1))}>✕</button>
                 </div>
               ))}
-            </div>
-            <div className="panel">
-              <div className="panel-title">
-                <h3>Battle scars</h3>
-                <button className="danger" onClick={() => setPicker({ kind: 'scar' })}>+ Scar</button>
-              </div>
+            </Panel>
+            <Panel id="unit.scars" title="Battle scars" h={3} extra={<button className="danger" onClick={() => setPicker({ kind: 'scar' })}>+ Scar</button>}>
               {u.scars.length === 0 && <p className="muted small">Unblemished.</p>}
               {u.scars.map((sc, i) => (
                 <div key={sc.id} className="list-item">
@@ -389,7 +387,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                   <button className="ghost icon" aria-label="Remove scar" onClick={() => set((d) => void d.scars.splice(i, 1))}>✕</button>
                 </div>
               ))}
-            </div>
+            </Panel>
           </div>
         </div>
 
@@ -407,14 +405,12 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               <Stepper value={u.bpAdjust} onChange={(n) => set((d) => void (d.bpAdjust = n))} />
             </label>
           </div>
-          <div className="panel">
-            <div className="panel-title"><h3>Validation</h3></div>
+          <Panel id="unit.validation" title="Validation" h={3}>
             <Issues issues={issues} />
-          </div>
-          <div className="panel">
-            <div className="panel-title"><h3>Notes</h3></div>
+          </Panel>
+          <Panel id="unit.notes" title="Notes" h={3}>
             <TextArea rows={6} value={u.notes} placeholder="Background, honours, grudges…" onCommit={(v) => set((d) => void (d.notes = v))} />
-          </div>
+          </Panel>
           <div className="panel">
             <button
               className="danger"

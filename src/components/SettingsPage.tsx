@@ -2,7 +2,7 @@ import { useStore } from '../model/store';
 import { exportBackup } from '../model/io';
 import { buildSeedState } from '../model/seed';
 import { DEFAULT_SETTINGS, type Settings } from '../model/types';
-import { Dropzone, Stepper, TextField, toast } from './ui';
+import { Dropzone, Panel, Stepper, TextField, toast } from './ui';
 import { useImporter } from './importer';
 import { useCloud } from '../cloud/CloudSync';
 import { PlayersPanel } from '../cloud/Players';
@@ -35,13 +35,15 @@ export default function SettingsPage() {
       </div>
 
       <div className="cols-2">
-        <div className="panel">
-          <div className="panel-title">
-            <h2>House rules</h2>
+        <Panel
+          id="settings.rules"
+          title="House rules"
+          extra={
             <button className="ghost" disabled={locked} onClick={() => set((d) => Object.assign(d, structuredClone(DEFAULT_SETTINGS), { armyForgeProxy: d.armyForgeProxy }))}>
               Reset to defaults
             </button>
-          </div>
+          }
+        >
           <fieldset className="fields" disabled={locked}>
             <label className="field span-all">
               Supply per Requisition Point
@@ -61,12 +63,11 @@ export default function SettingsPage() {
                 ? 'You are the GM: these apply to every player in the campaign.'
                 : "These apply to everyone viewing forces in this browser. Sign in to use the GM's house rules."}
           </p>
-        </div>
+        </Panel>
 
         <div>
           <PlayersPanel />
-          <div className="panel">
-            <div className="panel-title"><h2>Army Forge proxy</h2></div>
+          <Panel id="settings.proxy" title="Army Forge proxy">
             <label className="field">
               Proxy URL (optional)
               <TextField value={s.armyForgeProxy} placeholder={DEFAULT_PROXY || "https://your-worker.workers.dev"} onCommit={(v) => set((d) => void (d.armyForgeProxy = v.trim()))} />
@@ -75,10 +76,9 @@ export default function SettingsPage() {
               Army Forge doesn't let other sites fetch its books, so the app fetches them through a small proxy (proxy/worker.js, a free
               Cloudflare Worker). {DEFAULT_PROXY ? 'The group proxy is built in; set a URL here only to use a different one.' : 'Paste its URL here.'}
             </p>
-          </div>
+          </Panel>
 
-          <div className="panel">
-            <div className="panel-title"><h2>Data</h2></div>
+          <Panel id="settings.data" title="Data">
             <p className="muted small">
               {cloud.email
                 ? 'Your data is kept in this browser and in the campaign database. Export a backup now and then anyway.'
@@ -90,7 +90,7 @@ export default function SettingsPage() {
             <Dropzone accept=".json,application/json" onFiles={importFiles}>
               Drop a <b>backup</b> file here to restore it.
             </Dropzone>
-          </div>
+          </Panel>
 
           <div className="panel">
             <div className="panel-title"><h3>Danger zone</h3></div>

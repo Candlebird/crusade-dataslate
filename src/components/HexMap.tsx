@@ -13,7 +13,7 @@ import {
 import { pickSpread, spreadInto, spreadTargets } from '../rules/voidspawn';
 import { aiDefended, rateSectors } from '../rules/difficulty';
 import { href } from '../route';
-import { Modal, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
+import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 import SectorDanger from './SectorDanger';
 
 type SetC = (fn: (c: Campaign) => void) => void;
@@ -200,127 +200,128 @@ function MapEditor({ c, setC, onRecord }: { c: Campaign; setC: SetC; onRecord: (
   const hint = tool === 'move' && moving ? `Moving ${c.sectors.find((s) => s.id === moving)?.name} — click its new hex.` : TOOLS.find((t) => t.key === tool)!.hint;
 
   return (
-    <div className="panel">
-      <div className="panel-title">
-        <h2>Sector map</h2>
+    <>
+      <Panel id="campaign.map" title="Sector map" extra={
         <div className="row">
           <button onClick={() => setGenOpen(true)}>Generate…</button>
           <SpreadButton c={c} setC={setC} />
           <button onClick={exportPng} title="Download the whole map as a picture">Export PNG</button>
         </div>
-      </div>
+      }>
 
-      <div className="map-toolbar">
-        <div className="seg">
-          {TOOLS.map((t) => (
-            <button key={t.key} className={tool === t.key ? 'on' : ''} title={t.hint} onClick={() => { setTool(t.key); setMoving(null); }}>{t.label}</button>
-          ))}
+        <div className="map-toolbar">
+          <div className="seg">
+            {TOOLS.map((t) => (
+              <button key={t.key} className={tool === t.key ? 'on' : ''} title={t.hint} onClick={() => { setTool(t.key); setMoving(null); }}>{t.label}</button>
+            ))}
+          </div>
+          {tool === 'type' && (
+            <select value={paintType} onChange={(e) => setPaintType(e.target.value as SectorType)} aria-label="Type to paint">
+              {SECTOR_TYPE_KEYS.map((t) => <option key={t} value={t}>{GLYPH[t]} {SECTOR_TYPES[t].label}</option>)}
+            </select>
+          )}
+          {tool === 'owner' && (
+            <select value={paintOwner} onChange={(e) => setPaintOwner(e.target.value)} aria-label="Owner to paint">
+              <option value="">Unclaimed</option>
+              {sidesOf(c).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          )}
+          <span className="spacer" />
+          <label className="row small">
+            View as
+            <select value={viewAs} onChange={(e) => setViewAs(e.target.value)} title="Highlights the sectors bordering that faction's territory">
+              <option value="">—</option>
+              {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+            </select>
+          </label>
+          <span className="row small">
+            Size <Stepper value={map.cols} min={3} onChange={(n) => resize(Math.min(n, 30), map.rows)} /> × <Stepper value={map.rows} min={3} onChange={(n) => resize(map.cols, Math.min(n, 30))} />
+          </span>
         </div>
-        {tool === 'type' && (
-          <select value={paintType} onChange={(e) => setPaintType(e.target.value as SectorType)} aria-label="Type to paint">
-            {SECTOR_TYPE_KEYS.map((t) => <option key={t} value={t}>{GLYPH[t]} {SECTOR_TYPES[t].label}</option>)}
-          </select>
-        )}
-        {tool === 'owner' && (
-          <select value={paintOwner} onChange={(e) => setPaintOwner(e.target.value)} aria-label="Owner to paint">
-            <option value="">Unclaimed</option>
-            {sidesOf(c).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
-        )}
-        <span className="spacer" />
-        <label className="row small">
-          View as
-          <select value={viewAs} onChange={(e) => setViewAs(e.target.value)} title="Highlights the sectors bordering that faction's territory">
-            <option value="">—</option>
-            {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
-          </select>
-        </label>
-        <span className="row small">
-          Size <Stepper value={map.cols} min={3} onChange={(n) => resize(Math.min(n, 30), map.rows)} /> × <Stepper value={map.rows} min={3} onChange={(n) => resize(map.cols, Math.min(n, 30))} />
-        </span>
-      </div>
-      <p className="muted small" style={{ margin: '0.25rem 0' }}>{hint}</p>
+        <p className="muted small" style={{ margin: '0.25rem 0' }}>{hint}</p>
 
-      <div className="map-wrap">
-        <div className="map-view">
-          <svg
-            ref={svgRef}
-            className={`hexmap tool-${tool}`}
-            viewBox={`${vx} ${vy} ${vw} ${vh}`}
-            xmlns="http://www.w3.org/2000/svg"
-            onPointerDown={onDown}
-            onPointerMove={onMove}
-            onPointerUp={onUp}
-            onPointerLeave={() => (drag.current = null)}
-            onWheel={(e) => setZoom((z) => Math.min(4, Math.max(0.5, z * (e.deltaY < 0 ? 1.15 : 1 / 1.15))))}
-          >
-            <defs>
-              {nebulae.map((n, i) => (
-                <radialGradient key={i} id={`neb${i}`}>
-                  <stop offset="0" stopColor={n.c} stopOpacity="0.22" />
-                  <stop offset="1" stopColor={n.c} stopOpacity="0" />
-                </radialGradient>
-              ))}
-              {c.sectors.filter((s) => isPlaced(s) && s.image).map((s) => {
-                const p = toPixel(s as Hex, SIZE);
-                return <clipPath key={s.id} id={`clip-${s.id}`}><polygon points={hexCorners(p.x, p.y, SIZE - 1)} /></clipPath>;
+        <div className="map-wrap">
+          <div className="map-view">
+            <svg
+              ref={svgRef}
+              className={`hexmap tool-${tool}`}
+              viewBox={`${vx} ${vy} ${vw} ${vh}`}
+              xmlns="http://www.w3.org/2000/svg"
+              onPointerDown={onDown}
+              onPointerMove={onMove}
+              onPointerUp={onUp}
+              onPointerLeave={() => (drag.current = null)}
+              onWheel={(e) => setZoom((z) => Math.min(4, Math.max(0.5, z * (e.deltaY < 0 ? 1.15 : 1 / 1.15))))}
+            >
+              <defs>
+                {nebulae.map((n, i) => (
+                  <radialGradient key={i} id={`neb${i}`}>
+                    <stop offset="0" stopColor={n.c} stopOpacity="0.22" />
+                    <stop offset="1" stopColor={n.c} stopOpacity="0" />
+                  </radialGradient>
+                ))}
+                {c.sectors.filter((s) => isPlaced(s) && s.image).map((s) => {
+                  const p = toPixel(s as Hex, SIZE);
+                  return <clipPath key={s.id} id={`clip-${s.id}`}><polygon points={hexCorners(p.x, p.y, SIZE - 1)} /></clipPath>;
+                })}
+              </defs>
+              <rect x={bounds.x0 - bounds.w} y={bounds.y0 - bounds.h} width={bounds.w * 3} height={bounds.h * 3} fill="#07080b" />
+              {nebulae.map((n, i) => <circle key={i} cx={n.x} cy={n.y} r={n.r} fill={`url(#neb${i})`} />)}
+              {stars.map((s, i) => <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity={s.o} />)}
+
+              {all.map((h) => {
+                const p = toPixel(h, SIZE);
+                const s = bySector.get(hexKey(h.q, h.r));
+                const isSel = !!sel && sel.q === h.q && sel.r === h.r;
+                if (!s) {
+                  return <polygon key={hexKey(h.q, h.r)} data-q={h.q} data-r={h.r} className={`hex hex-blank${isSel ? ' hex-sel' : ''}`} points={hexCorners(p.x, p.y, SIZE - 1)} />;
+                }
+                const col = color(s.owner);
+                const dim = front && s.owner !== viewAs && !front.has(s.id);
+                return (
+                  <g key={s.id} data-q={h.q} data-r={h.r} className={`hex hex-${s.type}${isSel ? ' hex-sel' : ''}${front?.has(s.id) ? ' hex-front' : ''}${moving === s.id ? ' hex-moving' : ''}`} opacity={dim ? 0.45 : 1}>
+                    <polygon points={hexCorners(p.x, p.y, SIZE - 1)} className="hex-base" fill={s.type === 'empty' ? '#0e1014' : '#1a1d22'} />
+                    {s.image && <image href={s.image} x={p.x - SIZE} y={p.y - SIZE} width={SIZE * 2} height={SIZE * 2} preserveAspectRatio="xMidYMid slice" clipPath={`url(#clip-${s.id})`} opacity="0.75" />}
+                    {col && <polygon points={hexCorners(p.x, p.y, SIZE - 1)} fill={col} fillOpacity={s.image ? 0.15 : 0.3} />}
+                    <polygon points={hexCorners(p.x, p.y, SIZE - (col ? 3 : 1))} fill="none" className="hex-edge" stroke={col ?? (front?.has(s.id) ? '#5fb3b3' : '#4a525c')} strokeWidth={col || front?.has(s.id) ? 3 : 1} />
+                    <text x={p.x} y={p.y + 3} className="hex-glyph">{GLYPH[s.type]}</text>
+                    <text x={p.x} y={p.y + 21} className="hex-name">{s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name}</text>
+                    {s.reinforced && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Reinforced</title>⛨</text>}
+                    {s.type === 'void' && s.rewardClaimed && <text x={p.x + 15} y={p.y - 17} className="hex-mark"><title>Reward claimed</title>✓</text>}
+                    {stormed(c, s.id) && <text x={p.x} y={p.y - 17} className="hex-mark"><title>{activeEvent(c)?.name}: can't be attacked this round</title>🌀</text>}
+                    {activeCrisis(c)?.sectorId === s.id && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name}</title>☠</text>}
+                    {s.difficulty !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff"><title>AI garrison: {s.difficulty} Supply</title>{s.difficulty}</text>}
+                  </g>
+                );
               })}
-            </defs>
-            <rect x={bounds.x0 - bounds.w} y={bounds.y0 - bounds.h} width={bounds.w * 3} height={bounds.h * 3} fill="#07080b" />
-            {nebulae.map((n, i) => <circle key={i} cx={n.x} cy={n.y} r={n.r} fill={`url(#neb${i})`} />)}
-            {stars.map((s, i) => <circle key={i} cx={s.x} cy={s.y} r={s.r} fill="#fff" opacity={s.o} />)}
+            </svg>
+            <div className="map-zoom">
+              <button className="icon" aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(4, z * 1.25))}>+</button>
+              <button className="icon" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}>−</button>
+              <button className="icon" aria-label="Reset view" title="Reset view" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>⟲</button>
+            </div>
+          </div>
 
-            {all.map((h) => {
-              const p = toPixel(h, SIZE);
-              const s = bySector.get(hexKey(h.q, h.r));
-              const isSel = !!sel && sel.q === h.q && sel.r === h.r;
-              if (!s) {
-                return <polygon key={hexKey(h.q, h.r)} data-q={h.q} data-r={h.r} className={`hex hex-blank${isSel ? ' hex-sel' : ''}`} points={hexCorners(p.x, p.y, SIZE - 1)} />;
-              }
-              const col = color(s.owner);
-              const dim = front && s.owner !== viewAs && !front.has(s.id);
-              return (
-                <g key={s.id} data-q={h.q} data-r={h.r} className={`hex hex-${s.type}${isSel ? ' hex-sel' : ''}${front?.has(s.id) ? ' hex-front' : ''}${moving === s.id ? ' hex-moving' : ''}`} opacity={dim ? 0.45 : 1}>
-                  <polygon points={hexCorners(p.x, p.y, SIZE - 1)} className="hex-base" fill={s.type === 'empty' ? '#0e1014' : '#1a1d22'} />
-                  {s.image && <image href={s.image} x={p.x - SIZE} y={p.y - SIZE} width={SIZE * 2} height={SIZE * 2} preserveAspectRatio="xMidYMid slice" clipPath={`url(#clip-${s.id})`} opacity="0.75" />}
-                  {col && <polygon points={hexCorners(p.x, p.y, SIZE - 1)} fill={col} fillOpacity={s.image ? 0.15 : 0.3} />}
-                  <polygon points={hexCorners(p.x, p.y, SIZE - (col ? 3 : 1))} fill="none" className="hex-edge" stroke={col ?? (front?.has(s.id) ? '#5fb3b3' : '#4a525c')} strokeWidth={col || front?.has(s.id) ? 3 : 1} />
-                  <text x={p.x} y={p.y + 3} className="hex-glyph">{GLYPH[s.type]}</text>
-                  <text x={p.x} y={p.y + 21} className="hex-name">{s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name}</text>
-                  {s.reinforced && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Reinforced</title>⛨</text>}
-                  {s.type === 'void' && s.rewardClaimed && <text x={p.x + 15} y={p.y - 17} className="hex-mark"><title>Reward claimed</title>✓</text>}
-                  {stormed(c, s.id) && <text x={p.x} y={p.y - 17} className="hex-mark"><title>{activeEvent(c)?.name}: can't be attacked this round</title>🌀</text>}
-                  {activeCrisis(c)?.sectorId === s.id && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name}</title>☠</text>}
-                  {s.difficulty !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff"><title>AI garrison: {s.difficulty} Supply</title>{s.difficulty}</text>}
-                </g>
-              );
-            })}
-          </svg>
-          <div className="map-zoom">
-            <button className="icon" aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(4, z * 1.25))}>+</button>
-            <button className="icon" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}>−</button>
-            <button className="icon" aria-label="Reset view" title="Reset view" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>⟲</button>
+          <div className="map-side">
+            {!sel && <SideIntro c={c} unplaced={unplaced} />}
+            {sel && selSector && (editing
+              ? <SectorEditor c={c} s={selSector} setSector={(fn) => setSector(selSector.id, fn)} setC={setC} onDone={() => setEditing(false)} onDeleted={() => setSel(null)} />
+              : <SectorView c={c} s={selSector} onEdit={() => setEditing(true)} onRecord={() => onRecord(selSector.id)} />)}
+            {sel && !selSector && <EmptyHex c={c} h={sel} unplaced={unplaced} setC={setC} />}
           </div>
         </div>
 
-        <div className="map-side">
-          {!sel && <SideIntro c={c} unplaced={unplaced} />}
-          {sel && selSector && (editing
-            ? <SectorEditor c={c} s={selSector} setSector={(fn) => setSector(selSector.id, fn)} setC={setC} onDone={() => setEditing(false)} onDeleted={() => setSel(null)} />
-            : <SectorView c={c} s={selSector} onEdit={() => setEditing(true)} onRecord={() => onRecord(selSector.id)} />)}
-          {sel && !selSector && <EmptyHex c={c} h={sel} unplaced={unplaced} setC={setC} />}
+        <div className="map-legend small muted">
+          {SECTOR_TYPE_KEYS.map((t) => <span key={t} title={SECTOR_TYPES[t].desc}>{GLYPH[t]} {SECTOR_TYPES[t].label}</span>)}
+          <span>⛨ Reinforced</span>
+          <span>✓ Reward claimed</span>
+          {sidesOf(c).map((f) => <span key={f.id}><i className="swatch" style={{ background: f.color }} /> {f.name}</span>)}
         </div>
-      </div>
 
-      <div className="map-legend small muted">
-        {SECTOR_TYPE_KEYS.map((t) => <span key={t} title={SECTOR_TYPES[t].desc}>{GLYPH[t]} {SECTOR_TYPES[t].label}</span>)}
-        <span>⛨ Reinforced</span>
-        <span>✓ Reward claimed</span>
-        {sidesOf(c).map((f) => <span key={f.id}><i className="swatch" style={{ background: f.color }} /> {f.name}</span>)}
-      </div>
-
+      </Panel>
+      {/* Outside the panel so Generate… still opens it while the map is collapsed. */}
       {genOpen && <GenerateDialog c={c} setC={setC} onClose={() => setGenOpen(false)} />}
-    </div>
+    </>
   );
 }
 

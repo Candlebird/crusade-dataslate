@@ -9,7 +9,7 @@ import HexMapPanel from './HexMap';
 import OrdersPanel from './NexusOrders';
 import RoundPanel from './RoundPanel';
 import { useImporter } from './importer';
-import { Dropzone, TextField, confirmAction, toast } from './ui';
+import { Dropzone, Panel, TextField, confirmAction, toast } from './ui';
 
 const COLORS = ['#c0392b', '#2e86c1', '#27ae60', '#d4ac0d', '#8e44ad', '#d35400', '#17a589', '#7f8c8d'];
 
@@ -125,11 +125,7 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
       d.sectors.push({ id: uid(), name: `${name} Home`, type: 'home', owner: id, notes: '' });
     });
   return (
-    <div className="panel">
-      <div className="panel-title">
-        <h2>Factions</h2>
-        <button onClick={add}>+ Add faction</button>
-      </div>
+    <Panel id="campaign.factions" title="Factions" extra={<button onClick={add}>+ Add faction</button>}>
       {c.factions.length === 0 ? <p className="muted small">No factions yet. Each one gets a home sector.</p> : (
         <div className="table-wrap">
           <table className="compact stack">
@@ -164,7 +160,7 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
           </table>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -172,11 +168,7 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
   const setS = (i: number, fn: (s: Sector) => void) => setC((d) => fn(d.sectors[i]));
   const add = () => setC((d) => void d.sectors.push({ id: uid(), name: `Sector ${d.sectors.length + 1}`, type: 'planet', notes: '' }));
   return (
-    <div className="panel">
-      <div className="panel-title">
-        <h2>Sectors</h2>
-        <button onClick={add}>+ Add sector</button>
-      </div>
+    <Panel id="campaign.sectors" title="Sectors" extra={<button onClick={add}>+ Add sector</button>}>
       {c.sectors.length === 0 ? <p className="muted small">No sectors yet. Generate a map above, paint sectors onto it, or add them here.</p> : (
         <div className="table-wrap">
           <table className="compact stack">
@@ -229,7 +221,7 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
           </table>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -247,8 +239,7 @@ function RecordPanel({ c, setC, preset }: { c: Campaign; setC: SetC; preset: { s
   const effect = sectorEffect(c, ev);
 
   return (
-    <div className="panel" id="record-game">
-      <div className="panel-title"><h2>Record a sector game</h2></div>
+    <Panel id="campaign.record" domId="record-game" title="Record a sector game">
       <div className="fields">
         <label className="field">Date<input type="date" value={ev.date} onChange={(e) => set({ date: e.target.value })} /></label>
         <label className="field">
@@ -292,15 +283,14 @@ function RecordPanel({ c, setC, preset }: { c: Campaign; setC: SetC; preset: { s
           setEv(blank());
         }}>Record</button>
       </div>
-    </div>
+    </Panel>
   );
 }
 
 function LogPanel({ c, setC }: { c: Campaign; setC: SetC }) {
   const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
   return (
-    <div className="panel">
-      <div className="panel-title"><h2>Campaign log</h2><span className="muted small">{c.log.length} game{c.log.length === 1 ? '' : 's'}</span></div>
+    <Panel id="campaign.log" title="Campaign log" extra={<span className="muted small">{c.log.length} game{c.log.length === 1 ? '' : 's'}</span>}>
       {c.log.length === 0 ? <p className="muted small">No games yet.</p> : [...c.log].reverse().map((e) => (
         <div key={e.id} className="list-item small">
           <span className="muted" title={`Round ${e.round ?? 1}`}>R{e.round ?? 1} · {e.date}</span>
@@ -318,6 +308,6 @@ function LogPanel({ c, setC }: { c: Campaign; setC: SetC }) {
             onClick={() => confirmAction(`Delete this ${e.crisis ? 'Nexus Crisis battle' : e.skirmish ? 'skirmish' : `${sectorName(e.sectorId)} ${e.spread ? 'spread' : 'game'}`} from the log?${e.undo ? ` The sector goes back to how the ${e.spread ? 'spread' : 'game'} found it.` : ''}`) && setC((d) => removeSectorGame(d, e.id))}>✕</button>
         </div>
       ))}
-    </div>
+    </Panel>
   );
 }
