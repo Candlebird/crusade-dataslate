@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { rollDie } from '../rules/engine';
+import { rollUntilNew } from '../rules/engine';
 import { Modal } from './ui';
 
 export interface PickEntry {
@@ -16,6 +16,8 @@ export interface PickGroup {
   entries: PickEntry[];
   /** Show a "roll" button; rolls 1..entries.length (d6 / d10 tables). */
   rollable?: boolean;
+  /** Only used when a rule says so: hidden behind a "show" link, with this warning above the table when open. */
+  restricted?: string;
 }
 
 export interface Picked {
@@ -26,7 +28,7 @@ export interface Picked {
 }
 
 /** A modal for choosing (or rolling) an entry from one of several homebrew tables, or typing a custom one. */
-export default function TablePicker({ title, groups, onPick, onClose, allowFree = true, freeLabel, customLabel = 'Custom', check }: {
+export default function TablePicker({ title, groups, onPick, onClose, allowFree = true, freeLabel, customLabel = 'Custom', check, owned = [], defaultFree = false, intro }: {
   title: string;
   groups: PickGroup[];
   onPick: (p: Picked) => void;
@@ -37,19 +39,31 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
   customLabel?: string;
   /** Why the current choice can't be taken yet (e.g. not enough RP), shown in the footer; null when it can. */
   check?: (entry: PickEntry | null, free: boolean) => string | null;
+  /** Names already had: rolls skip them (rerolling), and they're marked in the list. */
+  owned?: string[];
+  defaultFree?: boolean;
+  /** Shown above the tables, e.g. "Trait 2 of 2". */
+  intro?: React.ReactNode;
 }) {
-  const [groupKey, setGroupKey] = useState(groups[0]?.key ?? '');
+  const [showRestricted, setShowRestricted] = useState(false);
+  const shown = groups.filter((g) => showRestricted || !g.restricted);
+  const [groupKey, setGroupKey] = useState(shown[0]?.key ?? '');
   const [selected, setSelected] = useState<number | null>(null);
-  const [rolled, setRolled] = useState<number | null>(null);
+  const [rolls, setRolls] = useState<number[]>([]);
   const [custom, setCustom] = useState('');
-  const [free, setFree] = useState(false);
-  const group = groups.find((g) => g.key === groupKey) ?? groups[0];
+  const [free, setFree] = useState(defaultFree);
+  const group = shown.find((g) => g.key === groupKey) ?? shown[0];
+  const have = new Set(owned.map((n) => n.toLowerCase()));
+  const isOwned = (e?: PickEntry) => !!e && have.has(e.name.toLowerCase());
+  const rolled = rolls.length ? rolls[rolls.length - 1] : null;
+
+  const pickGroup = (key: string) => { setGroupKey(key); setSelected(null); setRolls([]); };
 
   const roll = () => {
     if (!group) return;
-    const r = rollDie(group.entries.length);
-    setRolled(r);
-    setSelected(r - 1);
+    const r = rollUntilNew(group.entries.length, (face) => isOwned(group.entries[face - 1]));
+    setRolls(r);
+    setSelected(r[r.length - 1] - 1);
   };
 
   const confirm = () => {
@@ -83,22 +97,32 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
         </>
       }
     >
-      {groups.length > 1 && (
+      {intro}
+      {(shown.length > 1 || shown.length < groups.length) && (
         <div className="row" style={{ marginBottom: '0.6rem' }}>
-          {groups.map((g) => (
-            <button key={g.key} className={g.key === group?.key ? 'primary' : ''} onClick={() => { setGroupKey(g.key); setSelected(null); setRolled(null); }}>
+          {shown.map((g) => (
+            <button key={g.key} className={g.key === group?.key ? 'primary' : ''} onClick={() => pickGroup(g.key)}>
               {g.label}
             </button>
           ))}
+          {shown.length < groups.length && (
+            <button className="ghost small muted" onClick={() => setShowRestricted(true)} title="Only when a reward, relic or Nexus effect tells you to">
+              Show unique tables…
+            </button>
+          )}
         </div>
       )}
       {group && (
         <>
+          {group.restricted && <p className="small" style={{ color: 'var(--warn)' }}>⚠ {group.restricted}</p>}
           {group.rollable && (
             <div className="row" style={{ marginBottom: '0.6rem' }}>
               <button onClick={roll}>🎲 Roll D{group.entries.length}</button>
+              {rolls.slice(0, -1).map((r, i) => (
+                <span key={i} className="muted small" title="Already had — rerolled"><s>{r} {group.entries[r - 1].name}</s></span>
+              ))}
               {rolled != null && <span className="dice-result">{rolled}</span>}
-              {rolled != null && <span>→ {group.entries[rolled - 1].name}</span>}
+              {rolled != null && <span>→ {group.entries[rolled - 1].name}{isOwned(group.entries[rolled - 1]) ? ' (already had — nothing left to reroll into)' : ''}</span>}
             </div>
           )}
           <div className="pick-list">
@@ -111,7 +135,7 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
               >
                 {group.rollable && <span className="die">{i + 1}</span>}
                 <div>
-                  <b>{e.name}</b>
+                  <b>{e.name}</b>{isOwned(e) && <span className="tag" style={{ marginLeft: '0.4rem' }}>Have it</span>}
                   {e.desc && <div className="muted small">{e.desc}</div>}
                   {e.disabled && <div className="small" style={{ color: 'var(--warn)' }}>{e.disabled}</div>}
                 </div>

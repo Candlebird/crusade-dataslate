@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyScar,
+  rollUntilNew,
   battlePoints,
   deathDiceCount,
   deathOutcome,
@@ -163,5 +164,21 @@ describe('relicHolders', () => {
     const campaign = { factions: [{ id: 'n', name: 'Iron Wolves' }] } as unknown as Campaign;
     const held = relicHolders([force({ units: [rhys], nexus: { factionId: 'n' } as Force['nexus'] })], campaign);
     expect(held.get('Xenotech Digital Laser')?.[0]).toMatchObject({ forceId: 'f', unitId: 'r', faction: 'Iron Wolves' });
+  });
+});
+
+describe('rollUntilNew', () => {
+  const seq = (...faces: number[]) => { let i = 0; return () => (faces[i++] - 1) / 6; };
+
+  it('keeps a first roll that is not had yet', () => {
+    expect(rollUntilNew(6, () => false, seq(4))).toEqual([4]);
+  });
+
+  it('rerolls faces already had until a new one comes up', () => {
+    expect(rollUntilNew(6, (f) => f === 2 || f === 5, seq(2, 5, 2, 3))).toEqual([2, 5, 2, 3]);
+  });
+
+  it('gives up when every face is had', () => {
+    expect(rollUntilNew(6, () => true, seq(3))).toEqual([3]);
   });
 });

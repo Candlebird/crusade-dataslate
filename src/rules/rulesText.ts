@@ -39,7 +39,8 @@ export const CRUSADE_TEXT = {
   ],
   upgrades: [
     `Units level up at ${LEVEL_THRESHOLDS.join(' / ')} XP. Above ${MAX_LEVEL} XP, every ${POST_MAX_REPLACE_STEP} XP lets you replace a previous upgrade.`,
-    `On a level up, pick a trait from the unit's category table or upgrade one weapon. An infantry weapon upgrade gives 2 weapon traits; any other gives 1. A weapon holds at most ${MAX_WEAPON_TRAITS} traits.`,
+    `On a level up, pick a trait from the unit's category table or upgrade one weapon. An infantry weapon upgrade gives 2 weapon traits; any other gives 1. A weapon holds at most ${MAX_WEAPON_TRAITS} traits. Rolling a trait the unit or weapon already has is rerolled.`,
+    'Unique trait tables are only rolled on when the game tells you to (a reward, relic or Nexus effect), never for a normal level-up.',
     `A unit can have at most ${MAX_NORMAL_TRAITS} normal traits and ${MAX_UNIQUE_TRAITS} unique traits, and no duplicates unless a trait says so.`,
     'Overflow XP: a unit can only gain enough XP to level up once per battle. The rest is halved (rounding up) and handed out to other units that took part. For example, a unit at 9 XP gains 20: it takes 1 and levels up at 10, and the other 19 becomes 10 XP for the rest of the force.',
   ],

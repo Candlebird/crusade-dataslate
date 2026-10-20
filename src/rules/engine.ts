@@ -240,6 +240,23 @@ export function rollDie(sides = 6): number {
   return 1 + Math.floor(Math.random() * sides);
 }
 
+/**
+ * Roll 1..sides, rerolling any result `taken` says is already had. Returns every roll in order (the last one stands),
+ * or just the first when every face is taken, so there's nothing to reroll into.
+ */
+export function rollUntilNew(sides: number, taken: (face: number) => boolean, rand: () => number = Math.random): number[] {
+  const roll = () => 1 + Math.floor(rand() * sides);
+  const first = roll();
+  if (!taken(first)) return [first];
+  const open = Array.from({ length: sides }, (_, i) => i + 1).filter((x) => !taken(x));
+  if (!open.length) return [first];
+  const rolls = [first];
+  for (let r = roll(); ; r = roll()) {
+    rolls.push(r);
+    if (!taken(r)) return rolls;
+  }
+}
+
 export function rollDice(n: number, sides = 6): number[] {
   return Array.from({ length: n }, () => rollDie(sides));
 }

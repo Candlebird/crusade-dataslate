@@ -45,11 +45,14 @@ import { Issues, Panel, Stepper, TextArea, TextField, XpBar, toast } from './ui'
 
 type Picker =
   | { kind: 'trait' }
-  | { kind: 'weaponTrait'; weaponId: string }
+  /** `of` traits make up this weapon upgrade (2 for infantry); `n` is the one being picked now. */
+  | { kind: 'weaponTrait'; weaponId: string; n: number; of: number; free?: boolean }
   | { kind: 'scar' }
   | { kind: 'relic' };
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
+
+const UNIQUE_NOTE = 'Unique tables are only rolled on when the game tells you to (a reward, relic or Nexus effect). A normal level-up rolls on the normal tables.';
 
 function traitTablesFor(cat: Category): string[] {
   return cat === 'Infantry' ? ['Infantry (Utility)', 'Infantry (Aggressive)'] : [cat];
@@ -84,18 +87,28 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
 
   const access = nexusAccess(f, u.category);
 
+  const addWeaponTrait = (weaponId: string) => setPicker({ kind: 'weaponTrait', weaponId, n: 1, of: u.category === 'Infantry' ? 2 : 1 });
+
+  /** What the unit or weapon already has, so rolls reroll duplicates. */
+  const pickerOwned = (): string[] => {
+    if (picker?.kind === 'trait') return u.upgrades.map((x) => x.name);
+    if (picker?.kind === 'weaponTrait') return u.weapons.find((x) => x.id === picker.weaponId)?.traits.map((x) => x.name) ?? [];
+    return [];
+  };
+
   const pickerGroups = (): PickGroup[] => {
     if (!picker) return [];
     if (picker.kind === 'trait') {
       const groups: PickGroup[] = traitTablesFor(u.category).map((k) => ({
         key: `normal:${k}`, label: k, entries: TRAIT_TABLES[k] ?? [], rollable: true,
       }));
-      groups.push({ key: 'unique', label: 'Unique', entries: UNIQUE_TRAIT_TABLES[u.category] ?? [], rollable: true });
+      groups.push({ key: 'unique', label: 'Unique', entries: UNIQUE_TRAIT_TABLES[u.category] ?? [], rollable: true, restricted: UNIQUE_NOTE });
       const locked = access === null ? `The ${u.category} Nexus table is locked — unlock it in Nexus Wars or earn a trait token` : undefined;
       groups.push({
         key: 'nexus',
         label: access === 'token' ? 'Nexus (uses a token)' : 'Nexus',
         entries: (NEXUS_TRAITS[u.category] ?? []).map((t) => ({ name: t.name, desc: t.desc, disabled: locked })),
+        rollable: !locked,
       });
       return groups;
     }
@@ -104,7 +117,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       const kind = w && w.range > 0 ? 'Ranged' : 'Melee';
       return [
         { key: 'normal', label: `${kind} traits`, entries: WEAPON_TRAIT_TABLES[kind], rollable: true },
-        { key: 'unique', label: `Unique ${kind.toLowerCase()}`, entries: UNIQUE_WEAPON_TRAIT_TABLES[kind], rollable: true },
+        { key: 'unique', label: `Unique ${kind.toLowerCase()}`, entries: UNIQUE_WEAPON_TRAIT_TABLES[kind], rollable: true, restricted: UNIQUE_NOTE },
       ];
     }
     if (picker.kind === 'scar') return [{ key: 'scar', label: 'Battle scars', entries: SCAR_TABLE, rollable: true }];
@@ -148,6 +161,8 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
         const w = d.weapons.find((x) => x.id === picker.weaponId);
         w?.traits.push({ id: uid(), name: p.name, unique: p.group === 'unique', free: p.free || undefined });
       });
+      // An infantry weapon upgrade is two traits: keep the picker open for the second.
+      if (picker.n < picker.of) return setPicker({ ...picker, n: picker.n + 1, free: p.free });
     } else if (picker.kind === 'scar') {
       const result = applyScar(structuredClone(u), { id: uid(), name: p.name });
       set((d) => void applyScar(d, { id: uid(), name: p.name, desc: SCAR_TABLE.find((x) => x.name === p.name)?.desc }));
@@ -207,7 +222,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             {u.weapons.length > 0 && (
               <>
               <b className="muted small">OR</b>
-              <select value="" onChange={(e) => e.target.value && setPicker({ kind: 'weaponTrait', weaponId: e.target.value })} aria-label="Add a weapon trait">
+              <select value="" onChange={(e) => e.target.value && addWeaponTrait(e.target.value)} aria-label="Add a weapon trait">
                 <option value="">Weapon trait for…</option>
                 {u.weapons.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
               </select>
@@ -344,7 +359,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                 infantry={u.category === 'Infantry'}
                 onChange={(fn) => set((d) => fn(d.weapons[i]))}
                 onRemove={() => set((d) => void d.weapons.splice(i, 1))}
-                onAddTrait={() => setPicker({ kind: 'weaponTrait', weaponId: w.id })}
+                onAddTrait={() => addWeaponTrait(w.id)}
               />
             ))}
           </Panel>
@@ -428,11 +443,19 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
 
       {picker && (
         <TablePicker
-          title={{ trait: 'Choose a trait', weaponTrait: 'Choose a weapon trait', scar: 'Battle scar', relic: 'Choose a relic' }[picker.kind]}
+          title={{ trait: 'Choose a trait', weaponTrait: picker.kind === 'weaponTrait' && picker.of > 1 ? `Choose weapon trait ${picker.n} of ${picker.of}` : 'Choose a weapon trait', scar: 'Battle scar', relic: 'Choose a relic' }[picker.kind]}
           groups={pickerGroups()}
           allowFree={picker.kind !== 'scar'}
           freeLabel={picker.kind === 'relic' ? 'Free (no RP, e.g. a reward)' : undefined}
           check={picker.kind === 'relic' ? relicCheck : undefined}
+          owned={pickerOwned()}
+          key={picker.kind === 'weaponTrait' ? `${picker.weaponId}:${picker.n}` : picker.kind}
+          defaultFree={picker.kind === 'weaponTrait' && !!picker.free}
+          intro={picker.kind === 'weaponTrait' && picker.of > 1 && (
+            <p className="small">
+              <b>Trait {picker.n} of {picker.of}.</b> <span className="muted">An infantry weapon upgrade gives {picker.of} traits; rolls skip ones the weapon already has.</span>
+            </p>
+          )}
           onPick={onPick}
           onClose={() => setPicker(null)}
         />
