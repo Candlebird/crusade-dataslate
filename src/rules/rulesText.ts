@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
+import { ECHOES, DIFFICULTY_LEVELS, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
 import { EXPEDITION, SOLO_PATROL } from './downtimeData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
@@ -68,8 +68,10 @@ export const NEXUS_TEXT = {
     `The map changes every round. When a round ends, any space hulk whose reward has been claimed drifts off, leaving clear space that its holder keeps (its Salvage still counts for that round). Then new points of interest appear: ${NEXUS_MAP.refreshPerFaction} in each faction's half of the map and ${NEXUS_MAP.refreshContested} in the contested middle, in unclaimed clear space where there is some, otherwise at the edge of the map's sectors. They never appear right next to a home.`,
   ],
   difficulty: [
-    `Every sector except the homes has a difficulty, measured in Supply: the size of the AI garrison holding it. Ratings start at ${NEXUS_DIFFICULTY.min} next to the homes and climb to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor} at the far reaches of the map and the Voidspawn, so the best prizes mean punching above your weight. Void sites and Anomalies rate a little higher than other sectors at the same distance; empty space a little lower.`,
-    "Difficulty is recalculated at the end of every round, against each faction's total Supply across all its detachments, so the Nexus gets more dangerous as the factions grow.",
+    `Every sector except the homes has a difficulty, measured in Supply: the size of the AI garrison holding it. Ratings start around ${NEXUS_DIFFICULTY.min} next to the homes and climb to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor} (at least ${NEXUS_DIFFICULTY.min + NEXUS_DIFFICULTY.minSpread}) at the far reaches of the map and the Voidspawn, so the best prizes mean punching above your weight. Void sites and Anomalies rate a little higher than other sectors at the same distance; empty space a little lower.`,
+    `On top of that, every sector's rating rolls up or down by up to ${NEXUS_DIFFICULTY.jitter} Supply, in steps of ${NEXUS_DIFFICULTY.step} (never below ${NEXUS_DIFFICULTY.floor}), so two sectors side by side can be very different fights: look for the soft targets and pick your battles. The Voidspawn is always the top of the scale.`,
+    `The GM sets the campaign's difficulty next to Rescale sectors now on the Nexus Wars page: ${DIFFICULTY_LEVELS.map((l) => `${l.name} ×${l.scale}`).join(', ')}. It multiplies every rating (and the range they roll in), and changing it rescales the sectors straight away.`,
+    "Difficulty is recalculated (and rerolled) at the end of every round, against each faction's total Supply across all its detachments, so the Nexus gets more dangerous as the factions grow.",
     `Each sector also has a modifier that helps whoever defends it (two when it's rated in the top ${Math.round((1 - NEXUS_DIFFICULTY.hardAt) * 100)}% of the scale). Sectors held by the AI roll new modifiers every round; a faction's sectors keep theirs.`,
     "Attacking an AI-held sector: play 1 v AI and generate the garrison at the sector's difficulty. Its modifiers apply to the AI side.",
   ],

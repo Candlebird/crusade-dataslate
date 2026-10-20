@@ -2,12 +2,13 @@ import type { Campaign, Force, Sector } from '../model/types';
 import { factionForces, supplyLimit } from './detachments';
 import { hexDistance, isPlaced, type Hex, type Rand } from './hexmap';
 import { ECHOES } from './nexus';
-import { NEXUS_DIFFICULTY, SECTOR_MODIFIERS } from './nexusData';
+import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY, SECTOR_MODIFIERS } from './nexusData';
 
 // Nexus Wars sector difficulty. Every sector off a faction's home is rated in Supply: the size of the AI garrison that
 // holds it. Ratings run from NEXUS_DIFFICULTY.min up to the biggest faction's total Supply × maxFactor, so the far
-// reaches of the map are always a step up, and they're recalculated every round as the factions grow. Each sector also
-// rolls one modifier (two when it's rated hard) that favours its defender.
+// reaches of the map are always a step up, and they're recalculated every round as the factions grow. Each rating then
+// rolls up or down a little, so nearby sectors differ. Each sector also rolls one modifier (two when it's rated hard)
+// that favours its defender.
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
@@ -15,11 +16,23 @@ const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n
 export const factionSupply = (forces: Force[], factionId: string) =>
   factionForces(forces, factionId).reduce((n, f) => n + supplyLimit(f), 0);
 
-/** The current range of sector ratings. */
+/** The campaign's difficulty level (the GM picks it on the Nexus Wars page). */
+export const difficultyLevel = (c: Campaign) =>
+  DIFFICULTY_LEVELS.find((l) => l.id === c.difficulty) ?? DIFFICULTY_LEVELS.find((l) => l.id === 'normal')!;
+
+/**
+ * The current scale of sector ratings: `base` near the homes up to `max`; with the random roll, ratings land in
+ * `min`–`max`. The campaign's difficulty level scales all three.
+ */
 export function difficultyRange(c: Campaign, forces: Force[]) {
-  const { min, maxFactor, step } = NEXUS_DIFFICULTY;
+  const { min, minSpread, maxFactor, step, floor, jitter } = NEXUS_DIFFICULTY;
   const top = Math.max(0, ...c.factions.map((f) => factionSupply(forces, f.id)));
-  return { min, max: Math.max(min, Math.round((top * maxFactor) / step) * step) };
+  const scaled = (n: number) => Math.max(step, Math.round((n * difficultyLevel(c).scale) / step) * step);
+  return {
+    min: scaled(Math.max(floor, min - jitter)),
+    base: scaled(min),
+    max: scaled(Math.max(min + minSpread, Math.round((top * maxFactor) / step) * step)),
+  };
 }
 
 /** Is the sector held by the AI (unclaimed, or the Echoes'), so an attacker faces its garrison? */
@@ -45,7 +58,8 @@ export const modifierOf = (id: string) => SECTOR_MODIFIERS.find((m) => m.id === 
  */
 export function rateSectors(c: Campaign, forces: Force[], rand: Rand = Math.random, o: { reroll?: boolean } = {}) {
   const range = difficultyRange(c, forces);
-  const { step, hardAt } = NEXUS_DIFFICULTY;
+  const { step, hardAt, jitter } = NEXUS_DIFFICULTY;
+  const roll = () => (Math.floor(rand() * (2 * Math.floor(jitter / step) + 1)) - Math.floor(jitter / step)) * step;
   for (const s of c.sectors) {
     if (s.type === 'home') {
       delete s.difficulty;
@@ -53,12 +67,14 @@ export function rateSectors(c: Campaign, forces: Force[], rand: Rand = Math.rand
       continue;
     }
     const t = sectorThreat(c, s);
-    s.difficulty = Math.round((range.min + t * (range.max - range.min)) / step) * step;
+    // The Voidspawn is always the top of the scale; everything else rolls around its place on it.
+    const rated = Math.round((range.base + t * (range.max - range.base)) / step) * step;
+    s.difficulty = s.type === 'voidspawn' ? range.max : clamp(rated + roll(), range.min, range.max);
     if (s.modifiers?.length && !(o.reroll && aiDefended(s))) continue;
     const pool = [...SECTOR_MODIFIERS];
     const picks: string[] = [];
     for (let i = 0; i < (t >= hardAt ? 2 : 1) && pool.length; i++) picks.push(pool.splice(Math.floor(rand() * pool.length), 1)[0].id);
     s.modifiers = picks;
   }
-  return range;
+  return { min: range.min, max: range.max };
 }

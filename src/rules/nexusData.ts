@@ -167,21 +167,35 @@ export const NEXUS_MAP = {
 };
 
 /**
- * Sector difficulty: the Supply an AI garrison fields in an unclaimed or Echoes-held sector. It runs from `min` near the
- * homes up to the strongest faction's total Supply × `maxFactor` at the far reaches, so players can punch above their
- * weight. Rated when the map is generated and again at the end of every round.
+ * Sector difficulty: the Supply an AI garrison fields in an unclaimed or Echoes-held sector. It centres on `min` near the
+ * homes and climbs to the strongest faction's total Supply × `maxFactor` at the far reaches, so players can punch above
+ * their weight. Each sector then rolls up or down by up to `jitter`, so neighbours differ and players can pick their
+ * fights. Rated when the map is generated and again at the end of every round.
  */
 export const NEXUS_DIFFICULTY = {
   min: 800,
   maxFactor: 1.5,
+  /** The top of the scale is always at least this far above `min`, even before any force joins a faction. */
+  minSpread: 700,
+  /** Each sector's rating rolls up or down by up to this much (in steps), never below `floor` or above the top. */
+  jitter: 300,
+  floor: 500,
   /** Ratings round to this many points. */
-  step: 50,
+  step: 100,
   /** How much of the rating comes from distance to the nearest home (0–1); the type bonus adds to it. */
   distanceWeight: 0.8,
   typeBonus: { home: 0, planet: 0.05, research: 0.1, void: 0.2, anomaly: 0.15, empty: -0.1, voidspawn: 1 } as Record<SectorType, number>,
   /** Sectors rated at least this far up the scale get a second modifier. */
   hardAt: 0.6,
 };
+
+/** The GM's campaign difficulty: every sector rating (and the range they roll in) is multiplied by `scale`. */
+export const DIFFICULTY_LEVELS: { id: string; name: string; scale: number }[] = [
+  { id: 'easy', name: 'Easy', scale: 0.75 },
+  { id: 'normal', name: 'Normal', scale: 1 },
+  { id: 'hard', name: 'Hard', scale: 1.25 },
+  { id: 'brutal', name: 'Brutal', scale: 1.5 },
+];
 
 /** Battlefield conditions that favour a sector's defender. Each sector rolls one (two when it's hard). */
 export const SECTOR_MODIFIERS: { id: string; name: string; desc: string }[] = [

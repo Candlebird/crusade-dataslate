@@ -362,6 +362,8 @@ export interface Campaign {
   event?: GalacticEventState;
   /** The Nexus Crisis: an Echo Lord every faction must fight together before the round ends. */
   crisis?: NexusCrisis;
+  /** DIFFICULTY_LEVELS id (nexusData.ts): scales every sector rating; 'normal' when unset. */
+  difficulty?: string;
 }
 
 export interface GalacticEventState {

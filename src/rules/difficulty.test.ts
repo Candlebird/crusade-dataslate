@@ -64,12 +64,38 @@ describe('map generation for Nexus Wars', () => {
 });
 
 describe('sector difficulty', () => {
-  it('runs from the minimum to the biggest faction × 1.5, counting every detachment', () => {
+  it('runs from the minimum to the biggest faction × 1.5, counting every detachment, with a spread from the start', () => {
     const c = campaign();
-    expect(difficultyRange(c, [])).toEqual({ min: NEXUS_DIFFICULTY.min, max: NEXUS_DIFFICULTY.min });
+    expect(difficultyRange(c, [])).toEqual({ min: 500, base: 800, max: 1500 });
     const forces = [force('A', 1000), force('A', 500), force('B', 1200)];
     expect(factionSupply(forces, 'A')).toBe(1500);
-    expect(difficultyRange(c, forces)).toEqual({ min: 800, max: 2250 });
+    expect(difficultyRange(c, forces)).toEqual({ min: 500, base: 800, max: 2300 });
+  });
+
+  it('scales the whole range with the campaign difficulty', () => {
+    const c = campaign();
+    c.difficulty = 'easy';
+    expect(difficultyRange(c, [])).toEqual({ min: 400, base: 600, max: 1100 });
+    c.difficulty = 'brutal';
+    expect(difficultyRange(c, [])).toEqual({ min: 800, base: 1200, max: 2300 });
+    c.difficulty = 'nonsense';
+    expect(difficultyRange(c, [])).toEqual({ min: 500, base: 800, max: 1500 });
+    c.difficulty = 'hard';
+    const g = generate(c, 'a1');
+    rateSectors(g, [], rng('h'));
+    const rated = g.sectors.filter((s) => s.type !== 'home').map((s) => s.difficulty!);
+    expect(rated.every((d) => d % 100 === 0 && d >= 600 && d <= 1900)).toBe(true);
+    expect(g.sectors.find((s) => s.type === 'voidspawn')!.difficulty).toBe(1900);
+  });
+
+  it('rolls ratings up or down in 100-Supply steps, so the map has a spread of fights from round one', () => {
+    for (const seed of ['a1', 'b2', 'c3']) {
+      const c = generate(campaign(), seed);
+      rateSectors(c, [], rng(seed));
+      const rated = c.sectors.filter((s) => s.type !== 'home' && s.type !== 'voidspawn').map((s) => s.difficulty!);
+      expect(rated.every((d) => d % 100 === 0 && d >= 500 && d <= 1500)).toBe(true);
+      expect(new Set(rated).size, `seed ${seed}: ${[...new Set(rated)].sort()}`).toBeGreaterThanOrEqual(5);
+    }
   });
 
   it('rates sectors further from the homes higher, the Voidspawn highest, and skips homes', () => {
@@ -77,14 +103,14 @@ describe('sector difficulty', () => {
     const forces = [force('A', 1000), force('B', 1000)];
     rateSectors(c, forces, rng('x'));
     const rated = c.sectors.filter((s) => s.type !== 'home');
-    expect(rated.every((s) => s.difficulty! >= 800 && s.difficulty! <= 1500 && s.difficulty! % NEXUS_DIFFICULTY.step === 0)).toBe(true);
+    expect(rated.every((s) => s.difficulty! >= 500 && s.difficulty! <= 1500 && s.difficulty! % NEXUS_DIFFICULTY.step === 0)).toBe(true);
     expect(c.sectors.filter((s) => s.type === 'home').every((s) => s.difficulty === undefined && !s.modifiers)).toBe(true);
     expect(c.sectors.find((s) => s.type === 'voidspawn')!.difficulty).toBe(1500);
     const planets = rated.filter((s) => s.type === 'planet');
     const home = c.sectors.find((s) => s.id === 'hA') as Sector & Hex;
     const close = planets.reduce((a, b) => (hexDistance(home, a as Hex) < hexDistance(home, b as Hex) ? a : b));
     expect(sectorThreat(c, close)).toBeLessThan(sectorThreat(c, c.sectors.find((s) => s.type === 'voidspawn')!));
-    expect(Math.min(...rated.map((s) => s.difficulty!))).toBe(800);
+    expect(Math.min(...rated.map((s) => s.difficulty!))).toBeLessThan(800);
   });
 
   it('rolls one modifier, two on hard sectors, all different', () => {
@@ -110,7 +136,7 @@ describe('sector difficulty', () => {
 
     forces[0].startingSupply = 2000;
     const r = endRound(c, rng('round'), '2026-01-01', forces);
-    expect(r.difficulty).toEqual({ min: 800, max: 3000 });
+    expect(r.difficulty).toEqual({ min: 500, max: 3000 });
     expect(vs.difficulty).toBe(3000);
     expect(mine.modifiers).toBe(before.mine);
     expect(theirs.map((s) => s.modifiers!.join())).not.toEqual(before.theirs);
@@ -199,7 +225,7 @@ describe('the default map and the round refresh', () => {
     const r = endRound(c, rng('end'), '2026-01-01', forces);
     expect(r.cleared.map((s) => s.id)).toEqual([hulk.id]);
     expect(r.fresh).toHaveLength(3);
-    expect(r.fresh.every((s) => s.difficulty! >= 800 && s.modifiers?.length)).toBe(true);
+    expect(r.fresh.every((s) => s.difficulty! >= 500 && s.modifiers?.length)).toBe(true);
     expect(hulk.type).toBe('empty');
     const text = roundEndText(c, r);
     expect(text).toContain('drifted off');

@@ -10,8 +10,8 @@ import {
   assetName, assetsOf, echoWins, endRound, inGrace, leaders, nextThreat, refundAsset, roundEndText, sectorCounts, spendAsset, spreadsAt, threatOf,
   underdogBonus, type RoundEnd,
 } from '../rules/rounds';
-import { difficultyRange, rateSectors } from '../rules/difficulty';
-import { NEXUS_DIFFICULTY } from '../rules/nexusData';
+import { difficultyLevel, difficultyRange, rateSectors } from '../rules/difficulty';
+import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY } from '../rules/nexusData';
 import { confirmAction, toast } from './ui';
 
 /** End the current round on a copy of the campaign (the spread is random, so it's rolled once, here) and store the result. */
@@ -64,6 +64,20 @@ export default function RoundPanel({ c }: { c: Campaign }) {
     });
     toast(`Sectors rated ${range.min}–${range.max} Supply.`);
   };
+  // A new difficulty level rescales the sectors straight away (if they're rated yet), so the map always matches it.
+  const setDifficulty = (id: string) => {
+    let text = '';
+    update((d) => {
+      if (!d.campaign) return;
+      d.campaign.difficulty = id;
+      if (rated) {
+        const r = rateSectors(d.campaign, d.forces);
+        text = ` Sectors rescaled to ${r.min}–${r.max} Supply.`;
+      }
+      d.campaign.updatedAt = nowIso();
+    });
+    toast(`Difficulty: ${DIFFICULTY_LEVELS.find((l) => l.id === id)?.name}.${text}`);
+  };
 
   return (
     <div className="panel">
@@ -78,12 +92,20 @@ export default function RoundPanel({ c }: { c: Campaign }) {
         <span className="muted">If the round ended now: threat {coming}, spreading {spreads} sector{spreads === 1 ? '' : 's'}{ahead.size ? ', most likely into the leader\'s space' : ''}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>
       </div>
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-        <span className="tag" title={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}; rescaled when the round ends`}>
+        <span className="tag" title={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}, × ${difficultyLevel(c).scale} for ${difficultyLevel(c).name} difficulty; rescaled when the round ends`}>
           Sector difficulty {range.min}–{range.max} Supply
         </span>
         <button className="small" onClick={rescale} title="Rate sectors now against the factions' current Supply (the round's end does this too)">
           {rated ? 'Rescale sectors now' : 'Rate sectors'}
         </button>
+        <label className="row" style={{ gap: '0.35rem' }} title="Scales every sector rating; changing it rescales the sectors now">
+          <span className="muted">Difficulty</span>
+          <select value={difficultyLevel(c).id} onChange={(e) => setDifficulty(e.target.value)}>
+            {DIFFICULTY_LEVELS.map((l) => (
+              <option key={l.id} value={l.id}>{l.name} (×{l.scale})</option>
+            ))}
+          </select>
+        </label>
       </div>
       {grace && (
         <p className="small" style={{ margin: '0.5rem 0 0' }}>
