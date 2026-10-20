@@ -197,3 +197,71 @@ export const SECTOR_MODIFIERS: { id: string; name: string; desc: string }[] = [
   { id: 'initiative', name: 'Home Ground', desc: 'The defender picks deployment zones and activates first in round 1.' },
   { id: 'tide', name: 'Endless Tide', desc: 'The first defending non-hero unit destroyed comes back once, at full strength, from the defender’s table edge at the start of the next round.' },
 ];
+
+/**
+ * Galactic Events: one is rolled (D12) for each new round when the GM ends the last one; the GM can re-roll it or pick
+ * another. An event lasts its round. What each field does:
+ *  battle — a rule every battle that round plays with (shown in the tracker);
+ *  spread — extra sectors the Echoes spread into when the round ends (negative: fewer);
+ *  threat — added to the Echoes' threat when the round ends;
+ *  storm — this many random sectors are cut off: they can't be attacked that round;
+ *  noHome — no home-sector challenges that round;
+ *  income — added to every faction's income for the round;
+ *  hulks — extra space hulks that drift into the contested middle when the round ends.
+ * (Event ids are stored in saved campaigns, so rename an event's name, not its id.)
+ */
+export interface GalacticEvent {
+  id: string;
+  name: string;
+  desc: string;
+  battle?: string;
+  spread?: number;
+  threat?: number;
+  storm?: number;
+  noHome?: boolean;
+  income?: { us?: number; supply?: number };
+  hulks?: number;
+}
+
+export const GALACTIC_EVENTS: GalacticEvent[] = [
+  { id: 'quiet', name: 'Quiet Stars', desc: 'Nothing stirs between the stars. No effect this round.' },
+  { id: 'warpStorm', name: 'Warp Storm', desc: 'Two random sectors are swallowed by the storm: they can’t be attacked this round.', storm: 2 },
+  { id: 'ceasefire', name: 'Ceasefire Accords', desc: 'The factions agree to leave each other’s homeworlds alone: no home-sector challenges this round.', noHome: true },
+  { id: 'shardRush', name: 'Shard Rush', desc: 'Umbra seams surface everywhere: +1 Umbra Shard in every faction’s income for this round.', income: { us: 1 } },
+  { id: 'convoys', name: 'Supply Convoys', desc: 'Merchant fleets brave the Nexus: +25 Supply in every faction’s income for this round.', income: { supply: 25 } },
+  { id: 'echoSurge', name: 'Echo Surge', desc: 'The Echoes swell: they spread into 1 more sector when this round ends.', spread: 1 },
+  { id: 'voidLull', name: 'Void Lull', desc: 'The Echoes fall silent: they don’t spread when this round ends (their threat still moves).', spread: -99 },
+  { id: 'risingDark', name: 'Rising Dark', desc: 'Something vast stirs in the Voidspawn: the Echoes’ threat rises 1 more when this round ends.', threat: 1 },
+  { id: 'glory', name: 'Glory Seekers', desc: 'Warriors fight to be remembered.', battle: 'Every unit that survives the battle earns +1 XP (add it as Bonus XP).' },
+  { id: 'ionStorm', name: 'Ion Storm', desc: 'Charged clouds scatter targeting systems.', battle: 'Shooting at targets over 18″ away is at −1 to hit.' },
+  { id: 'derelicts', name: 'Derelict Fleet', desc: 'A lost fleet drifts into the Nexus: 2 extra space hulks appear in the contested middle when this round ends.', hulks: 2 },
+  { id: 'resonance', name: 'Nexus Resonance', desc: 'The Nexus hums with power.', battle: 'Casters get +1 to their casting rolls.' },
+];
+
+/**
+ * The Nexus Crisis: every few rounds an Echo Lord rises in an Echo-held sector, and every faction must fight it together,
+ * in one co-op battle against the AI, before the round ends.
+ *  - Win: the Echoes' threat drops by `threatDrop` more, each force that fought gets `winUs` Umbra Shards, and the force
+ *    whose units earned the most XP in the battle (the MVP) gets a `mvpTier` relic.
+ *  - Lose, or don't fight it by the round's end: the Echoes take each faction's sector nearest the Lord, and their threat
+ *    goes to its maximum.
+ */
+export const NEXUS_CRISIS = {
+  /** A Crisis begins every this many rounds (rounds 3, 6, 9…). */
+  everyRounds: 3,
+  threatDrop: 2,
+  winUs: 2,
+  mvpTier: 'Legendary' as const,
+  /** VP for destroying the Echo Lord (add it with the VP adjustment). */
+  lordVp: 3,
+};
+
+/** The Echo Lords (D6). The Lord is the Echoes' most expensive unit in the Crisis battle, with these rules on top. (Ids are saved; rename names only.) */
+export const ECHO_LORDS: { id: string; name: string; desc: string }[] = [
+  { id: 'devourer', name: 'The Devourer', desc: 'Regeneration. Whenever it destroys a unit in melee, it heals D3 wounds.' },
+  { id: 'hollowKing', name: 'The Hollow King', desc: 'Fear(2). Enemy units within 12″ get −1 to Morale tests.' },
+  { id: 'stormHerald', name: 'The Storm Herald', desc: 'Caster(3). Once per round, one enemy unit within 18″ takes 6 hits with AP(1).' },
+  { id: 'broodmother', name: 'The Broodmother', desc: 'At the end of each round, place a new unit of 5 of the Echoes’ cheapest infantry within 6″ of it.' },
+  { id: 'umbralTitan', name: 'The Umbral Titan', desc: '+6 Tough, and Defense 2+ against shooting from over 12″ away.' },
+  { id: 'whisperer', name: 'The Whisperer', desc: 'Ambush. Once per round, an enemy unit within 12″ that fails a Quality test is Shaken.' },
+];

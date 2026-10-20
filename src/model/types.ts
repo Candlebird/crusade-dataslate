@@ -308,6 +308,8 @@ export interface CampaignEvent {
   round?: number;
   /** A skirmish: a game away from the map (no sector). Only wins are logged: they earn Strategic Assets, and against the Echoes count as patrols. */
   skirmish?: boolean;
+  /** The Nexus Crisis battle (every faction against an Echo Lord): not a sector game, `sectorId` is where the Lord rose. */
+  crisis?: boolean;
   /** What the game changed, so deleting the entry can put the sector back. */
   undo?: { owner?: string; rewardClaimed?: boolean; reinforced?: boolean };
 }
@@ -322,6 +324,8 @@ export interface RoundSnapshot {
   underdog: Record<string, number>;
   /** Held sectors as they were when the round ended, for any the map refresh changed (a space hulk that drifted off). */
   was?: Sector[];
+  /** The Galactic Event that was active in the round (its income counts toward the round's income). */
+  event?: string;
 }
 
 export interface CampaignMap {
@@ -347,6 +351,31 @@ export interface Campaign {
   rounds?: RoundSnapshot[];
   /** Strategic Assets spent this round (cleared when the round ends, with any left unspent). */
   assetsSpent?: AssetUse[];
+  /** The Galactic Event for a round (GALACTIC_EVENTS, nexusData.ts); it only counts while `round` is the current round. */
+  event?: GalacticEventState;
+  /** The Nexus Crisis: an Echo Lord every faction must fight together before the round ends. */
+  crisis?: NexusCrisis;
+}
+
+export interface GalacticEventState {
+  id: string;
+  round: number;
+  /** Warp Storm: the sectors that can't be attacked. */
+  sectorIds?: string[];
+}
+
+export interface NexusCrisis {
+  /** The round it must be fought in. */
+  round: number;
+  /** ECHO_LORDS id. */
+  lord: string;
+  /** Where the Lord rose (an Echo-held sector). */
+  sectorId: string;
+  result?: 'won' | 'lost';
+  /** The force whose units earned the most XP in the battle. */
+  mvp?: string;
+  /** The tracked battle it was fought in. */
+  battleId?: string;
 }
 
 /** A Strategic Asset a faction spent on the round's Battle. */

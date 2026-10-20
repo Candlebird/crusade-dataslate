@@ -7,7 +7,9 @@ import {
   cells, clampToMap, defaultCounts, defaultMap, frontier, generateMap, hexCorners, hexKey, isPlaced, randomSeed, rng, rollSector, toPixel,
   type GenCounts, type GenOptions, type Hex,
 } from '../rules/hexmap';
-import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionColor, factionName, homeChallengeBlock, isStronghold, sidesOf } from '../rules/nexus';
+import {
+  BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, activeCrisis, activeEvent, benefitOf, factionColor, factionName, homeChallengeBlock, isStronghold, lordById, sidesOf, stormed,
+} from '../rules/nexus';
 import { pickSpread, spreadInto, spreadTargets } from '../rules/voidspawn';
 import { aiDefended, rateSectors } from '../rules/difficulty';
 import { href } from '../route';
@@ -287,6 +289,8 @@ function MapEditor({ c, setC, onRecord }: { c: Campaign; setC: SetC; onRecord: (
                   <text x={p.x} y={p.y + 21} className="hex-name">{s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name}</text>
                   {s.reinforced && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Reinforced</title>⛨</text>}
                   {s.type === 'void' && s.rewardClaimed && <text x={p.x + 15} y={p.y - 17} className="hex-mark"><title>Reward claimed</title>✓</text>}
+                  {stormed(c, s.id) && <text x={p.x} y={p.y - 17} className="hex-mark"><title>{activeEvent(c)?.name}: can't be attacked this round</title>🌀</text>}
+                  {activeCrisis(c)?.sectorId === s.id && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name}</title>☠</text>}
                   {s.difficulty !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff"><title>AI garrison: {s.difficulty} Supply</title>{s.difficulty}</text>}
                 </g>
               );
@@ -350,6 +354,8 @@ function SectorView({ c, s, onEdit, onRecord }: { c: Campaign; s: Sector; onEdit
         <span className="tag" style={ownerColor ? { borderColor: ownerColor, color: ownerColor } : undefined}>{factionName(c, s.owner)}</span>
         {s.reinforced && <span className="tag">⛨ Reinforced</span>}
         {s.type === 'void' && s.rewardClaimed && <span className="tag">✓ Reward claimed</span>}
+        {stormed(c, s.id) && <span className="tag red">🌀 {activeEvent(c)?.name}: can't be attacked this round</span>}
+        {activeCrisis(c)?.sectorId === s.id && <span className="tag red">☠ Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name} rises here</span>}
       </div>
       <p className="small">{benefit ? <><b>{benefit.name}:</b> {benefit.desc}</> : SECTOR_TYPES[s.type].desc}</p>
       <SectorDanger s={s} />
@@ -357,7 +363,7 @@ function SectorView({ c, s, onEdit, onRecord }: { c: Campaign; s: Sector; onEdit
       {games.length > 0 && (
         <div className="small">
           <b>Recent games</b>
-          {games.map((e) => <div key={e.id} className="muted">{e.date}: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} — {e.winner ? `${factionName(c, e.winner)} won` : 'draw'}</div>)}
+          {games.map((e) => <div key={e.id} className="muted">{e.date}: {e.crisis ? `Nexus Crisis — ${e.winner === ECHOES.id ? 'the Echo Lord prevailed' : 'the Echo Lord fell'}` : `${factionName(c, e.attacker)} vs ${factionName(c, e.defender)} — ${e.winner ? `${factionName(c, e.winner)} won` : 'draw'}`}</div>)}
         </div>
       )}
       {blocked && <p className="small"><span className="tag red">{blocked}</span></p>}

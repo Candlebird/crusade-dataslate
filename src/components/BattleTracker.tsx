@@ -5,13 +5,15 @@ import type { Force } from '../model/types';
 import { go, href } from '../route';
 import { useCloud } from '../cloud/CloudSync';
 import { AGENDAS, MAX_AGENDAS } from '../rules/data';
-import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES, factionName, homeChallengeBlock, recordSectorGame, sectorEffect } from '../rules/nexus';
+import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES, activeCrisis, factionName, homeChallengeBlock, lordById, recordSectorGame, sectorEffect } from '../rules/nexus';
 import { DEPLOYMENT_STYLES, SEIZE_RULE, allMissions, rollAdvancedMission, rollDeployment, type MissionDef } from '../rules/missions';
 import {
   FORMATS,
   TEAMS,
   addSide,
+  atCrisis,
   atSector,
+  crisisGame,
   cycleHolder,
   held,
   leaders,
@@ -47,7 +49,7 @@ import {
 } from '../rules/tracker';
 import { AI_TREES } from '../rules/aiTrees';
 import { echoesBook, randomEchoes } from '../rules/echoForce';
-import { ECHOES, NEXUS_REINFORCE_BONUS } from '../rules/nexusData';
+import { ECHOES, NEXUS_CRISIS, NEXUS_REINFORCE_BONUS } from '../rules/nexusData';
 import { aiDefended } from '../rules/difficulty';
 import SectorDanger from './SectorDanger';
 import { forceTotals } from '../rules/engine';
@@ -56,11 +58,11 @@ import AiActivation from './AiActivation';
 import { Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
 /** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
-export default function BattleTracker({ sectorId, attacker, forceId }: { sectorId?: string; attacker?: string; forceId?: string }) {
+export default function BattleTracker({ sectorId, attacker, forceId, crisis }: { sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean }) {
   const { state, update } = useStore();
   const b = state.battle;
   const sector = state.campaign?.sectors.find((s) => s.id === sectorId);
-  if (!b) return <StartBattle sectorId={sector?.id} preset={attacker} presetForce={forceId} />;
+  if (!b) return <StartBattle sectorId={sector?.id} preset={attacker} presetForce={forceId} crisis={crisis} />;
 
   const set = (fn: (d: TrackedBattle) => void) => update((s) => void (s.battle && fn(s.battle)));
   const sc = score(b);
@@ -72,6 +74,7 @@ export default function BattleTracker({ sectorId, attacker, forceId }: { sectorI
   const showRoles = !!b.attacker && !!(b.mission.roles || b.sectorId);
   const adjust = (t: TeamKey) => membersOf(b, t).reduce((n, x) => n + x.vpAdjust, 0);
   const game = sectorGame(b, state.campaign, state.forces);
+  const cg = crisisGame(b, state.campaign, state.forces);
   const finish = () => {
     update((s) => {
       s.battleHistory = [finishBattle(b, nowIso()), ...(s.battleHistory ?? [])];
@@ -81,8 +84,20 @@ export default function BattleTracker({ sectorId, attacker, forceId }: { sectorI
         recordSectorGame(s.campaign, { id: uid(), date: nowIso().slice(0, 10), ...game.event });
         s.campaign.updatedAt = nowIso();
       }
+      // The Crisis isn't fought over a sector: it only settles whether the Lord was stopped, and who was MVP. Only the first battle counts.
+      if (cg && s.campaign && activeCrisis(s.campaign) && !s.campaign.crisis!.battleId) {
+        Object.assign(s.campaign.crisis!, { result: cg.result, mvp: cg.mvp, battleId: b.id });
+        s.campaign.log.push({ id: uid(), date: nowIso().slice(0, 10), ...cg.event });
+        s.campaign.updatedAt = nowIso();
+      }
     });
     if (game && 'event' in game) toast(`Result added to the Nexus Wars log.${state.campaign ? ` ${sectorEffect(state.campaign, game.event)}` : ''}`);
+    if (cg && state.campaign && activeCrisis(state.campaign) && !state.campaign.crisis!.battleId) {
+      const mvp = state.forces.find((f) => f.id === cg.mvp);
+      toast(cg.result === 'won'
+        ? `The Echo Lord is defeated!${mvp ? ` MVP: ${mvp.name}, who takes a ${NEXUS_CRISIS.mvpTier} relic.` : ''} Each side claims its rewards from the battle.`
+        : 'The Echo Lord still stands. Unless the Crisis is won before the round ends, the Echoes take a sector from each faction.');
+    }
     go(href.tracker());
   };
 
@@ -113,7 +128,13 @@ export default function BattleTracker({ sectorId, attacker, forceId }: { sectorI
         </div>
       )}
 
-      {b.ended && <Result b={b} set={set} onFinish={finish} game={game} />}
+      {crisis && !b.crisis && (
+        <div className="panel">
+          <p>You came to fight the Nexus Crisis, but this battle is still running. Finish or discard it first.</p>
+        </div>
+      )}
+
+      {b.ended && <Result b={b} set={set} onFinish={finish} game={game} crisis={cg} />}
 
       <div className={`panel scoreboard${teams.length === 2 ? ' duel' : ''}`}>
         {teams.map((t) => (
@@ -274,18 +295,21 @@ function objectiveScoring(m: MissionDef): string {
   return `${base}${bonus}.`;
 }
 
-function StartBattle({ sectorId, preset, presetForce }: { sectorId?: string; preset?: string; presetForce?: string }) {
+function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { sectorId?: string; preset?: string; presetForce?: string; crisis?: boolean }) {
   const { state, update } = useStore();
   const cloud = useCloud();
   const c = state.campaign;
-  const sector = c?.sectors.find((s) => s.id === sectorId);
+  const crisis = wantCrisis && c ? activeCrisis(c) : undefined;
+  const sector = crisis ? undefined : c?.sectors.find((s) => s.id === sectorId);
   // Attack for my own force's faction if I have one, else for anyone but the sector's owner.
   const myFaction = state.forces.find((f) => f.nexus?.factionId && f.nexus.factionId !== sector?.owner && (!f.owner || f.owner === cloud.email))?.nexus?.factionId;
   const [attacker, setAttacker] = useState(() => (preset && c?.factions.some((f) => f.id === preset) ? preset : undefined) ?? myFaction ?? c?.factions.find((f) => f.id !== sector?.owner)?.id ?? '');
   const missions = allMissions(state.customMissions);
   const [id, setId] = useState(missions[0]?.id ?? '');
   // An unclaimed or void sector is held by the AI; a claimed one by its faction's player.
-  const [format, setFormat] = useState<Format>(() => FORMATS.find((f) => f.label === (sector && (!sector.owner || sector.type === 'void') ? '1 v AI' : '1 v 1'))!);
+  // The Crisis: every faction's player together against the AI.
+  const [format, setFormat] = useState<Format>(() => (crisis && c ? randomFormat(Math.max(1, c.factions.length), true)
+    : FORMATS.find((f) => f.label === (sector && (!sector.owner || sector.type === 'void') ? '1 v AI' : '1 v 1'))!));
   // The randomizer's options, and the forces it picked for each side in turn.
   const [players, setPlayers] = useState(2);
   const [withAi, setWithAi] = useState(false);
@@ -313,14 +337,15 @@ function StartBattle({ sectorId, preset, presetForce }: { sectorId?: string; pre
   const start = (mission: MissionDef) => {
     update((s) => {
       const b = newBattle(mission, uid(), nowIso(), Math.random, format);
-      if (sector && s.campaign) atSector(b, s.campaign, s.forces, s.settings, sector.id, attacker, attacker === preset ? presetForce : undefined);
+      if (crisis && s.campaign) atCrisis(b, s.campaign, s.forces, s.settings);
+      else if (sector && s.campaign) atSector(b, s.campaign, s.forces, s.settings, sector.id, attacker, attacker === preset ? presetForce : undefined);
       // Randomly picked forces fill the sides nothing was loaded into, players first.
       const open = [...b.sides.filter((x) => !x.ai), ...b.sides.filter((x) => x.ai)].filter((x) => !x.forceId);
       const left = forces.filter((f) => !b.sides.some((x) => x.forceId === f.id));
       open.forEach((side, i) => left[i] && loadForce(side, left[i], undefined, s.settings));
       s.battle = b;
     });
-    if (sector) go(href.tracker());
+    if (sector || crisis) go(href.tracker());
   };
   return (
     <div>
@@ -331,6 +356,22 @@ function StartBattle({ sectorId, preset, presetForce }: { sectorId?: string; pre
       <div className="panel">
         <div className="panel-title"><h2>Start a battle</h2></div>
         <p className="muted">Pick who's playing and a mission, then load each side's force on the next screen. The battle is kept on this device until you finish or discard it.</p>
+        {c && wantCrisis && !crisis && <p className="small"><span className="tag red">There is no Nexus Crisis this round.</span> <a href={href.tracker()}>Start an ordinary battle</a></p>}
+        {c && crisis && (
+          <>
+            <h3>Nexus Crisis</h3>
+            <p className="small">
+              <b>{lordById(crisis.lord)?.name ?? 'An Echo Lord'}</b> rises at <b>{c.sectors.find((x) => x.id === crisis.sectorId)?.name ?? 'the Voidspawn'}</b>.{' '}
+              {lordById(crisis.lord)?.desc}
+            </p>
+            <p className="small">
+              Every faction fights together on team A against the {ECHOES.name}; each faction with a single force has it loaded. Generate the {ECHOES.name}' army
+              to match your points: their most expensive unit is the Lord (+{NEXUS_CRISIS.lordVp} VP for destroying it). When you finish, the result goes into
+              the campaign log. Win and the threat drops; the side whose units earned the most XP is MVP and takes a {NEXUS_CRISIS.mvpTier} relic.
+            </p>
+            {crisis.battleId && <p className="small"><span className="tag red">Already fought: {crisis.result}</span> Only the first Crisis battle counts; delete its log entry to fight it again.</p>}
+          </>
+        )}
         {c && sector && (
           <>
             <h3>Nexus Wars</h3>
@@ -483,7 +524,7 @@ function Claim({ battle, side, claimed, by, mine }: { battle: FinishedBattle; si
   );
 }
 
-function Result({ b, set, onFinish, game }: { b: TrackedBattle; set: Set; onFinish: () => void; game?: SectorGame }) {
+function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set; onFinish: () => void; game?: SectorGame; crisis?: ReturnType<typeof crisisGame> }) {
   const { state } = useStore();
   const c = state.campaign;
   const sc = score(b);
@@ -511,6 +552,19 @@ function Result({ b, set, onFinish, game }: { b: TrackedBattle; set: Set; onFini
             : <>Finishing adds this to the campaign log: {factionName(c, game.event.attacker)} attacking {factionName(c, game.event.defender)}, {game.event.winner ? `${factionName(c, game.event.winner)} wins` : 'a draw'}. {sectorEffect(c, game.event) || "The sector doesn't change hands."}</>}
         </p>
       )}
+      {c && crisis && (
+        <p className="small" style={{ marginTop: '0.75rem' }}>
+          <b>Nexus Crisis.</b>{' '}
+          {c.crisis?.battleId
+            ? "The Crisis was already settled by an earlier battle: finishing this one won't change it."
+            : crisis.result === 'won'
+              ? <>Finishing marks the Crisis won.{' '}
+                {crisis.mvp
+                  ? <>MVP, for the most XP: <b>{state.forces.find((f) => f.id === crisis.mvp)?.name ?? 'a force not on this device'}</b>, who takes a {NEXUS_CRISIS.mvpTier} relic.</>
+                  : `No unit earned XP, so there's no MVP.`}</>
+              : `Finishing marks the Crisis lost: when the round ends the ${ECHOES.name} take a sector from each faction.`}
+        </p>
+      )}
       <div className="row" style={{ marginTop: '0.75rem' }}>
         <span className="muted small">Done? Finishing shares the battle with the group under Past battles, where anyone who hasn't recorded it yet can still claim their rewards.</span>
         <span className="spacer" />
@@ -535,7 +589,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
     const name = adding.trim();
     if (!name) return;
     setAdding('');
-    setSide((s) => void s.units.push({ id: uid(), name, maxWounds: 1, wounds: 1, shaken: false, activated: false, destroyed: false, kills: 0 }));
+    setSide((s) => void s.units.push({ id: uid(), name, maxWounds: 1, wounds: 1, shaken: false, activated: false, destroyed: false, xp: 0 }));
   };
 
   // The AI can field a random Void Echoes army, sized to match the sides it's up against.
@@ -673,10 +727,11 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
 
       <h3>Units</h3>
       {side.units.length === 0 && <p className="muted small">Load a crusade force above, or add units by hand.</p>}
+      {side.units.length > 0 && <p className="muted small">XP: 1 per wound of each model a unit destroys (½ per model in 10+ model, 1-wound units). It carries into the record wizard as Kill XP.</p>}
       {side.units.length > 0 && (
         <div className="table-wrap">
           <table className="compact stack tracker-units">
-            <thead><tr><th>Unit</th><th className="num">Wounds</th><th>Shaken</th><th>Activated</th><th className="num">Kills</th><th>Destroyed</th></tr></thead>
+            <thead><tr><th>Unit</th><th className="num">Wounds</th><th>Shaken</th><th>Activated</th><th className="num">XP</th><th>Destroyed</th></tr></thead>
             <tbody>
               {side.units.map((u) => (
                 <tr key={u.id} className={u.destroyed ? 'dead' : u.activated ? 'done' : ''}>
@@ -695,7 +750,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
                   </td>
                   <td data-label="Shaken"><input type="checkbox" checked={u.shaken} onChange={(e) => setUnit(u.id, (x) => void (x.shaken = e.target.checked))} /></td>
                   <td data-label="Activated"><input type="checkbox" checked={u.activated} onChange={(e) => setUnit(u.id, (x) => void (x.activated = e.target.checked))} /></td>
-                  <td className="num" data-label="Kills"><Stepper value={u.kills} min={0} onChange={(n) => setUnit(u.id, (x) => void (x.kills = n))} /></td>
+                  <td className="num" data-label="XP"><Stepper value={u.xp ?? 0} min={0} onChange={(n) => setUnit(u.id, (x) => void (x.xp = n))} /></td>
                   <td data-label="Destroyed"><input type="checkbox" checked={u.destroyed} onChange={(e) => setUnit(u.id, (x) => { x.destroyed = e.target.checked; if (!x.destroyed && x.wounds === 0) x.wounds = x.maxWounds; })} /></td>
                 </tr>
               ))}

@@ -84,7 +84,7 @@ describe('battle tracker', () => {
     expect(b.sides[0].units.map((u) => u.maxWounds)).toEqual([5, 6]);
     expect(b.sides[0].manipulations).toEqual([{ text: 'Combat Manipulation: Bombardment', used: false }]);
     b.sides[0].units[1].destroyed = true;
-    b.sides[0].units[0].kills = 2;
+    b.sides[0].units[0].xp = 2;
     b.sides[0].agendas.push({ name: 'Survivor', count: 0, done: true });
     setHolder(b, 0, 'A');
     expect(sideOfForce(b, f.id)).toBeUndefined();
@@ -99,7 +99,7 @@ describe('battle tracker', () => {
     expect(input.opponent).toBe('Orks');
     expect(input.result).toBe('win');
     expect(input.agendas).toEqual(['Survivor']);
-    expect(input.units.a).toMatchObject({ in: true, kills: 2, destroyed: false });
+    expect(input.units.a).toMatchObject({ in: true, killXp: 2, destroyed: false });
     expect(input.units.c).toMatchObject({ in: true, destroyed: true });
     expect(input.units.off.in).toBe(false);
     b.recorded.push('s1');

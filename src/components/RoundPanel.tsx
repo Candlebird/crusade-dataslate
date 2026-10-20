@@ -1,7 +1,11 @@
 import { nowIso, uid } from '../model/factory';
 import { useStore } from '../model/store';
 import type { Campaign } from '../model/types';
-import { ECHOES, NEXUS_ROUNDS, STRATEGIC_ASSETS, currentRound, factionColor } from '../rules/nexus';
+import {
+  ECHOES, GALACTIC_EVENTS, NEXUS_CRISIS, NEXUS_ROUNDS, STRATEGIC_ASSETS, activeCrisis, activeEvent, currentRound, factionColor, factionName, lordById,
+} from '../rules/nexus';
+import { crisisForfeits, rollEvent, setEvent } from '../rules/events';
+import { href } from '../route';
 import {
   assetName, assetsOf, echoWins, endRound, inGrace, leaders, nextThreat, refundAsset, roundEndText, sectorCounts, spendAsset, spreadsAt, threatOf,
   underdogBonus, type RoundEnd,
@@ -38,13 +42,16 @@ export default function RoundPanel({ c }: { c: Campaign }) {
   const grace = inGrace(c);
   const { patrols } = echoWins(c, round);
   const unspent = c.factions.reduce((n, f) => n + assetsOf(c, f.id).left, 0);
+  const event = activeEvent(c);
+  const crisis = activeCrisis(c);
+  const spreads = Math.max(0, spreadsAt(coming) + (event?.spread ?? 0));
 
   const endNow = () => {
-    const spreads = spreadsAt(coming);
     if (!confirmAction(`End round ${round}? Every faction's sector income for the round is fixed now (players claim it on their force page), `
       + `the ${ECHOES.name}' threat goes to ${coming} and they spread ${spreads} sector${spreads === 1 ? '' : 's'}${grace ? ' (into unclaimed space only)' : ''}.`
+      + (crisis && crisis.result !== 'won' ? ` The Nexus Crisis wasn't won: the ${ECHOES.name} take each faction's sector nearest ${lordById(crisis.lord)?.name ?? 'the Lord'}.` : '')
       + (unspent ? ` ${unspent} unspent Strategic Asset${unspent === 1 ? ' is' : 's are'} lost.` : '')
-      + ' Claimed space hulks drift off and new points of interest appear on the map.'
+      + ' Claimed space hulks drift off and new points of interest appear on the map, and a Galactic Event is rolled for the next round.'
       + ` Sector difficulty is rescaled to ${range.min}–${range.max} Supply and AI-held sectors roll new modifiers.`)) return;
     end(c);
   };
@@ -68,7 +75,7 @@ export default function RoundPanel({ c }: { c: Campaign }) {
         <span className="tag red" title={`Up ${NEXUS_ROUNDS.threatPerRound} each round, down ${NEXUS_ROUNDS.threatPerWin} per Battle won against them (${NEXUS_ROUNDS.threatPerVoidspawnWin} at a Voidspawn) and ${NEXUS_ROUNDS.threatPerPatrolWin} per patrol (a skirmish won against them)`}>
           ☣ {ECHOES.name} threat {threat}/{NEXUS_ROUNDS.threatMax}
         </span>
-        <span className="muted">If the round ended now: threat {coming}, spreading {spreadsAt(coming)} sector{spreadsAt(coming) === 1 ? '' : 's'}{ahead.size ? ', most likely into the leader\'s space' : ''}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>
+        <span className="muted">If the round ended now: threat {coming}, spreading {spreads} sector{spreads === 1 ? '' : 's'}{ahead.size ? ', most likely into the leader\'s space' : ''}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>
       </div>
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
         <span className="tag" title={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}; rescaled when the round ends`}>
@@ -95,7 +102,65 @@ export default function RoundPanel({ c }: { c: Campaign }) {
           ))}
         </div>
       )}
+      <EventRow c={c} />
+      {crisis && <CrisisRow c={c} />}
       {c.factions.length > 0 && <AssetsRow c={c} />}
+    </div>
+  );
+}
+
+/** This round's Galactic Event, which the GM can re-roll or pick by hand. */
+function EventRow({ c }: { c: Campaign }) {
+  const { update } = useStore();
+  const event = activeEvent(c);
+  const change = (fn: (d: Campaign) => void) => update((s) => {
+    if (!s.campaign) return;
+    fn(s.campaign);
+    s.campaign.updatedAt = nowIso();
+  });
+  const storm = event?.sectorIds.map((id) => c.sectors.find((x) => x.id === id)?.name).filter(Boolean) ?? [];
+  return (
+    <div className="small" style={{ marginTop: '0.5rem' }}>
+      <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+        <span className="tag gold">✦ Galactic Event: {event ? event.name : 'none'}</span>
+        <button className="small" onClick={() => change((d) => rollEvent(d))} title="Roll a D12 on the Galactic Events table">{event ? 'Re-roll' : 'Roll a Galactic Event'}</button>
+        <select value="" aria-label="Pick the Galactic Event" onChange={(e) => e.target.value && change((d) => setEvent(d, e.target.value))}>
+          <option value="">Pick one…</option>
+          {GALACTIC_EVENTS.map((x, i) => <option key={x.id} value={x.id}>{i + 1}. {x.name}</option>)}
+        </select>
+      </div>
+      {event && (
+        <p style={{ margin: '0.25rem 0 0' }}>
+          {event.desc}{event.battle && <> <b>In every battle this round:</b> {event.battle}</>}
+          {storm.length > 0 && <> Cut off: <b>{storm.join(', ')}</b>.</>}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** This round's Nexus Crisis: the Echo Lord, how it's going, and what happens if it isn't won. */
+function CrisisRow({ c }: { c: Campaign }) {
+  const { state } = useStore();
+  const crisis = activeCrisis(c)!;
+  const lord = lordById(crisis.lord);
+  const at = c.sectors.find((x) => x.id === crisis.sectorId);
+  const forfeits = crisisForfeits(c);
+  return (
+    <div className="small" style={{ marginTop: '0.5rem' }}>
+      <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+        <span className="tag red">☠ Nexus Crisis: {lord?.name ?? 'an Echo Lord'} at {at?.name ?? 'the Voidspawn'}</span>
+        <span className={`tag${crisis.result === 'won' ? ' gold' : ''}`}>{crisis.result === 'won' ? 'Won' : crisis.result === 'lost' ? 'Lost' : 'Not fought yet'}</span>
+        {!crisis.battleId && <a className="btn small" href={href.crisis()}>Start the Crisis battle</a>}
+      </div>
+      <p style={{ margin: '0.25rem 0 0' }}>
+        {lord?.desc} Every faction fights it together, against the AI, before the round ends.
+        Win: the threat drops {NEXUS_CRISIS.threatDrop}, each side claims +{NEXUS_CRISIS.winUs} US and the side whose units earned the most XP takes a {NEXUS_CRISIS.mvpTier} relic
+        {crisis.mvp ? ` (MVP: ${state.forces.find((f) => f.id === crisis.mvp)?.name ?? 'a force not on this device'})` : ''}.
+        {crisis.result !== 'won' && <> Lose, or don't fight it: the threat goes to {NEXUS_ROUNDS.threatMax} and the {ECHOES.name} take {forfeits.length
+          ? forfeits.map((x) => `${x.name} (${factionName(c, x.owner)})`).join(', ')
+          : "each faction's sector nearest the Lord"}.</>}
+      </p>
     </div>
   );
 }

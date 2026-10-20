@@ -2,7 +2,7 @@ import type { ArmyList, BattleResult, Campaign, CampaignEvent, Force, Settings, 
 import { battlePoints } from './engine';
 import { listUnits } from './lists';
 import { emptyUnitBattle, unitName, type BattleInput } from './battle';
-import { benefitOf, ECHOES, factionName, ORGANIZED_STRIKE, ownedSectors } from './nexus';
+import { NEXUS_CRISIS, activeEvent, benefitOf, ECHOES, factionName, lordById, ORGANIZED_STRIKE, ownedSectors } from './nexus';
 import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
 import { aiStyleFor, type AiStyle } from './aiTrees';
 import { aiDefended, modifierOf } from './difficulty';
@@ -41,7 +41,9 @@ export interface TrackerUnit {
   shaken: boolean;
   activated: boolean;
   destroyed: boolean;
-  kills: number;
+  /** Kill XP the unit earned this battle, tallied as models fall (the record wizard picks it up). Older battles tracked kills instead. */
+  xp: number;
+  kills?: number;
   /** The unit's points cost, when it came from a force or the army book. */
   points?: number;
   /** Which AI decision tree the unit follows when its side is run by the AI (hybrid if unset). */
@@ -88,6 +90,8 @@ export interface TrackedBattle {
   /** Nexus Wars: the sector fought over, and which team attacks it (every other team defends). */
   sectorId?: string;
   attacker?: TeamKey;
+  /** Nexus Wars: the Nexus Crisis battle of this round (every faction on team A against the Echo Lord). */
+  crisis?: number;
   /** OPR Advanced deployment style, if one was picked or rolled. */
   deploymentStyle?: string;
   notes: string;
@@ -175,7 +179,7 @@ export function migrateBattle(b: any): TrackedBattle | undefined {
 
 export function trackerUnit(u: Unit): TrackerUnit {
   const maxWounds = Math.max(1, u.size) * Math.max(1, u.tough || 1);
-  return { id: u.id, unitId: u.id, name: unitName(u), maxWounds, wounds: maxWounds, shaken: false, activated: false, destroyed: false, kills: 0, points: u.points, aiStyle: aiStyleFor(u) };
+  return { id: u.id, unitId: u.id, name: unitName(u), maxWounds, wounds: maxWounds, shaken: false, activated: false, destroyed: false, xp: 0, points: u.points, aiStyle: aiStyleFor(u) };
 }
 
 /** Fill a side from a force (and one of its lists, or every active unit). */
@@ -285,6 +289,14 @@ export function nexusNotes(b: TrackedBattle, c: Campaign | undefined, forces: Fo
     for (const x of membersOf(b, b.attacker))
       if (x.manipulations.some((m) => m.text.startsWith(ORGANIZED_STRIKE))) notes.push(`${x.name} attacks with an Organized Strike: +200 Supply Limit.`);
   }
+  if (c && b.crisis && c.crisis?.round === b.crisis) {
+    const lord = lordById(c.crisis.lord);
+    const at = c.sectors.find((s) => s.id === c.crisis!.sectorId);
+    if (lord) notes.push(`Nexus Crisis at ${at?.name ?? 'the Voidspawn'}: ${lord.name} leads the ${ECHOES.name} — their most expensive unit. ${lord.desc}`);
+    notes.push(`Destroying ${lord?.name ?? 'the Echo Lord'} is worth +${NEXUS_CRISIS.lordVp} VP (add it as a VP adjustment). Win: every force earns ${NEXUS_CRISIS.winUs} Umbra Shards and the force whose units earned the most XP gets a ${NEXUS_CRISIS.mvpTier} relic.`);
+  }
+  const event = c && activeEvent(c);
+  if (event?.battle) notes.push(`Galactic event, ${event.name}: ${event.battle}`);
   if (c) {
     for (const side of b.sides) {
       const factionId = forces.find((f) => f.id === side.forceId)?.nexus?.factionId;
@@ -351,6 +363,43 @@ export function sectorGame(b: TrackedBattle, c: Campaign | undefined, forces: Fo
 }
 
 /**
+ * Set a new battle up as this round's Nexus Crisis: every faction's player on team A, against the AI on team B. A
+ * faction with a single force gets it loaded. The battle is not fought over a sector.
+ */
+export function atCrisis(b: TrackedBattle, c: Campaign, forces: Force[], s: Settings) {
+  if (!c.crisis) return;
+  b.crisis = c.crisis.round;
+  const players = membersOf(b, 'A').filter((x) => !x.ai);
+  c.factions.forEach((f, i) => {
+    const theirs = forces.filter((x) => x.nexus?.factionId === f.id);
+    if (players[i] && theirs.length === 1) loadForce(players[i], theirs[0], undefined, s);
+  });
+}
+
+/** The force whose units earned the most XP in the battle (the Crisis MVP); the first on a tie. */
+export function mvpForce(b: TrackedBattle): string | undefined {
+  let best: TrackerSide | undefined;
+  let most = 0; // no XP earned, no MVP
+  const xp = (x: TrackerSide) => x.units.reduce((n, u) => n + (u.xp ?? 0), 0);
+  for (const x of b.sides) if (!x.ai && x.forceId && xp(x) > most) [best, most] = [x, xp(x)];
+  return best?.forceId;
+}
+
+/** How a Crisis battle went, and its campaign log entry. A draw doesn't stop the Lord: only a win counts. */
+export function crisisGame(b: TrackedBattle, c: Campaign | undefined, forces: Force[]) {
+  if (!c || !b.crisis || c.crisis?.round !== b.crisis) return undefined;
+  const w = winner(b);
+  const won = w !== 'draw' && membersOf(b, w).every((x) => !x.ai);
+  const sc = score(b);
+  const event: Omit<CampaignEvent, 'id' | 'date'> = {
+    sectorId: c.crisis.sectorId, attacker: teamFaction(b, 'A', c, forces), defender: ECHOES.id, winner: won ? teamFaction(b, 'A', c, forces) : ECHOES.id,
+    notes: `Nexus Crisis against ${lordById(c.crisis.lord)?.name ?? 'the Echo Lord'}: ${teamsOf(b).map((t) => `${teamName(b, t)} ${sc[t]!.total}`).join(', ')} VP.`,
+    battleId: b.id, crisis: true, round: b.crisis,
+  };
+  return { result: won ? ('won' as const) : ('lost' as const), mvp: won ? mvpForce(b) : undefined, event };
+}
+
+/**
  * The faction an AI defender stands in for: when a player's sector is attacked and they can't make the Battle,
  * the Void Echoes fight for it, and their win holds the sector for its owner. '' when no one is standing in.
  */
@@ -375,7 +424,7 @@ export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInp
     if (!units[u.id]) continue;
     const t = tracked.get(u.id);
     units[u.id] = t
-      ? { ...emptyUnitBattle(u), in: true, destroyed: t.destroyed, kills: t.kills }
+      ? { ...emptyUnitBattle(u), in: true, destroyed: t.destroyed, killXp: t.xp ?? 0, kills: t.kills ?? 0 }
       : { ...units[u.id], in: tracked.size === 0 ? units[u.id].in : false };
   }
   const s = score(b);

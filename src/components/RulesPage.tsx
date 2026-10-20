@@ -7,7 +7,7 @@ import {
   type RelicDef, type RelicTier, type RewardTableKey, type TableEntry,
 } from '../rules/data';
 import {
-  ANOMALY_TABLE, BENEFITS, COMBAT_MANIPULATIONS, ECHOES, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE,
+  ANOMALY_TABLE, BENEFITS, COMBAT_MANIPULATIONS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE,
 } from '../rules/nexusData';
 import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
 import { relicHolderText, relicHolders } from '../rules/engine';
@@ -322,7 +322,7 @@ function NexusRules() {
         </p>
         <Toc items={[
           ['n-map', 'Sectors'], ['n-danger', 'Difficulty & modifiers'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'],
-          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
+          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
           ['n-shop', 'Umbra Shard shop'],
         ]} />
         <p className="small">
@@ -377,6 +377,16 @@ function NexusRules() {
           <thead><tr><th>Threat</th>{R.spreadsByThreat.map((_, t) => <th key={t}>{t}</th>)}</tr></thead>
           <tbody><tr><td>Sectors spread into</td>{R.spreadsByThreat.map((n, t) => <td key={t}>{n}</td>)}</tr></tbody>
         </table>
+      </Section>
+
+      <Section id="n-events" title="Galactic Events">
+        <Prose lines={NEXUS_TEXT.events} />
+        <Entries title="Galactic Events (D12)" roll entries={GALACTIC_EVENTS.map((e) => ({ name: e.name, desc: e.battle ? `${e.desc} In every battle: ${e.battle}` : e.desc }))} />
+      </Section>
+
+      <Section id="n-crisis" title="The Nexus Crisis">
+        <Prose lines={NEXUS_TEXT.crisis} />
+        <Entries title="Echo Lords (D6)" roll entries={ECHO_LORDS} />
       </Section>
 
       <Section id="n-catchup" title="Catching up">

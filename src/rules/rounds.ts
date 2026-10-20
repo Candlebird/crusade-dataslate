@@ -2,9 +2,10 @@ import type { AssetUse, Campaign, Force, ForceNexus, RoundSnapshot, Sector } fro
 import { CATEGORIES } from './data';
 import { refreshSectors, type Rand } from './hexmap';
 import {
-  ANOMALY_TABLE, ECHOES, MANIPULATION_PREFIX, NEXUS_ROUNDS, STRATEGIC_ASSETS, currentRound, emptyNexusPick, factionName, incomeItems,
-  type NexusItem, type NexusPick,
+  ANOMALY_TABLE, ECHOES, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, STRATEGIC_ASSETS, activeCrisis, activeEvent, currentRound, emptyNexusPick, eventById,
+  factionName, incomeItems, lordById, type NexusItem, type NexusPick,
 } from './nexus';
+import { crisisRound, placeCrisis, rollEvent, settleCrisis, type CrisisEnd } from './events';
 import { pickSpread, spreadInto } from './voidspawn';
 import { factionClaimedRound } from './detachments';
 import { rateSectors } from './difficulty';
@@ -16,7 +17,9 @@ import { rateSectors } from './difficulty';
 //  - the Void Echoes' threat moves (up each round, down for every win against them), and they spread that many sectors,
 //  - unspent Strategic Assets are lost,
 //  - claimed space hulks drift off and new points of interest turn up (refreshSectors, hexmap.ts),
-//  - every sector's difficulty is rescaled to the factions' current Supply, and AI garrisons roll new modifiers.
+//  - every sector's difficulty is rescaled to the factions' current Supply, and AI garrisons roll new modifiers,
+//  - the round's Nexus Crisis is settled, a Galactic Event is rolled for the next round, and a new Crisis rises if it's
+//    time (events.ts).
 // Values live in NEXUS_ROUNDS (nexusData.ts).
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -58,7 +61,7 @@ export function echoWins(c: Campaign, round: number) {
   let voidspawn = 0;
   let patrols = 0;
   for (const e of c.log) {
-    if (e.spread || (e.round ?? 1) !== round || !e.winner || e.winner === ECHOES.id) continue;
+    if (e.spread || e.crisis || (e.round ?? 1) !== round || !e.winner || e.winner === ECHOES.id) continue;
     if (e.attacker !== ECHOES.id && e.defender !== ECHOES.id) continue;
     if (e.skirmish) patrols++;
     else if (c.sectors.find((s) => s.id === e.sectorId)?.type === 'voidspawn') voidspawn++;
@@ -71,7 +74,12 @@ export function echoWins(c: Campaign, round: number) {
 export function nextThreat(c: Campaign) {
   const { wins, voidspawn, patrols } = echoWins(c, currentRound(c));
   const R = NEXUS_ROUNDS;
-  return clamp(threatOf(c) + R.threatPerRound - wins * R.threatPerWin - voidspawn * R.threatPerVoidspawnWin - patrols * R.threatPerPatrolWin, 0, R.threatMax);
+  const event = activeEvent(c)?.threat ?? 0;
+  const threat = clamp(threatOf(c) + R.threatPerRound + event - wins * R.threatPerWin - voidspawn * R.threatPerVoidspawnWin - patrols * R.threatPerPatrolWin, 0, R.threatMax);
+  // The Crisis: a win pushes the Echoes back further; otherwise they rage at full threat.
+  const crisis = activeCrisis(c);
+  if (!crisis) return threat;
+  return crisis.result === 'won' ? clamp(threat - NEXUS_CRISIS.threatDrop, 0, R.threatMax) : R.threatMax;
 }
 
 // ---- skirmishes and Strategic Assets ----
@@ -116,6 +124,14 @@ export interface RoundEnd {
   cleared: Sector[];
   /** New points of interest. */
   fresh: Sector[];
+  /** The Galactic Event of the round that ended. */
+  event?: string;
+  /** The round's Nexus Crisis, settled. */
+  crisis?: CrisisEnd;
+  /** The Galactic Event rolled for the next round. */
+  nextEvent?: string;
+  /** A Nexus Crisis rose for the next round: the Lord and where. */
+  newCrisis?: { lord: string; sectorName: string };
 }
 
 /**
@@ -127,17 +143,21 @@ export function endRound(c: Campaign, rand: Rand = Math.random, date = new Date(
   const holdings: RoundSnapshot['holdings'] = {};
   for (const f of c.factions) holdings[f.id] = c.sectors.filter((s) => s.owner === f.id).map((s) => s.id);
   const snapshot: RoundSnapshot = { round, date, holdings, underdog: underdogBonus(c) };
+  const event = activeEvent(c);
+  if (event) snapshot.event = event.id;
 
   const threatBefore = threatOf(c);
   const { wins, voidspawn, patrols } = echoWins(c, round);
   const threat = nextThreat(c);
+  // The Crisis, unless it was won, takes a sector from everyone.
+  const crisis = settleCrisis(c, date);
 
   // The Echoes go for whoever is ahead; while the campaign is young, they only take unclaimed space.
   const ahead = new Set(leaders(c));
   const weight = (s: Sector) => (s.owner && ahead.has(s.owner) ? NEXUS_ROUNDS.leaderWeight : 1);
   const only = inGrace(c) ? (s: Sector) => !s.owner : () => true;
   const spread: Sector[] = [];
-  for (let i = 0; i < spreadsAt(threat); i++) {
+  for (let i = 0; i < Math.max(0, spreadsAt(threat) + (event?.spread ?? 0)); i++) {
     const target = pickSpread(c, rand, weight, only);
     if (!target || !spreadInto(c, target.id, date)) break;
     spread.push(target);
@@ -149,18 +169,30 @@ export function endRound(c: Campaign, rand: Rand = Math.random, date = new Date(
   // Strategic Assets don't carry over.
   delete c.assetsSpent;
   // The map moves on: claimed hulks drift off and new points of interest turn up. The round's income still counts the hulks.
-  const { cleared, fresh } = refreshSectors(c, rand);
+  const { cleared, fresh } = refreshSectors(c, rand, event?.hulks ?? 0);
   const held = new Set(Object.values(holdings).flat());
   const was = cleared.filter((s) => held.has(s.id));
   if (was.length) snapshot.was = was;
   const difficulty = forces ? rateSectors(c, forces, rand, { reroll: true }) : undefined;
-  return { round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, difficulty, cleared, fresh };
+  // What the next round brings.
+  rollEvent(c, rand);
+  let newCrisis: RoundEnd['newCrisis'];
+  if (crisisRound(c.round) && placeCrisis(c, rand))
+    newCrisis = { lord: lordById(c.crisis!.lord)?.name ?? '', sectorName: c.sectors.find((s) => s.id === c.crisis!.sectorId)?.name ?? '' };
+  return {
+    round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, difficulty, cleared, fresh,
+    event: event?.id, crisis, nextEvent: c.event?.id, newCrisis,
+  };
 }
 
 /** One line for the log / a toast. */
 export function roundEndText(c: Campaign, r: RoundEnd) {
   const where = r.spread.length ? `spread to ${r.spread.map((s) => s.name).join(', ')}` : 'did not spread';
-  return `Round ${r.round} ended. ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${r.cleared.length ? ` Space hulk${r.cleared.length === 1 ? '' : 's'} drifted off: ${r.cleared.map((s) => s.name).join(', ')}.` : ''}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''} Round ${currentRound(c)} begins.`;
+  const crisis = !r.crisis ? ''
+    : r.crisis.result === 'won' ? ` The Nexus Crisis was won: ${r.crisis.lord} is beaten.`
+    : ` The Nexus Crisis was lost: ${r.crisis.lord} took ${r.crisis.lost.map((s) => s.name).join(', ') || 'nothing'}.`;
+  const next = `${r.nextEvent ? ` Galactic event: ${eventById(r.nextEvent)?.name}.` : ''}${r.newCrisis ? ` Nexus Crisis! ${r.newCrisis.lord} rises at ${r.newCrisis.sectorName}.` : ''}`;
+  return `Round ${r.round} ended.${crisis} ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${r.cleared.length ? ` Space hulk${r.cleared.length === 1 ? '' : 's'} drifted off: ${r.cleared.map((s) => s.name).join(', ')}.` : ''}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''} Round ${currentRound(c)} begins.${next}`;
 }
 
 /**
@@ -184,6 +216,9 @@ export function roundIncomeItems(c: Campaign, factionId: string, snap: RoundSnap
   }
   const behind = snap.underdog[factionId] ?? 0;
   if (behind > 0) items.push({ key: `r${snap.round}:underdog`, kind: 'us', source: 'Catch-up bonus', us: behind });
+  const event = eventById(snap.event);
+  if (event?.income?.us) items.push({ key: `r${snap.round}:eventUs`, kind: 'us', source: event.name, us: event.income.us });
+  if (event?.income?.supply) items.push({ key: `r${snap.round}:eventSupply`, kind: 'supply', source: event.name, supply: event.income.supply });
   return items.map((i) => ({ ...i, source: `Round ${snap.round} — ${i.source.replace(/^Conquest — /, '')}` }));
 }
 

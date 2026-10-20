@@ -395,9 +395,10 @@ export interface Refresh {
  * The map moves on at the end of a round: space hulks whose reward has been claimed drift off and leave clear space
  * (still held by whoever held it), and new points of interest turn up, NEXUS_MAP.refreshPerFaction in each faction's
  * half and NEXUS_MAP.refreshContested in the contested middle. New ones appear in unclaimed clear space, or at the edge
- * of the map's sectors when there is none, never right next to a home. Mutates `c`.
+ * of the map's sectors when there is none, never right next to a home. `hulks` more space hulks drift into the
+ * contested middle too (the Derelict Fleet event). Mutates `c`.
  */
-export function refreshSectors(c: Campaign, rand: Rand = Math.random): Refresh {
+export function refreshSectors(c: Campaign, rand: Rand = Math.random, hulks = 0): Refresh {
   const cleared: Sector[] = [];
   const fresh: Sector[] = [];
   const used = new Set(c.sectors.map((s) => s.name));
@@ -440,7 +441,7 @@ export function refreshSectors(c: Campaign, rand: Rand = Math.random): Refresh {
     return weights[0][0];
   };
 
-  const spawn = (region: number, near?: Hex) => {
+  const spawn = (region: number, near?: Hex, forced?: SectorType) => {
     const ok = (x: Hex) => regionOf(x) === region && homes.every((h) => hexDistance(h, x) >= 2);
     let options: Hex[] = c.sectors.filter((s): s is Sector & Hex => isPlaced(s) && s.type === 'empty' && !s.owner && ok(s));
     if (!options.length) {
@@ -457,7 +458,7 @@ export function refreshSectors(c: Campaign, rand: Rand = Math.random): Refresh {
       if (v < low) [cell, low] = [x, v];
     }
     if (!cell) return;
-    const type = kind();
+    const type = forced ?? kind();
     const r = named(type);
     let s = c.sectors.find((x) => x.q === cell!.q && x.r === cell!.r);
     if (!s) c.sectors.push((s = { id: uid(), name: '', type, notes: '', q: cell.q, r: cell.r }));
@@ -476,6 +477,7 @@ export function refreshSectors(c: Campaign, rand: Rand = Math.random): Refresh {
     for (let k = 0; k < NEXUS_MAP.refreshPerFaction; k++) spawn(i, h);
   });
   for (let k = 0; k < NEXUS_MAP.refreshContested; k++) spawn(-1, spawns[0]);
+  for (let k = 0; k < hulks; k++) spawn(-1, spawns[0], 'void');
   return { cleared, fresh };
 }
 

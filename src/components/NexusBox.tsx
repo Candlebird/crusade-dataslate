@@ -1,6 +1,6 @@
 import type { Unit } from '../model/types';
 import { CATEGORIES, RELICS } from '../rules/data';
-import { ANOMALY_TABLE, COMBAT_MANIPULATIONS, NEXUS_ROUNDS, ROLL_SIDES, VOID_TABLE, nexusEntry, type NexusItem, type NexusPick } from '../rules/nexus';
+import { ANOMALY_TABLE, COMBAT_MANIPULATIONS, NEXUS_CRISIS, NEXUS_ROUNDS, ROLL_SIDES, VOID_TABLE, nexusEntry, type NexusItem, type NexusPick } from '../rules/nexus';
 import { relicHolders, relicTaken, rollDie } from '../rules/engine';
 import { useStore } from '../model/store';
 import { unitName } from '../rules/battle';
@@ -35,10 +35,12 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
   const given = Object.values(pick.alloc).reduce((n, x) => n + x, 0);
   const { state } = useStore();
   const held = relicHolders(state.forces, state.campaign);
-  const wantsRelic = (item.kind === 'relicRoll' && pick.roll === 6) || !!e?.nexusRelic;
+  const wantsRelic = (item.kind === 'relicRoll' && pick.roll === 6) || item.kind === 'relic' || !!e?.nexusRelic;
   const relics = item.kind === 'relicRoll'
     ? RELICS.filter((r) => r.tier === 'Common' && !r.nexus)
-    : RELICS.filter((r) => r.nexus && r.tier !== 'Legendary');
+    : item.kind === 'relic'
+      ? RELICS.filter((r) => r.tier === NEXUS_CRISIS.mvpTier)
+      : RELICS.filter((r) => r.nexus && r.tier !== 'Legendary');
 
   let fixed = '';
   if (item.kind === 'us' || item.kind === 'matchBonus') fixed = `+${item.us} Umbra Shard${item.us === 1 ? '' : 's'}`;

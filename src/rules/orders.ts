@@ -1,6 +1,6 @@
 import type { Campaign, Force } from '../model/types';
 import { frontier, isPlaced } from './hexmap';
-import { homeChallengeBlock } from './nexus';
+import { homeChallengeBlock, stormed } from './nexus';
 
 // Nexus Wars sealed orders: each player picks what their detachments attack next game (or holds),
 // nobody sees anyone else's picks until the GM reveals them. Each force linked to a faction is a
@@ -45,7 +45,7 @@ export const playedDetachments = (c: Campaign, forces: Force[]) =>
 /** Sectors a faction may attack: placed ones next to its territory, by name. */
 export function attackTargets(c: Campaign, factionId: string) {
   const front = frontier(c, factionId);
-  return c.sectors.filter((s) => isPlaced(s) && front.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+  return c.sectors.filter((s) => isPlaced(s) && front.has(s.id) && !stormed(c, s.id)).sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export interface Attack {

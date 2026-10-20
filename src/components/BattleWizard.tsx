@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../model/store';
-import { claims, sideOfForce, wizardPrefill } from '../rules/tracker';
+import { claims, mvpForce, sideOfForce, wizardPrefill } from '../rules/tracker';
 import { uid } from '../model/factory';
 import type { BattleResult, Campaign, Force, Unit } from '../model/types';
 import { AGENDAS, MARKED_XP, MAX_AGENDAS, REWARD_TABLES, SCAR_TABLE, type RewardTableKey } from '../rules/data';
@@ -63,10 +63,12 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
   const campaign = state.campaign;
   const factionId = f?.nexus?.factionId;
   const nexus = useMemo(() => {
-    const ctx = nexusGeneration(campaign, factionId, input?.sectorId ?? '', input?.result ?? 'draw', !!input?.vsAi);
+    const crisis = source?.battle.crisis;
+    const ctx = nexusGeneration(campaign, factionId, input?.sectorId ?? '', input?.result ?? 'draw', !!input?.vsAi, undefined,
+      crisis ? { crisis, forceId: f?.id, mvp: mvpForce(source.battle) } : undefined);
     if (factionId && ctx.round) ctx.matchesElsewhere = matchBonusesEarned(state.forces, factionId, ctx.round, f?.id);
     return ctx;
-  }, [campaign, factionId, input?.sectorId, input?.result, input?.vsAi, state.forces, f?.id]);
+  }, [campaign, factionId, input?.sectorId, input?.result, input?.vsAi, state.forces, f?.id, source]);
   const full = useMemo(() => (input ? { ...input, nexus } : null), [input, nexus]);
 
   const preview = useMemo(() => {
@@ -106,7 +108,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       });
     // A won skirmish goes into the campaign log: it earns a Strategic Asset, and against the Echoes it's a patrol.
     const battleId = source?.battle.id;
-    if (linked && !input.sectorId && input.result === 'win')
+    if (linked && !input.sectorId && !source?.battle.crisis && input.result === 'win')
       update((d) => {
         const c = d.campaign;
         if (!c || (battleId && c.log.some((e) => e.skirmish && e.battleId === battleId && e.winner === factionId))) return;

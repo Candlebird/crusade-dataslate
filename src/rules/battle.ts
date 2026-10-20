@@ -277,6 +277,9 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
           else if (pick.roll >= NEXUS_ROUNDS.shardMineRoll) addUs(`${src} (rolled ${pick.roll})`, 1);
           else nexusLines.push(`${src}: rolled ${pick.roll} — no shard.`);
           break;
+        case 'relic':
+          relic(src, pick);
+          break;
         case 'relicRoll':
           if (!pick.roll) warnings.push(`${src}: not rolled yet.`);
           else if (pick.roll === 6) relic(src, pick);

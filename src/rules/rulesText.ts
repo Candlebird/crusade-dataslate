@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
+import { ECHOES, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
 // The tables on that page come straight from data.ts and nexusData.ts; this file holds only the text around them,
@@ -107,6 +107,16 @@ export const NEXUS_TEXT = {
     `Their threat starts at ${R.threatStart} and runs from 0 to ${R.threatMax}. When a round ends it rises by ${R.threatPerRound}, then falls by ${R.threatPerWin} for every Battle won against the Echoes that round (${R.threatPerVoidspawnWin} for a win at a Voidspawn) and ${R.threatPerPatrolWin} for every patrol. The new threat sets how many sectors they spread into.`,
     `They go after whoever is ahead: sectors held by the faction with the most sectors are ${R.leaderWeight} times as likely to be hit. In the opening rounds (rounds 1–${R.graceRounds}) they only spread into unclaimed sectors.`,
     `Bounty: retaking a sector from the ${ECHOES.name} earns a free roll on the AI special table, on top of the match rewards.`,
+  ],
+  events: [
+    'When the GM ends a round, a D12 is rolled on the Galactic Events table for the next round. Its effect lasts that one round. The GM can re-roll it or pick one from the table on the Nexus Wars page.',
+    "Events that change the round's end (spread, threat, space hulks) apply when that round ends. Income from an event is paid with that round's sector income. A battle rule applies to every battle of the round.",
+  ],
+  crisis: [
+    `Every ${NEXUS_CRISIS.everyRounds} rounds (rounds ${NEXUS_CRISIS.everyRounds}, ${NEXUS_CRISIS.everyRounds * 2}, ${NEXUS_CRISIS.everyRounds * 3}…) an Echo Lord rises in a random sector held by the ${ECHOES.name}. Every faction must fight it together, in one battle against the AI, before the round ends.`,
+    `Start it from the round panel on the Nexus Wars page: one player per faction on the same team, against the ${ECHOES.name}. Generate their army to match your points. Their most expensive unit is the Echo Lord, with its special rule; destroying it is worth +${NEXUS_CRISIS.lordVp} VP. Only the first Crisis battle counts.`,
+    `Win: the ${ECHOES.name}' threat falls by ${NEXUS_CRISIS.threatDrop} when the round ends, and every side claims +${NEXUS_CRISIS.winUs} Umbra Shards with its match rewards. The MVP, the side whose units earned the most XP in the tracker, also takes a ${NEXUS_CRISIS.mvpTier} relic.`,
+    `Lose, draw, or don't fight it before the round ends: the threat goes to ${R.threatMax}, and the ${ECHOES.name} take each faction's sector nearest the Lord (not its home or a stronghold).`,
   ],
   catchUp: [
     `Factions that fall behind get help: at each round's end, a faction gains +1 Umbra Shard for every ${R.underdogStep} sectors it's behind the faction holding the most (up to +${R.underdogMax}), paid with its round income.`,

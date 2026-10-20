@@ -1,6 +1,9 @@
 import type { BattleResult, Campaign, CampaignEvent, Force, ForceNexus, Sector } from '../model/types';
 import { CATEGORIES, type Category } from './data';
-import { ANOMALY_TABLE, BENEFITS, ECHOES, MANIPULATION_PREFIX, NEXUS_ROUNDS, STRONGHOLDS, VOID_TABLE, type NexusTableEntry } from './nexusData';
+import {
+  ANOMALY_TABLE, BENEFITS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, STRONGHOLDS, VOID_TABLE,
+  type GalacticEvent, type NexusTableEntry,
+} from './nexusData';
 
 // Nexus Wars: what a faction earns each round and after each match. The tables and costs live in nexusData.ts;
 // the round itself (ending it, income, threat) is in rounds.ts.
@@ -51,6 +54,19 @@ export function sectorEffect(c: Campaign, e: Pick<CampaignEvent, 'sectorId' | 'w
 /** The round being played. */
 export const currentRound = (c: Campaign) => c.round ?? 1;
 
+export const eventById = (id: string | undefined) => GALACTIC_EVENTS.find((e) => e.id === id);
+/** This round's Galactic Event, if one was drawn for it. */
+export function activeEvent(c: Campaign): (GalacticEvent & { sectorIds: string[] }) | undefined {
+  const e = c.event && c.event.round === currentRound(c) ? eventById(c.event.id) : undefined;
+  return e && { ...e, sectorIds: c.event!.sectorIds ?? [] };
+}
+/** The sector is cut off by this round's Warp Storm: it can't be attacked. */
+export const stormed = (c: Campaign, sectorId: string) => !!activeEvent(c)?.sectorIds.includes(sectorId);
+
+export const lordById = (id: string | undefined) => ECHO_LORDS.find((l) => l.id === id);
+/** The Nexus Crisis to fight this round, if there is one. */
+export const activeCrisis = (c: Campaign) => (c.crisis && c.crisis.round === currentRound(c) ? c.crisis : undefined);
+
 /** Hand a sector to a new owner, noting the old one; a Reinforce doesn't survive the change. */
 export function changeHands(s: Sector, owner: string, undo: NonNullable<CampaignEvent['undo']>) {
   undo.owner = s.owner ?? '';
@@ -81,6 +97,16 @@ export function removeSectorGame(c: Campaign, id: string) {
   const i = c.log.findIndex((x) => x.id === id);
   if (i < 0) return;
   const [e] = c.log.splice(i, 1);
+  // A Crisis battle didn't change the map: deleting it means the Crisis hasn't been fought yet (while its round lasts).
+  if (e.crisis) {
+    const crisis = activeCrisis(c);
+    if (crisis?.battleId && crisis.battleId === e.battleId) {
+      delete crisis.result;
+      delete crisis.mvp;
+      delete crisis.battleId;
+    }
+    return;
+  }
   const s = c.sectors.find((x) => x.id === e.sectorId);
   if (!s || !e.undo || c.log.slice(i).some((x) => x.sectorId === e.sectorId && x.undo)) return;
   if (e.undo.owner !== undefined && s.owner === e.winner) {
@@ -93,7 +119,7 @@ export function removeSectorGame(c: Campaign, id: string) {
 
 // ---- income and after-match generation ----
 
-export type NexusItemKind = 'us' | 'supply' | 'shardRoll' | 'relicRoll' | 'research' | 'manipulation' | 'anomaly' | 'void' | 'matchBonus';
+export type NexusItemKind = 'us' | 'supply' | 'shardRoll' | 'relicRoll' | 'research' | 'manipulation' | 'anomaly' | 'void' | 'matchBonus' | 'relic';
 
 export interface NexusItem {
   key: string;
@@ -170,7 +196,9 @@ function challengerOf(c: Campaign, sectorId: string, owner: string): string | un
 
 /** Why a home sector can't be challenged right now (the opening rounds, or it was already challenged this round), if it can't. */
 export function homeChallengeBlock(c: Campaign, s: Sector | undefined): string | undefined {
+  if (s && stormed(c, s.id)) return `Cut off by the ${activeEvent(c)!.name} this round`;
   if (s?.type !== 'home' || !s.owner) return undefined;
+  if (activeEvent(c)?.noHome) return `No home-sector challenges during the ${activeEvent(c)!.name}`;
   if (currentRound(c) <= NEXUS_ROUNDS.graceRounds) return `No home-sector challenges until round ${NEXUS_ROUNDS.graceRounds + 1}`;
   if (challengerOf(c, s.id, s.owner)) return 'Home sector already challenged this round';
   return undefined;
@@ -178,9 +206,14 @@ export function homeChallengeBlock(c: Campaign, s: Sector | undefined): string |
 
 /** What a faction earns from the match itself, given the campaign, the sector fought over (if any) and the result.
  *  Sector income is paid once per round instead (rounds.ts). `opponent` is the enemy faction, if known. */
-export function nexusGeneration(c: Campaign | undefined, factionId: string | undefined, sectorId: string, result: BattleResult, vsAi: boolean, opponent?: string): NexusContext {
+export function nexusGeneration(
+  c: Campaign | undefined, factionId: string | undefined, sectorId: string, result: BattleResult, vsAi: boolean, opponent?: string,
+  /** From a tracked battle: its Crisis round (if it was the Nexus Crisis), the recording force, and the battle's MVP force. */
+  battle?: { crisis?: number; forceId?: string; mvp?: string },
+): NexusContext {
   if (!c || !factionId || !c.factions.some((f) => f.id === factionId)) return { items: [], notes: [] };
   const won = result === 'win';
+  if (battle?.crisis && c.crisis?.round === battle.crisis) return crisisGeneration(c, won, battle.forceId, battle.mvp ?? c.crisis.mvp);
   const fought = c.sectors.find((s) => s.id === sectorId);
   const notes: string[] = [];
   const items: NexusItem[] = [];
@@ -221,6 +254,19 @@ export function nexusGeneration(c: Campaign | undefined, factionId: string | und
     notes.push(`Retook ${fought.name} from the ${ECHOES.name}: a bounty roll on the AI special table.`);
   }
   return ctx;
+}
+
+/** What a force earns from fighting the Nexus Crisis. */
+function crisisGeneration(c: Campaign, won: boolean, forceId: string | undefined, mvp: string | undefined): NexusContext {
+  const crisis = c.crisis!;
+  const lord = lordById(crisis.lord)?.name ?? 'the Echo Lord';
+  const items: NexusItem[] = [{ key: 'matchBonus', kind: 'matchBonus', source: 'Match bonus', us: NEXUS_ROUNDS.matchBonusUs }];
+  const notes: string[] = [];
+  if (won) {
+    items.push({ key: 'crisis', kind: 'us', source: `Nexus Crisis — ${lord} defeated`, us: NEXUS_CRISIS.winUs });
+    if (forceId && mvp === forceId) items.push({ key: 'crisisMvp', kind: 'relic', source: `Nexus Crisis MVP: a ${NEXUS_CRISIS.mvpTier} relic` });
+  } else notes.push(`The Nexus Crisis was lost: the ${ECHOES.name} take each faction's sector nearest ${lord} when the round ends.`);
+  return { items, notes, round: crisis.round };
 }
 
 export const ROLL_SIDES: Partial<Record<NexusItemKind, number>> = { shardRoll: 6, relicRoll: 6, anomaly: 6, void: 6 };

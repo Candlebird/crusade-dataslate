@@ -11,6 +11,8 @@ Crusade and Nexus Wars are homebrew and get rebalanced often, so their numbers a
 | The map: default size, how full it is, the share of points of interest and their odds, and how many new ones appear each round (`NEXUS_MAP`). Generation and the round refresh are in `hexmap.ts` | `nexusData.ts` |
 | Sector difficulty: the rating range, how distance and sector type push it up, when a sector gets a second modifier (`NEXUS_DIFFICULTY`), and the sector modifiers (`SECTOR_MODIFIERS`). The rating logic is in `difficulty.ts` | `nexusData.ts` |
 | Strategic Assets earned from skirmish wins (`STRATEGIC_ASSETS`; the per-round cap and patrol threat drop are in `NEXUS_ROUNDS`), Reinforce Supply bonus (`NEXUS_REINFORCE_BONUS`) | `nexusData.ts` |
+| Galactic Events, one rolled on a D12 for each round (`GALACTIC_EVENTS`; the effects are applied in `events.ts` and `rounds.ts`) | `nexusData.ts` |
+| The Nexus Crisis: how often it comes, the threat drop, Umbra Shard and MVP relic rewards, the Lord's VP (`NEXUS_CRISIS`), and the Echo Lords (`ECHO_LORDS`). The logic is in `events.ts` | `nexusData.ts` |
 | The prose on the in-app **Rules** page (tables there come from the two files above) | `rulesText.ts` |
 | Built-in battle tracker missions: the 18 OPR Advanced Rules missions, deployment styles and the example template | `missions.ts` |
 
