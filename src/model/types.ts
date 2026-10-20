@@ -133,8 +133,7 @@ export interface ForceNexus {
   matchBonus?: { round: number; count: number };
   /** The campaign round this force's faction last reorganised its detachments in. */
   reorganisedRound?: number;
-  /** The campaign rounds this force last went on an Expedition and recorded a solo patrol in. */
-  expeditionRound?: number;
+  /** The campaign round this force last recorded a solo patrol in. */
   patrolRound?: number;
   /** Units that already fought a game or went on an Expedition in this round: each unit takes part once a round. */
   usedUnits?: { round: number; ids: string[] };

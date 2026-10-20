@@ -3,7 +3,7 @@ import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { Campaign, Force } from '../model/types';
 import { unitName } from '../rules/battle';
-import { currentRound, markUnitsUsed, unitsUsed } from '../rules/nexus';
+import { markUnitsUsed, unitsUsed } from '../rules/nexus';
 import { EXPEDITION, EXPEDITION_SITES } from '../rules/downtimeData';
 import {
   applyExpedition, chooseOption, currentEncounter, expeditionSite, headHome, pressOn, rewardText, scaledReward, squadBonus, startExpedition,
@@ -11,7 +11,7 @@ import {
 } from '../rules/downtime';
 import { Modal, toast } from './ui';
 
-/** Send up to three units on a short dice-story into the Nexus, once per campaign round. */
+/** Send up to three units on a short dice-story into the Nexus. Any number a round, but each unit goes once. */
 export default function ExpeditionModal({ force, c, onClose }: { force: Force; c: Campaign; onClose: () => void }) {
   const { updateForce } = useStore();
   const units = force.units.filter((u) => u.status === 'active');
@@ -32,7 +32,6 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
     let summary = '';
     updateForce(force.id, (d) => {
       summary = applyExpedition(d, x, new Date().toISOString().slice(0, 10), uid);
-      if (d.nexus) d.nexus.expeditionRound = currentRound(c);
       markUnitsUsed(d, c, x.squad);
     });
     setDone(summary);
