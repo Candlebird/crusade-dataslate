@@ -458,6 +458,7 @@ tr.unpicked td { opacity: 0.6; }
 .card-weapons th { font-weight: 700; text-transform: none; letter-spacing: 0; font-size: inherit; }
 .card-weapons td:nth-child(2), .card-weapons td:nth-child(3), .card-weapons td:nth-child(4) { white-space: nowrap; }
 .sheet-rules { margin-top: 12px; break-inside: auto; }
+.sheet-glossary { break-inside: avoid; page-break-inside: avoid; }
 .sheet-rule-cols { columns: 2; column-gap: 18px; }
 .sheet-rule-cols p { margin: 0 0 4px; break-inside: avoid; }
 @media (max-width: 700px) {

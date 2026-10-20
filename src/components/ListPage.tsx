@@ -220,22 +220,25 @@ export function ListSheet({ force: f, list: l, settings: s, books, coreRules }: 
         {units.map((u) => <UnitCard key={u.id} u={u} joined={joinedTo(f, l, u)} s={s} />)}
       </div>
 
-      {rules.length > 0 && (
-        <section className="sheet-rules">
-          <h2>Special Rules</h2>
-          <div className="sheet-rule-cols">
-            {rules.map((r) => <p key={r.name}><b>{r.name}:</b> {r.desc}</p>)}
-          </div>
-        </section>
-      )}
-      {spells.length > 0 && (
-        <section className="sheet-rules">
-          <h2>Spells</h2>
-          <div className="sheet-rule-cols">
-            {spells.map((sp) => <p key={sp.name}><b>{sp.name} ({sp.threshold}):</b> {sp.effect}</p>)}
-          </div>
-        </section>
-      )}
+      {/* Printed as one block, so if it doesn't fit under the units it starts on a new page. */}
+      <div className="sheet-glossary">
+        {rules.length > 0 && (
+          <section className="sheet-rules">
+            <h2>Special Rules</h2>
+            <div className="sheet-rule-cols">
+              {rules.map((r) => <p key={r.name}><b>{r.name}:</b> {r.desc}</p>)}
+            </div>
+          </section>
+        )}
+        {spells.length > 0 && (
+          <section className="sheet-rules">
+            <h2>Spells</h2>
+            <div className="sheet-rule-cols">
+              {spells.map((sp) => <p key={sp.name}><b>{sp.name} ({sp.threshold}):</b> {sp.effect}</p>)}
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

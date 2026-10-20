@@ -12,7 +12,7 @@ export function newList(f: Force, id: string): ArmyList {
     joins: {},
     notes: '',
     glossary: true,
-    compact: false,
+    compact: true,
   };
 }
 

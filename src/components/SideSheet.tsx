@@ -22,7 +22,7 @@ export default function SideSheet({ sideId }: { sideId: string }) {
   const force = { ...newForce(side.name), id: `sheet-${side.id}`, faction: side.roster[0].bookName ?? '', units: side.roster };
   const list: ArmyList = {
     id: 'sheet', name: side.name, pointsLimit: side.roster.reduce((n, u) => n + u.points, 0),
-    unitIds: side.roster.map((u) => u.id), joins: {}, notes: '', glossary: true, compact: false,
+    unitIds: side.roster.map((u) => u.id), joins: {}, notes: '', glossary: true, compact: true,
   };
   return (
     <>
