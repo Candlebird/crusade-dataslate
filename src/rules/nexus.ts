@@ -147,6 +147,8 @@ export interface NexusContext {
   round?: number;
   /** Retook a sector from the Void Echoes: an extra roll on the AI special table. */
   bounty?: boolean;
+  /** Match bonuses the faction's other detachments already earned this round (the cap is the faction's). */
+  matchesElsewhere?: number;
 }
 
 /** Did this faction take the sector back from the Void Echoes (whether or not the game is logged yet)? */

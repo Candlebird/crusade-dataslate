@@ -75,6 +75,14 @@ export const NEXUS_ROUNDS = {
   keepRounds: 8,
 };
 
+/** Detachments: further forces linked to a faction that already has one. Each declares its own attack in the Battle. */
+export const NEXUS_DETACHMENTS = {
+  /** A detachment's Starting Supply: it gets its Supply from the faction's other forces when they reorganise. */
+  startingSupply: 0,
+  /** Umbra Shards to reorganise a faction's detachments (move Supply, shards and units between them), at most once a round. */
+  reorganiseCost: 1,
+};
+
 export interface NexusTableEntry {
   text: string;
   us?: number;

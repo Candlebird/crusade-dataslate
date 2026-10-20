@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newForce } from '../model/factory';
 import type { Campaign } from '../model/types';
 import { emptyNexus } from './nexus';
-import { HOLD, attackTargets, myFactions, playedFactions, revealOrders } from './orders';
+import { HOLD, attackTargets, myDetachments, playedDetachments, revealOrders } from './orders';
 
 // A row of hexes: A's home and planet, then B's planet and home, with an unclaimed sector under the border.
 function campaign(): Campaign {
@@ -26,8 +26,8 @@ function campaign(): Campaign {
   };
 }
 
-const force = (owner: string | undefined, factionId: string) => {
-  const f = newForce('F');
+const force = (owner: string | undefined, factionId: string, name = 'F') => {
+  const f = newForce(name);
   f.owner = owner;
   f.nexus = emptyNexus(factionId);
   return f;
@@ -40,10 +40,28 @@ describe('sealed orders', () => {
     expect(attackTargets(campaign(), 'C')).toEqual([]);
   });
 
-  it("finds each player's factions from their linked forces", () => {
-    const forces = [force('me@x', 'A'), force('me@x', 'A'), force('you@x', 'B'), force('me@x', 'gone'), force(undefined, 'C')];
-    expect(myFactions(campaign(), forces, 'me@x')).toEqual(['A', 'C']);
-    expect(Object.fromEntries(playedFactions(campaign(), forces))).toEqual({ 'me@x': ['A'], 'you@x': ['B'] });
+  it("finds each player's detachments from their linked forces", () => {
+    const forces = [force('me@x', 'C', 'Z'), force('me@x', 'A', 'Second'), force('me@x', 'A', 'First'), force('you@x', 'B'), force('me@x', 'gone'), force(undefined, 'C', 'Local')];
+    expect(myDetachments(campaign(), forces, 'me@x').map((f) => f.name)).toEqual(['First', 'Second', 'Local', 'Z']);
+    expect(playedDetachments(campaign(), forces).map((f) => f.name)).toEqual(['Z', 'Second', 'First', 'F']);
+  });
+
+  it('takes one pick per detachment, and still reads picks keyed by faction', () => {
+    const a1 = force('me@x', 'A', 'One');
+    const a2 = force('me@x', 'A', 'Two');
+    const r = revealOrders(campaign(), [
+      { email: 'me@x', round: 1, picks: { [a1.id]: 'x', [a2.id]: 'p2' } },
+      { email: 'you@x', round: 1, picks: { B: HOLD } },
+    ], 1, [a1, a2]);
+    expect(r.attacks.map((a) => [a.factionId, a.forceId, a.sectorId])).toEqual([['A', a1.id, 'x'], ['A', a2.id, 'p2']]);
+    expect(r.holds).toEqual([{ email: 'you@x', factionId: 'B' }]);
+  });
+
+  it('flags two detachments of one faction on the same sector, not as a rival', () => {
+    const a1 = force('me@x', 'A', 'One');
+    const a2 = force('me@x', 'A', 'Two');
+    const r = revealOrders(campaign(), [{ email: 'me@x', round: 1, picks: { [a1.id]: 'x', [a2.id]: 'x' } }], 1, [a1, a2]);
+    expect(r.attacks[0].flags).toEqual(['Another detachment of Alpha attacks it too: pick one, or fight together']);
   });
 
   it('lists attacks and holds from the current round only', () => {

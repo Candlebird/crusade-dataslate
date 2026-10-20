@@ -54,11 +54,11 @@ import AiActivation from './AiActivation';
 import { Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
 /** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
-export default function BattleTracker({ sectorId, attacker }: { sectorId?: string; attacker?: string }) {
+export default function BattleTracker({ sectorId, attacker, forceId }: { sectorId?: string; attacker?: string; forceId?: string }) {
   const { state, update } = useStore();
   const b = state.battle;
   const sector = state.campaign?.sectors.find((s) => s.id === sectorId);
-  if (!b) return <StartBattle sectorId={sector?.id} preset={attacker} />;
+  if (!b) return <StartBattle sectorId={sector?.id} preset={attacker} presetForce={forceId} />;
 
   const set = (fn: (d: TrackedBattle) => void) => update((s) => void (s.battle && fn(s.battle)));
   const sc = score(b);
@@ -272,7 +272,7 @@ function objectiveScoring(m: MissionDef): string {
   return `${base}${bonus}.`;
 }
 
-function StartBattle({ sectorId, preset }: { sectorId?: string; preset?: string }) {
+function StartBattle({ sectorId, preset, presetForce }: { sectorId?: string; preset?: string; presetForce?: string }) {
   const { state, update } = useStore();
   const cloud = useCloud();
   const c = state.campaign;
@@ -311,7 +311,7 @@ function StartBattle({ sectorId, preset }: { sectorId?: string; preset?: string 
   const start = (mission: MissionDef) => {
     update((s) => {
       const b = newBattle(mission, uid(), nowIso(), Math.random, format);
-      if (sector && s.campaign) atSector(b, s.campaign, s.forces, s.settings, sector.id, attacker);
+      if (sector && s.campaign) atSector(b, s.campaign, s.forces, s.settings, sector.id, attacker, attacker === preset ? presetForce : undefined);
       // Randomly picked forces fill the sides nothing was loaded into, players first.
       const open = [...b.sides.filter((x) => !x.ai), ...b.sides.filter((x) => x.ai)].filter((x) => !x.forceId);
       const left = forces.filter((f) => !b.sides.some((x) => x.forceId === f.id));
@@ -343,7 +343,7 @@ function StartBattle({ sectorId, preset }: { sectorId?: string; preset?: string 
                 {c.factions.map((f) => <option key={f.id} value={f.id} disabled={f.id === sector.owner}>{f.name}</option>)}
               </select>
             </label>
-            <p className="muted small">A faction with just one force here gets it loaded for you. <a href={href.tracker()}>Start an ordinary battle instead</a></p>
+            <p className="muted small">The attacking detachment from the orders, or a faction's only force, is loaded for you. <a href={href.tracker()}>Start an ordinary battle instead</a></p>
             {sector.owner && sector.owner !== ECHOES.id && (
               <p className="small">
                 <b>{factionName(c, sector.owner)} can't make it?</b> The {ECHOES.name} stand in: play <b>1 v AI</b> and generate their army at your points

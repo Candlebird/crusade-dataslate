@@ -6,6 +6,7 @@ import {
   type NexusItem, type NexusPick,
 } from './nexus';
 import { pickSpread, spreadInto } from './voidspawn';
+import { factionClaimedRound } from './detachments';
 
 // Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
 // a Strategic Asset, and one against the Echoes is a patrol). The round closes with the Battle: the sealed-order attacks.
@@ -144,11 +145,15 @@ export function roundEndText(c: Campaign, r: RoundEnd) {
   return `Round ${r.round} ended. ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}. Round ${currentRound(c)} begins.`;
 }
 
-/** Ended rounds this force hasn't claimed income for. A force new to the campaign starts from the latest one. */
-export function claimableRounds(c: Campaign, n: ForceNexus): RoundSnapshot[] {
+/**
+ * Ended rounds this force's faction hasn't claimed income for. Income is the faction's, so a claim by any of its
+ * detachments (in `forces`) counts. A faction new to the campaign starts from the latest round.
+ */
+export function claimableRounds(c: Campaign, n: ForceNexus, forces: Force[] = []): RoundSnapshot[] {
   const rounds = c.rounds ?? [];
   if (!rounds.length || !c.factions.some((f) => f.id === n.factionId)) return [];
-  const from = n.claimedRound ?? rounds[rounds.length - 1].round - 1;
+  const claimed = [n.claimedRound, factionClaimedRound(forces, n.factionId)].filter((r): r is number => r !== undefined);
+  const from = claimed.length ? Math.max(...claimed) : rounds[rounds.length - 1].round - 1;
   return rounds.filter((r) => r.round > from);
 }
 

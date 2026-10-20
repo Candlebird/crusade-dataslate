@@ -304,18 +304,19 @@ export function teamFaction(b: TrackedBattle, t: TeamKey, c: Campaign, forces: F
 
 /**
  * Set a new battle up to be fought over a sector: team A attacks for a faction, team B defends.
- * A team's first player gets their faction's force loaded when the faction has exactly one.
+ * A team's first player gets their faction's force loaded: the attacking detachment if given, else the faction's only force.
  */
-export function atSector(b: TrackedBattle, c: Campaign, forces: Force[], s: Settings, sectorId: string, attacker: string) {
+export function atSector(b: TrackedBattle, c: Campaign, forces: Force[], s: Settings, sectorId: string, attacker: string, forceId?: string) {
   b.sectorId = sectorId;
   b.attacker = 'A';
   const owner = c.sectors.find((x) => x.id === sectorId)?.owner;
-  const load = (t: TeamKey, factionId: string | undefined) => {
+  const load = (t: TeamKey, factionId: string | undefined, pick?: string) => {
     const side = membersOf(b, t).find((x) => !x.ai);
     const theirs = forces.filter((f) => factionId && f.nexus?.factionId === factionId);
-    if (side && theirs.length === 1) loadForce(side, theirs[0], undefined, s);
+    const one = theirs.find((f) => f.id === pick) ?? (theirs.length === 1 ? theirs[0] : undefined);
+    if (side && one) loadForce(side, one, undefined, s);
   };
-  load('A', attacker);
+  load('A', attacker, forceId);
   if (owner !== attacker) load('B', owner);
 }
 

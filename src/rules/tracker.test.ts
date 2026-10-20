@@ -282,6 +282,19 @@ describe('battles over a Nexus sector', () => {
     expect(b.sides[0].units).toHaveLength(1);
   });
 
+  it('loads the attacking detachment when the faction has several', () => {
+    const c = campaign();
+    const [red, blue] = forces();
+    const second = newForce('Red Vanguard');
+    second.nexus = emptyNexus('red');
+    const none = newBattle(STANDARD_MISSION, 'b', '', () => 0);
+    atSector(none, c, [red, second, blue], DEFAULT_SETTINGS, 'p', 'red');
+    expect(none.sides.map((x) => x.forceId)).toEqual([undefined, blue.id]);
+    const b = newBattle(STANDARD_MISSION, 'b', '', () => 0);
+    atSector(b, c, [red, second, blue], DEFAULT_SETTINGS, 'p', 'red', second.id);
+    expect(b.sides.map((x) => x.forceId)).toEqual([second.id, blue.id]);
+  });
+
   it('turns the result into a campaign log entry that moves the sector', () => {
     const c = campaign();
     const fs = forces();

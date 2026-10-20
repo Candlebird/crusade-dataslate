@@ -129,6 +129,8 @@ export interface ForceNexus {
   claimedRound?: number;
   /** Match bonuses earned in a round (capped per round). */
   matchBonus?: { round: number; count: number };
+  /** The campaign round this force's faction last reorganised its detachments in. */
+  reorganisedRound?: number;
 }
 
 /** A battle list: a printable selection of the force's units for one game. */

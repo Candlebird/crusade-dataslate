@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useCloud } from '../cloud/CloudSync';
 import { useStore } from '../model/store';
-import type { Campaign } from '../model/types';
+import type { Campaign, Force } from '../model/types';
+import { detachmentName } from '../rules/detachments';
 import { ECHOES, currentRound, factionName } from '../rules/nexus';
-import { HOLD, attackTargets, myFactions, playedFactions, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
+import { HOLD, attackTargets, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
 import { spreadsAt, nextThreat } from '../rules/rounds';
 import { href } from '../route';
 import { useEndRound } from './RoundPanel';
@@ -75,17 +76,19 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     );
   }
 
-  const played = playedFactions(c, state.forces);
-  const expected = [...new Set([...played.values()].flat())];
+  // One pick per detachment (older orders were keyed by faction, which still counts for all its detachments).
+  const expected = playedDetachments(c, state.forces);
   const declaredNow = new Set(declared.filter((d) => d.round === current.round).flatMap((d) => d.factions));
-  const waiting = expected.filter((f) => !declaredNow.has(f));
-  const mine = myFactions(c, state.forces, cloud.email);
+  const isDeclared = (f: Force) => declaredNow.has(f.id) || declaredNow.has(f.nexus!.factionId);
+  const waiting = expected.filter((f) => !isDeclared(f));
+  const mine = myDetachments(c, state.forces, cloud.email);
   const own = orders.find((o) => o.email === cloud.email && o.round === current.round);
+  const label = (f: Force) => detachmentName(c, state.forces, f);
 
-  const pick = (factionId: string, target: string) => {
+  const pick = (forceId: string, target: string) => {
     const picks = { ...(own?.picks ?? {}) };
-    if (target) picks[factionId] = target;
-    else delete picks[factionId];
+    if (target) picks[forceId] = target;
+    else delete picks[forceId];
     fb.saveOrders(cloud.email!, current.round, picks).catch(fail('save your orders'));
   };
   // Open the next set of orders, ending the campaign round first if the GM says so.
@@ -96,7 +99,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     open();
   };
   const reveal = () => {
-    const who = waiting.map((f) => factionName(c, f)).join(', ');
+    const who = waiting.map(label).join(', ');
     if (waiting.length && !confirmAction(`${who} ${waiting.length === 1 ? "hasn't" : "haven't"} declared yet. Reveal anyway?`)) return;
     fb.setRound({ ...current, revealed: true }).then(() => toast('Orders revealed.'), fail('reveal the orders'));
   };
@@ -109,11 +112,11 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
           <p className="muted small">Your picks are sealed: only you can see them until the GM reveals the round. You can change them until then.</p>
           {mine.length === 0 && <p className="muted small">Link one of your forces to a faction to declare orders for it.</p>}
           {mine.map((f) => {
-            const targets = attackTargets(c, f);
+            const targets = attackTargets(c, f.nexus!.factionId);
             return (
-              <label key={f} className="field">
-                <span>{factionName(c, f)}</span>
-                <select value={own?.picks[f] ?? ''} onChange={(e) => pick(f, e.target.value)}>
+              <label key={f.id} className="field">
+                <span>{label(f)}</span>
+                <select value={own?.picks[f.id] ?? own?.picks[f.nexus!.factionId] ?? ''} onChange={(e) => pick(f.id, e.target.value)}>
                   <option value="">— Not declared —</option>
                   <option value={HOLD}>Hold: no attack</option>
                   {targets.length > 0 && (
@@ -128,7 +131,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
           <h3>Declared</h3>
           {expected.length === 0 ? <p className="muted small">No forces are linked to factions yet.</p> : (
             <div className="row">
-              {expected.map((f) => <span key={f} className="tag" title={declaredNow.has(f) ? 'Declared' : 'Waiting'}>{declaredNow.has(f) ? '✓' : '…'} {factionName(c, f)}</span>)}
+              {expected.map((f) => <span key={f.id} className="tag" title={isDeclared(f) ? 'Declared' : 'Waiting'}>{isDeclared(f) ? '✓' : '…'} {label(f)}</span>)}
             </div>
           )}
           {cloud.isGm && (
@@ -149,22 +152,27 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
 }
 
 function RevealedOrders({ c, orders, round }: { c: Campaign; orders: PlayerOrders[]; round: number }) {
-  const { attacks, holds } = revealOrders(c, orders, round);
+  const { state } = useStore();
+  const { attacks, holds } = revealOrders(c, orders, round, state.forces);
+  const who = (factionId: string, forceId?: string) => {
+    const f = forceId && state.forces.find((x) => x.id === forceId);
+    return f ? detachmentName(c, state.forces, f) : factionName(c, factionId);
+  };
   const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
   if (!attacks.length && !holds.length) return <p className="muted small">Nobody declared this round.</p>;
   return (
     <>
       {attacks.map((a) => (
-        <div key={a.factionId} className="list-item small">
+        <div key={a.forceId ?? a.factionId} className="list-item small">
           <span className="grow">
-            <b>{factionName(c, a.factionId)}</b> attacks <b>{sectorName(a.sectorId)}</b> ({factionName(c, a.defender)})
+            <b>{who(a.factionId, a.forceId)}</b> attacks <b>{sectorName(a.sectorId)}</b> ({factionName(c, a.defender)})
             {a.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}>⚠ {f}</span>)}
           </span>
-          <a className="btn" href={href.tracker(a.sectorId, a.factionId)}>⚔ Start battle</a>
+          <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}>⚔ Start battle</a>
         </div>
       ))}
       {holds.map((h) => (
-        <div key={h.factionId} className="list-item small"><span className="grow"><b>{factionName(c, h.factionId)}</b> holds</span></div>
+        <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds</span></div>
       ))}
     </>
   );

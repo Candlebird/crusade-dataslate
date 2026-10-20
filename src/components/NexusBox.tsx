@@ -49,7 +49,7 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
       <div className="reward-head">
         <h4>{item.source}</h4>
         <span className="spacer" />
-        {item.kind === 'matchBonus' && <span className="muted small">up to {NEXUS_ROUNDS.matchBonusMax} per round</span>}
+        {item.kind === 'matchBonus' && <span className="muted small">up to {NEXUS_ROUNDS.matchBonusMax} per round for the faction</span>}
         {fixed && <span className="tag green">{fixed}</span>}
         {sides && (
           <>

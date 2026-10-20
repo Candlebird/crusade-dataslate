@@ -4,6 +4,7 @@ import { claims, sideOfForce, wizardPrefill } from '../rules/tracker';
 import { uid } from '../model/factory';
 import type { BattleResult, Campaign, Force, Unit } from '../model/types';
 import { AGENDAS, MARKED_XP, MAX_AGENDAS, REWARD_TABLES, SCAR_TABLE, type RewardTableKey } from '../rules/data';
+import { matchBonusesEarned } from '../rules/detachments';
 import { ECHOES, emptyNexusPick, nexusEntry, nexusGeneration, recordSectorGame, type NexusContext, type NexusPick } from '../rules/nexus';
 import { deathDiceCount, deathOutcome, forceTotals, levelForXp, rollDice, rollDie, type DeathOutcome } from '../rules/engine';
 import {
@@ -61,10 +62,11 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
 
   const campaign = state.campaign;
   const factionId = f?.nexus?.factionId;
-  const nexus = useMemo(
-    () => nexusGeneration(campaign, factionId, input?.sectorId ?? '', input?.result ?? 'draw', !!input?.vsAi),
-    [campaign, factionId, input?.sectorId, input?.result, input?.vsAi],
-  );
+  const nexus = useMemo(() => {
+    const ctx = nexusGeneration(campaign, factionId, input?.sectorId ?? '', input?.result ?? 'draw', !!input?.vsAi);
+    if (factionId && ctx.round) ctx.matchesElsewhere = matchBonusesEarned(state.forces, factionId, ctx.round, f?.id);
+    return ctx;
+  }, [campaign, factionId, input?.sectorId, input?.result, input?.vsAi, state.forces, f?.id]);
   const full = useMemo(() => (input ? { ...input, nexus } : null), [input, nexus]);
 
   const preview = useMemo(() => {

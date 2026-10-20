@@ -2,13 +2,14 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
+import { ECHOES, NEXUS_DETACHMENTS, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
 // The tables on that page come straight from data.ts and nexusData.ts; this file holds only the text around them,
 // and reads its numbers from those files so the two never disagree.
 
 const R = NEXUS_ROUNDS;
+const D = NEXUS_DETACHMENTS;
 const MAX_LEVEL = LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
 
 export const CRUSADE_TEXT = {
@@ -64,8 +65,8 @@ export const NEXUS_TEXT = {
   ],
   rounds: [
     'The campaign is played in rounds. Each round has two parts: skirmishes, played whenever you like, and then the Battle, where the sector attacks happen. When the Battle is done, the GM ends the round on the Nexus Wars page.',
-    `When a round ends, what every faction holds is noted, and each player claims that round's sector income on their force page with "Claim round income". Income is paid once per round, however many games you played. Missed rounds wait for you: up to ${R.keepRounds} ended rounds can be claimed late.`,
-    `Every match you play in a round, skirmish or Battle, also pays ${R.matchBonusUs} Umbra Shard, for up to ${R.matchBonusMax} matches a round, on top of the normal Crusade rewards.`,
+    `When a round ends, what every faction holds is noted, and each player claims that round's sector income on their force page with "Claim round income". Income is paid once per round per faction, however many games or detachments you played. Missed rounds wait for you: up to ${R.keepRounds} ended rounds can be claimed late.`,
+    `Every match you play in a round, skirmish or Battle, also pays ${R.matchBonusUs} Umbra Shard, for up to ${R.matchBonusMax} matches a round across all of a faction's detachments, on top of the normal Crusade rewards.`,
     `Temporary unlocks (a Research station's table, an Anomaly's "all tables") last until your next round income.`,
   ],
   skirmishes: [
@@ -75,12 +76,18 @@ export const NEXUS_TEXT = {
     'Record a skirmish in the app by finishing the battle with "Skirmish (no sector)" picked: the win goes into the campaign log.',
   ],
   attacking: [
-    "The Battle: each faction secretly picks one sector to attack this round, or holds. The GM reveals every faction's orders at once, and then the attacks are played. Only Battle games take sectors, challenge home sectors or earn the Echoes bounty.",
+    "The Battle: each detachment secretly picks one sector to attack this round, or holds. The GM reveals everyone's orders at once, and then the attacks are played. Only Battle games take sectors, challenge home sectors or earn the Echoes bounty.",
     'Unclaimed sectors: the attacker plays the AI for it, unless another faction attacks it too: then the two fight each other for it. Claimed sectors: the owner defends. The winner takes the sector.',
     'Reinforcements stay with the sector, not the faction: when a sector changes hands, any Reinforce Sector on it is lost.',
     `Defender can't make it: the ${ECHOES.name} stand in. Play against the AI, with an army at the attacker's points (+${NEXUS_REINFORCE_BONUS} if the sector is Reinforced). If the Echoes win, the owner holds the sector; if the attacker wins, they take it.`,
     "Attacker can't make it: the attack lapses, and the faction keeps its orders slot: it may make the same attack next round.",
     'Battles over a sector must be reported to the GM (or recorded in the app) so the map stays current.',
+  ],
+  detachments: [
+    'A faction can field more than one force. Its first force is its main army; every further force you link to the faction is a detachment. Each detachment declares its own attack in the Battle, so a faction with three forces can make three attacks a round.',
+    `A detachment starts with ${D.startingSupply} Supply: it gets its Supply Limit from the faction's other forces. Once a round, for ${D.reorganiseCost} Umbra Shard${D.reorganiseCost === 1 ? '' : 's'}, a faction may reorganise: share out its forces' Supply Limit and Umbra Shards between them and move units from one to another. Units keep their XP, traits, scars and relics. Apart from the cost, the totals never change: reorganising only moves what the faction already has.`,
+    "The faction's round income and the match bonus are paid once for the whole faction, not per detachment. Claim the income on any one of its forces; the match bonus cap counts every detachment's matches.",
+    'Table unlocks, Combat Manipulations and other Nexus rewards stay with the force that earned them.',
   ],
   home: [
     `A home sector can be challenged at most once per round, and not at all in the opening rounds (until round ${R.graceRounds + 1}).`,

@@ -321,7 +321,7 @@ function NexusRules() {
           the <a href={href.campaign()}>Nexus Wars</a> page.
         </p>
         <Toc items={[
-          ['n-map', 'Sectors'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'],
+          ['n-map', 'Sectors'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'],
           ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
           ['n-shop', 'Umbra Shard shop'],
         ]} />
@@ -356,6 +356,10 @@ function NexusRules() {
 
       <Section id="n-attack" title="The Battle: attacking a sector">
         <Prose lines={NEXUS_TEXT.attacking} />
+      </Section>
+
+      <Section id="n-detach" title="Detachments">
+        <Prose lines={NEXUS_TEXT.detachments} />
       </Section>
 
       <Section id="n-home" title="Home-sector challenges">

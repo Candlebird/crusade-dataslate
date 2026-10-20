@@ -12,13 +12,15 @@ import UmbraShop from './UmbraShop';
 import RoundIncome from './RoundIncome';
 import type { Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
-import { SECTOR_TYPES, benefitOf, emptyNexus, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
+import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, emptyNexus, factionName, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
+import { factionClaimedRound, factionForces } from '../rules/detachments';
+import { DetachmentsBox } from './Detachments';
 import { claimableRounds } from '../rules/rounds';
 import { RESULT_LABEL } from '../rules/battle';
 import { listTotals, newList } from '../rules/lists';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
-import { Stepper, TextArea, TextField, XpBar, toast } from './ui';
+import { Stepper, TextArea, TextField, XpBar, confirmAction, toast } from './ui';
 
 /** Hands the force to another player on the campaign, e.g. when you've been looking after their army. */
 function TransferForce({ f }: { f: Force }) {
@@ -382,7 +384,8 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const home = c && n ? homeOf(c, n.factionId) : undefined;
   const researchHome = home?.benefit === 'researchStation';
   const [claiming, setClaiming] = useState(false);
-  const toClaim = c && n && faction ? claimableRounds(c, n) : [];
+  const toClaim = c && n && faction ? claimableRounds(c, n, state.forces) : [];
+  const claimedThrough = n && factionClaimedRound(state.forces, n.factionId);
 
   return (
     <div className="panel">
@@ -396,12 +399,19 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
         <div className="fields">
           <label className="field span-all">
             Campaign faction
-            <select value={n?.factionId ?? ''} onChange={(e) => set((d) => {
+            <select value={n?.factionId ?? ''} onChange={(e) => {
               const id = e.target.value;
-              if (!id) d.nexus = undefined;
-              else if (d.nexus) d.nexus.factionId = id;
-              else d.nexus = emptyNexus(id);
-            })}>
+              // Joining a faction that already has a force makes this one a detachment: its Supply comes from the others.
+              const detachment = !!id && factionForces(state.forces, id).some((x) => x.id !== f.id);
+              const zero = detachment && f.startingSupply !== NEXUS_DETACHMENTS.startingSupply;
+              if (zero && !confirmAction(`${factionName(c, id)} already has a force, so ${f.name} becomes a detachment: its Starting Supply goes from ${f.startingSupply} to ${NEXUS_DETACHMENTS.startingSupply}. Give it Supply, shards and units by reorganising the faction's detachments. Link it?`)) return;
+              set((d) => {
+                if (!id) d.nexus = undefined;
+                else if (d.nexus) d.nexus.factionId = id;
+                else d.nexus = emptyNexus(id);
+                if (zero) d.startingSupply = NEXUS_DETACHMENTS.startingSupply;
+              });
+            }}>
               <option value="">Not linked</option>
               {c.factions.map((x) => <option key={x.id} value={x.id}>{x.name}{x.player ? ` (${x.player})` : ''}</option>)}
             </select>
@@ -413,11 +423,12 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
                 <span className="grow small">
                   {toClaim.length
                     ? <><b>Income ready</b> for {toClaim.length === 1 ? `round ${toClaim[0].round}` : `${toClaim.length} rounds`}.</>
-                    : <span className="muted">Round income claimed{n.claimedRound ? ` through round ${n.claimedRound}` : ''}. More arrives when the GM ends the round.</span>}
+                    : <span className="muted">Round income claimed{claimedThrough ? ` through round ${claimedThrough}` : ''}{factionForces(state.forces, n.factionId).length > 1 ? ' for the faction' : ''}. More arrives when the GM ends the round.</span>}
                 </span>
                 <button className={toClaim.length ? 'primary' : ''} disabled={!toClaim.length} onClick={() => setClaiming(true)}>Claim round income…</button>
               </div>
               {claiming && <RoundIncome force={f} c={c} onClose={() => setClaiming(false)} />}
+              <DetachmentsBox f={f} c={c} />
               <div className="span-all small">
                 <div className="muted">Controlled sectors</div>
                 {ownedSectors(c, n.factionId).map((s) => (

@@ -264,7 +264,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
         case 'matchBonus': {
           const round = input.nexus?.round ?? 0;
           const mb = n.matchBonus?.round === round ? n.matchBonus : { round, count: 0 };
-          if (mb.count >= NEXUS_ROUNDS.matchBonusMax) nexusLines.push(`${src}: already earned ${NEXUS_ROUNDS.matchBonusMax} this round.`);
+          if (mb.count + (input.nexus?.matchesElsewhere ?? 0) >= NEXUS_ROUNDS.matchBonusMax) nexusLines.push(`${src}: already earned ${NEXUS_ROUNDS.matchBonusMax} this round.`);
           else {
             n.matchBonus = { round, count: mb.count + 1 };
             addUs(src, item.us ?? 0);

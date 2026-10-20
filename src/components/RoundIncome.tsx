@@ -7,12 +7,12 @@ import { claimableRounds, resolveRoundIncome, roundIncomeItems } from '../rules/
 import NexusBox from './NexusBox';
 import { Modal, confirmAction, toast } from './ui';
 
-/** Collect the sector income of every ended round this force hasn't claimed yet. */
+/** Collect the sector income of every ended round this force's faction hasn't claimed yet (on any of its detachments). */
 export default function RoundIncome({ force, c, onClose }: { force: Force; c: Campaign; onClose: () => void }) {
-  const { updateForce } = useStore();
+  const { state, updateForce } = useStore();
   const [picks, setPicks] = useState<Record<string, NexusPick>>({});
   const n = force.nexus!;
-  const rounds = useMemo(() => claimableRounds(c, n), [c, n]);
+  const rounds = useMemo(() => claimableRounds(c, n, state.forces), [c, n, state.forces]);
   const items = useMemo(() => rounds.flatMap((r) => roundIncomeItems(c, n.factionId, r)), [c, n.factionId, rounds]);
   const date = new Date().toISOString().slice(0, 10);
   const preview = useMemo(() => {

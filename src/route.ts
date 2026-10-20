@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 
-/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle[/sector/:sectorId[/:attacker]] , #/battle/sheet/:sideId , #/missions , #/campaign , #/books , #/settings , #/rules[/nexus|traits|relics] , #/guide */
+/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle[/sector/:sectorId[/:attacker[/:forceId]]] , #/battle/sheet/:sideId , #/missions , #/campaign , #/books , #/settings , #/rules[/nexus|traits|relics] , #/guide */
 export type Route =
   | { page: 'forces' }
   | { page: 'force'; forceId: string }
   | { page: 'unit'; forceId: string; unitId: string }
   | { page: 'battle'; forceId: string; battleId?: string; sideId?: string }
   | { page: 'list'; forceId: string; listId: string }
-  | { page: 'tracker'; sectorId?: string; attacker?: string }
+  | { page: 'tracker'; sectorId?: string; attacker?: string; forceId?: string }
   | { page: 'sideSheet'; sideId: string }
   | { page: 'missions' }
   | { page: 'campaign' }
@@ -29,7 +29,7 @@ export function parseRoute(hash: string): Route {
     return { page: 'force', forceId: parts[1] };
   }
   if (parts[0] === 'battle' && parts[1] === 'sheet' && parts[2]) return { page: 'sideSheet', sideId: parts[2] };
-  if (parts[0] === 'battle') return parts[1] === 'sector' ? { page: 'tracker', sectorId: parts[2], attacker: parts[3] } : { page: 'tracker' };
+  if (parts[0] === 'battle') return parts[1] === 'sector' ? { page: 'tracker', sectorId: parts[2], attacker: parts[3], forceId: parts[4] } : { page: 'tracker' };
   if (parts[0] === 'missions') return { page: 'missions' };
   if (parts[0] === 'campaign') return { page: 'campaign' };
   if (parts[0] === 'books') return { page: 'books' };
@@ -46,8 +46,9 @@ export const href = {
   /** The record wizard; with a past battle and side, filled in from it to claim that side's rewards. */
   battle: (forceId: string, battleId?: string, sideId?: string) => `#/force/${forceId}/battle${battleId && sideId ? `/${battleId}/${sideId}` : ''}`,
   list: (forceId: string, listId: string) => `#/force/${forceId}/list/${listId}`,
-  /** The battle tracker; with a sector, a new battle is set up to be fought over it (by this attacking faction). */
-  tracker: (sectorId?: string, attacker?: string) => (sectorId ? `#/battle/sector/${sectorId}${attacker ? `/${attacker}` : ''}` : '#/battle'),
+  /** The battle tracker; with a sector, a new battle is set up to be fought over it (by this attacking faction and detachment). */
+  tracker: (sectorId?: string, attacker?: string, forceId?: string) =>
+    (sectorId ? `#/battle/sector/${sectorId}${attacker ? `/${attacker}${forceId ? `/${forceId}` : ''}` : ''}` : '#/battle'),
   /** The printable army sheet of a generated side in the current battle. */
   sideSheet: (sideId: string) => `#/battle/sheet/${sideId}`,
   missions: () => '#/missions',
