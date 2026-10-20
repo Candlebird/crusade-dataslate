@@ -402,6 +402,7 @@ table.compact .stepper input { width: 2.6rem; }
 .hex-empty .hex-glyph { fill: #666; }
 .hex-name { fill: var(--text); font: 600 7.5px var(--sans); text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }
 .hex-mark { fill: var(--text); font: 11px var(--sans); text-anchor: middle; }
+.hex-diff { fill: #e08a7a; font: 600 9px var(--sans); text-anchor: middle; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }
 .map-zoom { position: absolute; right: 0.5rem; top: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; }
 .map-side { border-left: 1px solid var(--line); padding-left: 1rem; min-width: 0; }
 .map-side h3 { margin-top: 0; }

@@ -8,6 +8,8 @@ Crusade and Nexus Wars are homebrew and get rebalanced often, so their numbers a
 | Nexus Wars sector types and benefits, Anomaly and Void tables, Combat Manipulations, Umbra shop | `nexusData.ts` |
 | Nexus Wars round values: match bonus, catch-up bonus, opening rounds, Void Echoes threat and spread, void salvage, Shard Mine roll, Relic Collector discount (`NEXUS_ROUNDS`) | `nexusData.ts` |
 | Detachments: a further force's Starting Supply and the once-a-round reorganise cost (`NEXUS_DETACHMENTS`) | `nexusData.ts` |
+| The map: default size, how full it is, the share of points of interest and their odds, and how many new ones appear each round (`NEXUS_MAP`). Generation and the round refresh are in `hexmap.ts` | `nexusData.ts` |
+| Sector difficulty: the rating range, how distance and sector type push it up, when a sector gets a second modifier (`NEXUS_DIFFICULTY`), and the sector modifiers (`SECTOR_MODIFIERS`). The rating logic is in `difficulty.ts` | `nexusData.ts` |
 | Strategic Assets earned from skirmish wins (`STRATEGIC_ASSETS`; the per-round cap and patrol threat drop are in `NEXUS_ROUNDS`), Reinforce Supply bonus (`NEXUS_REINFORCE_BONUS`) | `nexusData.ts` |
 | The prose on the in-app **Rules** page (tables there come from the two files above) | `rulesText.ts` |
 | Built-in battle tracker missions: the 18 OPR Advanced Rules missions, deployment styles and the example template | `missions.ts` |

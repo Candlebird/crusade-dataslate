@@ -1,19 +1,22 @@
 import type { AssetUse, Campaign, Force, ForceNexus, RoundSnapshot, Sector } from '../model/types';
 import { CATEGORIES } from './data';
-import type { Rand } from './hexmap';
+import { refreshSectors, type Rand } from './hexmap';
 import {
   ANOMALY_TABLE, ECHOES, MANIPULATION_PREFIX, NEXUS_ROUNDS, STRATEGIC_ASSETS, currentRound, emptyNexusPick, factionName, incomeItems,
   type NexusItem, type NexusPick,
 } from './nexus';
 import { pickSpread, spreadInto } from './voidspawn';
 import { factionClaimedRound } from './detachments';
+import { rateSectors } from './difficulty';
 
 // Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
 // a Strategic Asset, and one against the Echoes is a patrol). The round closes with the Battle: the sealed-order attacks.
 // The GM then ends the round:
 //  - every faction's holdings are noted, and each force claims that round's sector income whenever its player is ready,
 //  - the Void Echoes' threat moves (up each round, down for every win against them), and they spread that many sectors,
-//  - unspent Strategic Assets are lost.
+//  - unspent Strategic Assets are lost,
+//  - claimed space hulks drift off and new points of interest turn up (refreshSectors, hexmap.ts),
+//  - every sector's difficulty is rescaled to the factions' current Supply, and AI garrisons roll new modifiers.
 // Values live in NEXUS_ROUNDS (nexusData.ts).
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -107,10 +110,19 @@ export interface RoundEnd {
   voidspawnWins: number;
   patrols: number;
   spread: Sector[];
+  /** The new range of sector ratings, when the forces were given to rescale them. */
+  difficulty?: { min: number; max: number };
+  /** Claimed space hulks that drifted off, as they were. */
+  cleared: Sector[];
+  /** New points of interest. */
+  fresh: Sector[];
 }
 
-/** End the current round: note holdings for income, move the threat, spread the Echoes, start the next round. */
-export function endRound(c: Campaign, rand: Rand = Math.random, date = new Date().toISOString().slice(0, 10)): RoundEnd {
+/**
+ * End the current round: note holdings for income, move the threat, spread the Echoes, start the next round. With the
+ * campaign's forces, sector difficulty is rescaled to their Supply too.
+ */
+export function endRound(c: Campaign, rand: Rand = Math.random, date = new Date().toISOString().slice(0, 10), forces?: Force[]): RoundEnd {
   const round = currentRound(c);
   const holdings: RoundSnapshot['holdings'] = {};
   for (const f of c.factions) holdings[f.id] = c.sectors.filter((s) => s.owner === f.id).map((s) => s.id);
@@ -136,13 +148,19 @@ export function endRound(c: Campaign, rand: Rand = Math.random, date = new Date(
   c.round = round + 1;
   // Strategic Assets don't carry over.
   delete c.assetsSpent;
-  return { round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread };
+  // The map moves on: claimed hulks drift off and new points of interest turn up. The round's income still counts the hulks.
+  const { cleared, fresh } = refreshSectors(c, rand);
+  const held = new Set(Object.values(holdings).flat());
+  const was = cleared.filter((s) => held.has(s.id));
+  if (was.length) snapshot.was = was;
+  const difficulty = forces ? rateSectors(c, forces, rand, { reroll: true }) : undefined;
+  return { round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, difficulty, cleared, fresh };
 }
 
 /** One line for the log / a toast. */
 export function roundEndText(c: Campaign, r: RoundEnd) {
   const where = r.spread.length ? `spread to ${r.spread.map((s) => s.name).join(', ')}` : 'did not spread';
-  return `Round ${r.round} ended. ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}. Round ${currentRound(c)} begins.`;
+  return `Round ${r.round} ended. ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${r.cleared.length ? ` Space hulk${r.cleared.length === 1 ? '' : 's'} drifted off: ${r.cleared.map((s) => s.name).join(', ')}.` : ''}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''} Round ${currentRound(c)} begins.`;
 }
 
 /**
@@ -161,7 +179,7 @@ export function claimableRounds(c: Campaign, n: ForceNexus, forces: Force[] = []
 export function roundIncomeItems(c: Campaign, factionId: string, snap: RoundSnapshot): NexusItem[] {
   const items: NexusItem[] = [];
   for (const id of snap.holdings[factionId] ?? []) {
-    const s = c.sectors.find((x) => x.id === id);
+    const s = snap.was?.find((x) => x.id === id) ?? c.sectors.find((x) => x.id === id);
     if (s) items.push(...incomeItems(s, `r${snap.round}:`));
   }
   const behind = snap.underdog[factionId] ?? 0;

@@ -6,14 +6,16 @@ import {
   assetName, assetsOf, echoWins, endRound, inGrace, leaders, nextThreat, refundAsset, roundEndText, sectorCounts, spendAsset, spreadsAt, threatOf,
   underdogBonus, type RoundEnd,
 } from '../rules/rounds';
+import { difficultyRange, rateSectors } from '../rules/difficulty';
+import { NEXUS_DIFFICULTY } from '../rules/nexusData';
 import { confirmAction, toast } from './ui';
 
 /** End the current round on a copy of the campaign (the spread is random, so it's rolled once, here) and store the result. */
 export function useEndRound() {
-  const { update } = useStore();
+  const { state, update } = useStore();
   return (c: Campaign): RoundEnd => {
     const next = structuredClone(c);
-    const r = endRound(next);
+    const r = endRound(next, Math.random, undefined, state.forces);
     next.updatedAt = nowIso();
     update((d) => void (d.campaign = next));
     toast(roundEndText(next, r));
@@ -24,6 +26,9 @@ export function useEndRound() {
 /** The campaign round: the Void Echoes' threat, who's ahead, and the GM's End round button. */
 export default function RoundPanel({ c }: { c: Campaign }) {
   const end = useEndRound();
+  const { state, update } = useStore();
+  const range = difficultyRange(c, state.forces);
+  const rated = c.sectors.some((s) => s.difficulty !== undefined);
   const round = currentRound(c);
   const threat = threatOf(c);
   const coming = nextThreat(c);
@@ -38,8 +43,19 @@ export default function RoundPanel({ c }: { c: Campaign }) {
     const spreads = spreadsAt(coming);
     if (!confirmAction(`End round ${round}? Every faction's sector income for the round is fixed now (players claim it on their force page), `
       + `the ${ECHOES.name}' threat goes to ${coming} and they spread ${spreads} sector${spreads === 1 ? '' : 's'}${grace ? ' (into unclaimed space only)' : ''}.`
-      + (unspent ? ` ${unspent} unspent Strategic Asset${unspent === 1 ? ' is' : 's are'} lost.` : ''))) return;
+      + (unspent ? ` ${unspent} unspent Strategic Asset${unspent === 1 ? ' is' : 's are'} lost.` : '')
+      + ' Claimed space hulks drift off and new points of interest appear on the map.'
+      + ` Sector difficulty is rescaled to ${range.min}–${range.max} Supply and AI-held sectors roll new modifiers.`)) return;
     end(c);
+  };
+  const rescale = () => {
+    if (rated && !confirmAction(`Rescale every sector to ${range.min}–${range.max} Supply? Sectors keep their modifiers; unrated ones roll theirs.`)) return;
+    update((d) => {
+      if (!d.campaign) return;
+      rateSectors(d.campaign, d.forces);
+      d.campaign.updatedAt = nowIso();
+    });
+    toast(`Sectors rated ${range.min}–${range.max} Supply.`);
   };
 
   return (
@@ -53,6 +69,14 @@ export default function RoundPanel({ c }: { c: Campaign }) {
           ☣ {ECHOES.name} threat {threat}/{NEXUS_ROUNDS.threatMax}
         </span>
         <span className="muted">If the round ended now: threat {coming}, spreading {spreadsAt(coming)} sector{spreadsAt(coming) === 1 ? '' : 's'}{ahead.size ? ', most likely into the leader\'s space' : ''}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>
+      </div>
+      <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
+        <span className="tag" title={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}; rescaled when the round ends`}>
+          Sector difficulty {range.min}–{range.max} Supply
+        </span>
+        <button className="small" onClick={rescale} title="Rate sectors now against the factions' current Supply (the round's end does this too)">
+          {rated ? 'Rescale sectors now' : 'Rate sectors'}
+        </button>
       </div>
       {grace && (
         <p className="small" style={{ margin: '0.5rem 0 0' }}>

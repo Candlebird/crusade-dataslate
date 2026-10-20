@@ -48,6 +48,8 @@ import {
 import { AI_TREES } from '../rules/aiTrees';
 import { echoesBook, randomEchoes } from '../rules/echoForce';
 import { ECHOES, NEXUS_REINFORCE_BONUS } from '../rules/nexusData';
+import { aiDefended } from '../rules/difficulty';
+import SectorDanger from './SectorDanger';
 import { forceTotals } from '../rules/engine';
 import { MAX_PLAYERS, randomForces, randomFormat, type Format } from '../rules/randomBattle';
 import AiActivation from './AiActivation';
@@ -336,6 +338,10 @@ function StartBattle({ sectorId, preset, presetForce }: { sectorId?: string; pre
               Fighting over <b>{sector.name}</b> <span className="tag">{SECTOR_TYPES[sector.type].label}</span>, held by <b>{factionName(c, sector.owner)}</b>.
               Team A attacks; everyone else defends. When you finish, the result goes into the campaign log and the map.
             </p>
+            <SectorDanger s={sector} />
+            {aiDefended(sector) && sector.difficulty !== undefined && (
+              <p className="muted small">The {ECHOES.name} hold it with a {sector.difficulty}-Supply garrison: play <b>1 v AI</b> and generate their army at that size. The modifiers favour the defender.</p>
+            )}
             {homeChallengeBlock(c, sector) && <p className="small"><span className="tag red">{homeChallengeBlock(c, sector)}</span> Check with the GM before playing this one.</p>}
             <label className="field">
               <span>Attacking faction</span>
@@ -535,9 +541,13 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
   // The AI can field a random Void Echoes army, sized to match the sides it's up against.
   const book = echoesBook(state.books);
   // Standing in for a player who can't defend a Reinforced sector, they get its +200 Supply Limit too.
-  const reinforced = !!b.attacker && side.team !== b.attacker && !!state.campaign?.sectors.find((x) => x.id === b.sectorId)?.reinforced;
+  const sector = state.campaign?.sectors.find((x) => x.id === b.sectorId);
+  const defending = !!b.attacker && side.team !== b.attacker;
+  const reinforced = defending && !!sector?.reinforced;
   const enemies = b.sides.filter((x) => x.team !== side.team).reduce((n, x) => n + sidePoints(x), 0) + (reinforced ? NEXUS_REINFORCE_BONUS : 0);
-  const [target, setTarget] = useState(() => enemies || 1000);
+  // Holding an AI sector, the Echoes field its garrison: the sector's difficulty rating.
+  const garrison = defending && sector && aiDefended(sector) ? sector.difficulty : undefined;
+  const [target, setTarget] = useState(() => garrison || enemies || 1000);
   const generate = () => {
     if (!book) return;
     const units = randomEchoes(book, target);
@@ -599,6 +609,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
                 <Stepper value={target} step={50} min={50} onChange={setTarget} />
                 <span className="small muted">pts</span>
                 <button onClick={generate} title="Build a random army from the Void Echoes book, up to the target points">🎲 Generate</button>
+                {!!garrison && garrison !== target && <button className="ghost small" onClick={() => setTarget(garrison)} title="The sector's difficulty rating">Sector garrison {garrison} pts</button>}
                 {enemies > 0 && enemies !== target && <button className="ghost small" onClick={() => setTarget(enemies)}>Match {enemies} pts{reinforced ? ' (Reinforced)' : ''}</button>}
                 {!!side.roster?.length && <a className="btn" href={href.sideSheet(side.id)}>📄 Army sheet</a>}
               </div>

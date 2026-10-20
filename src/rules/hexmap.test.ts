@@ -16,7 +16,7 @@ function campaign(): Campaign {
   };
 }
 
-const opts = (seed: string, replace = false) => ({ cols: 10, rows: 8, seed, counts: defaultCounts(3), startingSectors: 2, replace });
+const opts = (seed: string, replace = false) => ({ cols: 10, rows: 8, seed, counts: defaultCounts(3, 10, 8), startingSectors: 2, replace });
 
 describe('hex math', () => {
   it('measures distance and neighbours', () => {
@@ -54,7 +54,7 @@ describe('map generation', () => {
       expect(isConnected(c)).toBe(true);
       const homes = c.sectors.filter((s) => s.type === 'home') as never[];
       for (let i = 0; i < homes.length; i++) for (let j = i + 1; j < homes.length; j++) expect(hexDistance(homes[i], homes[j])).toBeGreaterThanOrEqual(3);
-      const counts = defaultCounts(3);
+      const counts = defaultCounts(3, 10, 8);
       expect(c.sectors.filter((s) => s.type === 'planet')).toHaveLength(counts.planet);
       expect(c.sectors.filter((s) => s.owner === 'A' && s.type !== 'home')).toHaveLength(2);
     }

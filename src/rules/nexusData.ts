@@ -145,3 +145,55 @@ export const UMBRA_SHOP: { key: UmbraBuy; name: string; cost: number; desc: stri
   { key: 'relic', name: 'Nexus Relic', cost: 6, desc: 'Bought together with the normal Crusade relic requisition (its RP cost too).' },
   { key: 'evolution', name: 'Umbral Evolution', cost: 12, desc: 'A free unique Nexus trait: BP goes up, but it does not use a level.' },
 ];
+
+/**
+ * The Nexus Wars map: its default size, how full it is, and the points of interest that turn up at the end of every round.
+ * Points of interest are every sector type worth fighting over (planets, research stations, void sites and Anomalies);
+ * the rest of the sectors are clear (empty) space.
+ */
+export const NEXUS_MAP = {
+  /** A two-faction map is size × size hexes; each extra faction adds this many columns and rows. */
+  size: 12,
+  perExtraFaction: 2,
+  /** Share of the hexes that hold a sector. */
+  fill: 0.6,
+  /** Share of those sectors that are points of interest; the rest (besides homes and the Voidspawn) are clear space. */
+  poiShare: 0.4,
+  /** Relative odds of each kind of point of interest, at generation and in the end-of-round refresh. */
+  poiWeights: { planet: 3, research: 1, void: 1, anomaly: 1 } as Partial<Record<SectorType, number>>,
+  /** New points of interest each round: this many in each faction's half of the map, and this many in the contested middle. */
+  refreshPerFaction: 1,
+  refreshContested: 1,
+};
+
+/**
+ * Sector difficulty: the Supply an AI garrison fields in an unclaimed or Echoes-held sector. It runs from `min` near the
+ * homes up to the strongest faction's total Supply × `maxFactor` at the far reaches, so players can punch above their
+ * weight. Rated when the map is generated and again at the end of every round.
+ */
+export const NEXUS_DIFFICULTY = {
+  min: 800,
+  maxFactor: 1.5,
+  /** Ratings round to this many points. */
+  step: 50,
+  /** How much of the rating comes from distance to the nearest home (0–1); the type bonus adds to it. */
+  distanceWeight: 0.8,
+  typeBonus: { home: 0, planet: 0.05, research: 0.1, void: 0.2, anomaly: 0.15, empty: -0.1, voidspawn: 1 } as Record<SectorType, number>,
+  /** Sectors rated at least this far up the scale get a second modifier. */
+  hardAt: 0.6,
+};
+
+/** Battlefield conditions that favour a sector's defender. Each sector rolls one (two when it's hard). */
+export const SECTOR_MODIFIERS: { id: string; name: string; desc: string }[] = [
+  { id: 'entrenched', name: 'Entrenched', desc: 'Defending units in their deployment zone get +1 to Defense rolls in round 1.' },
+  { id: 'lurkers', name: 'Lurkers', desc: 'Up to two defending units gain Ambush.' },
+  { id: 'fanatics', name: 'Fanatical Garrison', desc: 'Defending units get +1 to Morale tests.' },
+  { id: 'regrowth', name: 'Echo-Flesh', desc: 'The defender’s toughest non-hero unit gains Regeneration.' },
+  { id: 'veterans', name: 'Veteran Garrison', desc: 'Two defending units get +1 to hit in melee.' },
+  { id: 'gunline', name: 'Prepared Firing Lines', desc: 'One defending shooting unit gets +1 to hit with shooting in rounds 1 and 2.' },
+  { id: 'fog', name: 'Umbral Fog', desc: 'Attackers get −1 to hit when shooting at targets over 18″ away.' },
+  { id: 'minefield', name: 'Minefields', desc: 'Place two 6″ areas of Dangerous terrain in no-man’s-land; the defender places them.' },
+  { id: 'bastion', name: 'Fortified Objectives', desc: 'Defending units within 3″ of an objective get +1 to Defense rolls.' },
+  { id: 'initiative', name: 'Home Ground', desc: 'The defender picks deployment zones and activates first in round 1.' },
+  { id: 'tide', name: 'Endless Tide', desc: 'The first defending non-hero unit destroyed comes back once, at full strength, from the defender’s table edge at the start of the next round.' },
+];

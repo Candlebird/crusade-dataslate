@@ -47,12 +47,12 @@ describe('Void Echoes', () => {
 
   it('get a Voidspawn on generated maps, kept apart like a home', () => {
     const c: Campaign = { ...campaign(), sectors: [{ id: 'hA', name: 'A Home', type: 'home', owner: 'A', notes: '' }] };
-    generateMap(c, { cols: 8, rows: 6, seed: 's', counts: defaultCounts(2), startingSectors: 1, replace: true });
+    generateMap(c, { cols: 8, rows: 6, seed: 's', counts: defaultCounts(2, 8, 6), startingSectors: 1, replace: true });
     const spawns = c.sectors.filter((s) => s.type === 'voidspawn');
     expect(spawns).toHaveLength(1);
     expect(spawns[0].owner).toBe(ECHOES.id);
     expect(spawns[0].q).toBeDefined();
-    generateMap(c, { cols: 8, rows: 6, seed: 't', counts: defaultCounts(2), startingSectors: 1, replace: true });
+    generateMap(c, { cols: 8, rows: 6, seed: 't', counts: defaultCounts(2, 8, 6), startingSectors: 1, replace: true });
     expect(c.sectors.filter((s) => s.type === 'voidspawn').map((s) => s.id)).toEqual([spawns[0].id]);
   });
 });

@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, NEXUS_DETACHMENTS, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
+import { ECHOES, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
 // The tables on that page come straight from data.ts and nexusData.ts; this file holds only the text around them,
@@ -62,6 +62,15 @@ export const NEXUS_TEXT = {
   ],
   map: [
     'The Nexus is a hex map of sectors. Each faction starts with a home sector, which can be attacked but never taken, and picks one home benefit. Planets give their owner one benefit, picked when the planet is developed.',
+    `Homes sit two sectors in from the edge of the map, with rival factions at opposite ends. Every faction gets the same mix of sectors around its home to expand into; the extra sectors gather in a contested middle around the ${ECHOES.name}' Voidspawn.`,
+    `A new map is ${NEXUS_MAP.size}×${NEXUS_MAP.size} hexes (${NEXUS_MAP.perExtraFaction} more each way for every faction past two), about ${Math.round(NEXUS_MAP.fill * 100)}% of it filled with sectors. About ${Math.round(NEXUS_MAP.poiShare * 100)}% of those are points of interest (planets, research stations, void sites and Anomalies); the rest are clear space.`,
+    `The map changes every round. When a round ends, any space hulk whose reward has been claimed drifts off, leaving clear space that its holder keeps (its Salvage still counts for that round). Then new points of interest appear: ${NEXUS_MAP.refreshPerFaction} in each faction's half of the map and ${NEXUS_MAP.refreshContested} in the contested middle, in unclaimed clear space where there is some, otherwise at the edge of the map's sectors. They never appear right next to a home.`,
+  ],
+  difficulty: [
+    `Every sector except the homes has a difficulty, measured in Supply: the size of the AI garrison holding it. Ratings start at ${NEXUS_DIFFICULTY.min} next to the homes and climb to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor} at the far reaches of the map and the Voidspawn, so the best prizes mean punching above your weight. Void sites and Anomalies rate a little higher than other sectors at the same distance; empty space a little lower.`,
+    "Difficulty is recalculated at the end of every round, against each faction's total Supply across all its detachments, so the Nexus gets more dangerous as the factions grow.",
+    `Each sector also has a modifier that helps whoever defends it (two when it's rated in the top ${Math.round((1 - NEXUS_DIFFICULTY.hardAt) * 100)}% of the scale). Sectors held by the AI roll new modifiers every round; a faction's sectors keep theirs.`,
+    "Attacking an AI-held sector: play 1 v AI and generate the garrison at the sector's difficulty. Its modifiers apply to the AI side.",
   ],
   rounds: [
     'The campaign is played in rounds. Each round has two parts: skirmishes, played whenever you like, and then the Battle, where the sector attacks happen. When the Battle is done, the GM ends the round on the Nexus Wars page.',
@@ -77,7 +86,7 @@ export const NEXUS_TEXT = {
   ],
   attacking: [
     "The Battle: each detachment secretly picks one sector to attack this round, or holds. The GM reveals everyone's orders at once, and then the attacks are played. Only Battle games take sectors, challenge home sectors or earn the Echoes bounty.",
-    'Unclaimed sectors: the attacker plays the AI for it, unless another faction attacks it too: then the two fight each other for it. Claimed sectors: the owner defends. The winner takes the sector.',
+    "Unclaimed sectors: the attacker plays the AI's garrison, at the sector's difficulty, unless another faction attacks it too: then the two fight each other for it. Claimed sectors: the owner defends. The winner takes the sector, and the sector's modifiers always favour its defender.",
     'Reinforcements stay with the sector, not the faction: when a sector changes hands, any Reinforce Sector on it is lost.',
     `Defender can't make it: the ${ECHOES.name} stand in. Play against the AI, with an army at the attacker's points (+${NEXUS_REINFORCE_BONUS} if the sector is Reinforced). If the Echoes win, the owner holds the sector; if the attacker wins, they take it.`,
     "Attacker can't make it: the attack lapses, and the faction keeps its orders slot: it may make the same attack next round.",

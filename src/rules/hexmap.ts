@@ -1,6 +1,7 @@
 import { uid } from '../model/factory';
 import type { Campaign, CampaignMap, Sector, SectorType } from '../model/types';
 import { BENEFITS, ECHOES, isStronghold } from './nexus';
+import { NEXUS_MAP } from './nexusData';
 
 // Pointy-top hexes in axial coordinates (q, r), laid out as an "odd-r" rectangle.
 
@@ -17,7 +18,7 @@ export const neighbors = (h: Hex): Hex[] => DIRS.map((d) => ({ q: h.q + d.q, r: 
 
 export const hexDistance = (a: Hex, b: Hex) => (Math.abs(a.q - b.q) + Math.abs(a.r - b.r) + Math.abs(a.q + a.r - b.q - b.r)) / 2;
 
-const colOf = (h: Hex) => h.q + Math.floor(h.r / 2);
+export const colOf = (h: Hex) => h.q + Math.floor(h.r / 2);
 
 export const inBounds = (m: CampaignMap, h: Hex) => h.r >= 0 && h.r < m.rows && colOf(h) >= 0 && colOf(h) < m.cols;
 
@@ -65,7 +66,11 @@ export function clampToMap(c: Campaign) {
   for (const s of c.sectors) if (s.q != null && s.r != null && !inBounds(c.map, { q: s.q, r: s.r })) s.q = s.r = undefined;
 }
 
-export const defaultMap = (factions: number): CampaignMap => ({ cols: 4 + Math.max(2, factions), rows: 3 + Math.max(2, factions), seed: randomSeed() });
+/** Room for every faction to grow: 12×12 for two factions, two columns and rows more for each extra one (NEXUS_MAP). */
+export function defaultMap(factions: number): CampaignMap {
+  const n = NEXUS_MAP.size + NEXUS_MAP.perExtraFaction * (Math.max(2, factions) - 2);
+  return { cols: n, rows: n, seed: randomSeed() };
+}
 
 // ---- seeded randomness ----
 
@@ -185,33 +190,32 @@ export interface GenOptions {
   replace: boolean;
 }
 
-export function defaultCounts(factions: number): GenCounts {
+/**
+ * Sector counts that fill NEXUS_MAP.fill of a cols × rows map (the default map's size when not given): NEXUS_MAP.poiShare
+ * of them points of interest split by their weights, the rest clear space around the homes and the Voidspawn.
+ */
+export function defaultCounts(factions: number, cols?: number, rows?: number): GenCounts {
   const f = Math.max(2, factions);
-  return { planet: 2 * f + 1, research: Math.ceil(f / 2), void: Math.ceil(f / 2) + 1, anomaly: Math.ceil(f / 2), empty: 2 * f, voidspawn: 1 };
-}
-
-/** Cells on the straight hex line from a to b, inclusive. */
-function hexLine(a: Hex, b: Hex): Hex[] {
-  const n = hexDistance(a, b);
-  const out: Hex[] = [];
-  for (let i = 0; i <= n; i++) {
-    const t = n === 0 ? 0 : i / n;
-    const q = a.q + (b.q - a.q) * t + 1e-6;
-    const r = a.r + (b.r - a.r) * t + 1e-6;
-    const s = -q - r;
-    let rq = Math.round(q), rr = Math.round(r);
-    const rs = Math.round(s);
-    const dq = Math.abs(rq - q), dr = Math.abs(rr - r), ds = Math.abs(rs - s);
-    if (dq > dr && dq > ds) rq = -rr - rs;
-    else if (dr > ds) rr = -rq - rs;
-    out.push({ q: rq, r: rr });
-  }
-  return out;
+  const size = cols && rows ? { cols, rows } : defaultMap(f);
+  const total = Math.round(size.cols * size.rows * NEXUS_MAP.fill);
+  const poi = Math.round(total * NEXUS_MAP.poiShare);
+  const kinds = Object.entries(NEXUS_MAP.poiWeights) as [keyof GenCounts, number][];
+  const sum = kinds.reduce((n, [, w]) => n + w, 0);
+  const counts: GenCounts = { planet: 0, research: 0, void: 0, anomaly: 0, empty: 0, voidspawn: 1 };
+  // Largest remainder, so the points of interest add up exactly.
+  const exact = kinds.map(([t, w]) => ({ t, x: (poi * w) / sum }));
+  for (const e of exact) counts[e.t] = Math.floor(e.x);
+  let left = poi - exact.reduce((n, e) => n + Math.floor(e.x), 0);
+  for (const e of [...exact].sort((a, b) => (b.x % 1) - (a.x % 1))) if (left-- > 0) counts[e.t]++;
+  counts.empty = Math.max(0, total - poi - f - counts.voidspawn);
+  return counts;
 }
 
 /**
- * Lay out the campaign map: spread the home sectors apart, link them with chains of sectors,
- * grow the rest outward, then give each faction its nearest sectors. Mutates `c`.
+ * Lay out the campaign map. Homes sit two hexes in from the edge, spread evenly around the map so rivals start at opposite
+ * ends; the Voidspawn sits in the middle. Each faction then grows the same mix of sectors into its own half (the hexes
+ * nearer its home than any other), the leftovers form a contested middle around the Voidspawn, and empty space links up
+ * anything cut off. Finally each faction takes its nearest sectors. Mutates `c`.
  */
 export function generateMap(c: Campaign, o: GenOptions) {
   const rand = rng(o.seed);
@@ -247,52 +251,126 @@ export function generateMap(c: Campaign, o: GenOptions) {
     taken.set(hexKey(h.q, h.r), s);
   };
   const edge = (h: Hex) => Math.min(colOf(h), map.cols - 1 - colOf(h), h.r, map.rows - 1 - h.r);
+  const nearest = (options: Hex[], score: (h: Hex) => number) => {
+    let best: Hex | undefined;
+    let low = Infinity;
+    for (const x of options) {
+      const v = score(x);
+      if (v < low) [best, low] = [x, v];
+    }
+    return best;
+  };
 
-  // Homes and Voidspawns: farthest-point spread, kept off the very edge where possible.
-  const homes = c.sectors.filter(isStronghold);
-  for (const h of homes.filter((s) => !isPlaced(s))) {
-    const placed = homes.filter(isPlaced);
-    const options = all.filter(free);
-    if (!options.length) break;
-    const score = (x: Hex) => (placed.length ? Math.min(...placed.map((p) => hexDistance(p, x))) : rand() * 10) * 4 + Math.min(edge(x), 1) * 8 + rand();
-    put(h, options.reduce((best, x) => (score(x) > score(best) ? x : best)));
+  // Where a hex sits relative to the middle of the map, scaled so the map reads as a circle.
+  const corner = toPixel({ q: 0, r: 0 }, 1);
+  const far = toPixel({ q: map.cols - 1 - Math.floor((map.rows - 1) / 2), r: map.rows - 1 }, 1);
+  const mid = { x: (corner.x + far.x) / 2, y: (corner.y + far.y) / 2 };
+  const half = { x: Math.max(1, (far.x - corner.x) / 2), y: Math.max(1, (far.y - corner.y) / 2) };
+  const polar = (h: Hex) => {
+    const p = toPixel(h, 1);
+    const x = (p.x - mid.x) / half.x, y = (p.y - mid.y) / half.y;
+    return { angle: Math.atan2(y, x), radius: Math.hypot(x, y) };
+  };
+  const centre = nearest(all, (h) => polar(h).radius) ?? { q: 0, r: 0 };
+
+  // Voidspawns: the first in the middle, any others spread out around it, away from the edge.
+  const strongholds = c.sectors.filter(isStronghold);
+  const spawns = strongholds.filter((s) => s.type === 'voidspawn');
+  for (const v of spawns.filter((s) => !isPlaced(s))) {
+    const placed = strongholds.filter(isPlaced);
+    const cell = placed.some((s) => s.type === 'voidspawn')
+      ? nearest(all.filter((h) => free(h) && edge(h) >= 3), (h) => -Math.min(...placed.map((p) => hexDistance(p, h))) + rand())
+      : nearest(all.filter(free), (h) => hexDistance(h, centre) + rand() * 0.5);
+    if (cell) put(v, cell);
   }
 
-  // The pool of new sectors still needed to reach the target counts.
-  const pool: SectorType[] = [];
+  // Homes: spaced evenly around the ring two hexes in from the edge, the first on the left (so a pair faces off across the
+  // map). Four or six factions go by angle from a corner instead, so no home lands on a short side nearer the middle.
+  const homes = strongholds.filter((s) => s.type === 'home');
+  const ring = all.filter((x) => edge(x) === 2).sort((a, b) => polar(a).angle - polar(b).angle);
+  const left = ring.indexOf(nearest(ring, (x) => Math.abs(Math.abs(polar(x).angle) - Math.PI) + polar(x).radius * 0.01)!);
+  const turn = 2 * Math.PI;
+  const byAngle = homes.length > 2 && homes.length % 2 === 0;
+  homes.forEach((h, i) => {
+    if (isPlaced(h)) return;
+    const others = homes.filter(isPlaced);
+    const wrap = (d: number, n: number) => Math.min(((d % n) + n) % n, n - (((d % n) + n) % n));
+    const angle = Math.PI + (turn * (i + 0.5)) / homes.length;
+    const spot = left + (i * ring.length) / homes.length;
+    const off = (x: Hex) => (byAngle ? wrap(polar(x).angle - angle, turn) : wrap(ring.indexOf(x) - spot, ring.length));
+    const open = ring.filter((x) => free(x) && others.every((p) => hexDistance(p, x) >= 3));
+    const cell = open.length
+      ? nearest(open, off)
+      // Too small a map for a ring: keep homes as far from each other as possible.
+      : nearest(all.filter(free), (x) => -(others.length ? Math.min(...others.map((p) => hexDistance(p, x))) : rand() * 10) * 4 - Math.min(edge(x), 1) * 8 - rand());
+    if (cell) put(h, cell);
+  });
+
+  // The new sectors still needed to reach the target counts: an equal share for each faction, the rest to the middle.
+  const placedHomes = homes.filter(isPlaced);
+  const share: SectorType[] = [];
+  const middle: SectorType[] = [];
   for (const t of Object.keys(o.counts) as (keyof GenCounts)[]) {
     if (t === 'voidspawn') continue;
-    const have = c.sectors.filter((s) => s.type === t).length;
-    for (let i = have; i < o.counts[t]; i++) pool.push(t);
+    const need = Math.max(0, o.counts[t] - c.sectors.filter((s) => s.type === t).length);
+    const each = placedHomes.length > 1 ? Math.floor(need / placedHomes.length) : 0;
+    for (let i = 0; i < each; i++) share.push(t);
+    for (let i = each * placedHomes.length; i < need; i++) middle.push(t);
   }
-  shuffle(rand, pool);
-  const next = (): Sector => make(pool.pop() ?? 'empty');
+  shuffle(rand, share);
+  shuffle(rand, middle);
 
-  // Chains from each home to the centre keep the map connected and contested in the middle.
-  const placedHomes = homes.filter(isPlaced);
-  const centre = { q: Math.floor((map.cols - 1) / 2) - Math.floor(Math.floor((map.rows - 1) / 2) / 2), r: Math.floor((map.rows - 1) / 2) };
-  if (placedHomes.length > 1) for (const h of placedHomes) for (const cell of hexLine(h, centre)) if (free(cell)) put(next(), cell);
+  // A faction's half: hexes strictly nearer its home than any other, leaving the Voidspawn's surroundings to the middle.
+  const spawnsPlaced = spawns.filter(isPlaced);
+  const regionOf = (x: Hex) => {
+    if (spawnsPlaced.some((v) => hexDistance(v, x) < 2)) return -1;
+    const d = placedHomes.map((h) => hexDistance(h, x));
+    const best = Math.min(...d);
+    return d.filter((n) => n === best).length === 1 ? d.indexOf(best) : -1;
+  };
+  const toward = (x: Hex) => hexDistance(x, centre);
+  // Every faction lays the same type at the same step, taking turns to go first, so no one gets the pick of the map.
+  share.forEach((type, k) => {
+    for (let j = 0; j < placedHomes.length; j++) {
+      const i = (k + j) % placedHomes.length;
+      const home = placedHomes[i];
+      const front = new Map<string, Hex>();
+      for (const s of taken.values()) {
+        if (s !== home && regionOf(s as Hex) !== i) continue;
+        for (const n of neighbors(s as Hex)) if (free(n) && regionOf(n) === i) front.set(hexKey(n.q, n.r), n);
+      }
+      const cell = nearest([...front.values()], (x) => hexDistance(x, home) * 2 + toward(x) + rand() * 1.5);
+      if (cell) put(make(type), cell);
+      else middle.push(type);
+    }
+  });
 
-  // Existing unplaced sectors, then the rest of the pool, grow from what is already on the map.
-  const growInto = (): Hex | undefined => {
+  // The contested middle, then any existing sectors not yet on the map, grow from what is already there.
+  // The middle keeps off the factions' halves while it can, so the leftovers don't favour whoever is nearest.
+  const growInto = (contested = false): Hex | undefined => {
     const front = new Map<string, Hex>();
     for (const s of taken.values()) for (const n of neighbors(s as Hex)) if (free(n)) front.set(hexKey(n.q, n.r), n);
-    const options = front.size ? [...front.values()] : all.filter(free);
-    if (!options.length) return undefined;
-    // Favour cells near the centre so the map fills out as a rough disc rather than a tendril.
-    return options.reduce((best, x) => {
-      const sx = hexDistance(x, centre) + rand() * 2.5, sb = hexDistance(best, centre) + rand() * 2.5;
-      return sx < sb ? x : best;
-    });
+    const shared = contested ? [...front.values()].filter((x) => regionOf(x) === -1) : [];
+    return nearest(shared.length ? shared : front.size ? [...front.values()] : all.filter(free), (x) => toward(x) + rand() * 2);
   };
+  for (const type of middle) {
+    const cell = growInto(true);
+    if (!cell) break;
+    put(make(type), cell);
+  }
   for (const s of c.sectors.filter((x) => !isPlaced(x))) {
     const cell = growInto();
     if (cell) put(s, cell);
   }
-  while (pool.length) {
-    const cell = growInto();
-    if (!cell) break;
-    put(next(), cell);
+
+  // Link up anything cut off with the shortest run of empty space.
+  for (let guard = 0; guard < 50; guard++) {
+    const groups = components([...taken.values()] as (Sector & Hex)[]);
+    if (groups.length < 2) break;
+    const main = new Set(groups[0].map((s) => hexKey(s.q, s.r)));
+    const path = shortestPath(groups[1], main, free);
+    if (!path) break;
+    for (const h of path) put(make('empty'), h);
   }
 
   // Starting territory: round-robin, each faction takes its nearest unclaimed sector.
@@ -305,6 +383,152 @@ export function generateMap(c: Campaign, o: GenOptions) {
       near.owner = h.owner;
     }
   }
+}
+
+/** What the end-of-round refresh changed. `cleared` holds the space hulks as they were before they went. */
+export interface Refresh {
+  cleared: Sector[];
+  fresh: Sector[];
+}
+
+/**
+ * The map moves on at the end of a round: space hulks whose reward has been claimed drift off and leave clear space
+ * (still held by whoever held it), and new points of interest turn up, NEXUS_MAP.refreshPerFaction in each faction's
+ * half and NEXUS_MAP.refreshContested in the contested middle. New ones appear in unclaimed clear space, or at the edge
+ * of the map's sectors when there is none, never right next to a home. Mutates `c`.
+ */
+export function refreshSectors(c: Campaign, rand: Rand = Math.random): Refresh {
+  const cleared: Sector[] = [];
+  const fresh: Sector[] = [];
+  const used = new Set(c.sectors.map((s) => s.name));
+  const named = (type: SectorType) => {
+    let r = rollSector(type, rand);
+    for (let i = 0; i < 20 && used.has(r.name); i++) r = rollSector(type, rand);
+    used.add(r.name);
+    return r;
+  };
+
+  for (const s of c.sectors) {
+    if (s.type !== 'void' || !s.rewardClaimed) continue;
+    cleared.push(structuredClone(s));
+    const r = named('empty');
+    s.type = 'empty';
+    s.name = r.name;
+    const was = cleared[cleared.length - 1].name;
+    s.notes = `Where ${/hulk/i.test(was) ? was : `the space hulk ${was}`} drifted until it was picked clean.`;
+    delete s.benefit;
+    delete s.rewardClaimed;
+    delete s.modifiers;
+    delete s.difficulty;
+  }
+
+  const map = c.map;
+  if (!map) return { cleared, fresh };
+  const homes = c.sectors.filter((s): s is Sector & Hex => s.type === 'home' && isPlaced(s));
+  const spawns = c.sectors.filter((s): s is Sector & Hex => s.type === 'voidspawn' && isPlaced(s));
+  // Nearer one home than any other is that faction's half; ties and the Voidspawn's surroundings are the middle (-1).
+  const regionOf = (x: Hex) => {
+    if (spawns.some((v) => hexDistance(v, x) < 2)) return -1;
+    const d = homes.map((h) => hexDistance(h, x));
+    const best = Math.min(...d);
+    return d.filter((n) => n === best).length === 1 ? d.indexOf(best) : -1;
+  };
+  const weights = Object.entries(NEXUS_MAP.poiWeights) as [SectorType, number][];
+  const kind = () => {
+    let roll = rand() * weights.reduce((n, [, w]) => n + w, 0);
+    for (const [t, w] of weights) if ((roll -= w) < 0) return t;
+    return weights[0][0];
+  };
+
+  const spawn = (region: number, near?: Hex) => {
+    const ok = (x: Hex) => regionOf(x) === region && homes.every((h) => hexDistance(h, x) >= 2);
+    let options: Hex[] = c.sectors.filter((s): s is Sector & Hex => isPlaced(s) && s.type === 'empty' && !s.owner && ok(s));
+    if (!options.length) {
+      const taken = new Set(c.sectors.filter(isPlaced).map((s) => hexKey(s.q!, s.r!)));
+      const edge = new Map<string, Hex>();
+      for (const s of c.sectors.filter(isPlaced))
+        for (const n of neighbors(s as Hex)) if (inBounds(map, n) && !taken.has(hexKey(n.q, n.r)) && ok(n)) edge.set(hexKey(n.q, n.r), n);
+      options = [...edge.values()];
+    }
+    let cell: Hex | undefined;
+    let low = Infinity;
+    for (const x of options) {
+      const v = (near ? hexDistance(near, x) : 0) + rand() * 3;
+      if (v < low) [cell, low] = [x, v];
+    }
+    if (!cell) return;
+    const type = kind();
+    const r = named(type);
+    let s = c.sectors.find((x) => x.q === cell!.q && x.r === cell!.r);
+    if (!s) c.sectors.push((s = { id: uid(), name: '', type, notes: '', q: cell.q, r: cell.r }));
+    s.type = type;
+    s.name = r.name;
+    s.notes = r.notes;
+    if (r.benefit) s.benefit = r.benefit;
+    else delete s.benefit;
+    delete s.rewardClaimed;
+    delete s.modifiers;
+    delete s.difficulty;
+    fresh.push(s);
+  };
+  homes.forEach((h, i) => {
+    if (!h.owner) return;
+    for (let k = 0; k < NEXUS_MAP.refreshPerFaction; k++) spawn(i, h);
+  });
+  for (let k = 0; k < NEXUS_MAP.refreshContested; k++) spawn(-1, spawns[0]);
+  return { cleared, fresh };
+}
+
+/** Groups of neighbouring sectors, biggest first. */
+function components(placed: (Sector & Hex)[]): (Sector & Hex)[][] {
+  const byKey = new Map(placed.map((s) => [hexKey(s.q, s.r), s]));
+  const seen = new Set<string>();
+  const out: (Sector & Hex)[][] = [];
+  for (const start of placed) {
+    if (seen.has(hexKey(start.q, start.r))) continue;
+    const group: (Sector & Hex)[] = [];
+    const queue = [start];
+    seen.add(hexKey(start.q, start.r));
+    while (queue.length) {
+      const s = queue.pop()!;
+      group.push(s);
+      for (const n of neighbors(s)) {
+        const t = byKey.get(hexKey(n.q, n.r));
+        if (t && !seen.has(hexKey(t.q, t.r))) {
+          seen.add(hexKey(t.q, t.r));
+          queue.push(t);
+        }
+      }
+    }
+    out.push(group);
+  }
+  return out.sort((a, b) => b.length - a.length);
+}
+
+/** The fewest free hexes that connect `from` to a hex in `to`, not counting either end. */
+function shortestPath(from: Hex[], to: Set<string>, free: (h: Hex) => boolean): Hex[] | undefined {
+  const prev = new Map<string, Hex | null>();
+  const queue: Hex[] = [];
+  for (const h of from) {
+    prev.set(hexKey(h.q, h.r), null);
+    queue.push(h);
+  }
+  for (let i = 0; i < queue.length; i++) {
+    const h = queue[i];
+    for (const n of neighbors(h)) {
+      const k = hexKey(n.q, n.r);
+      if (prev.has(k)) continue;
+      if (to.has(k)) {
+        const path: Hex[] = [];
+        for (let x = h; prev.get(hexKey(x.q, x.r)); x = prev.get(hexKey(x.q, x.r))!) path.push(x);
+        return path;
+      }
+      if (!free(n)) continue;
+      prev.set(k, h);
+      queue.push(n);
+    }
+  }
+  return undefined;
 }
 
 /** True if every placed sector can be reached from every other through neighbouring sectors. */

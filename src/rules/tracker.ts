@@ -5,6 +5,7 @@ import { emptyUnitBattle, unitName, type BattleInput } from './battle';
 import { benefitOf, ECHOES, factionName, ORGANIZED_STRIKE, ownedSectors } from './nexus';
 import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
 import { aiStyleFor, type AiStyle } from './aiTrees';
+import { aiDefended, modifierOf } from './difficulty';
 
 // The battle tracker: one game in progress, scored from the mission it was started with.
 // The mission is copied in, so editing the library mid-game doesn't change a running battle.
@@ -279,6 +280,8 @@ export function nexusNotes(b: TrackedBattle, c: Campaign | undefined, forces: Fo
     const defenders = b.sides.filter((x) => x.team !== b.attacker);
     if (sector.reinforced && defenders.length)
       notes.push(`${defenders.map((x) => x.name).join(' & ')} ${defenders.length > 1 ? 'defend' : 'defends'} a Reinforced sector: +200 Supply Limit.`);
+    if (sector.difficulty !== undefined && aiDefended(sector)) notes.push(`${sector.name}'s AI garrison: ${sector.difficulty} Supply.`);
+    for (const m of (sector.modifiers ?? []).map(modifierOf)) if (m) notes.push(`Sector modifier, ${m.name}: ${m.desc}`);
     for (const x of membersOf(b, b.attacker))
       if (x.manipulations.some((m) => m.text.startsWith(ORGANIZED_STRIKE))) notes.push(`${x.name} attacks with an Organized Strike: +200 Supply Limit.`);
   }

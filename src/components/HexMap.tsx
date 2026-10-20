@@ -9,8 +9,10 @@ import {
 } from '../rules/hexmap';
 import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionColor, factionName, homeChallengeBlock, isStronghold, sidesOf } from '../rules/nexus';
 import { pickSpread, spreadInto, spreadTargets } from '../rules/voidspawn';
+import { aiDefended, rateSectors } from '../rules/difficulty';
 import { href } from '../route';
 import { Modal, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
+import SectorDanger from './SectorDanger';
 
 type SetC = (fn: (c: Campaign) => void) => void;
 type Tool = 'select' | 'type' | 'owner' | 'move' | 'unplace';
@@ -285,6 +287,7 @@ function MapEditor({ c, setC, onRecord }: { c: Campaign; setC: SetC; onRecord: (
                   <text x={p.x} y={p.y + 21} className="hex-name">{s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name}</text>
                   {s.reinforced && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Reinforced</title>⛨</text>}
                   {s.type === 'void' && s.rewardClaimed && <text x={p.x + 15} y={p.y - 17} className="hex-mark"><title>Reward claimed</title>✓</text>}
+                  {s.difficulty !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff"><title>AI garrison: {s.difficulty} Supply</title>{s.difficulty}</text>}
                 </g>
               );
             })}
@@ -349,6 +352,7 @@ function SectorView({ c, s, onEdit, onRecord }: { c: Campaign; s: Sector; onEdit
         {s.type === 'void' && s.rewardClaimed && <span className="tag">✓ Reward claimed</span>}
       </div>
       <p className="small">{benefit ? <><b>{benefit.name}:</b> {benefit.desc}</> : SECTOR_TYPES[s.type].desc}</p>
+      <SectorDanger s={s} />
       {s.notes && <p className="small lore">{s.notes}</p>}
       {games.length > 0 && (
         <div className="small">
@@ -475,12 +479,17 @@ function EmptyHex({ c, h, unplaced, setC }: { c: Campaign; h: Hex; unplaced: Sec
 }
 
 function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose: () => void }) {
-  const base = c.map ?? defaultMap(c.factions.length);
+  const forces = useStore().state.forces;
+  // Never smaller than the default, so an old small map grows to fit the default sector counts.
+  const fit = defaultMap(c.factions.length);
+  const base = { cols: Math.max(fit.cols, c.map?.cols ?? 0), rows: Math.max(fit.rows, c.map?.rows ?? 0) };
   const [o, setO] = useState<GenOptions>({
-    cols: base.cols, rows: base.rows, seed: randomSeed(), counts: defaultCounts(c.factions.length), startingSectors: 1,
+    cols: base.cols, rows: base.rows, seed: randomSeed(), counts: defaultCounts(c.factions.length, base.cols, base.rows), startingSectors: 1,
     replace: c.sectors.some((s) => !isStronghold(s)),
   });
   const set = (p: Partial<GenOptions>) => setO({ ...o, ...p });
+  // A new size resets the counts to fill the same share of it.
+  const resize = (cols: number, rows: number) => set({ cols, rows, counts: defaultCounts(c.factions.length, cols, rows) });
   const setCount = (t: keyof GenCounts, n: number) => set({ counts: { ...o.counts, [t]: n } });
   const total = c.factions.length + Object.values(o.counts).reduce((a, b) => a + b, 0);
   const tooSmall = total > o.cols * o.rows;
@@ -488,7 +497,10 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
 
   const run = () => {
     if (o.replace && keep && !confirmAction(`Replace mode deletes ${keep} sector${keep === 1 ? '' : 's'} (with their lore and art). Continue?`)) return;
-    setC((d) => generateMap(d, o));
+    setC((d) => {
+      generateMap(d, o);
+      rateSectors(d, forces, rng(o.seed + ':mods'), { reroll: true });
+    });
     toast('Map generated.');
     onClose();
   };
@@ -499,8 +511,8 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
       {c.factions.length === 0 && <p className="small" style={{ color: 'var(--warn)' }}>Add the factions first — each one's home sector is spread across the map.</p>}
       <div className="cols-2">
         <div className="fields">
-          <label className="field">Columns<Stepper value={o.cols} min={3} onChange={(n) => set({ cols: Math.min(n, 30) })} /></label>
-          <label className="field">Rows<Stepper value={o.rows} min={3} onChange={(n) => set({ rows: Math.min(n, 30) })} /></label>
+          <label className="field">Columns<Stepper value={o.cols} min={3} onChange={(n) => resize(Math.min(n, 30), o.rows)} /></label>
+          <label className="field">Rows<Stepper value={o.rows} min={3} onChange={(n) => resize(o.cols, Math.min(n, 30))} /></label>
           <label className="field span-all">
             Seed
             <span className="row"><input value={o.seed} onChange={(e) => set({ seed: e.target.value })} /><button onClick={() => set({ seed: randomSeed() })} title="New seed">🎲</button></span>

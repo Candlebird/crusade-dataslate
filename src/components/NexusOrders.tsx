@@ -3,6 +3,7 @@ import { useCloud } from '../cloud/CloudSync';
 import { useStore } from '../model/store';
 import type { Campaign, Force } from '../model/types';
 import { detachmentName } from '../rules/detachments';
+import { aiDefended } from '../rules/difficulty';
 import { ECHOES, currentRound, factionName } from '../rules/nexus';
 import { HOLD, attackTargets, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
 import { spreadsAt, nextThreat } from '../rules/rounds';
@@ -121,7 +122,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
                   <option value={HOLD}>Hold: no attack</option>
                   {targets.length > 0 && (
                     <optgroup label="Attack">
-                      {targets.map((s) => <option key={s.id} value={s.id}>{s.name} ({factionName(c, s.owner)})</option>)}
+                      {targets.map((s) => <option key={s.id} value={s.id}>{s.name} ({factionName(c, s.owner)}){s.difficulty !== undefined && aiDefended(s) ? ` — ${s.difficulty} Supply` : ''}</option>)}
                     </optgroup>
                   )}
                 </select>

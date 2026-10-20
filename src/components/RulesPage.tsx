@@ -7,7 +7,7 @@ import {
   type RelicDef, type RelicTier, type RewardTableKey, type TableEntry,
 } from '../rules/data';
 import {
-  ANOMALY_TABLE, BENEFITS, COMBAT_MANIPULATIONS, ECHOES, NEXUS_ROUNDS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE,
+  ANOMALY_TABLE, BENEFITS, COMBAT_MANIPULATIONS, ECHOES, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE,
 } from '../rules/nexusData';
 import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
 import { relicHolderText, relicHolders } from '../rules/engine';
@@ -321,7 +321,7 @@ function NexusRules() {
           the <a href={href.campaign()}>Nexus Wars</a> page.
         </p>
         <Toc items={[
-          ['n-map', 'Sectors'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'],
+          ['n-map', 'Sectors'], ['n-danger', 'Difficulty & modifiers'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'],
           ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
           ['n-shop', 'Umbra Shard shop'],
         ]} />
@@ -336,6 +336,11 @@ function NexusRules() {
         <table className="compact small">
           <tbody>{Object.values(SECTOR_TYPES).map((t) => <tr key={t.label}><td><b>{t.label}</b></td><td>{t.desc}</td></tr>)}</tbody>
         </table>
+      </Section>
+
+      <Section id="n-danger" title="Difficulty & sector modifiers">
+        <Prose lines={NEXUS_TEXT.difficulty} />
+        <Entries title="Sector modifiers" entries={SECTOR_MODIFIERS} />
       </Section>
 
       <Section id="n-benefits" title="Benefits">

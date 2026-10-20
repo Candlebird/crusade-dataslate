@@ -269,6 +269,10 @@ export interface Sector {
   reinforced?: boolean;
   /** Void one-off reward already taken. */
   rewardClaimed?: boolean;
+  /** Nexus Wars difficulty: the Supply of the AI garrison holding it, recalculated each round (rules/difficulty). */
+  difficulty?: number;
+  /** Sector modifier ids (SECTOR_MODIFIERS) that favour its defender. */
+  modifiers?: string[];
   /** Axial hex coordinates on the campaign map; unset = not placed. */
   q?: number;
   r?: number;
@@ -316,6 +320,8 @@ export interface RoundSnapshot {
   holdings: Record<string, string[]>;
   /** Faction id → catch-up Umbra Shards. */
   underdog: Record<string, number>;
+  /** Held sectors as they were when the round ended, for any the map refresh changed (a space hulk that drifted off). */
+  was?: Sector[];
 }
 
 export interface CampaignMap {
