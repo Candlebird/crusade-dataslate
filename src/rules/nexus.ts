@@ -61,7 +61,7 @@ export function changeHands(s: Sector, owner: string, undo: NonNullable<Campaign
   }
 }
 
-/** Apply a reported sector game to the campaign. Home sectors and Voidspawns never change hands. */
+/** Apply a reported sector game to the campaign. Home sectors and Voidspawns never change hands. Skirmishes (no sector) are only logged. */
 export function recordSectorGame(c: Campaign, e: CampaignEvent) {
   e.round ??= currentRound(c);
   c.log.push(e);
@@ -199,6 +199,13 @@ export function nexusGeneration(c: Campaign | undefined, factionId: string | und
     } else notes.push('Held your home sector. Log the game with the challenger to claim one round of their sector income.');
   }
 
+  if (!fought && won) {
+    const wins = c.log.filter((e) => e.skirmish && e.winner === factionId && (e.round ?? 1) === ctx.round).length;
+    notes.push(wins < NEXUS_ROUNDS.assetsMax
+      ? `Skirmish win: +1 Strategic Asset for ${factionName(c, factionId)} to spend in this round's Battle (${wins + 1} of ${NEXUS_ROUNDS.assetsMax}).`
+      : `Skirmish win: ${factionName(c, factionId)} already has its ${NEXUS_ROUNDS.assetsMax} Strategic Assets this round.`);
+    if (vsAi) notes.push(`A patrol against the ${ECHOES.name}: their threat goes down ${NEXUS_ROUNDS.threatPerPatrolWin} at the round's end.`);
+  }
   items.push({ key: 'matchBonus', kind: 'matchBonus', source: 'Match bonus', us: NEXUS_ROUNDS.matchBonusUs });
   const home = homeOf(c, factionId);
   if (won && home?.benefit === 'relicCollector') items.push({ key: home.id, kind: 'relicRoll', source: `${home.name}: Relic Collector` });

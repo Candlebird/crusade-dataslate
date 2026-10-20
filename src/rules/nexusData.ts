@@ -57,6 +57,10 @@ export const NEXUS_ROUNDS = {
   threatPerRound: 1,
   threatPerWin: 1,
   threatPerVoidspawnWin: 2,
+  /** A skirmish won against the Echoes (a patrol) lowers the threat by this. */
+  threatPerPatrolWin: 1,
+  /** Strategic Assets: one per skirmish win, at most this many a round. Unspent ones are lost when the round ends. */
+  assetsMax: 2,
   /** Sectors the Echoes spread into when a round ends, by threat level (index 0 to threatMax). */
   spreadsByThreat: [0, 1, 1, 2, 2, 3, 3],
   /** The Echoes prefer sectors held by the faction with the most sectors: they weigh this many times more. */
@@ -108,6 +112,18 @@ export const COMBAT_MANIPULATIONS = [
   { name: 'Dark Shroud', desc: 'The first time one chosen unit takes wounds, ignore up to 3 of them.' },
 ];
 export const MANIPULATION_PREFIX = 'Combat Manipulation';
+/** What a faction can spend a Strategic Asset on, in the round's Battle. One Asset each. */
+/** Supply Limit a Reinforced sector's defender gets (a Void Echoes stand-in too). */
+export const NEXUS_REINFORCE_BONUS = 200;
+
+export const STRATEGIC_ASSETS: { key: string; name: string; desc: string }[] = [
+  { key: 'mission', name: 'Change of plans', desc: 'Re-roll the mission or the deployment of your Battle.' },
+  { key: 'manipulation', name: 'Covert support', desc: '+1 Combat Manipulation in your Battle (pick it as if you had bought it).' },
+  { key: 'reserve', name: 'Held in reserve', desc: 'One of your units gains Ambush for your Battle.' },
+  { key: 'rerolls', name: 'Fortune favours', desc: '+2 re-rolls in your Battle: each re-rolls one die.' },
+  { key: 'tie', name: 'Right of way', desc: 'Win the tie when another faction attacks the same sector: you fight for it and their attack lapses. If both spend one, play a multiplayer battle.' },
+];
+
 export const ORGANIZED_STRIKE = 'Organized Strike';
 
 export type UmbraBuy = 'rp' | 'knowledge' | 'manipulation' | 'strike' | 'reinforce' | 'expansion' | 'relic' | 'evolution';

@@ -2,7 +2,7 @@ import type { ArmyList, BattleResult, Campaign, CampaignEvent, Force, Settings, 
 import { battlePoints } from './engine';
 import { listUnits } from './lists';
 import { emptyUnitBattle, unitName, type BattleInput } from './battle';
-import { benefitOf, ORGANIZED_STRIKE, ownedSectors } from './nexus';
+import { benefitOf, ECHOES, factionName, ORGANIZED_STRIKE, ownedSectors } from './nexus';
 import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
 import { aiStyleFor, type AiStyle } from './aiTrees';
 
@@ -334,13 +334,27 @@ export function sectorGame(b: TrackedBattle, c: Campaign | undefined, forces: Fo
   const attacker = faction(b.attacker);
   if (!attacker) return { problem: `${teamName(b, b.attacker)} isn't playing for a Nexus faction: load a force linked to one, or set the side to the AI.` };
   const defenders = teamsOf(b).filter((t) => t !== b.attacker).map(faction);
-  const defender = defenders.find((x) => x && x === sector.owner) ?? defenders.find(Boolean) ?? sector.owner ?? '';
+  const standIn = standInFor(b, c, forces);
+  const defender = standIn || (defenders.find((x) => x && x === sector.owner) ?? defenders.find(Boolean) ?? sector.owner ?? '');
   const w = winner(b);
-  const won = w === 'draw' ? '' : faction(w);
+  let won = w === 'draw' ? '' : faction(w);
   if (w !== 'draw' && !won) return { problem: `${teamName(b, w)} won but isn't playing for a Nexus faction, so the map can't tell who takes ${sector.name}.` };
+  if (standIn && won === ECHOES.id) won = standIn;
   const sc = score(b);
-  const notes = `${b.mission.name}: ${teamsOf(b).map((t) => `${teamName(b, t)} ${sc[t]!.total}`).join(', ')} VP.`;
+  const notes = `${b.mission.name}: ${teamsOf(b).map((t) => `${teamName(b, t)} ${sc[t]!.total}`).join(', ')} VP.`
+    + (standIn ? ` The ${ECHOES.name} stood in for ${factionName(c, standIn)}.` : '');
   return { event: { sectorId: sector.id, attacker, defender, winner: won, notes, battleId: b.id } };
+}
+
+/**
+ * The faction an AI defender stands in for: when a player's sector is attacked and they can't make the Battle,
+ * the Void Echoes fight for it, and their win holds the sector for its owner. '' when no one is standing in.
+ */
+export function standInFor(b: TrackedBattle, c: Campaign, forces: Force[]): string {
+  const owner = c.sectors.find((s) => s.id === b.sectorId)?.owner;
+  if (!b.attacker || !owner || owner === ECHOES.id || owner === teamFaction(b, b.attacker, c, forces)) return '';
+  const defenders = teamsOf(b).filter((t) => t !== b.attacker).map((t) => teamFaction(b, t, c, forces));
+  return defenders.length && defenders.every((x) => x === ECHOES.id) ? owner : '';
 }
 
 /** What the post-battle wizard can fill in for one side of a tracked battle. */

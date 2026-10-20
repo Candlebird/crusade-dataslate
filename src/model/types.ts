@@ -300,6 +300,8 @@ export interface CampaignEvent {
   spread?: boolean;
   /** The campaign round it happened in. */
   round?: number;
+  /** A skirmish: a game away from the map (no sector). Only wins are logged: they earn Strategic Assets, and against the Echoes count as patrols. */
+  skirmish?: boolean;
   /** What the game changed, so deleting the entry can put the sector back. */
   undo?: { owner?: string; rewardClaimed?: boolean; reinforced?: boolean };
 }
@@ -335,6 +337,18 @@ export interface Campaign {
   threat?: number;
   /** The rounds that have ended, oldest first (only the last few are kept). */
   rounds?: RoundSnapshot[];
+  /** Strategic Assets spent this round (cleared when the round ends, with any left unspent). */
+  assetsSpent?: AssetUse[];
+}
+
+/** A Strategic Asset a faction spent on the round's Battle. */
+export interface AssetUse {
+  id: string;
+  round: number;
+  factionId: string;
+  /** StrategicAsset key (nexusData.ts). */
+  asset: string;
+  date: string;
 }
 
 export interface RuleText {

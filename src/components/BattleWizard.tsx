@@ -4,7 +4,7 @@ import { claims, sideOfForce, wizardPrefill } from '../rules/tracker';
 import { uid } from '../model/factory';
 import type { BattleResult, Campaign, Force, Unit } from '../model/types';
 import { AGENDAS, MARKED_XP, MAX_AGENDAS, REWARD_TABLES, SCAR_TABLE, type RewardTableKey } from '../rules/data';
-import { emptyNexusPick, nexusEntry, nexusGeneration, type NexusContext, type NexusPick } from '../rules/nexus';
+import { ECHOES, emptyNexusPick, nexusEntry, nexusGeneration, recordSectorGame, type NexusContext, type NexusPick } from '../rules/nexus';
 import { deathDiceCount, deathOutcome, forceTotals, levelForXp, rollDice, rollDie, type DeathOutcome } from '../rules/engine';
 import {
   RESULT_LABEL,
@@ -102,6 +102,18 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
         const sec = d.campaign?.sectors.find((x) => x.id === input.sectorId);
         if (sec) sec.rewardClaimed = true;
       });
+    // A won skirmish goes into the campaign log: it earns a Strategic Asset, and against the Echoes it's a patrol.
+    const battleId = source?.battle.id;
+    if (linked && !input.sectorId && input.result === 'win')
+      update((d) => {
+        const c = d.campaign;
+        if (!c || (battleId && c.log.some((e) => e.skirmish && e.battleId === battleId && e.winner === factionId))) return;
+        recordSectorGame(c, {
+          id: uid(), date: input.date, sectorId: '', attacker: factionId!, defender: input.vsAi ? ECHOES.id : '', winner: factionId!,
+          notes: `${f.name} beat ${input.opponent || (input.vsAi ? ECHOES.name : 'an opponent')}`, skirmish: true, ...(battleId ? { battleId } : {}),
+        });
+        c.updatedAt = new Date().toISOString();
+      });
     if (source && !source.past)
       update((d) => {
         if (d.battle?.id === source.battle.id && !d.battle.recorded.includes(source.side)) d.battle.recorded.push(source.side);
@@ -187,14 +199,19 @@ function SetupStep({ input, set, campaign }: { input: BattleInput; set: (p: Part
           </label>
           {campaign && (
             <label className="field span-all">
-              Nexus Wars sector
+              Nexus Wars game
               <select value={input.sectorId ?? ''} onChange={(e) => {
                 const sec = campaign.sectors.find((x) => x.id === e.target.value);
                 set({ sectorId: sec?.id, sectorName: sec?.name, nexusPicks: {} });
               }}>
-                <option value="">Not a sector game</option>
-                {campaign.sectors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                <option value="">Skirmish (no sector)</option>
+                <optgroup label="Battle over a sector">
+                  {campaign.sectors.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </optgroup>
               </select>
+              <span className="muted small">
+                {input.sectorId ? "The round's Battle: an attack from the sealed orders." : "Any game away from the map. A win earns a Strategic Asset; against the AI it's also a patrol."}
+              </span>
             </label>
           )}
           <label className="field">Your Battle Points<Stepper value={input.myBp} min={0} onChange={(n) => set({ myBp: n })} /></label>

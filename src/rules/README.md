@@ -7,6 +7,7 @@ Crusade and Nexus Wars are homebrew and get rebalanced often, so their numbers a
 | Crusade XP levels, trait/relic/scar tables, relics, requisitions, agendas, reward tables, XP and RP values | `data.ts` |
 | Nexus Wars sector types and benefits, Anomaly and Void tables, Combat Manipulations, Umbra shop | `nexusData.ts` |
 | Nexus Wars round values: match bonus, catch-up bonus, opening rounds, Void Echoes threat and spread, void salvage, Shard Mine roll, Relic Collector discount (`NEXUS_ROUNDS`) | `nexusData.ts` |
+| Strategic Assets earned from skirmish wins (`STRATEGIC_ASSETS`; the per-round cap and patrol threat drop are in `NEXUS_ROUNDS`), Reinforce Supply bonus (`NEXUS_REINFORCE_BONUS`) | `nexusData.ts` |
 | The prose on the in-app **Rules** page (tables there come from the two files above) | `rulesText.ts` |
 | Built-in battle tracker missions: the 18 OPR Advanced Rules missions, deployment styles and the example template | `missions.ts` |
 

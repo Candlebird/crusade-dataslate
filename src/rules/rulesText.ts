@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
+import { ECHOES, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
 // The tables on that page come straight from data.ts and nexusData.ts; this file holds only the text around them,
@@ -63,16 +63,24 @@ export const NEXUS_TEXT = {
     'The Nexus is a hex map of sectors. Each faction starts with a home sector, which can be attacked but never taken, and picks one home benefit. Planets give their owner one benefit, picked when the planet is developed.',
   ],
   rounds: [
-    'The campaign is played in rounds. Play as many matches as your group manages in a round; when everyone is done, the GM ends it on the Nexus Wars page.',
+    'The campaign is played in rounds. Each round has two parts: skirmishes, played whenever you like, and then the Battle, where the sector attacks happen. When the Battle is done, the GM ends the round on the Nexus Wars page.',
     `When a round ends, what every faction holds is noted, and each player claims that round's sector income on their force page with "Claim round income". Income is paid once per round, however many games you played. Missed rounds wait for you: up to ${R.keepRounds} ended rounds can be claimed late.`,
-    `Every match you play in a round also pays ${R.matchBonusUs} Umbra Shard, for up to ${R.matchBonusMax} matches a round, on top of the normal Crusade rewards.`,
-    'Temporary unlocks (a Research station\'s table, an Anomaly\'s "all tables") last until your next round income.',
+    `Every match you play in a round, skirmish or Battle, also pays ${R.matchBonusUs} Umbra Shard, for up to ${R.matchBonusMax} matches a round, on top of the normal Crusade rewards.`,
+    `Temporary unlocks (a Research station's table, an Anomaly's "all tables") last until your next round income.`,
+  ],
+  skirmishes: [
+    'Play as many skirmishes as you like during a round, against another player or the AI, with any mission. They earn the full Crusade rewards (XP, levels, reward rolls) and the match bonus, but no sector changes hands.',
+    `Each skirmish your faction wins earns a Strategic Asset, up to ${R.assetsMax} a round. Spend them in the Battle (mark them on the Nexus Wars page so everyone can see). Unspent Assets are lost when the round ends.`,
+    `Patrols: a skirmish won against the ${ECHOES.name} lowers their threat by ${R.threatPerPatrolWin} at the round's end.`,
+    'Record a skirmish in the app by finishing the battle with "Skirmish (no sector)" picked: the win goes into the campaign log.',
   ],
   attacking: [
-    'Unclaimed sectors: challenge another player, and the winner takes the sector, or play a game against the AI.',
-    'Claimed sectors: challenge the owner. The winner takes the sector.',
+    "The Battle: each faction secretly picks one sector to attack this round, or holds. The GM reveals every faction's orders at once, and then the attacks are played. Only Battle games take sectors, challenge home sectors or earn the Echoes bounty.",
+    'Unclaimed sectors: the attacker plays the AI for it, unless another faction attacks it too: then the two fight each other for it. Claimed sectors: the owner defends. The winner takes the sector.',
     'Reinforcements stay with the sector, not the faction: when a sector changes hands, any Reinforce Sector on it is lost.',
-    'Games for a sector must be reported to the GM (or recorded in the app) so the map stays current.',
+    `Defender can't make it: the ${ECHOES.name} stand in. Play against the AI, with an army at the attacker's points (+${NEXUS_REINFORCE_BONUS} if the sector is Reinforced). If the Echoes win, the owner holds the sector; if the attacker wins, they take it.`,
+    "Attacker can't make it: the attack lapses, and the faction keeps its orders slot: it may make the same attack next round.",
+    'Battles over a sector must be reported to the GM (or recorded in the app) so the map stays current.',
   ],
   home: [
     `A home sector can be challenged at most once per round, and not at all in the opening rounds (until round ${R.graceRounds + 1}).`,
@@ -80,7 +88,7 @@ export const NEXUS_TEXT = {
   ],
   echoes: [
     `The ${ECHOES.name} are the AI's faction. They hold the Voidspawn sectors, which can be attacked but never taken, and spread out from their territory into neighbouring sectors when a round ends.`,
-    `Their threat starts at ${R.threatStart} and runs from 0 to ${R.threatMax}. When a round ends it rises by ${R.threatPerRound}, then falls by ${R.threatPerWin} for every win against the Echoes that round (${R.threatPerVoidspawnWin} for a win at a Voidspawn). The new threat sets how many sectors they spread into.`,
+    `Their threat starts at ${R.threatStart} and runs from 0 to ${R.threatMax}. When a round ends it rises by ${R.threatPerRound}, then falls by ${R.threatPerWin} for every Battle won against the Echoes that round (${R.threatPerVoidspawnWin} for a win at a Voidspawn) and ${R.threatPerPatrolWin} for every patrol. The new threat sets how many sectors they spread into.`,
     `They go after whoever is ahead: sectors held by the faction with the most sectors are ${R.leaderWeight} times as likely to be hit. In the opening rounds (rounds 1–${R.graceRounds}) they only spread into unclaimed sectors.`,
     `Bounty: retaking a sector from the ${ECHOES.name} earns a free roll on the AI special table, on top of the match rewards.`,
   ],

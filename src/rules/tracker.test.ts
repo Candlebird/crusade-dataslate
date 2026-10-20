@@ -9,6 +9,7 @@ import {
   addSide,
   atSector,
   sectorGame,
+  standInFor,
   cycleHolder,
   leaders,
   loadForce,
@@ -306,6 +307,24 @@ describe('battles over a Nexus sector', () => {
     atSector(b, c, fs, DEFAULT_SETTINGS, 'v', 'red');
     setHolder(b, 0, 'B');
     expect(sectorGame(b, c, fs)).toMatchObject({ event: { attacker: 'red', defender: 'ai', winner: 'ai' } });
+  });
+
+  it("lets the Void Echoes stand in for a defender who can't make it", () => {
+    const c = campaign();
+    const fs = forces();
+    const b = newBattle(STANDARD_MISSION, 'b', '', () => 0, FORMATS.find((f) => f.label === '1 v AI'));
+    atSector(b, c, fs, DEFAULT_SETTINGS, 'p', 'red');
+    expect(standInFor(b, c, fs)).toBe('blue');
+    setHolder(b, 0, 'B');
+    expect(sectorGame(b, c, fs)).toMatchObject({ event: { attacker: 'red', defender: 'blue', winner: 'blue', notes: expect.stringContaining('stood in for Blue') } });
+    setHolder(b, 0, 'A');
+    const game = sectorGame(b, c, fs) as { event: any };
+    expect(game.event).toMatchObject({ defender: 'blue', winner: 'red' });
+    recordSectorGame(c, { id: 'e', date: '', ...game.event });
+    expect(c.sectors[0].owner).toBe('red');
+    // An unclaimed sector has no one to stand in for.
+    b.sectorId = 'v';
+    expect(standInFor(b, c, fs)).toBe('');
   });
 
   it("explains when the result can't be mapped onto the campaign", () => {

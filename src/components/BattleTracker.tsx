@@ -47,7 +47,7 @@ import {
 } from '../rules/tracker';
 import { AI_TREES } from '../rules/aiTrees';
 import { echoesBook, randomEchoes } from '../rules/echoForce';
-import { ECHOES } from '../rules/nexusData';
+import { ECHOES, NEXUS_REINFORCE_BONUS } from '../rules/nexusData';
 import { forceTotals } from '../rules/engine';
 import { MAX_PLAYERS, randomForces, randomFormat, type Format } from '../rules/randomBattle';
 import AiActivation from './AiActivation';
@@ -344,6 +344,13 @@ function StartBattle({ sectorId, preset }: { sectorId?: string; preset?: string 
               </select>
             </label>
             <p className="muted small">A faction with just one force here gets it loaded for you. <a href={href.tracker()}>Start an ordinary battle instead</a></p>
+            {sector.owner && sector.owner !== ECHOES.id && (
+              <p className="small">
+                <b>{factionName(c, sector.owner)} can't make it?</b> The {ECHOES.name} stand in: play <b>1 v AI</b> and generate their army at your points
+                {sector.reinforced ? ` +${NEXUS_REINFORCE_BONUS} (the sector is Reinforced)` : ''}. If they win, {factionName(c, sector.owner)} holds the sector.{' '}
+                {format.label !== '1 v AI' && <button className="ghost small" onClick={() => choose(FORMATS.find((f) => f.label === '1 v AI')!)}>Use a stand-in</button>}
+              </p>
+            )}
           </>
         )}
         <h3>Players</h3>
@@ -527,7 +534,9 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
 
   // The AI can field a random Void Echoes army, sized to match the sides it's up against.
   const book = echoesBook(state.books);
-  const enemies = b.sides.filter((x) => x.team !== side.team).reduce((n, x) => n + sidePoints(x), 0);
+  // Standing in for a player who can't defend a Reinforced sector, they get its +200 Supply Limit too.
+  const reinforced = !!b.attacker && side.team !== b.attacker && !!state.campaign?.sectors.find((x) => x.id === b.sectorId)?.reinforced;
+  const enemies = b.sides.filter((x) => x.team !== side.team).reduce((n, x) => n + sidePoints(x), 0) + (reinforced ? NEXUS_REINFORCE_BONUS : 0);
   const [target, setTarget] = useState(() => enemies || 1000);
   const generate = () => {
     if (!book) return;
@@ -590,7 +599,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
                 <Stepper value={target} step={50} min={50} onChange={setTarget} />
                 <span className="small muted">pts</span>
                 <button onClick={generate} title="Build a random army from the Void Echoes book, up to the target points">🎲 Generate</button>
-                {enemies > 0 && enemies !== target && <button className="ghost small" onClick={() => setTarget(enemies)}>Match {enemies} pts</button>}
+                {enemies > 0 && enemies !== target && <button className="ghost small" onClick={() => setTarget(enemies)}>Match {enemies} pts{reinforced ? ' (Reinforced)' : ''}</button>}
                 {!!side.roster?.length && <a className="btn" href={href.sideSheet(side.id)}>📄 Army sheet</a>}
               </div>
             ) : (

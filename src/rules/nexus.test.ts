@@ -29,6 +29,17 @@ describe('nexus generation', () => {
     expect(kinds(nexusGeneration(campaign(), undefined, '', 'win', false))).toEqual([]);
   });
 
+  it('notes the Strategic Asset a skirmish win earns, and a patrol against the AI', () => {
+    const c = campaign();
+    expect(nexusGeneration(c, 'A', '', 'win', true).notes).toEqual([
+      expect.stringContaining('+1 Strategic Asset for Alpha'),
+      expect.stringContaining('patrol'),
+    ]);
+    expect(nexusGeneration(c, 'A', '', 'loss', false).notes).toEqual([]);
+    for (const id of ['s1', 's2']) recordSectorGame(c, { id, date: '', sectorId: '', attacker: 'A', defender: 'B', winner: 'A', notes: '', skirmish: true });
+    expect(nexusGeneration(c, 'A', '', 'win', false).notes).toEqual([expect.stringContaining('already has its 2')]);
+  });
+
   it('gives the void reward for beating the AI there, once', () => {
     const c = campaign();
     expect(kinds(nexusGeneration(c, 'A', 'v', 'win', true))).toContain('void:void');

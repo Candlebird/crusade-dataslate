@@ -1,15 +1,18 @@
-import type { Campaign, Force, ForceNexus, RoundSnapshot, Sector } from '../model/types';
+import type { AssetUse, Campaign, Force, ForceNexus, RoundSnapshot, Sector } from '../model/types';
 import { CATEGORIES } from './data';
 import type { Rand } from './hexmap';
 import {
-  ANOMALY_TABLE, ECHOES, MANIPULATION_PREFIX, NEXUS_ROUNDS, currentRound, emptyNexusPick, factionName, incomeItems,
+  ANOMALY_TABLE, ECHOES, MANIPULATION_PREFIX, NEXUS_ROUNDS, STRATEGIC_ASSETS, currentRound, emptyNexusPick, factionName, incomeItems,
   type NexusItem, type NexusPick,
 } from './nexus';
 import { pickSpread, spreadInto } from './voidspawn';
 
-// Nexus Wars rounds. The GM ends a round when the group has played what it's going to play; then:
+// Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
+// a Strategic Asset, and one against the Echoes is a patrol). The round closes with the Battle: the sealed-order attacks.
+// The GM then ends the round:
 //  - every faction's holdings are noted, and each force claims that round's sector income whenever its player is ready,
-//  - the Void Echoes' threat moves (up each round, down for every win against them), and they spread that many sectors.
+//  - the Void Echoes' threat moves (up each round, down for every win against them), and they spread that many sectors,
+//  - unspent Strategic Assets are lost.
 // Values live in NEXUS_ROUNDS (nexusData.ts).
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -45,24 +48,54 @@ export function underdogBonus(c: Campaign): Record<string, number> {
   return out;
 }
 
-/** Wins against the Void Echoes in a round (at the Voidspawn counted apart). */
+/** Wins against the Void Echoes in a round: sector games, at the Voidspawn, and skirmishes (patrols), counted apart. */
 export function echoWins(c: Campaign, round: number) {
   let wins = 0;
   let voidspawn = 0;
+  let patrols = 0;
   for (const e of c.log) {
     if (e.spread || (e.round ?? 1) !== round || !e.winner || e.winner === ECHOES.id) continue;
     if (e.attacker !== ECHOES.id && e.defender !== ECHOES.id) continue;
-    if (c.sectors.find((s) => s.id === e.sectorId)?.type === 'voidspawn') voidspawn++;
+    if (e.skirmish) patrols++;
+    else if (c.sectors.find((s) => s.id === e.sectorId)?.type === 'voidspawn') voidspawn++;
     else wins++;
   }
-  return { wins, voidspawn };
+  return { wins, voidspawn, patrols };
 }
 
 /** Where the threat is heading if the round ended now. */
 export function nextThreat(c: Campaign) {
-  const { wins, voidspawn } = echoWins(c, currentRound(c));
+  const { wins, voidspawn, patrols } = echoWins(c, currentRound(c));
   const R = NEXUS_ROUNDS;
-  return clamp(threatOf(c) + R.threatPerRound - wins * R.threatPerWin - voidspawn * R.threatPerVoidspawnWin, 0, R.threatMax);
+  return clamp(threatOf(c) + R.threatPerRound - wins * R.threatPerWin - voidspawn * R.threatPerVoidspawnWin - patrols * R.threatPerPatrolWin, 0, R.threatMax);
+}
+
+// ---- skirmishes and Strategic Assets ----
+
+/** Skirmishes a faction has won this round. */
+export const skirmishWins = (c: Campaign, factionId: string) =>
+  c.log.filter((e) => e.skirmish && e.winner === factionId && (e.round ?? 1) === currentRound(c)).length;
+
+/** Strategic Assets a faction has this round: earned (one per skirmish win, capped), spent, and left. */
+export function assetsOf(c: Campaign, factionId: string) {
+  const earned = Math.min(NEXUS_ROUNDS.assetsMax, skirmishWins(c, factionId));
+  const spent = (c.assetsSpent ?? []).filter((a) => a.factionId === factionId && a.round === currentRound(c));
+  return { earned, spent, left: Math.max(0, earned - spent.length) };
+}
+
+export const assetName = (key: string) => STRATEGIC_ASSETS.find((a) => a.key === key)?.name ?? key;
+
+/** Spend one of a faction's Strategic Assets this round. False when it has none left. */
+export function spendAsset(c: Campaign, factionId: string, asset: string, id: string, date: string): boolean {
+  if (assetsOf(c, factionId).left < 1) return false;
+  const use: AssetUse = { id, round: currentRound(c), factionId, asset, date };
+  c.assetsSpent = [...(c.assetsSpent ?? []), use];
+  return true;
+}
+
+/** Take back a spent Asset (it was spent by mistake). */
+export function refundAsset(c: Campaign, id: string) {
+  c.assetsSpent = (c.assetsSpent ?? []).filter((a) => a.id !== id);
 }
 
 export interface RoundEnd {
@@ -71,6 +104,7 @@ export interface RoundEnd {
   threat: number;
   wins: number;
   voidspawnWins: number;
+  patrols: number;
   spread: Sector[];
 }
 
@@ -82,7 +116,7 @@ export function endRound(c: Campaign, rand: Rand = Math.random, date = new Date(
   const snapshot: RoundSnapshot = { round, date, holdings, underdog: underdogBonus(c) };
 
   const threatBefore = threatOf(c);
-  const { wins, voidspawn } = echoWins(c, round);
+  const { wins, voidspawn, patrols } = echoWins(c, round);
   const threat = nextThreat(c);
 
   // The Echoes go for whoever is ahead; while the campaign is young, they only take unclaimed space.
@@ -99,7 +133,9 @@ export function endRound(c: Campaign, rand: Rand = Math.random, date = new Date(
   c.rounds = [...(c.rounds ?? []), snapshot].slice(-NEXUS_ROUNDS.keepRounds);
   c.threat = threat;
   c.round = round + 1;
-  return { round, threatBefore, threat, wins, voidspawnWins: voidspawn, spread };
+  // Strategic Assets don't carry over.
+  delete c.assetsSpent;
+  return { round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread };
 }
 
 /** One line for the log / a toast. */

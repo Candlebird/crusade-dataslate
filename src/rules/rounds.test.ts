@@ -3,7 +3,7 @@ import { newForce } from '../model/factory';
 import type { Campaign } from '../model/types';
 import { ECHOES, emptyNexus } from './nexus';
 import { HOLD, revealOrders, type PlayerOrders } from './orders';
-import { claimableRounds, endRound, leaders, nextThreat, resolveRoundIncome, roundIncomeItems, underdogBonus } from './rounds';
+import { assetsOf, claimableRounds, endRound, leaders, nextThreat, refundAsset, resolveRoundIncome, roundIncomeItems, spendAsset, underdogBonus } from './rounds';
 
 // Alpha's three sectors ring the Voidspawn, with an unclaimed one beside it; Bravo is far away with one.
 function campaign(): Campaign {
@@ -60,6 +60,37 @@ describe('campaign rounds', () => {
     c.log.push({ ...win('u', 'B'), round: 0 }); // an older round doesn't count
     const r = endRound(c, () => 0);
     expect(r).toMatchObject({ wins: 1, voidspawnWins: 1, threat: 1 });
+  });
+
+  it('counts a skirmish won against the Echoes as a patrol', () => {
+    const c = campaign();
+    c.threat = 3;
+    c.log.push({ ...win('', 'A'), id: 's1', skirmish: true });
+    c.log.push({ ...win('', 'B'), id: 's2', skirmish: true, defender: 'A', winner: 'B' }); // a skirmish between players isn't
+    expect(nextThreat(c)).toBe(3);
+    expect(endRound(c, () => 0)).toMatchObject({ wins: 0, voidspawnWins: 0, patrols: 1, threat: 3 });
+  });
+
+  it('earns a Strategic Asset per skirmish won, up to the cap, and loses unspent ones at the round end', () => {
+    const c = campaign();
+    const skirmish = (id: string, winner: string) => c.log.push({ ...win('', winner), id, skirmish: true });
+    expect(assetsOf(c, 'A')).toMatchObject({ earned: 0, left: 0 });
+    expect(spendAsset(c, 'A', 'rerolls', 'x', '')).toBe(false);
+    skirmish('s1', 'A');
+    skirmish('s2', 'A');
+    skirmish('s3', 'A');
+    win('p1', 'A'); // a Battle doesn't earn one
+    expect(assetsOf(c, 'A')).toMatchObject({ earned: 2, left: 2 });
+    expect(spendAsset(c, 'A', 'rerolls', 'x', '')).toBe(true);
+    expect(spendAsset(c, 'A', 'tie', 'y', '')).toBe(true);
+    expect(spendAsset(c, 'A', 'mission', 'z', '')).toBe(false);
+    expect(assetsOf(c, 'A').spent.map((a) => a.asset)).toEqual(['rerolls', 'tie']);
+    refundAsset(c, 'x');
+    expect(assetsOf(c, 'A').left).toBe(1);
+    expect(assetsOf(c, 'B').earned).toBe(0);
+    endRound(c, () => 0);
+    expect(c.assetsSpent).toBeUndefined();
+    expect(assetsOf(c, 'A')).toMatchObject({ earned: 0, left: 0 });
   });
 
   it('after the opening rounds, goes for the leader and breaks their reinforcements', () => {
