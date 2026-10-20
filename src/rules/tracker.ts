@@ -99,6 +99,8 @@ export interface TrackedBattle {
   deploymentStyle?: string;
   notes: string;
   ended: boolean;
+  /** Settled by auto-battle instead of being played: who won, and the points of enemy each team destroyed. */
+  auto?: { winner: TeamKey | 'draw'; dealt: Partial<Record<TeamKey, number>> };
   /** Ids of the sides already recorded in their force's crusade log. */
   recorded: string[];
 }
@@ -270,8 +272,9 @@ export function score(b: TrackedBattle): Partial<Record<TeamKey, TeamScore>> {
 
 /** The teams on the most VP: one is a win, several a draw between them. */
 export function leaders(b: TrackedBattle): TeamKey[] {
-  const s = score(b);
   const teams = teamsOf(b);
+  if (b.auto) return b.auto.winner === 'draw' ? teams : teams.filter((t) => t === b.auto!.winner);
+  const s = score(b);
   const top = Math.max(...teams.map((t) => s[t]!.total));
   return teams.filter((t) => s[t]!.total === top);
 }
@@ -458,7 +461,9 @@ export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInp
     sectorId: sector?.id ?? input.sectorId,
     sectorName: sector?.name ?? input.sectorName,
     notes: [
-      `${b.mission.name}, ${scores} VP after round ${b.round}.`,
+      b.auto
+        ? `Auto-battle (${b.mission.name}): destroyed ${b.auto.dealt[side.team] ?? 0} pts, lost ${teamsOf(b).filter((t) => t !== side.team).reduce((n, t) => n + (b.auto!.dealt[t] ?? 0), 0)} pts.`
+        : `${b.mission.name}, ${scores} VP after round ${b.round}.`,
       allies.length ? `Allied with ${allies.map((x) => x.name).join(' & ')}.` : '',
       b.notes,
     ].filter(Boolean).join(' '),

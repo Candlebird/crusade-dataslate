@@ -59,6 +59,7 @@ import { SOLO_PATROL } from '../rules/downtimeData';
 import { MAX_PLAYERS, randomForces, randomFormat, type Format } from '../rules/randomBattle';
 import AiActivation from './AiActivation';
 import PatrolModal from './PatrolModal';
+import AutoBattleModal from './AutoBattleModal';
 import { Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 
 /** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
@@ -66,6 +67,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
   const { state, update } = useStore();
   const b = state.battle;
   const sector = state.campaign?.sectors.find((s) => s.id === sectorId);
+  const [auto, setAuto] = useState(false);
   if (!b) return <StartBattle sectorId={sector?.id} preset={attacker} presetForce={forceId} crisis={crisis} />;
 
   const set = (fn: (d: TrackedBattle) => void) => update((s) => void (s.battle && fn(s.battle)));
@@ -114,6 +116,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
         </div>
         <div className="row">
           <a className="btn" href={href.missions()}>Mission library</a>
+          {!b.ended && <button onClick={() => setAuto(true)} title="No time to play it out? Let the units fight it out on their stats">⚡ Auto-battle</button>}
           {!b.ended && <button className="primary" onClick={() => set((d) => void (d.ended = true))}>End battle</button>}
           <button className="danger" onClick={() => confirmAction('Throw away this battle?') && update((s) => void delete s.battle)}>Discard</button>
         </div>
@@ -137,6 +140,8 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
           <p>You came to fight the Nexus Crisis, but this battle is still running. Finish or discard it first.</p>
         </div>
       )}
+
+      {auto && !b.ended && <AutoBattleModal b={b} set={set} onClose={() => setAuto(false)} />}
 
       {b.ended && <Result b={b} set={set} onFinish={finish} game={game} crisis={cg} />}
 
@@ -567,8 +572,9 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
   return (
     <div className="panel result-panel">
       <div className="panel-title">
-        <h2>{title} · {teams.map((t) => sc[t]!.total).join('–')}</h2>
-        <button className="ghost" onClick={() => set((d) => void (d.ended = false))}>Resume</button>
+        <h2>{title} · {b.auto ? `auto-battle, ${teams.map((t) => b.auto!.dealt[t] ?? 0).join('–')} pts destroyed` : teams.map((t) => sc[t]!.total).join('–')}</h2>
+        <button className="ghost" onClick={() => set((d) => { d.ended = false; delete d.auto; })}
+          title={b.auto ? 'Back to the tracker. The auto-battle result is dropped, but its losses and kill XP stay on the units.' : undefined}>Resume</button>
       </div>
       <p className="muted small">Record the result in each crusade force's log. The wizard is filled in from this battle: check it, then apply.</p>
       <div className="row">

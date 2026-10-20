@@ -130,6 +130,12 @@ export default function GuidePage() {
           When a game run in the battle tracker is finished, it's shared with the whole group. Each player then claims their own XP, RP and
           rewards from it, whenever they get to it.
         </p>
+        <p className="muted small">
+          No time to play? Press <b>⚡ Auto-battle</b> on a running battle. Each side picks its force (the other player picks their own, or the AI
+          generates one), and every unit gets an Attack and Defense from its Quality, Defense, weapons, traits, upgrades, relics, scars and
+          level. The units then take turns attacking for 4 rounds; the team that destroys the most points wins (close is a draw). Apply the
+          result and claim it like any other battle: losses and kill XP carry over.
+        </p>
         <Step n={1} title="Open Past battles" where={<a href={href.tracker()}>Battle</a>}>
           <p>Scroll to the <b>Past battles</b> panel at the bottom of the Battle page.</p>
         </Step>

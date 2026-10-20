@@ -586,6 +586,20 @@ fieldset.fields:disabled { opacity: 0.6; }
 .past-sides { display: grid; gap: 0.25rem; margin: 0.35rem 0; }
 .past-sides select { width: auto; }
 .tag[class*='team-'] { border-color: var(--team); color: var(--team); }
+/* Auto-battle: the teams side by side, HP bars and a log of moves. */
+.auto-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; margin-bottom: 0.75rem; }
+.auto-team { border-top: 3px solid var(--team, var(--line)); padding-top: 0.4rem; min-width: 0; }
+.auto-team h3 { color: var(--team); margin: 0 0 0.4rem; }
+.auto-side { margin-bottom: 0.5rem; }
+.auto-side select { width: auto; max-width: 100%; }
+.auto-team summary { cursor: pointer; }
+.auto-hp { margin-bottom: 0.35rem; }
+.auto-hp.dead { opacity: 0.45; }
+.auto-hp-track { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.auto-hp-track > div { height: 100%; background: var(--team); transition: width 0.3s; }
+.auto-log { max-height: 16rem; overflow-y: auto; margin: 0.25rem 0 0.75rem; padding-left: 1.6rem; }
+.auto-log li { padding: 0.15rem 0; }
+.auto-result { border-top: 1px solid var(--line); padding-top: 0.5rem; }
 .mission-rule { padding: 0.4rem 0; border-bottom: 1px solid var(--line); }
 .mission-rule textarea { width: 100%; margin-top: 0.3rem; }
 
