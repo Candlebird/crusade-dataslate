@@ -5,7 +5,7 @@ import { uid } from '../model/factory';
 import type { BattleResult, Campaign, Force, Unit } from '../model/types';
 import { AGENDAS, MARKED_XP, MAX_AGENDAS, REWARD_TABLES, SCAR_TABLE, type RewardTableKey } from '../rules/data';
 import { matchBonusesEarned } from '../rules/detachments';
-import { ECHOES, emptyNexusPick, nexusEntry, nexusGeneration, recordSectorGame, type NexusContext, type NexusPick } from '../rules/nexus';
+import { ECHOES, currentRound, emptyNexusPick, markUnitsUsed, nexusEntry, nexusGeneration, recordSectorGame, unitsUsed, type NexusContext, type NexusPick } from '../rules/nexus';
 import { deathDiceCount, deathOutcome, forceTotals, levelForXp, rollDice, rollDie, type DeathOutcome } from '../rules/engine';
 import {
   RESULT_LABEL,
@@ -28,6 +28,7 @@ import {
 import { go, href } from '../route';
 import NexusBox, { UnitSelect } from './NexusBox';
 import { Stepper, confirmAction, toast } from './ui';
+import { SOLO_PATROL } from '../rules/downtimeData';
 
 const STEPS = ['Setup', 'Units', 'Deaths', 'Rewards', 'Summary'] as const;
 const OUTCOME_LABEL: Record<DeathOutcome, string> = { scar: 'Battle scar', xp: '+1 XP', none: 'Nothing' };
@@ -53,10 +54,19 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
     const side = sideOfForce(state.battle, forceId);
     return side && state.battle ? { battle: state.battle, side, past: '' } : undefined;
   });
+  // Each unit takes part in one skirmish, patrol or Expedition a campaign round: units that already have sit this one out.
+  // The round's main Battle (a sector attack or a Crisis battle) is exempt: every unit can fight in it.
+  const [used] = useState(() => {
+    const c = state.campaign;
+    return f && c?.factions.some((x) => x.id === f.nexus?.factionId) ? unitsUsed(f, c) : [];
+  });
   const [input, setInput] = useState<BattleInput | null>(() => {
     if (!f) return null;
     const blank = initialInput(f, forceTotals(f, state.settings).bp);
-    return source ? wizardPrefill(source.battle, source.side, blank, f, state.campaign) : blank;
+    const filled = source ? wizardPrefill(source.battle, source.side, blank, f, state.campaign) : blank;
+    if (!filled.sectorId && !source?.battle.crisis)
+      for (const id of used) if (filled.units[id]) filled.units[id] = { ...filled.units[id], in: false };
+    return filled;
   });
   const [applied, setApplied] = useState<BattleOutcome | null>(null);
 
@@ -64,11 +74,12 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
   const factionId = f?.nexus?.factionId;
   const nexus = useMemo(() => {
     const crisis = source?.battle.crisis;
-    const ctx = nexusGeneration(campaign, factionId, input?.sectorId ?? '', input?.result ?? 'draw', !!input?.vsAi, undefined,
+    // A solo patrol earns no Nexus rewards (a win still counts as a patrol, below).
+    const ctx = nexusGeneration(input?.patrol ? undefined : campaign, factionId, input?.sectorId ?? '', input?.result ?? 'draw', !!input?.vsAi, undefined,
       crisis ? { crisis, forceId: f?.id, mvp: mvpForce(source.battle) } : undefined);
     if (factionId && ctx.round) ctx.matchesElsewhere = matchBonusesEarned(state.forces, factionId, ctx.round, f?.id);
     return ctx;
-  }, [campaign, factionId, input?.sectorId, input?.result, input?.vsAi, state.forces, f?.id, source]);
+  }, [campaign, factionId, input?.sectorId, input?.result, input?.vsAi, input?.patrol, state.forces, f?.id, source]);
   const full = useMemo(() => (input ? { ...input, nexus } : null), [input, nexus]);
 
   const preview = useMemo(() => {
@@ -81,7 +92,15 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
 
   const units = f.units.filter((u) => input.units[u.id]);
   const claimedBy = source ? claims(source.battle, state.forces)[source.side] : undefined;
-  const set = (patch: Partial<BattleInput>) => setInput({ ...input, ...patch });
+  const set = (patch: Partial<BattleInput>) => {
+    // Switching between a skirmish and the main Battle puts the units that already fought this round out or back in.
+    if ('sectorId' in patch && !source?.battle.crisis && !patch.sectorId !== !input.sectorId) {
+      const next = { ...input.units };
+      for (const u of f.units) if (used.includes(u.id) && next[u.id]) next[u.id] = { ...next[u.id], in: patch.sectorId ? u.status === 'active' : false };
+      patch = { ...patch, units: next };
+    }
+    setInput({ ...input, ...patch });
+  };
   const setUnit = (id: string, patch: Partial<UnitBattle>) => {
     const next = { ...input.units };
     if (patch.marked) for (const k of Object.keys(next)) next[k] = { ...next[k], marked: false };
@@ -93,13 +112,19 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
   const setNexusPick = (key: string, patch: Partial<NexusPick>) =>
     set({ nexusPicks: { ...input.nexusPicks, [key]: { ...(input.nexusPicks?.[key] ?? emptyNexusPick()), ...patch } } });
   const linked = !!(campaign && f.nexus && campaign.factions.some((x) => x.id === f.nexus!.factionId));
+  const mainBattle = !!(input.sectorId || source?.battle.crisis);
+  const locked = mainBattle ? [] : used;
 
   const apply = () => {
     const msg = preview.warnings.length
       ? `There are ${preview.warnings.length} unresolved item(s):\n\n${preview.warnings.join('\n')}\n\nApply anyway?`
       : `Apply this battle to ${f.name}? This updates XP, scars, RP and Supply.`;
     if (!confirmAction(msg)) return;
-    updateForce(f.id, (d) => void resolveBattle(d, full, uid));
+    updateForce(f.id, (d) => {
+      resolveBattle(d, full, uid);
+      if (linked && !mainBattle) markUnitsUsed(d, campaign!, Object.keys(full.units).filter((id) => full.units[id].in));
+      if (full.patrol && linked && d.nexus) d.nexus.patrolRound = currentRound(campaign!);
+    });
     const voidItem = nexus.items.find((i) => i.kind === 'void');
     if (voidItem && nexusEntry(voidItem, input.nexusPicks?.void))
       update((d) => {
@@ -153,6 +178,14 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
         </p>
       )}
 
+      {input.patrol && (
+        <p className="panel notice small">
+          <span className="tag cyan">Solo patrol</span> A downtime game of up to {SOLO_PATROL.points} pts against the AI: units earn participation and kill XP only — no RP, reward rolls or Marked for Greatness.
+          {linked && ' A win still counts as a patrol against the Echoes and earns a Strategic Asset.'}
+          {linked && f.nexus?.patrolRound === currentRound(campaign!) && <b> {f.name} already recorded a patrol this round.</b>}
+        </p>
+      )}
+
       <div className="steps">
         {STEPS.map((s, i) => (
           <button key={s} className={i === step ? 'primary' : i < step ? 'done' : ''} onClick={() => setStep(i)}>
@@ -162,7 +195,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       </div>
 
       {step === 0 && <SetupStep input={input} set={set} campaign={linked ? campaign : undefined} />}
-      {step === 1 && <UnitsStep units={units} input={input} setUnit={setUnit} />}
+      {step === 1 && <UnitsStep units={units} input={input} setUnit={setUnit} used={locked} />}
       {step === 2 && <DeathsStep units={units} input={input} setUnit={setUnit} />}
       {step === 3 && <RewardsStep units={units} input={full} set={set} setPick={setPick} />}
       {step === 3 && linked && <NexusRewards units={units} input={input} nexus={nexus} setPick={setNexusPick} />}
@@ -201,7 +234,7 @@ function SetupStep({ input, set, campaign }: { input: BattleInput; set: (p: Part
             Opponent type
             <span className="row"><input type="checkbox" checked={input.vsAi} onChange={(e) => set({ vsAi: e.target.checked })} /> Solo / AI opponent</span>
           </label>
-          {campaign && (
+          {campaign && !input.patrol && (
             <label className="field span-all">
               Nexus Wars game
               <select value={input.sectorId ?? ''} onChange={(e) => {
@@ -220,19 +253,24 @@ function SetupStep({ input, set, campaign }: { input: BattleInput; set: (p: Part
           )}
           <label className="field">Your Battle Points<Stepper value={input.myBp} min={0} onChange={(n) => set({ myBp: n })} /></label>
           <label className="field">Opponent Battle Points<Stepper value={input.oppBp} min={0} onChange={(n) => set({ oppBp: n })} /></label>
-          <label className="field span-all">
+          {!input.patrol && <label className="field span-all">
             Reward table
             <select value={input.table} onChange={(e) => set({ table: e.target.value as RewardTableKey | '' })}>
               <option value="">By result ({REWARD_TABLES[mainTable({ ...input, table: '' })].label})</option>
               {(['winner', 'loser', 'ai'] as const).map((k) => <option key={k} value={k}>{REWARD_TABLES[k].label}</option>)}
             </select>
-          </label>
+          </label>}
           <label className="field span-all">Notes<textarea rows={3} value={input.notes} onChange={(e) => set({ notes: e.target.value })} /></label>
         </div>
         {input.result === 'draw' && !input.table && <p className="muted small">Draws use the Losers table by default — change it above if your group plays it differently.</p>}
         {suffering > 0 && <p className="small"><span className="tag gold">Growth Through Suffering</span> {suffering} roll{suffering > 1 ? 's' : ''} for being {input.oppBp - input.myBp} BP down.</p>}
       </div>
-      <div className="panel">
+      {input.patrol ? (
+        <div className="panel">
+          <div className="panel-title"><h2>Solo patrol</h2></div>
+          <p className="muted small">No agendas on a patrol: every unit that took part gains {participationXp(input)} XP, plus its kill XP.</p>
+        </div>
+      ) : <div className="panel">
         <div className="panel-title">
           <h2>Agendas</h2>
           <span className="muted small">{input.agendas.length} / {MAX_AGENDAS} · participation {participationXp(input)} XP</span>
@@ -251,14 +289,14 @@ function SetupStep({ input, set, campaign }: { input: BattleInput; set: (p: Part
           );
         })}
         <p className="muted small">No agendas: every unit that took part gains {participationXp({ ...input, agendas: [] })} XP instead. Record agenda XP per unit on the next step.</p>
-      </div>
+      </div>}
     </div>
   );
 }
 
 // ---- Step 2: units ----
 
-function UnitsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInput; setUnit: (id: string, p: Partial<UnitBattle>) => void }) {
+function UnitsStep({ units, input, setUnit, used }: { units: Unit[]; input: BattleInput; setUnit: (id: string, p: Partial<UnitBattle>) => void; used: string[] }) {
   const part = participationXp(input);
   return (
     <div className="panel">
@@ -278,20 +316,21 @@ function UnitsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInpu
             {units.map((u) => {
               const r = input.units[u.id];
               const comatose = u.status === 'comatose';
-              const total = r.in ? part + (r.marked ? MARKED_XP : 0) + r.killXp + r.bonusXp : 0;
+              const total = r.in ? part + (input.patrol ? r.killXp : (r.marked ? MARKED_XP : 0) + r.killXp + r.bonusXp) : 0;
               return (
                 <tr key={u.id} className={r.in ? '' : 'removed'}>
-                  <td data-label="Fought"><input type="checkbox" checked={r.in} onChange={(e) => setUnit(u.id, { in: e.target.checked })} /></td>
+                  <td data-label="Fought"><input type="checkbox" checked={r.in} disabled={used.includes(u.id)} onChange={(e) => setUnit(u.id, { in: e.target.checked })} /></td>
                   <td className="s-2">
                     <b>{unitName(u)}</b>
-                    <div className="muted small">{u.name && u.unitType} {comatose && <span className="tag cyan" title="Sits this battle out; recovers afterwards">Comatose</span>}</div>
+                    <div className="muted small">{u.name && u.unitType} {comatose && <span className="tag cyan" title="Sits this battle out; recovers afterwards">Comatose</span>}
+                      {used.includes(u.id) && <span className="tag gold" title="Each unit takes part in one skirmish, Solo patrol or Expedition a campaign round">Already fought this round</span>}</div>
                   </td>
                   <td data-label="Destroyed"><input type="checkbox" disabled={!r.in} checked={r.destroyed} onChange={(e) => setUnit(u.id, { destroyed: e.target.checked, death: e.target.checked ? r.death : null })} /></td>
-                  <td data-label="Marked"><input type="radio" name="marked" disabled={!r.in} checked={r.marked} onChange={() => setUnit(u.id, { marked: true })} onClick={() => r.marked && setUnit(u.id, { marked: false })} /></td>
+                  <td data-label="Marked"><input type="radio" name="marked" disabled={!r.in || input.patrol} checked={r.marked} onChange={() => setUnit(u.id, { marked: true })} onClick={() => r.marked && setUnit(u.id, { marked: false })} /></td>
                   <td data-label="Holding"><input type="checkbox" disabled={!r.in} checked={r.holding} onChange={(e) => setUnit(u.id, { holding: e.target.checked })} /></td>
                   <td className="num" data-label="Kills"><Stepper value={r.kills} min={0} onChange={(n) => setUnit(u.id, { kills: n })} /></td>
                   <td className="num" data-label="Kill XP"><Stepper value={r.killXp} min={0} onChange={(n) => setUnit(u.id, { killXp: n })} /></td>
-                  <td className="num" data-label="Bonus XP"><Stepper value={r.bonusXp} min={0} onChange={(n) => setUnit(u.id, { bonusXp: n })} /></td>
+                  <td className="num" data-label="Bonus XP">{input.patrol ? <span className="muted">—</span> : <Stepper value={r.bonusXp} min={0} onChange={(n) => setUnit(u.id, { bonusXp: n })} />}</td>
                   <td className="num s-full" data-label="Total XP"><b>{total}</b></td>
                 </tr>
               );
@@ -300,6 +339,9 @@ function UnitsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInpu
         </table>
       </div>
       <p className="muted small">Total excludes death rolls and table rewards. Comatose units sit out by default and recover once the battle is applied.</p>
+      {units.some((u) => used.includes(u.id)) && (
+        <p className="muted small">Each unit takes part in one skirmish, Solo patrol or Expedition a campaign round. Units that already have earn nothing from this one; they are free again when the GM ends the round. The round's main Battle doesn't count: every unit can fight in it.</p>
+      )}
     </div>
   );
 }
@@ -383,9 +425,9 @@ function RewardsStep({ units, input, set, setPick }: {
     <div className="panel">
       <div className="panel-title">
         <h2>Rewards</h2>
-        <label className="row small">Agenda RP <Stepper value={input.agendaRp} min={0} onChange={(n) => set({ agendaRp: n })} /></label>
+        {!input.patrol && <label className="row small">Agenda RP <Stepper value={input.agendaRp} min={0} onChange={(n) => set({ agendaRp: n })} /></label>}
       </div>
-      <p className="muted small">Every battle earns 1 RP. Roll on each table below and assign what it gives.</p>
+      <p className="muted small">{input.patrol ? 'Solo patrol: no RP or reward rolls — participation and kill XP only.' : 'Every battle earns 1 RP. Roll on each table below and assign what it gives.'}</p>
       {rows.map((row) => (
         <RewardBox key={row.key} row={row} units={units} input={input} pick={input.rewards[row.key] ?? emptyPick()} setPick={(p) => setPick(row.key, p)} />
       ))}

@@ -68,6 +68,8 @@ export interface BattleInput {
   nexusPicks?: Record<string, NexusPick>;
   /** The tracked battle and side this report claims the rewards of. */
   from?: { battleId: string; sideId: string };
+  /** Solo patrol (downtime): participation and kill XP only — no RP, reward rolls or Marked for Greatness. */
+  patrol?: boolean;
 }
 
 export interface RewardRow {
@@ -94,6 +96,7 @@ export function mainTable(input: BattleInput): RewardTableKey {
 }
 
 export function participationXp(input: BattleInput): number {
+  if (input.patrol) return PARTICIPATION_XP;
   if (input.agendas.includes(RISKY_GAMBLE) && input.result !== 'win') return 0;
   return input.agendas.length === 0 ? NO_AGENDA_XP : PARTICIPATION_XP;
 }
@@ -104,6 +107,7 @@ export function sufferingCount(input: BattleInput): number {
 
 /** Every reward roll this battle earns, with special-table follow-ups inserted after their parent. */
 export function rewardRows(input: BattleInput): RewardRow[] {
+  if (input.patrol) return [];
   const entryOf = (key: string, table: RewardTableKey) => {
     const roll = input.rewards[key]?.roll;
     return roll ? REWARD_TABLES[table].entries[roll - 1] ?? null : null;
@@ -189,8 +193,8 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
   const byId = new Map(units.map((u) => [u.id, u]));
 
   const ledger: BattleOutcome['ledger'] = [{
-    label: `Battle vs ${input.opponent || 'unknown'} — ${RESULT_LABEL[input.result]}${input.vsAi ? ' (AI)' : ''}`,
-    rp: BATTLE_RP + input.agendaRp,
+    label: `${input.patrol ? 'Solo patrol' : 'Battle'} vs ${input.opponent || 'unknown'} — ${RESULT_LABEL[input.result]}${input.vsAi ? ' (AI)' : ''}`,
+    rp: input.patrol ? 0 : BATTLE_RP + input.agendaRp,
     supply: 0,
   }];
 
@@ -343,16 +347,17 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
     const name = unitName(u);
     const xpBefore = u.xp;
     const parts: { label: string; xp: number }[] = [];
-    const wokeUp = u.status === 'comatose';
+    // A solo patrol is too small to count as the battle a comatose unit sits out.
+    const wokeUp = u.status === 'comatose' && !input.patrol;
     if (wokeUp) u.status = 'active';
 
     if (r.in) {
       u.battles += 1;
       u.kills += r.kills;
       if (part) parts.push({ label: 'Participation', xp: part });
-      if (r.marked) parts.push({ label: 'Marked for Greatness', xp: MARKED_XP });
+      if (r.marked && !input.patrol) parts.push({ label: 'Marked for Greatness', xp: MARKED_XP });
       if (r.killXp) parts.push({ label: 'Kills', xp: r.killXp });
-      if (r.bonusXp) parts.push({ label: 'Agendas / bonus', xp: r.bonusXp });
+      if (r.bonusXp && !input.patrol) parts.push({ label: 'Agendas / bonus', xp: r.bonusXp });
       if (r.destroyed && r.death?.outcome === 'xp') parts.push({ label: 'Death roll', xp: 1 });
     }
     parts.push(...(extra[u.id] ?? []));
@@ -423,6 +428,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
     id: newId(), date: input.date, opponent: input.opponent, result: input.result, vsAi: input.vsAi,
     agendas: input.agendas, myBp: input.myBp, oppBp: input.oppBp, summary, notes: input.notes,
     sectorId: input.sectorId || undefined, sectorName: input.sectorId ? input.sectorName : undefined,
+    ...(input.patrol ? { patrol: true } : {}),
     ...(input.from ? { battleId: input.from.battleId, sideId: input.from.sideId } : {}),
   });
 

@@ -92,6 +92,8 @@ export interface TrackedBattle {
   attacker?: TeamKey;
   /** Nexus Wars: the Nexus Crisis battle of this round (every faction on team A against the Echo Lord). */
   crisis?: number;
+  /** A solo patrol (downtime): reduced rewards, see SOLO_PATROL. */
+  patrol?: boolean;
   /** OPR Advanced deployment style, if one was picked or rolled. */
   deploymentStyle?: string;
   notes: string;
@@ -192,6 +194,20 @@ export function loadForce(side: TrackerSide, f: Force, list: ArmyList | undefine
   side.units = units.map(trackerUnit);
   side.bp = units.reduce((n, u) => n + battlePoints(u, s), 0);
   side.manipulations = (f.nexus?.pending ?? []).map((text) => ({ text, used: false }));
+}
+
+/** A solo patrol: some of one force's active units against the AI, and a random Void Echoes army when one is given. */
+export function patrolBattle(mission: MissionDef, id: string, startedAt: string, f: Force, unitIds: string[], s: Settings, echoes?: Unit[]): TrackedBattle {
+  const b = newBattle(mission, id, startedAt, Math.random, FORMATS.find((x) => x.label === '1 v AI'));
+  b.patrol = true;
+  const me = b.sides.find((x) => !x.ai)!;
+  const units = f.units.filter((u) => u.status === 'active' && unitIds.includes(u.id));
+  loadForce(me, f, undefined, s);
+  me.units = units.map(trackerUnit);
+  me.bp = units.reduce((n, u) => n + battlePoints(u, s), 0);
+  const ai = b.sides.find((x) => x.ai);
+  if (ai && echoes) loadUnits(ai, ECHOES.name, echoes);
+  return b;
 }
 
 /** Resize every round's markers, keeping what was already set. */
@@ -447,6 +463,7 @@ export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInp
     ].filter(Boolean).join(' '),
     units,
     from: { battleId: b.id, sideId },
+    ...(b.patrol ? { patrol: true } : {}),
   };
 }
 

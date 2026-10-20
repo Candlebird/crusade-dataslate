@@ -10,9 +10,10 @@ import AddUnitModal from './AddUnitModal';
 import RequisitionShop from './RequisitionShop';
 import UmbraShop from './UmbraShop';
 import RoundIncome from './RoundIncome';
+import ExpeditionModal from './ExpeditionModal';
 import type { Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
-import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, emptyNexus, factionName, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
+import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, currentRound, emptyNexus, factionName, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
 import { factionClaimedRound, factionForces } from '../rules/detachments';
 import { DetachmentsBox } from './Detachments';
 import { claimableRounds } from '../rules/rounds';
@@ -384,6 +385,8 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const home = c && n ? homeOf(c, n.factionId) : undefined;
   const researchHome = home?.benefit === 'researchStation';
   const [claiming, setClaiming] = useState(false);
+  const [expedition, setExpedition] = useState(false);
+  const expedited = !!c && n?.expeditionRound === currentRound(c);
   const toClaim = c && n && faction ? claimableRounds(c, n, state.forces) : [];
   const claimedThrough = n && factionClaimedRound(state.forces, n.factionId);
 
@@ -428,6 +431,15 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
                 <button className={toClaim.length ? 'primary' : ''} disabled={!toClaim.length} onClick={() => setClaiming(true)}>Claim round income…</button>
               </div>
               {claiming && <RoundIncome force={f} c={c} onClose={() => setClaiming(false)} />}
+              <div className="span-all row">
+                <span className="grow small">
+                  {expedited
+                    ? <span className="muted">Expedition done this round. Another one opens when the GM ends the round.</span>
+                    : <><b>Downtime:</b> send up to three units on an Expedition between games.</>}
+                </span>
+                <button disabled={expedited} onClick={() => setExpedition(true)}>Expedition…</button>
+              </div>
+              {expedition && <ExpeditionModal force={f} c={c} onClose={() => setExpedition(false)} />}
               <DetachmentsBox f={f} c={c} />
               <div className="span-all small">
                 <div className="muted">Controlled sectors</div>

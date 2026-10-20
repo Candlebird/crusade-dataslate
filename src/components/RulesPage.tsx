@@ -10,6 +10,8 @@ import {
   ANOMALY_TABLE, BENEFITS, COMBAT_MANIPULATIONS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE,
 } from '../rules/nexusData';
 import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
+import { EXPEDITION_SITES } from '../rules/downtimeData';
+import { rewardText } from '../rules/downtime';
 import { relicHolderText, relicHolders } from '../rules/engine';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
@@ -322,7 +324,7 @@ function NexusRules() {
         </p>
         <Toc items={[
           ['n-map', 'Sectors'], ['n-danger', 'Difficulty & modifiers'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'],
-          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
+          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-downtime', 'Downtime'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
           ['n-shop', 'Umbra Shard shop'],
         ]} />
         <p className="small">
@@ -387,6 +389,11 @@ function NexusRules() {
       <Section id="n-crisis" title="The Nexus Crisis">
         <Prose lines={NEXUS_TEXT.crisis} />
         <Entries title="Echo Lords (D6)" roll entries={ECHO_LORDS} />
+      </Section>
+
+      <Section id="n-downtime" title="Downtime: Expeditions & Solo patrols">
+        <Prose lines={NEXUS_TEXT.downtime} />
+        <Entries title="Expedition sites" entries={EXPEDITION_SITES.map((x) => ({ name: x.name, desc: `${x.desc} Make it all the way: ${rewardText(x.finish.reward)}.` }))} />
       </Section>
 
       <Section id="n-catchup" title="Catching up">

@@ -5,7 +5,7 @@ import type { Force } from '../model/types';
 import { go, href } from '../route';
 import { useCloud } from '../cloud/CloudSync';
 import { AGENDAS, MAX_AGENDAS } from '../rules/data';
-import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES, activeCrisis, factionName, homeChallengeBlock, lordById, recordSectorGame, sectorEffect } from '../rules/nexus';
+import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES, activeCrisis, currentRound, factionName, homeChallengeBlock, lordById, recordSectorGame, sectorEffect, unitsUsed } from '../rules/nexus';
 import { DEPLOYMENT_STYLES, SEIZE_RULE, allMissions, rollAdvancedMission, rollDeployment, type MissionDef } from '../rules/missions';
 import {
   FORMATS,
@@ -22,6 +22,7 @@ import {
   sidePoints,
   membersOf,
   newBattle,
+  patrolBattle,
   nexusNotes,
   nextRound,
   prevRound,
@@ -52,7 +53,8 @@ import { echoesBook, randomEchoes } from '../rules/echoForce';
 import { ECHOES, NEXUS_CRISIS, NEXUS_REINFORCE_BONUS } from '../rules/nexusData';
 import { aiDefended } from '../rules/difficulty';
 import SectorDanger from './SectorDanger';
-import { forceTotals } from '../rules/engine';
+import { battlePoints, forceTotals } from '../rules/engine';
+import { SOLO_PATROL } from '../rules/downtimeData';
 import { MAX_PLAYERS, randomForces, randomFormat, type Format } from '../rules/randomBattle';
 import AiActivation from './AiActivation';
 import { Stepper, TextArea, TextField, confirmAction, toast } from './ui';
@@ -105,8 +107,8 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
     <div>
       <div className="page-head">
         <div>
-          <div className="crumbs">Battle · {b.mission.source} · started {b.startedAt.slice(0, 10)}</div>
-          <h1>{b.mission.name}</h1>
+          <div className="crumbs">{b.patrol ? 'Solo patrol' : 'Battle'} · {b.mission.source} · started {b.startedAt.slice(0, 10)}</div>
+          <h1>{b.mission.name} {b.patrol && <span className="tag cyan">Solo patrol</span>}</h1>
         </div>
         <div className="row">
           <a className="btn" href={href.missions()}>Mission library</a>
@@ -437,7 +439,74 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
           <button onClick={() => setId(rollAdvancedMission().id)} title="Roll the mission type (1-2 Face-Off, 3-4 Progressive, 5-6 Attack & Defend), then a D6">🎲 Random OPR mission</button>
         </div>
       </div>
+      {!sector && !crisis && <SoloPatrol mission={m} />}
       <PastBattles />
+    </div>
+  );
+}
+
+/** Downtime: a quick game against the AI with a small part of one force, for reduced rewards. */
+function SoloPatrol({ mission }: { mission?: MissionDef }) {
+  const { state, update } = useStore();
+  const own = state.forces.filter((f) => f.units.some((u) => u.status === 'active'));
+  const [forceId, setForceId] = useState('');
+  const [picked, setPicked] = useState<string[]>([]);
+  const f = own.find((x) => x.id === forceId);
+  if (!own.length) return null;
+  const active = f ? f.units.filter((u) => u.status === 'active') : [];
+  const points = active.filter((u) => picked.includes(u.id)).reduce((n, u) => n + u.points, 0);
+  const c = state.campaign;
+  const done = !!(c && f?.nexus && f.nexus.patrolRound === currentRound(c));
+  const used = f && c?.factions.some((x) => x.id === f.nexus?.factionId) ? unitsUsed(f, c) : [];
+  const book = echoesBook(state.books);
+  const start = () => {
+    if (!f || !mission) return;
+    if (done && !confirmAction(`${f.name} already recorded a patrol this round. Start another anyway?`)) return;
+    const echoes = book ? randomEchoes(book, Math.max(points, 100)) : undefined;
+    update((s) => void (s.battle = patrolBattle(mission, uid(), nowIso(), f, picked, s.settings, echoes)));
+  };
+  return (
+    <div className="panel">
+      <div className="panel-title"><h2>Solo patrol</h2><span className="tag cyan">Downtime</span></div>
+      <p className="muted small">
+        Can't get the group together? Take up to {SOLO_PATROL.points} pts of one force on a quick game against the AI ({mission?.name ?? 'the mission picked above'}).
+        Units earn participation and kill XP only — no RP or reward rolls. In a campaign, a win counts as a patrol against the {ECHOES.name} and earns a
+        Strategic Asset; each force can record one patrol per campaign round.
+      </p>
+      <label className="field">
+        <span>Force</span>
+        <select value={forceId} onChange={(e) => { setForceId(e.target.value); setPicked([]); }}>
+          <option value="">Choose a force…</option>
+          {own.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+        </select>
+      </label>
+      {f && (
+        <>
+          {done && <p className="small"><span className="tag gold">{f.name} already recorded a patrol this round.</span></p>}
+          <div className="mission-pick">
+            {active.map((u) => {
+              const on = picked.includes(u.id);
+              const spent = used.includes(u.id);
+              const over = !on && (spent || points + u.points > SOLO_PATROL.points);
+              return (
+                <label key={u.id} className={`shop-item${on ? ' selected' : ''}${over ? ' disabled' : ''}`}>
+                  <input type="checkbox" checked={on} disabled={over} onChange={() => setPicked(on ? picked.filter((x) => x !== u.id) : [...picked, u.id])} />
+                  <div className="grow">
+                    <b>{u.name || u.unitType}</b> <span className="muted small">{u.points} pts · {battlePoints(u, state.settings)} BP</span>
+                    {spent && <> <span className="tag gold">Already fought this round</span></>}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+          <div className="row" style={{ marginTop: '0.8rem' }}>
+            <b>{points} / {SOLO_PATROL.points} pts</b>
+            <span className="spacer" />
+            <button className="primary" disabled={!picked.length || !mission} onClick={start}>Start patrol</button>
+          </div>
+          {!book && <p className="muted small">Load the {ECHOES.name} army book to have their army generated for you, or fill the AI side in by hand.</p>}
+        </>
+      )}
     </div>
   );
 }

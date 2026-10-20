@@ -112,6 +112,8 @@ export interface BattleRecord {
   /** The tracked battle and side this record claimed (see rules/tracker claims). */
   battleId?: string;
   sideId?: string;
+  /** A solo patrol (downtime), not a full battle. */
+  patrol?: boolean;
 }
 
 /** A force's Nexus Wars state (only once it is linked to a campaign faction). */
@@ -131,6 +133,11 @@ export interface ForceNexus {
   matchBonus?: { round: number; count: number };
   /** The campaign round this force's faction last reorganised its detachments in. */
   reorganisedRound?: number;
+  /** The campaign rounds this force last went on an Expedition and recorded a solo patrol in. */
+  expeditionRound?: number;
+  patrolRound?: number;
+  /** Units that already fought a game or went on an Expedition in this round: each unit takes part once a round. */
+  usedUnits?: { round: number; ids: string[] };
 }
 
 /** A battle list: a printable selection of the force's units for one game. */

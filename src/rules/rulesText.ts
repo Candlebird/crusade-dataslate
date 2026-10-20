@@ -3,6 +3,7 @@ import {
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
 import { ECHOES, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
+import { EXPEDITION, SOLO_PATROL } from './downtimeData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
 // The tables on that page come straight from data.ts and nexusData.ts; this file holds only the text around them,
@@ -117,6 +118,13 @@ export const NEXUS_TEXT = {
     `Start it from the round panel on the Nexus Wars page: one player per faction on the same team, against the ${ECHOES.name}. Generate their army to match your points. Their most expensive unit is the Echo Lord, with its special rule; destroying it is worth +${NEXUS_CRISIS.lordVp} VP. Only the first Crisis battle counts.`,
     `Win: the ${ECHOES.name}' threat falls by ${NEXUS_CRISIS.threatDrop} when the round ends, and every side claims +${NEXUS_CRISIS.winUs} Umbra Shards with its match rewards. The MVP, the side whose units earned the most XP in the tracker, also takes a ${NEXUS_CRISIS.mvpTier} relic.`,
     `Lose, draw, or don't fight it before the round ends: the threat goes to ${R.threatMax}, and the ${ECHOES.name} take each faction's sector nearest the Lord (not its home or a stronghold).`,
+  ],
+  downtime: [
+    'Between games, each force linked to the campaign can go on one Expedition and fight one Solo patrol per round. Both refresh when the GM ends the round. They are worth about a quarter of a battle: something to do while the group cannot meet, never a substitute for playing.',
+    "One fight per unit per round: each unit takes part in one side game a round, whether a skirmish, a Solo patrol or an Expedition. A unit that already has is greyed out on the Expedition and Solo patrol pickers, and sits out when the next skirmish is recorded, earning nothing from it. The round's main Battle (the sealed-orders attack on a sector, or a Nexus Crisis battle) doesn't count: every unit can fight in it and earn its full rewards, and fighting in it doesn't use a unit up. Every unit is free again when the GM ends the round.",
+    `Expedition (Expedition… on your force page): send up to ${EXPEDITION.squadMax} active units to one of four sites for ${EXPEDITION.encounters} encounters. Each encounter offers a few choices; most need a D6 roll (a natural 1 always fails), and a squad with a level ${EXPEDITION.veteranLevel}+ unit gets +1. Rewards deeper in are worth more: XP and Supply ×${EXPEDITION.depth.join(', ×')}.`,
+    `After each encounter, head home with the haul (always safe) or press on. A failed roll raises the danger by ${EXPEDITION.failDanger} (${EXPEDITION.fumbleDanger} on a natural 1). Pressing on, roll a D6: equal to or under the danger, the squad is ambushed and one unit takes a battle scar (on a ${EXPEDITION.ambushScarOn === 1 ? '1' : `1–${EXPEDITION.ambushScarOn}`}) or is Lost and sits out the next battle. Make it through every encounter for the site's bonus.`,
+    `Solo patrol (Start a solo patrol on the Battle page): up to ${SOLO_PATROL.points} pts of one force against the AI, a quick game of about 45 minutes. Record it like any battle: the units earn ${PARTICIPATION_XP} participation XP plus their kill XP, but no RP, reward rolls or Marked for Greatness. A win still counts as a patrol against the Echoes (lowering their threat) and earns a Strategic Asset.`,
   ],
   catchUp: [
     `Factions that fall behind get help: at each round's end, a faction gains +1 Umbra Shard for every ${R.underdogStep} sectors it's behind the faction holding the most (up to +${R.underdogMax}), paid with its round income.`,
