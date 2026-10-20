@@ -5,7 +5,7 @@ import type { Force } from '../model/types';
 import { go, href } from '../route';
 import { useCloud } from '../cloud/CloudSync';
 import { AGENDAS, MAX_AGENDAS } from '../rules/data';
-import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES, factionName, recordSectorGame, sectorEffect } from '../rules/nexus';
+import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES, factionName, homeChallengeBlock, recordSectorGame, sectorEffect } from '../rules/nexus';
 import { DEPLOYMENT_STYLES, SEIZE_RULE, allMissions, rollAdvancedMission, rollDeployment, type MissionDef } from '../rules/missions';
 import {
   FORMATS,
@@ -336,6 +336,7 @@ function StartBattle({ sectorId, preset }: { sectorId?: string; preset?: string 
               Fighting over <b>{sector.name}</b> <span className="tag">{SECTOR_TYPES[sector.type].label}</span>, held by <b>{factionName(c, sector.owner)}</b>.
               Team A attacks; everyone else defends. When you finish, the result goes into the campaign log and the map.
             </p>
+            {homeChallengeBlock(c, sector) && <p className="small"><span className="tag red">{homeChallengeBlock(c, sector)}</span> Check with the GM before playing this one.</p>}
             <label className="field">
               <span>Attacking faction</span>
               <select value={attacker} onChange={(e) => setAttacker(e.target.value)}>

@@ -7,6 +7,7 @@ import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionCol
 import { href } from '../route';
 import HexMapPanel from './HexMap';
 import OrdersPanel from './NexusOrders';
+import RoundPanel from './RoundPanel';
 import { useImporter } from './importer';
 import { Dropzone, TextField, confirmAction, toast } from './ui';
 
@@ -68,10 +69,12 @@ export default function CampaignPage() {
       </div>
       <p className="muted small">
         The GM's campaign.json is authoritative: players import the latest copy and report sector games to the GM.
-        Benefits from your sectors are applied when you record a battle with a linked force.
+        The GM ends each round when the group has played; each player then claims their faction's sector income on their force page, and match rewards come with each battle you record.
+        The full rules are on the <a href={href.rules('nexus')}>Rules</a> page.
         Pick a sector on the map and <b>Start a battle here</b>: when the battle is finished, its result goes into the log and the map.
       </p>
 
+      <RoundPanel c={c} />
       <FactionsPanel c={c} setC={setC} />
       <HexMapPanel c={c} setC={setC} onRecord={(sectorId) => {
         setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
@@ -300,7 +303,7 @@ function LogPanel({ c, setC }: { c: Campaign; setC: SetC }) {
       <div className="panel-title"><h2>Campaign log</h2><span className="muted small">{c.log.length} game{c.log.length === 1 ? '' : 's'}</span></div>
       {c.log.length === 0 ? <p className="muted small">No sector games yet.</p> : [...c.log].reverse().map((e) => (
         <div key={e.id} className="list-item small">
-          <span className="muted">{e.date}</span>
+          <span className="muted" title={`Round ${e.round ?? 1}`}>R{e.round ?? 1} · {e.date}</span>
           <span className="grow">
             {e.spread ? <>☣ <b>{factionName(c, e.winner)}</b> spread to <b>{sectorName(e.sectorId)}</b>{e.defender && <> from {factionName(c, e.defender)}</>}</> : <>
               <b>{sectorName(e.sectorId)}</b>: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} —{' '}

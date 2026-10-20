@@ -9,9 +9,11 @@ import { go, href } from '../route';
 import AddUnitModal from './AddUnitModal';
 import RequisitionShop from './RequisitionShop';
 import UmbraShop from './UmbraShop';
+import RoundIncome from './RoundIncome';
 import type { Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
 import { SECTOR_TYPES, benefitOf, emptyNexus, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
+import { claimableRounds } from '../rules/rounds';
 import { RESULT_LABEL } from '../rules/battle';
 import { listTotals, newList } from '../rules/lists';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
@@ -379,6 +381,8 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const faction = n && c?.factions.find((x) => x.id === n.factionId);
   const home = c && n ? homeOf(c, n.factionId) : undefined;
   const researchHome = home?.benefit === 'researchStation';
+  const [claiming, setClaiming] = useState(false);
+  const toClaim = c && n && faction ? claimableRounds(c, n) : [];
 
   return (
     <div className="panel">
@@ -405,6 +409,15 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
           {n && !faction && <p className="span-all small" style={{ color: 'var(--warn)', margin: 0 }}>This faction is not in the loaded campaign.</p>}
           {n && faction && (
             <>
+              <div className="span-all row">
+                <span className="grow small">
+                  {toClaim.length
+                    ? <><b>Income ready</b> for {toClaim.length === 1 ? `round ${toClaim[0].round}` : `${toClaim.length} rounds`}.</>
+                    : <span className="muted">Round income claimed{n.claimedRound ? ` through round ${n.claimedRound}` : ''}. More arrives when the GM ends the round.</span>}
+                </span>
+                <button className={toClaim.length ? 'primary' : ''} disabled={!toClaim.length} onClick={() => setClaiming(true)}>Claim round income…</button>
+              </div>
+              {claiming && <RoundIncome force={f} c={c} onClose={() => setClaiming(false)} />}
               <div className="span-all small">
                 <div className="muted">Controlled sectors</div>
                 {ownedSectors(c, n.factionId).map((s) => (
@@ -425,7 +438,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
               <div className="span-all small">
                 <span className="muted">Unlocked Nexus tables: </span>
                 {unlockedTables(n).length ? unlockedTables(n).join(', ') : 'none'}
-                {n.tempTables === 'all' || n.tempTables.length ? <span className="muted"> (temporary ones expire next match)</span> : null}
+                {n.tempTables === 'all' || n.tempTables.length ? <span className="muted"> (temporary ones last until your next round income)</span> : null}
               </div>
               <label className="field span-all">Trait tokens<Stepper value={n.traitTokens} min={0} onChange={(v) => set((d) => void (d.nexus!.traitTokens = v))} /></label>
               <div className="span-all small">

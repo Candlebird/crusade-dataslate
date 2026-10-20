@@ -125,6 +125,10 @@ export interface ForceNexus {
   traitTokens: number;
   /** Bought or granted for the next match: Combat Manipulations, Organized Strike. */
   pending: string[];
+  /** The last campaign round whose income this force claimed. */
+  claimedRound?: number;
+  /** Match bonuses earned in a round (capped per round). */
+  matchBonus?: { round: number; count: number };
 }
 
 /** A battle list: a printable selection of the force's units for one game. */
@@ -259,7 +263,7 @@ export interface Sector {
   benefit?: string;
   /** Controlling faction id; a home sector's owner never changes. */
   owner?: string;
-  /** Reinforce Sector: +200 supply when defending it. */
+  /** Reinforce Sector: +200 supply when defending it. Lost when the sector changes hands. */
   reinforced?: boolean;
   /** Void one-off reward already taken. */
   rewardClaimed?: boolean;
@@ -294,8 +298,20 @@ export interface CampaignEvent {
   battleId?: string;
   /** Not a game: the Void Echoes spread into the sector at the end of a round. */
   spread?: boolean;
+  /** The campaign round it happened in. */
+  round?: number;
   /** What the game changed, so deleting the entry can put the sector back. */
-  undo?: { owner?: string; rewardClaimed?: boolean };
+  undo?: { owner?: string; rewardClaimed?: boolean; reinforced?: boolean };
+}
+
+/** What each faction held when a round ended: round income is paid from this. */
+export interface RoundSnapshot {
+  round: number;
+  date: string;
+  /** Faction id → sector ids it held. */
+  holdings: Record<string, string[]>;
+  /** Faction id → catch-up Umbra Shards. */
+  underdog: Record<string, number>;
 }
 
 export interface CampaignMap {
@@ -313,6 +329,12 @@ export interface Campaign {
   sectors: Sector[];
   log: CampaignEvent[];
   map?: CampaignMap;
+  /** The round being played (1 when unset). */
+  round?: number;
+  /** Void Echoes threat level: how many sectors they spread into when a round ends. */
+  threat?: number;
+  /** The rounds that have ended, oldest first (only the last few are kept). */
+  rounds?: RoundSnapshot[];
 }
 
 export interface RuleText {

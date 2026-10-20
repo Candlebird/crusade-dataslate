@@ -1,5 +1,6 @@
 import type { Campaign, Force } from '../model/types';
 import { frontier, isPlaced } from './hexmap';
+import { homeChallengeBlock } from './nexus';
 
 // Nexus Wars sealed orders: each player picks what their factions attack next game (or holds),
 // nobody sees anyone else's picks until the GM reveals them.
@@ -85,6 +86,8 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number)
       if (!s) continue;
       const flags: string[] = [];
       if (!frontier(c, factionId).has(s.id)) flags.push('No longer next to their territory');
+      const blocked = homeChallengeBlock(c, s);
+      if (blocked) flags.push(blocked);
       attacks.push({ email: o.email, factionId, sectorId: s.id, defender: s.owner ?? '', flags });
     }
   }
@@ -92,6 +95,7 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number)
   for (const a of attacks) {
     const rivals = attacks.filter((x) => x !== a && x.sectorId === a.sectorId);
     if (rivals.length) a.flags.push(`Also attacked by ${rivals.map((x) => name(x.factionId)).join(', ')}`);
+    if (rivals.length && c.sectors.find((s) => s.id === a.sectorId)?.type === 'home') a.flags.push('A home sector can only be challenged once per round');
     if (a.defender && a.defender !== a.factionId && attacks.some((x) => x.factionId === a.defender && c.sectors.find((s) => s.id === x.sectorId)?.owner === a.factionId))
       a.flags.push(`${name(a.defender)} is attacking them too`);
   }

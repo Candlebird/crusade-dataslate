@@ -12,6 +12,7 @@ import BattleTracker from './components/BattleTracker';
 import SideSheet from './components/SideSheet';
 import MissionLibrary from './components/MissionLibrary';
 import GuidePage from './components/GuidePage';
+import RulesPage from './components/RulesPage';
 import { Toaster } from './components/ui';
 import AccountButton from './cloud/AccountButton';
 import { JoinPanel } from './cloud/Players';
@@ -43,6 +44,9 @@ export default function App() {
           <a className={route.page === 'settings' ? 'active' : ''} href={href.settings()}>
             Settings
           </a>
+          <a className={route.page === 'rules' ? 'active' : ''} href={href.rules()}>
+            Rules
+          </a>
           <a className={route.page === 'guide' ? 'active' : ''} href={href.guide()}>
             Guide
           </a>
@@ -63,6 +67,7 @@ export default function App() {
         {route.page === 'campaign' && <CampaignPage />}
         {route.page === 'books' && <BooksPage />}
         {route.page === 'settings' && <SettingsPage />}
+        {route.page === 'rules' && <RulesPage sub={route.sub} />}
         {route.page === 'guide' && <GuidePage />}
       </main>
       <Toaster />

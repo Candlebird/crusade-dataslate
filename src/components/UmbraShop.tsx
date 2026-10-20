@@ -5,7 +5,7 @@ import type { Force, Unit } from '../model/types';
 import { NEXUS_TRAITS, RELICS, type RelicTier } from '../rules/data';
 import { forceTotals, relicCost as relicRp } from '../rules/engine';
 import { unitName } from '../rules/battle';
-import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, UMBRA_SHOP, ownedSectors, type UmbraBuy } from '../rules/nexus';
+import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_ROUNDS, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
 import { Modal, toast } from './ui';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
@@ -23,7 +23,11 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
   const [tier, setTier] = useState<RelicTier>('Common');
   const [result, setResult] = useState<string | null>(null);
 
+  // A Relic Collector home world makes Nexus relics cheaper.
+  const collector = !!c && !!fid && homeOf(c, fid)?.benefit === 'relicCollector';
+  const costOf = (x: (typeof UMBRA_SHOP)[number]) => (x.key === 'relic' && collector ? Math.max(0, x.cost - NEXUS_ROUNDS.relicCollectorDiscount) : x.cost);
   const item = UMBRA_SHOP.find((x) => x.key === sel);
+  const cost = item ? costOf(item) : 0;
   const units = force.units.filter((u) => u.status !== 'removed');
   const unit = units.find((u) => u.id === unitId);
   const rpCost = sel === 'relic' ? relicRp(tier) : 0;
@@ -40,7 +44,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
 
   const problem = (): string | null => {
     if (!item) return 'Choose something to buy.';
-    if (item.cost > us) return `Needs ${item.cost} Umbra Shards (you have ${us}).`;
+    if (cost > us) return `Needs ${cost} Umbra Shards (you have ${us}).`;
     if (rpCost > rp) return `Also needs ${rpCost} RP for the relic (you have ${rp}).`;
     if (NEEDS_UNIT.has(item.key) && !unit) return 'Choose a unit.';
     if ((item.key === 'manipulation' || item.key === 'relic' || item.key === 'evolution') && !choice) return 'Make a choice.';
@@ -106,8 +110,8 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
     update((d) => {
       const f = d.forces.find((x) => x.id === force.id);
       if (!f) return;
-      f.umbraShards -= item.cost;
-      f.ledger.push({ id: uid(), date: today, label, rp: rpDelta, supply: 0, us: -item.cost });
+      f.umbraShards -= cost;
+      f.ledger.push({ id: uid(), date: today, label, rp: rpDelta, supply: 0, us: -cost });
       mutate?.(f, f.units.find((u) => u.id === unitId));
       f.updatedAt = new Date().toISOString();
       if (sectorFn && d.campaign) sectorFn(d.campaign);
@@ -119,12 +123,12 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
 
   return (
     <Modal title={`Umbra Shards — ${us} available`} onClose={onClose} wide
-      footer={<><span className="muted small grow">{why}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>Buy{item ? ` (${item.cost} US${rpCost ? ` + ${rpCost} RP` : ''})` : ''}</button></>}>
+      footer={<><span className="muted small grow">{why}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>Buy{item ? ` (${cost} US${rpCost ? ` + ${rpCost} RP` : ''})` : ''}</button></>}>
       <div className="cols-2">
         <div>
           {UMBRA_SHOP.map((x) => (
-            <div key={x.key} className={`shop-item${sel === x.key ? ' selected' : ''}${x.cost > us ? ' disabled' : ''}`} onClick={() => pick(x.key)}>
-              <span className="cost">{x.cost} US</span>
+            <div key={x.key} className={`shop-item${sel === x.key ? ' selected' : ''}${costOf(x) > us ? ' disabled' : ''}`} onClick={() => pick(x.key)}>
+              <span className="cost" title={costOf(x) < x.cost ? 'Relic Collector discount' : undefined}>{costOf(x)} US</span>
               <div className="grow"><b>{x.name}</b><div className="muted small">{x.desc}</div></div>
             </div>
           ))}

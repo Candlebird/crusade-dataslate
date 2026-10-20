@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
 import type { Campaign } from '../model/types';
-import { emptyUnitBattle, resolveBattle, type BattleInput } from './battle';
-import { emptyNexus, nexusAccess, nexusGeneration, recordSectorGame, removeSectorGame } from './nexus';
+import { emptyUnitBattle, resolveBattle, rewardRows, type BattleInput } from './battle';
+import { REWARD_TABLES } from './data';
+import { ECHOES, emptyNexus, homeChallengeBlock, nexusAccess, nexusGeneration, recordSectorGame, removeSectorGame } from './nexus';
 
 function campaign(): Campaign {
   return {
@@ -23,8 +24,8 @@ function campaign(): Campaign {
 const kinds = (ctx: ReturnType<typeof nexusGeneration>) => ctx.items.map((i) => `${i.key}:${i.kind}`);
 
 describe('nexus generation', () => {
-  it('lists owned-sector benefits after any match', () => {
-    expect(kinds(nexusGeneration(campaign(), 'A', '', 'loss', false))).toEqual(['hA:us', 'p1:shardRoll', 'an:anomaly']);
+  it('pays a match bonus after any match; sector income is paid per round instead', () => {
+    expect(kinds(nexusGeneration(campaign(), 'A', '', 'loss', false))).toEqual(['matchBonus:matchBonus']);
     expect(kinds(nexusGeneration(campaign(), undefined, '', 'win', false))).toEqual([]);
   });
 
@@ -41,7 +42,41 @@ describe('nexus generation', () => {
     expect(lost.items).toEqual([]);
     expect(lost.notes[0]).toMatch(/forfeited/);
     const won = nexusGeneration(campaign(), 'A', 'hB', 'win', false);
-    expect(kinds(won)).toEqual(['conquest:hB:supply', 'conquest:p2:manipulation', 'hA:us', 'p1:shardRoll', 'an:anomaly']);
+    expect(kinds(won)).toEqual(['conquest:hB:supply', 'conquest:p2:manipulation', 'matchBonus:matchBonus']);
+  });
+
+  it('pays the defender of a home sector the challenger\'s income too', () => {
+    const c = campaign();
+    const held = nexusGeneration(c, 'B', 'hB', 'win', false, 'A');
+    expect(kinds(held)).toEqual(['conquest:hA:us', 'conquest:p1:shardRoll', 'conquest:an:anomaly', 'matchBonus:matchBonus']);
+    // Without the opponent, the challenger comes from this round's log.
+    expect(kinds(nexusGeneration(c, 'B', 'hB', 'win', false))[0]).toBe('matchBonus:matchBonus');
+    recordSectorGame(c, { id: 'g', date: '', sectorId: 'hB', attacker: 'A', defender: 'B', winner: 'B', notes: '' });
+    expect(kinds(nexusGeneration(c, 'B', 'hB', 'win', false))[0]).toBe('conquest:hA:us');
+  });
+
+  it('pays a bounty for retaking a sector from the Echoes', () => {
+    const c = campaign();
+    c.sectors[3].owner = ECHOES.id;
+    expect(nexusGeneration(c, 'A', 'p2', 'win', true).bounty).toBe(true);
+    expect(nexusGeneration(c, 'A', 'p2', 'loss', true).bounty).toBeUndefined();
+    // Still a bounty once the game is logged (the sector is now theirs).
+    recordSectorGame(c, { id: 'g', date: '', sectorId: 'p2', attacker: 'A', defender: ECHOES.id, winner: 'A', notes: '' });
+    expect(nexusGeneration(c, 'A', 'p2', 'win', true).bounty).toBe(true);
+    expect(nexusGeneration(c, 'A', 'p1', 'win', true).bounty).toBeUndefined();
+  });
+
+  it('blocks home challenges in the opening rounds and after one this round', () => {
+    const c = campaign();
+    const hB = c.sectors[1];
+    expect(homeChallengeBlock(c, hB)).toMatch(/until round 4/);
+    expect(homeChallengeBlock(c, c.sectors[2])).toBeUndefined();
+    c.round = 4;
+    expect(homeChallengeBlock(c, hB)).toBeUndefined();
+    recordSectorGame(c, { id: 'g', date: '', sectorId: 'hB', attacker: 'A', defender: 'B', winner: 'B', notes: '' });
+    expect(homeChallengeBlock(c, hB)).toMatch(/already challenged/);
+    c.round = 5;
+    expect(homeChallengeBlock(c, hB)).toBeUndefined();
   });
 });
 
@@ -60,39 +95,46 @@ describe('nexus resolution', () => {
     return { f, input, id: () => `id${n++}` };
   }
 
-  it('applies shards, rolls and table results, and expires last match\'s unlocks', () => {
+  it('applies the match bonus and table results, and spends last match\'s manipulations', () => {
     const { f, input, id } = setup();
-    input.nexusPicks = {
-      p1: { roll: 5, choice: '', target: '', alloc: {} }, // shard mine 4+ → +1 US
-      an: { roll: 5, choice: '', target: 'a:s1', alloc: {} }, // anomaly 5: remove a scar
-      void: { roll: 2, choice: '', target: '', alloc: { a: 6 } }, // void 2: 6 XP + 1 US
-    };
+    input.nexusPicks = { void: { roll: 2, choice: '', target: '', alloc: { a: 6 } } }; // void 2: 6 XP + 1 US
     const out = resolveBattle(f, input, id);
-    expect(out.us).toBe(3); // home mine 1 + shard mine 1 + void 1
-    expect(f.umbraShards).toBe(3);
-    expect(f.units[0].scars).toEqual([]);
+    expect(out.us).toBe(2); // match bonus 1 + void 1
+    expect(f.umbraShards).toBe(2);
     expect(f.units[0].xp).toBe(3 + 6);
-    expect(f.nexus!.tempTables).toEqual([]);
+    expect(f.nexus!.tempTables).toEqual(['Hero']); // round unlocks last until the next round income
     expect(f.nexus!.pending).toEqual(['Organized Strike']);
-    expect(f.ledger.filter((l) => l.us).map((l) => l.us)).toEqual([1, 1, 1]);
+    expect(f.ledger.filter((l) => l.us).map((l) => l.us)).toEqual([1, 1]);
     expect(f.battleLog![0].sectorName).toBe('Hulk');
     expect(out.warnings).toEqual([]);
   });
 
-  it('grants unlock-all, trait tokens and relics', () => {
+  it('caps the match bonus per round', () => {
     const { f, input, id } = setup();
-    input.nexusPicks = {
-      p1: { roll: 1, choice: '', target: '', alloc: {} },
-      an: { roll: 6, choice: '', target: '', alloc: {} },
-      void: { roll: 6, choice: 'Umbra Claw', target: 'a', alloc: {} },
-    };
+    input.nexus = nexusGeneration(campaign(), 'A', '', 'win', false);
+    for (let i = 0; i < 3; i++) resolveBattle(f, input, id);
+    expect(f.umbraShards).toBe(2);
+    input.nexus = { ...input.nexus, round: 2 };
     resolveBattle(f, input, id);
-    expect(f.nexus!.tempTables).toBe('all');
+    expect(f.umbraShards).toBe(3);
+  });
+
+  it('adds an AI special table roll for an Echo bounty', () => {
+    const { input } = setup();
+    expect(rewardRows(input).map((r) => r.key)).not.toContain('bounty');
+    input.nexus = { ...input.nexus!, bounty: true };
+    input.rewards.bounty = { roll: 3, alloc: {}, target: '' };
+    expect(rewardRows(input).find((r) => r.key === 'bounty')).toMatchObject({ table: 'aiSpecial', source: 'Echo bounty', entry: REWARD_TABLES.aiSpecial.entries[2] });
+  });
+
+  it('grants trait tokens and relics', () => {
+    const { f, input, id } = setup();
+    input.nexusPicks = { void: { roll: 6, choice: 'Umbra Claw', target: 'a', alloc: {} } };
+    resolveBattle(f, input, id);
     expect(f.units[0].relics.map((r) => [r.name, r.tier])).toEqual([['Umbra Claw', 'Rare']]);
     input.nexusPicks.void = { roll: 3, choice: '', target: '', alloc: {} };
     resolveBattle(f, input, id);
     expect(f.nexus!.traitTokens).toBe(1);
-    expect(nexusAccess(f, 'Elite')).toBe('unlocked'); // anomaly 6 again
   });
 
   it('gates Nexus traits by unlocked table or token', () => {
@@ -108,7 +150,7 @@ describe('nexus resolution', () => {
   it('warns about unrolled nexus items', () => {
     const { f, input, id } = setup();
     const out = resolveBattle(f, input, id);
-    expect(out.warnings).toEqual(expect.arrayContaining(['Planet 1: Shard Mine: not rolled yet.', 'Rift: Anomaly: not rolled yet.']));
+    expect(out.warnings).toEqual(['Hulk: Void / Space hulk: not rolled yet.']);
   });
 });
 
@@ -140,5 +182,16 @@ describe('sector games', () => {
     expect(c.sectors[5].owner).toBeUndefined();
     expect(c.sectors[5].rewardClaimed).toBeUndefined();
     expect(c.log).toHaveLength(0);
+  });
+
+  it('loses a Reinforce when the sector changes hands, and gets it back on undo', () => {
+    const c = campaign();
+    c.sectors[3].reinforced = true;
+    recordSectorGame(c, { ...ev('p2', 'B', 'A', 'B'), id: 'e0' }); // held: stays reinforced
+    expect(c.sectors[3].reinforced).toBe(true);
+    recordSectorGame(c, { ...ev('p2', 'A', 'B', 'A'), id: 'e1' });
+    expect(c.sectors[3].reinforced).toBeUndefined();
+    removeSectorGame(c, 'e1');
+    expect(c.sectors[3]).toMatchObject({ owner: 'B', reinforced: true });
   });
 });

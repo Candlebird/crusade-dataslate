@@ -275,8 +275,8 @@ export const RELICS: RelicDef[] = [
   { name: 'Blackstone Shard Amulet', tier: 'Rare', nexus: true, desc: "This model's unit can't be targeted or affected by spells, and can't cast spells." },
   { name: 'Ancient Quantum Shielding', tier: 'Rare', nexus: true, desc: 'When blocking melee hits, for each unmodified 6 the attacking unit takes 1 wound.' },
   { name: 'Umbra Claw', tier: 'Rare', profile: 'Melee, A6, AP(1), Bane', nexus: true },
-  { name: 'Oblivion Orb', tier: 'Legendary', nexus: true, desc: 'Once per game, pick a point within 24". Roll one die for each unit within 6" of it; on a 4+ that unit takes 1 hit with AP(2) and Blast(9).' },
-  { name: 'Nexus Resonator', tier: 'Legendary', nexus: true, desc: 'Once per game, every enemy unit within 12" takes D3 wounds.' },
+  { name: 'Oblivion Orb', tier: 'Legendary', nexus: true, desc: 'Once per game, pick a point within 24". Roll one die for each unit, friend or foe, within 6" of it; on a 4+ that unit takes D6 hits with AP(2).' },
+  { name: 'Nexus Resonator', tier: 'Legendary', nexus: true, desc: 'Once per game, when activated, every enemy unit within 12" takes 3 hits with AP(1).' },
 ];
 
 /** Homebrew special rules used in relic weapon profiles. */
@@ -299,7 +299,7 @@ export const NEXUS_TRAITS: Record<Category, TableEntry[]> = {
   ],
   Elite: [
     { name: 'Shard Infusion', desc: 'After it destroys an enemy unit in melee, it gets +1 to hit rolls when shooting. After it destroys one by shooting, it gets +1 to hit rolls in melee.' },
-    { name: 'Shroud of Despair', desc: 'When activated, pick one enemy unit within 12", which must take a morale test. If it fails, it takes 3 hits.' },
+    { name: 'Shroud of Despair', desc: 'Twice per game, when activated, pick one enemy unit within 12", which must take a morale test. If it fails, it takes 3 hits.' },
   ],
   'Vehicle/Monster': [
     { name: 'Shadowbound', desc: 'Once per game, when targeted by an enemy, this model takes half the wounds it would (rounding up, min. 1) until the end of the round.' },

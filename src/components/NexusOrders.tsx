@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useCloud } from '../cloud/CloudSync';
-import { nowIso } from '../model/factory';
 import { useStore } from '../model/store';
 import type { Campaign } from '../model/types';
-import { ECHOES, factionName } from '../rules/nexus';
+import { ECHOES, currentRound, factionName } from '../rules/nexus';
 import { HOLD, attackTargets, myFactions, playedFactions, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
-import { pickSpread, spreadInto } from '../rules/voidspawn';
+import { spreadsAt, nextThreat } from '../rules/rounds';
 import { href } from '../route';
+import { useEndRound } from './RoundPanel';
 import { confirmAction, toast } from './ui';
 
 type Firebase = typeof import('../cloud/firebase');
@@ -15,7 +15,8 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message : String
 
 /** Sealed attack orders: every player picks a target (or holds) per faction; the GM reveals them all at once. */
 export default function OrdersPanel({ c }: { c: Campaign }) {
-  const { state, update } = useStore();
+  const { state } = useStore();
+  const endRound = useEndRound();
   const cloud = useCloud();
   const online = cloud.status === 'synced' || cloud.status === 'syncing';
   const [fb, setFb] = useState<Firebase | null>(null);
@@ -46,7 +47,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     return fb.watchOrders(revealed ? null : cloud.email, setOrders, console.error);
   }, [fb, online, cloud.email, revealed]);
 
-  const title = <div className="panel-title"><h2>Sealed orders</h2>{round && round.campaignId === c.id && <span className="muted small">Round {round.round}{revealed ? ' · revealed' : ' · open'}</span>}</div>;
+  const title = <div className="panel-title"><h2>Sealed orders</h2>{round && round.campaignId === c.id && <span className="muted small">Round {currentRound(c)} · orders #{round.round}{revealed ? ' · revealed' : ' · open'}</span>}</div>;
   if (!online || !cloud.email) {
     return (
       <div className="panel">
@@ -87,17 +88,11 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     else delete picks[factionId];
     fb.saveOrders(cloud.email!, current.round, picks).catch(fail('save your orders'));
   };
-  // The round is over: the Void Echoes spread before the next one opens.
+  // Open the next set of orders, ending the campaign round first if the GM says so.
   const openNext = () => {
-    if (!confirmAction(`Open orders for the next game? These orders will be hidden again${pickSpread(c) ? `, and the ${ECHOES.name} spread into a random neighbouring sector` : ''}.`)) return;
-    const target = pickSpread(c);
-    if (target) {
-      update((d) => {
-        if (!d.campaign || !spreadInto(d.campaign, target.id)) return;
-        d.campaign.updatedAt = nowIso();
-      });
-      toast(`The ${ECHOES.name} spread to ${target.name}.`);
-    }
+    if (!confirmAction('Open orders for the next game? These orders will be hidden again.')) return;
+    const spreads = spreadsAt(nextThreat(c));
+    if (confirmAction(`Also end round ${currentRound(c)}? Sector income is fixed for the round and the ${ECHOES.name} spread ${spreads} sector${spreads === 1 ? '' : 's'}. Cancel to keep playing this round.`)) endRound(c);
     open();
   };
   const reveal = () => {

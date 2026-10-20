@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle[/sector/:sectorId[/:attacker]] , #/battle/sheet/:sideId , #/missions , #/campaign , #/books , #/settings , #/guide */
+/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle[/sector/:sectorId[/:attacker]] , #/battle/sheet/:sideId , #/missions , #/campaign , #/books , #/settings , #/rules[/nexus] , #/guide */
 export type Route =
   | { page: 'forces' }
   | { page: 'force'; forceId: string }
@@ -13,6 +13,7 @@ export type Route =
   | { page: 'campaign' }
   | { page: 'books' }
   | { page: 'settings' }
+  | { page: 'rules'; sub?: 'nexus' }
   | { page: 'guide' };
 
 export function parseRoute(hash: string): Route {
@@ -29,6 +30,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'campaign') return { page: 'campaign' };
   if (parts[0] === 'books') return { page: 'books' };
   if (parts[0] === 'settings') return { page: 'settings' };
+  if (parts[0] === 'rules') return { page: 'rules', sub: parts[1] === 'nexus' ? 'nexus' : undefined };
   if (parts[0] === 'guide') return { page: 'guide' };
   return { page: 'forces' };
 }
@@ -48,6 +50,8 @@ export const href = {
   campaign: () => '#/campaign',
   books: () => '#/books',
   settings: () => '#/settings',
+  /** The campaign rules; 'nexus' is the Nexus Wars sub-page. */
+  rules: (sub?: 'nexus') => (sub ? '#/rules/nexus' : '#/rules'),
   guide: () => '#/guide',
 };
 

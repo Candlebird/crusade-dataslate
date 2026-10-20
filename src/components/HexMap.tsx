@@ -7,7 +7,7 @@ import {
   cells, clampToMap, defaultCounts, defaultMap, frontier, generateMap, hexCorners, hexKey, isPlaced, randomSeed, rng, rollSector, toPixel,
   type GenCounts, type GenOptions, type Hex,
 } from '../rules/hexmap';
-import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionColor, factionName, isStronghold, sidesOf } from '../rules/nexus';
+import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionColor, factionName, homeChallengeBlock, isStronghold, sidesOf } from '../rules/nexus';
 import { pickSpread, spreadInto, spreadTargets } from '../rules/voidspawn';
 import { href } from '../route';
 import { Modal, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
@@ -335,6 +335,7 @@ function SideIntro({ c, unplaced }: { c: Campaign; unplaced: Sector[] }) {
 function SectorView({ c, s, onEdit, onRecord }: { c: Campaign; s: Sector; onEdit: () => void; onRecord: () => void }) {
   const benefit = benefitOf(s);
   const games = c.log.filter((e) => e.sectorId === s.id).slice(-4).reverse();
+  const blocked = homeChallengeBlock(c, s);
   const ownerColor = factionColor(c, s.owner);
   const running = useStore().state.battle;
   return (
@@ -355,6 +356,7 @@ function SectorView({ c, s, onEdit, onRecord }: { c: Campaign; s: Sector; onEdit
           {games.map((e) => <div key={e.id} className="muted">{e.date}: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} — {e.winner ? `${factionName(c, e.winner)} won` : 'draw'}</div>)}
         </div>
       )}
+      {blocked && <p className="small"><span className="tag red">{blocked}</span></p>}
       {running?.sectorId === s.id && <p className="small">⚔ <a href={href.tracker()}>{running.mission.name}</a> is being fought here, round {running.round}.</p>}
       <div className="row" style={{ marginTop: '0.75rem' }}>
         <a className="btn primary" href={href.tracker(s.id)} title="Open the battle tracker set up for this sector; finishing the battle updates the map">⚔ Start a battle here</a>
@@ -537,7 +539,7 @@ const MAP_EXPORT_CSS = `
   .hex-mark { fill: #d9d4c7; font: 11px sans-serif; text-anchor: middle; }
 `;
 
-/** Let the Void Echoes spread one sector by hand (it also happens when the GM opens the next round of orders). */
+/** Let the Void Echoes spread one sector by hand (the Echoes also spread when the GM ends a round). */
 function SpreadButton({ c, setC }: { c: Campaign; setC: SetC }) {
   if (!c.sectors.some((s) => s.owner === ECHOES.id)) return null;
   const options = spreadTargets(c);

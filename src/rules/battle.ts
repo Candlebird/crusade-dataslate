@@ -12,7 +12,7 @@ import {
   type RewardTableKey,
 } from './data';
 import { applyScar, levelForXp, previousBracketXp, sufferingRolls, type DeathOutcome, type ScarResult } from './engine';
-import { MANIPULATION_PREFIX, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
+import { MANIPULATION_PREFIX, NEXUS_ROUNDS, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
 
 // Post-battle resolution ("Gaining Experience", "Gaining RP", "Deaths").
 // resolveBattle() mutates a force draft, so the wizard can preview on a clone and apply the same code for real.
@@ -116,6 +116,8 @@ export function rewardRows(input: BattleInput): RewardRow[] {
   const n = sufferingCount(input);
   for (let i = 0; i < n; i++)
     base.push({ key: `suffer${i}`, table: 'suffering', source: `Growth Through Suffering${n > 1 ? ` ${i + 1}/${n}` : ''}`, entry: entryOf(`suffer${i}`, 'suffering') });
+  // Nexus Wars: retaking a sector from the Void Echoes pays a bounty.
+  if (input.nexus?.bounty) base.push({ key: 'bounty', table: 'aiSpecial', source: 'Echo bounty', entry: entryOf('bounty', 'aiSpecial') });
 
   const rows: RewardRow[] = [];
   for (const r of base) {
@@ -259,10 +261,20 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
       const src = item.source;
       switch (item.kind) {
         case 'us': addUs(src, item.us ?? 0); break;
+        case 'matchBonus': {
+          const round = input.nexus?.round ?? 0;
+          const mb = n.matchBonus?.round === round ? n.matchBonus : { round, count: 0 };
+          if (mb.count >= NEXUS_ROUNDS.matchBonusMax) nexusLines.push(`${src}: already earned ${NEXUS_ROUNDS.matchBonusMax} this round.`);
+          else {
+            n.matchBonus = { round, count: mb.count + 1 };
+            addUs(src, item.us ?? 0);
+          }
+          break;
+        }
         case 'supply': addSupply(src, item.supply ?? 0); break;
         case 'shardRoll':
           if (!pick.roll) warnings.push(`${src}: not rolled yet.`);
-          else if (pick.roll >= 4) addUs(`${src} (rolled ${pick.roll})`, 1);
+          else if (pick.roll >= NEXUS_ROUNDS.shardMineRoll) addUs(`${src} (rolled ${pick.roll})`, 1);
           else nexusLines.push(`${src}: rolled ${pick.roll} — no shard.`);
           break;
         case 'relicRoll':
@@ -274,7 +286,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
           if (!CATEGORIES.includes(pick.choice as never)) warnings.push(`${src}: choose a Nexus Traits table.`);
           else {
             if (n.tempTables !== 'all' && !n.tempTables.includes(pick.choice as never)) n.tempTables.push(pick.choice as never);
-            nexusLines.push(`${src}: ${pick.choice} Nexus traits unlocked until the next match.`);
+            nexusLines.push(`${src}: ${pick.choice} Nexus traits unlocked until your next round income.`);
           }
           break;
         case 'manipulation':
