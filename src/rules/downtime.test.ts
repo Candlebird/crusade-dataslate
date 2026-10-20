@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type Campaign } from '../model/types';
 import { newForce, newUnit } from '../model/factory';
-import { applyExpedition, chooseOption, currentEncounter, headHome, pressOn, scaledReward, squadBonus, startExpedition } from './downtime';
+import { applyExpedition, checkOdds, chooseOption, currentEncounter, headHome, pressOn, scaledReward, squadBonus, startExpedition } from './downtime';
 import { EXPEDITION, EXPEDITION_SITES } from './downtimeData';
 import { emptyUnitBattle, participationXp, resolveBattle, rewardRows, type BattleInput } from './battle';
 import { STANDARD_MISSION } from './missions';
@@ -30,35 +30,88 @@ describe('expeditions', () => {
     expect(() => startExpedition('nope', [])).toThrow();
   });
 
-  it('gives a veteran squad +1', () => {
+  it('has six encounters a site, each in three variants with a way through', () => {
+    for (const site of EXPEDITION_SITES) {
+      expect(site.encounters).toHaveLength(6);
+      for (const enc of site.encounters) {
+        expect(enc.variants).toHaveLength(3);
+        for (const v of enc.variants) {
+          expect(v.choices.length).toBeGreaterThanOrEqual(2);
+          for (const c of v.choices) if (c.check) expect(c.lose).not.toBe('');
+        }
+      }
+    }
+  });
+
+  it('draws a variant for each encounter', () => {
+    const e = hulk(() => 0.99);
+    expect(e.variants).toEqual([2, 2, 2]);
+    const enc = EXPEDITION_SITES[0].encounters.find((x) => x.id === e.deck[0])!;
+    expect(currentEncounter(e)?.title).toBe(enc.variants[2].title);
+    delete e.variants; // an expedition saved before variants meets the first
+    expect(currentEncounter(e)?.title).toBe(enc.variants[0].title);
+  });
+
+  it('gives bigger and more experienced squads a bonus, up to the cap', () => {
+    expect(squadBonus([])).toBe(0);
     expect(squadBonus([newUnit({ xp: 0 })])).toBe(0);
-    expect(squadBonus([newUnit({ xp: 0 }), newUnit({ xp: 100 })])).toBe(1);
+    expect(squadBonus([newUnit({ xp: 0 }), newUnit({ xp: 0 })])).toBe(1);
+    expect(squadBonus([newUnit({ xp: 40 })])).toBe(1); // level 3
+    expect(squadBonus([newUnit({ xp: 20 }), newUnit({ xp: 20 }), newUnit({ xp: 20 })])).toBe(4); // three level 2s
+    expect(squadBonus([newUnit({ xp: 200 }), newUnit({ xp: 200 }), newUnit({ xp: 200 })])).toBe(EXPEDITION.bonusCap);
+  });
+
+  it('makes harder checks harder, and the bonus help', () => {
+    const tiers = ['safe', 'easy', 'medium', 'hard', 'heroic'] as const;
+    for (let i = 1; i < tiers.length; i++) expect(checkOdds(tiers[i], 0)).toBeLessThan(checkOdds(tiers[i - 1], 0));
+    for (const t of tiers.slice(1)) expect(checkOdds(t, 3)).toBeGreaterThan(checkOdds(t, 0));
+    expect(checkOdds('safe', 0)).toBeCloseTo(5 / 6);
+    expect(checkOdds('heroic', 0)).toBeLessThan(0.15);
+    expect(checkOdds('heroic', EXPEDITION.bonusCap)).toBeGreaterThan(0.5);
   });
 
   it('scales XP and Supply with depth, not RP or shards', () => {
     expect(scaledReward({ xp: 1, supply: 25, rp: 1, us: 1 }, 0)).toEqual({ xp: 1, supply: 25, rp: 1, us: 1 });
-    expect(scaledReward({ xp: 1, supply: 25 }, 1)).toEqual({ xp: 1, supply: 40, rp: 0, us: 0 });
+    expect(scaledReward({ xp: 1, supply: 25 }, 1)).toEqual({ xp: 2, supply: 40, rp: 0, us: 0 });
     expect(scaledReward({ xp: 2, supply: 25 }, 2)).toEqual({ xp: 4, supply: 50, rp: 0, us: 0 });
   });
 
-  it('pays a success, adds danger on a fail and more on a natural 1', () => {
-    const e = hulk();
-    const enc = currentEncounter(e)!;
-    const i = enc.choices.findIndex((c) => c.target > 0);
-    const target = enc.choices[i].target;
+  it('pays a success, adds danger on a fail and more on a fumble', () => {
+    // Force a medium check (3D6, 12+) onto the first encounter so the dice are known.
+    const withMedium = () => {
+      const e = hulk();
+      const site = EXPEDITION_SITES[0];
+      const enc = site.encounters.find((x) => x.id === e.deck[0])!;
+      const v = enc.variants[e.variants![0]];
+      const i = v.choices.findIndex((c) => c.check === 'medium');
+      return { e, i: i >= 0 ? i : v.choices.findIndex((c) => !!c.check), check: v.choices[i >= 0 ? i : 0].check! };
+    };
+    const { e, i } = withMedium();
     const win = chooseOption(e, i, 0, () => roll(6))!;
-    expect(win).toMatchObject({ roll: 6, success: true });
+    expect(win.success).toBe(true);
+    expect(win.dice!.every((d) => d === 6)).toBe(true);
     expect(e.phase).toBe('crossroads');
     expect(e.danger).toBe(0);
     expect(e.log).toHaveLength(1);
+    expect(e.log[0]).toMatch(/rolled 6\+6/);
     expect(chooseOption(e, i)).toBeUndefined(); // not at an encounter now
 
-    const fail = hulk();
-    chooseOption(fail, i, 0, () => roll(target - 1 || 1));
-    expect(fail.danger).toBe(target - 1 > 1 ? EXPEDITION.failDanger : EXPEDITION.fumbleDanger);
-    const fumble = hulk();
-    expect(chooseOption(fumble, i, 5, () => roll(1))!.success).toBe(false); // a 1 fails whatever the bonus
-    expect(fumble.danger).toBe(EXPEDITION.fumbleDanger);
+    const near = withMedium();
+    const target = EXPEDITION.checks[near.check].target;
+    const dice = EXPEDITION.checks[near.check].dice;
+    // All dice show the same face, a little short of the target: a plain fail.
+    const face = Math.floor((target - 1) / dice);
+    const r = chooseOption(near.e, near.i, target - 1 - face * dice, () => roll(face))!;
+    expect(r).toMatchObject({ success: false, fumble: false });
+    expect(near.e.danger).toBe(EXPEDITION.failDanger);
+
+    const fumble = withMedium();
+    const f = chooseOption(fumble.e, fumble.i, 20, () => roll(1))!; // all 1s fail whatever the bonus
+    expect(f).toMatchObject({ success: false, fumble: true });
+    expect(fumble.e.danger).toBe(EXPEDITION.fumbleDanger);
+
+    const short = withMedium();
+    expect(chooseOption(short.e, short.i, 0, () => roll(2))!.fumble).toBe(true); // missed by a lot
   });
 
   it('heads home safely, or presses on into an ambush', () => {

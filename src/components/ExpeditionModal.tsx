@@ -6,7 +6,7 @@ import { unitName } from '../rules/battle';
 import { markUnitsUsed, unitsUsed } from '../rules/nexus';
 import { EXPEDITION, EXPEDITION_SITES } from '../rules/downtimeData';
 import {
-  applyExpedition, chooseOption, currentEncounter, expeditionSite, headHome, pressOn, rewardText, scaledReward, squadBonus, startExpedition,
+  applyExpedition, checkOdds, checkText, chooseOption, currentEncounter, expeditionSite, headHome, pressOn, rewardText, scaledReward, squadBonus, startExpedition,
   type Expedition,
 } from '../rules/downtime';
 import { Modal, toast } from './ui';
@@ -64,7 +64,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
       <>
         <p className="muted small">
           Up to {EXPEDITION.squadMax} units head into the Nexus for {EXPEDITION.encounters} encounters. After each one, head home with the haul or press on: deeper pays more, but every failed roll raises the danger of an ambush.
-          {bonus ? ' A veteran in the squad gives +1 to every roll.' : ` A unit of level ${EXPEDITION.veteranLevel}+ gives the squad +1 to its rolls.`}
+          {' '}Checks roll 1 to 4 dice. The squad adds +1 to every roll for each unit after the first, and +1 for every {EXPEDITION.levelsPerBonus} levels across the squad (up to +{EXPEDITION.bonusCap}).
         </p>
         <div className="fields">
           <label className="field span-all">
@@ -75,7 +75,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
           </label>
           <p className="span-all small" style={{ margin: 0 }}>{s.desc} <span className="muted">Make it all the way: {rewardText(s.finish.reward)}.</span></p>
           <div className="span-all small">
-            <div className="muted">Squad ({squad.length}/{EXPEDITION.squadMax})</div>
+            <div className="muted">Squad ({squad.length}/{EXPEDITION.squadMax}){squad.length > 0 && <> · <b>+{bonus}</b> to every roll</>}</div>
             {units.length === 0 && <span className="muted">No active units.</span>}
             {used.length > 0 && <div className="muted">Each unit takes part in one skirmish, Solo patrol or Expedition a round (the main Battle doesn't count).</div>}
             {units.map((u) => (
@@ -102,7 +102,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
       <>
         <div className="row small">
           <span className="grow"><b>{s.name}</b> · encounter {Math.min(e.stage + 1, e.deck.length)} of {e.deck.length} · squad: {e.squad.map(name).join(', ')}</span>
-          <span>Danger <b>{e.danger}</b></span>
+          <span>Bonus <b>+{bonus}</b> · Danger <b>{e.danger}</b></span>
         </div>
         <p className="small" style={{ margin: '0.5rem 0' }}><span className="muted">Haul so far:</span> {rewardText(e.haul)}</p>
         {e.log.length > 0 && (
@@ -123,7 +123,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
               <div key={i} className="row" style={{ marginTop: '0.4rem' }}>
                 <button onClick={() => step((x) => void chooseOption(x, i, bonus))}>{ch.label}</button>
                 <span className="muted small grow">
-                  {ch.target ? `${ch.target}+${bonus ? ` (+${bonus})` : ''}` : 'no roll'}
+                  {ch.check ? `${checkText(ch.check)} · ${Math.round(checkOdds(ch.check, bonus) * 100)}%` : 'no roll'}
                   {rewardText(scaledReward(ch.reward, e.stage)) !== 'nothing' ? ` · ${rewardText(scaledReward(ch.reward, e.stage))}` : ''}
                 </span>
               </div>
