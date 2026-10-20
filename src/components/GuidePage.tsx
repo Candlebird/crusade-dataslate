@@ -133,7 +133,9 @@ export default function GuidePage() {
         <p className="muted small">
           No time to play? Press <b>⚡ Auto-battle</b> on a running battle. Each side picks its force (the other player picks their own, or the AI
           generates one), and every unit gets an Attack and Defense from its Quality, Defense, weapons, traits, upgrades, relics, scars and
-          level. The units then take turns attacking for 4 rounds; the team that destroys the most points wins (close is a draw). Apply the
+          level. The units then take turns attacking for 4 rounds; the team that destroys the most points wins (close is a draw). A unit brought
+          to half strength, or beaten in melee, takes a Morale test and may be Shaken, losing its next turn. A battle over a Nexus sector also
+          uses the sector's modifiers (Entrenched, Fanatical Garrison, Minefields and the rest), plus an Ion Storm if one is raging that round. Apply the
           result and claim it like any other battle: losses and kill XP carry over.
         </p>
         <Step n={1} title="Open Past battles" where={<a href={href.tracker()}>Battle</a>}>

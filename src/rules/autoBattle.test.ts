@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newUnit } from '../model/factory';
-import type { Unit } from '../model/types';
-import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, avgAttacks, fighter, fightersOf } from './autoBattle';
+import type { Campaign, Unit } from '../model/types';
+import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, autoSetup, avgAttacks, fighter, fightersOf } from './autoBattle';
 import { FACE_OFF_MISSIONS } from './missions';
 import { leaders, loadUnits, newBattle, resultFor } from './tracker';
 
@@ -86,5 +86,51 @@ describe('auto-battle', () => {
     expect(resultFor(b, b.sides[0].id)).toBe('loss');
     b.auto.winner = 'draw';
     expect(resultFor(b, b.sides[1].id)).toBe('draw');
+  });
+});
+
+describe('auto-battle morale and sector effects', () => {
+  // Bravo holds the sector; Alpha attacks it.
+  const sectorBattle = (modifiers: string[], a = [squad(), squad()], d = [squad(), squad()]) => {
+    const b = battle(a, d);
+    b.sectorId = 's';
+    b.attacker = 'A';
+    const c = {
+      id: 'c', name: 'Test', updatedAt: '', round: 1, log: [],
+      factions: [{ id: 'A', name: 'Alpha', player: '', color: '#f00' }, { id: 'B', name: 'Bravo', player: '', color: '#00f' }],
+      sectors: [{ id: 's', name: 'Sector', type: 'planet', owner: 'B', notes: '', q: 0, r: 0, modifiers }],
+    } as Campaign;
+    return autoSetup(b, [], c);
+  };
+
+  it('Shakes units at half strength or beaten in melee, and they rally on their next turn', () => {
+    const moves = [1, 2, 3, 4, 5, 6, 7, 8].flatMap((seed) => autoBattle(fightersOf(battle([squad(), squad()], [squad(), squad()]), []), seeded(seed)).moves);
+    expect(moves.some((m) => m.shaken?.length)).toBe(true);
+    expect(moves.some((m) => m.kind === 'rally')).toBe(true);
+    expect(rate(squad({ rules: ['Fearless'] })).morale).toBe(1);
+  });
+
+  it('applies the sector modifiers to the defenders and attackers', () => {
+    const s = sectorBattle(['fanatics', 'entrenched', 'minefield', 'initiative', 'tide']);
+    const def = s.fighters.filter((f) => f.team === 'B');
+    const att = s.fighters.filter((f) => f.team === 'A');
+    expect(def.every((f) => f.morale === 1 && f.r1Def === 1)).toBe(true);
+    expect(att.every((f) => f.morale === 0 && f.r1Def === 0 && f.mines)).toBe(true);
+    expect([s.first, s.tide]).toEqual(['B', 'B']);
+    expect(s.effects).toHaveLength(5);
+    expect(def[0].notes.some((n) => n.startsWith('Fanatical Garrison'))).toBe(true);
+    // Veterans pick two defenders, and their Attack goes up.
+    const v = sectorBattle(['veterans']).fighters.filter((f) => f.team === 'B');
+    expect(v.every((f) => f.hitMelee === 1)).toBe(true);
+    expect(v[0].melee).toBeGreaterThan(rate(squad()).melee);
+    expect(sectorBattle([]).effects).toEqual([]);
+  });
+
+  it('brings back the first defending unit destroyed with Endless Tide', () => {
+    const big = () => squad({ quality: 2, defense: 2, size: 10, weapons: [{ ...rifle, count: 10, rules: ['AP(2)'] }, { ...blade, count: 10 }] });
+    const s = sectorBattle(['tide'], [big(), big(), big()], [squad({ size: 1 }), squad()]);
+    const returns = [1, 2, 3, 4, 5].map((seed) => autoBattle(s.fighters, seeded(seed), AUTO_BATTLE.rounds, s).moves.filter((m) => m.kind === 'return'));
+    expect(returns.some((r) => r.length === 1)).toBe(true);
+    expect(returns.every((r) => r.length <= 1)).toBe(true);
   });
 });

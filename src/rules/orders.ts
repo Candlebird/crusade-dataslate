@@ -1,4 +1,4 @@
-import type { Campaign, Force } from '../model/types';
+import type { Campaign, CampaignEvent, Force } from '../model/types';
 import { frontier, isPlaced } from './hexmap';
 import { homeChallengeBlock, stormed } from './nexus';
 
@@ -102,4 +102,9 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
       a.flags.push(`${name(a.defender)} is attacking them too`);
   }
   return { attacks, holds };
+}
+
+/** The game already recorded for a revealed attack this round, if it has been fought. */
+export function foughtFor(c: Campaign, a: Pick<Attack, 'factionId' | 'sectorId'>, round: number): CampaignEvent | undefined {
+  return [...c.log].reverse().find((e) => e.round === round && e.sectorId === a.sectorId && e.attacker === a.factionId && !e.spread && !e.skirmish && !e.crisis);
 }

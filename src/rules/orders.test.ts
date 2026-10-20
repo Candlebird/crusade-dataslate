@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newForce } from '../model/factory';
 import type { Campaign } from '../model/types';
 import { emptyNexus } from './nexus';
-import { HOLD, attackTargets, myDetachments, playedDetachments, revealOrders } from './orders';
+import { HOLD, attackTargets, foughtFor, myDetachments, playedDetachments, revealOrders } from './orders';
 
 // A row of hexes: A's home and planet, then B's planet and home, with an unclaimed sector under the border.
 function campaign(): Campaign {
@@ -85,5 +85,19 @@ describe('sealed orders', () => {
     c.sectors.find((s) => s.id === 'p2')!.owner = 'A';
     const s = revealOrders(c, [{ email: 'me@x', round: 1, picks: { A: 'p2' } }], 1).attacks;
     expect(s[0].flags).toEqual(['No longer next to their territory']);
+  });
+});
+
+describe('fought attacks', () => {
+  it('finds the game recorded for a revealed attack this round', () => {
+    const c = campaign();
+    const a = { factionId: 'A', sectorId: 'p2' };
+    expect(foughtFor(c, a, 1)).toBeUndefined();
+    c.log.push({ id: 'old', date: '', round: 0, sectorId: 'p2', attacker: 'A', defender: 'B', winner: 'B', notes: '' });
+    c.log.push({ id: 'sp', date: '', round: 1, sectorId: 'p2', attacker: 'A', defender: 'B', winner: 'A', notes: '', spread: true });
+    c.log.push({ id: 'other', date: '', round: 1, sectorId: 'p2', attacker: 'C', defender: 'B', winner: 'C', notes: '' });
+    expect(foughtFor(c, a, 1)).toBeUndefined();
+    c.log.push({ id: 'g', date: '', round: 1, sectorId: 'p2', attacker: 'A', defender: 'B', winner: 'A', notes: '' });
+    expect(foughtFor(c, a, 1)?.id).toBe('g');
   });
 });

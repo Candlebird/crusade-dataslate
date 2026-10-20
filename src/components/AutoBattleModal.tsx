@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../model/store';
 import type { Force } from '../model/types';
-import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, fightersOf, type AutoResult, type Fighter, type Move } from '../rules/autoBattle';
+import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, autoSetup, type AutoResult, type Fighter, type Move } from '../rules/autoBattle';
 import { loadForce, loadUnits, sidePoints, teamName, teamsOf, type TeamKey, type TrackedBattle, type TrackerSide } from '../rules/tracker';
 import { echoesBook, randomEchoes } from '../rules/echoForce';
 import { ECHOES } from '../rules/nexusData';
@@ -15,7 +15,8 @@ export default function AutoBattleModal({ b, set, onClose }: { b: TrackedBattle;
   const [result, setResult] = useState<AutoResult | null>(null);
   // How many moves have been played back so far.
   const [shown, setShown] = useState(0);
-  const fighters = useMemo(() => fightersOf(b, state.forces), [b, state.forces]);
+  const setup = useMemo(() => autoSetup(b, state.forces, state.campaign), [b, state.forces, state.campaign]);
+  const { fighters } = setup;
   const teams = teamsOf(b);
   const block = autoBattleBlock(b);
   const done = !!result && shown >= result.moves.length;
@@ -25,7 +26,7 @@ export default function AutoBattleModal({ b, set, onClose }: { b: TrackedBattle;
     onClose();
   };
   const fight = () => {
-    setResult(autoBattle(fighters));
+    setResult(autoBattle(fighters, Math.random, AUTO_BATTLE.rounds, setup));
     setShown(0);
   };
   const apply = () => {
@@ -43,8 +44,16 @@ export default function AutoBattleModal({ b, set, onClose }: { b: TrackedBattle;
         <p className="muted small">
           Each unit gets an <b>Attack</b> (expected wounds a round against a 5-model Defense 4+ unit, shooting / in melee) and a <b>Defense</b> (plain hits it takes
           to lose a wound), worked out from its Quality, Defense, weapons, weapon rules and traits, upgrades, relics, scars and level. Hover a unit to see why.
-          Then the teams take turns, each unit attacking once a round, for {AUTO_BATTLE.rounds} rounds. Units start the auto-battle as they are on the tracker.
+          Then the teams take turns, each unit attacking once a round, for {AUTO_BATTLE.rounds} rounds. A unit brought to half strength, or beaten in melee,
+          takes a Morale test (a Quality test): failing leaves it <b>Shaken</b>, so it can't strike back and spends its next turn rallying.
+          Units start the auto-battle as they are on the tracker.
         </p>
+        {setup.effects.length > 0 && (
+          <div className="small">
+            <b>In play</b>
+            <ul style={{ margin: '0.25rem 0', paddingLeft: '1.2rem' }}>{setup.effects.map((e) => <li key={e}>{e}</li>)}</ul>
+          </div>
+        )}
         <div className="auto-teams">
           {teams.map((t) => (
             <div key={t} className={`auto-team team-${t}`}>
@@ -219,13 +228,19 @@ function MoveText({ m, byKey, b }: { m: Move; byKey: Map<string, Fighter>; b: Tr
   const t = m.target ? byKey.get(m.target) : undefined;
   const who = (f: Fighter) => <span className={`team-${f.team}`} style={{ color: 'var(--team)' }}>{f.name}</span>;
   const side = (team: TeamKey) => b.sides.length > 2 ? <span className="muted"> ({teamName(b, team)})</span> : null;
-  if (m.kind === 'advance' || !t) return <>{who(a)}{side(a.team)} advances.</>;
+  if (m.kind === 'rally') return <>R{m.round}: {who(a)}{side(a.team)} is Shaken, and spends its turn rallying.</>;
+  if (m.kind === 'return') return <>R{m.round}: {who(a)}{side(a.team)} <b>returns at full strength</b> (Endless Tide)!</>;
+  if (m.kind === 'advance' || !t) return <>R{m.round}: {who(a)}{side(a.team)} advances.</>;
+  const shaken = (m.shaken ?? []).map((k) => byKey.get(k)?.name).filter(Boolean);
   return (
     <>
       R{m.round}: {who(a)}{side(a.team)} {m.kind === 'charge' ? 'charges' : 'shoots'} {who(t)}{side(t.team)}:{' '}
+      {m.hazard ? <>loses <b>{m.hazard}</b> to the minefield on the way in; </> : null}
       {m.dmg ? <b>{m.dmg} wound{m.dmg === 1 ? '' : 's'}</b> : 'no damage'}
       {m.targetHp <= 0 && <> — <b>destroyed!</b></>}
-      {m.kind === 'charge' && m.targetHp > 0 && <>; strikes back for {m.back ? <b>{m.back}</b> : 'nothing'}{m.attackerHp <= 0 && <> — <b>{a.name} destroyed!</b></>}</>}
+      {m.kind === 'charge' && m.targetHp > 0 && (m.cowed ? '; too Shaken to strike back'
+        : <>; strikes back for {m.back ? <b>{m.back}</b> : 'nothing'}{m.attackerHp <= 0 && <> — <b>{a.name} destroyed!</b></>}</>)}
+      {shaken.length > 0 && <>. <b>{shaken.join(' and ')} {shaken.length > 1 ? 'are' : 'is'} Shaken.</b></>}
     </>
   );
 }

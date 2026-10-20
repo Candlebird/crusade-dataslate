@@ -5,7 +5,7 @@ import type { Campaign, Force } from '../model/types';
 import { detachmentName } from '../rules/detachments';
 import { aiDefended } from '../rules/difficulty';
 import { ECHOES, currentRound, factionName } from '../rules/nexus';
-import { HOLD, attackTargets, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
+import { HOLD, attackTargets, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
 import { spreadsAt, nextThreat } from '../rules/rounds';
 import { href } from '../route';
 import { useEndRound } from './RoundPanel';
@@ -156,15 +156,22 @@ function RevealedOrders({ c, orders, round }: { c: Campaign; orders: PlayerOrder
   if (!attacks.length && !holds.length) return <p className="muted small">Nobody declared this round.</p>;
   return (
     <>
-      {attacks.map((a) => (
-        <div key={a.forceId ?? a.factionId} className="list-item small">
-          <span className="grow">
-            <b>{who(a.factionId, a.forceId)}</b> attacks <b>{sectorName(a.sectorId)}</b> ({factionName(c, a.defender)})
-            {a.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}>⚠ {f}</span>)}
-          </span>
-          <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}>⚔ Start battle</a>
-        </div>
-      ))}
+      {attacks.map((a) => {
+        const fought = foughtFor(c, a, round);
+        return (
+          <div key={a.forceId ?? a.factionId} className="list-item small">
+            <span className="grow">
+              <b>{who(a.factionId, a.forceId)}</b> attacks <b>{sectorName(a.sectorId)}</b> ({factionName(c, a.defender)})
+              {!fought && a.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}>⚠ {f}</span>)}
+            </span>
+            {fought ? (
+              <span className="tag green" title={fought.notes || undefined}>✓ Fought: {fought.winner ? `${factionName(c, fought.winner)} won` : 'a draw'}</span>
+            ) : (
+              <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}>⚔ Start battle</a>
+            )}
+          </div>
+        );
+      })}
       {holds.map((h) => (
         <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds</span></div>
       ))}

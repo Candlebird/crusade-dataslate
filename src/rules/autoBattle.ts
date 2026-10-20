@@ -1,9 +1,13 @@
-import type { Force, Unit, Weapon } from '../model/types';
+import type { Campaign, Force, Unit, Weapon } from '../model/types';
+import { modifierOf } from './difficulty';
 import { hasRule, levelForXp, ruleRating } from './engine';
+import { activeEvent } from './nexus';
 import { teamsOf, type TeamKey, type TrackedBattle } from './tracker';
 
 // Auto-battle: when there's no time to play a battle out, each unit gets an overall Attack and Defense from its
-// profile (quality, defense, weapons, traits, relics, level), and the units trade blows for 4 rounds.
+// profile (quality, defense, weapons, traits, relics, level), and the units trade blows for 4 rounds. A unit brought
+// to half strength, or beaten in melee, tests its morale: failing leaves it Shaken, and it spends its next turn rallying.
+// The sector's modifiers and the round's Galactic Event play their part too.
 
 export const AUTO_BATTLE = {
   rounds: 4,
@@ -70,6 +74,19 @@ export interface Fighter {
   hitMelee: number;
   /** Charges in round 1 instead of shooting. */
   fast: boolean;
+  hero: boolean;
+  /** Bonus to Morale tests (Fearless, Fanatical Garrison). */
+  morale: number;
+  /** Bonus to Defense in round 1 (Entrenched). */
+  r1Def: number;
+  /** To-hit bonus when shooting in rounds 1 and 2 (Prepared Firing Lines; a penalty from Umbral Fog, Ion Storm). */
+  earlyShoot: number;
+  /** Charging in rounds 1 and 2 crosses Dangerous terrain (Minefields). */
+  mines: boolean;
+  /** Failed a Morale test: spends its next activation rallying, and can't strike back meanwhile. */
+  shaken: boolean;
+  /** Has taken its half-strength Morale test. */
+  tested: boolean;
   /** Multipliers from traits, relics, Hero and level the auto-battle doesn't model one by one. */
   atkBonus: number;
   defBonus: number;
@@ -84,7 +101,7 @@ export interface Fighter {
   xp: number;
 }
 
-export type MoveKind = 'shoot' | 'charge' | 'advance';
+export type MoveKind = 'shoot' | 'charge' | 'advance' | 'rally' | 'return';
 
 export interface Move {
   round: number;
@@ -94,6 +111,12 @@ export interface Move {
   dmg: number;
   /** Melee damage struck back at the attacker. */
   back: number;
+  /** Wounds the attacker lost to Dangerous terrain on the way in. */
+  hazard?: number;
+  /** The target was Shaken, so couldn't strike back. */
+  cowed?: boolean;
+  /** Units that failed a Morale test from this move. */
+  shaken?: string[];
   targetHp: number;
   attackerHp: number;
 }
@@ -222,6 +245,8 @@ export function fighter(u: Unit | undefined, t: { id: string; name: string; woun
 
   const impact = (ruleRating(names, 'Impact') ?? 0) + 3 * count(upgrades, 'Impact +3') + 6 * count(upgrades, 'Impact +6') + (has('Momentum') ? size : 0);
   const fast = ['Fast', 'Flying', 'Scout', 'Ambush', 'Swift', 'Aura of Swiftness', 'Flying + Fast', 'Orbital Drop'].some(has);
+  const morale = has('Fearless') ? 1 : 0;
+  if (morale) notes.push('Fearless: +1 to Morale tests');
 
   // Everything else it has earned still counts, a little each.
   let atkBonus = 1;
@@ -251,14 +276,20 @@ export function fighter(u: Unit | undefined, t: { id: string; name: string; woun
   const f: Fighter = {
     key: `${sideId}:${t.id}`, sideId, team, unitId: t.id, name: t.name, points: t.points ?? u?.points ?? 0,
     quality, defense, size, tough, hp: t.wounds, maxHp: t.maxWounds, guns, defMod, fortified, ignore, evasive, impact, hitShoot, hitMelee, fast,
+    hero: !!u && hasRule(u.rules, 'Hero'), morale, r1Def: 0, earlyShoot: 0, mines: false, shaken: false, tested: false,
     atkBonus: Math.max(0.5, atkBonus), defBonus: Math.max(0.5, defBonus), shoot: 0, melee: 0, attack: 0, def: 0, notes, xp: 0,
   };
+  return rate(f);
+}
+
+/** The Attack and Defense shown on a fighter. */
+function rate(f: Fighter): Fighter {
   const base = { ...AUTO_BATTLE.baseline, defMod: 0, fortified: false, ignore: 0, evasive: 0 };
   f.shoot = round1(damage(f, base, 'shoot', base.size));
   f.melee = round1(damage(f, base, 'charge', base.size));
   f.attack = round1(Math.max(f.shoot, f.melee) + 0.35 * Math.min(f.shoot, f.melee));
   // Defense: hits from a plain AP(0) weapon it takes to deal one wound.
-  f.def = round1((f.defBonus * (1 / failChance(defense, 0, defMod)) / (1 - ignore)) * (1 + evasive / 6));
+  f.def = round1((f.defBonus * (1 / failChance(f.defense, 0, f.defMod)) / (1 - f.ignore)) * (1 + f.evasive / 6));
   return f;
 }
 
@@ -269,22 +300,27 @@ const hitBonus = (f: Fighter, kind: MoveKind) => (kind === 'shoot' ? f.hitShoot 
 const alive = (f: { hp: number; tough: number; size: number }) => Math.min(f.size, Math.ceil(f.hp / f.tough));
 
 /** Expected wounds `f` deals to `t` this move, before its target's Defense bonus. */
-function damage(f: Fighter, t: Target, kind: MoveKind, targetModels: number): number {
-  if (kind === 'advance') return 0;
+function damage(f: Fighter, t: Target, kind: MoveKind, targetModels: number, hit = hitBonus(f, kind)): number {
+  if (kind !== 'shoot' && kind !== 'charge') return 0;
   const melee = kind === 'charge';
   // A unit that has lost models has fewer guns.
   const share = alive(f) / f.size;
-  let n = f.guns.filter((g) => g.melee === melee).reduce((sum, g) => sum + gunDamage(g, f.quality, hitBonus(f, kind), t, targetModels), 0);
+  let n = f.guns.filter((g) => g.melee === melee).reduce((sum, g) => sum + gunDamage(g, f.quality, hit, t, targetModels), 0);
   if (melee && f.impact) n += f.impact * (5 / 6) * failChance(t.defense, 0, t.defMod) * (1 - t.ignore);
   return n * share * f.atkBonus;
 }
 
-const expected = (f: Fighter, t: Fighter, kind: MoveKind) => damage(f, t, kind, alive(t)) / t.defBonus;
+/** Expected wounds `f` deals to `t` in this round, with the round's sector effects. */
+function expected(f: Fighter, t: Fighter, kind: MoveKind, round: number) {
+  const target = round === 1 && t.r1Def ? { ...t, defMod: t.defMod + t.r1Def } : t;
+  const hit = hitBonus(f, kind) + (kind === 'shoot' && round <= 2 ? f.earlyShoot : 0);
+  return damage(f, target, kind, alive(t), hit) / t.defBonus;
+}
 
 /** What a unit does this round: shoot, charge, or (with nothing to shoot and too slow to charge) advance. */
 function moveKind(f: Fighter, round: number, t: Fighter): MoveKind {
-  const shoot = expected(f, t, 'shoot');
-  const charge = expected(f, t, 'charge');
+  const shoot = expected(f, t, 'shoot', round);
+  const charge = expected(f, t, 'charge', round);
   if (round === 1 && !f.fast) return shoot > 0 ? 'shoot' : 'advance';
   return charge > shoot ? 'charge' : shoot > 0 ? 'shoot' : 'advance';
 }
@@ -293,7 +329,7 @@ function moveKind(f: Fighter, round: number, t: Fighter): MoveKind {
 function pickTarget(f: Fighter, enemies: Fighter[], round: number, rng: () => number): Fighter {
   const weight = (t: Fighter) => {
     const kind = moveKind(f, round, t);
-    const dmg = Math.min(t.hp, expected(f, t, kind === 'advance' ? 'charge' : kind));
+    const dmg = Math.min(t.hp, expected(f, t, kind === 'advance' ? 'charge' : kind, round));
     return Math.pow(0.05 + (dmg / t.maxHp) * (t.points + 50), 2);
   };
   const ws = enemies.map(weight);
@@ -314,6 +350,20 @@ function killXp(t: Fighter, before: number, after: number): number {
   return lost * (t.tough === 1 && t.size >= 10 ? 0.5 : t.tough);
 }
 
+/** A Morale test: a Quality test, with its bonuses. Failing leaves the unit Shaken. */
+function moraleTest(f: Fighter, rng: () => number): boolean {
+  if (f.hp <= 0 || f.shaken) return false;
+  f.shaken = rng() >= hitChance(f.quality, f.morale);
+  return f.shaken;
+}
+
+/** The test a unit takes on first being brought to half strength. */
+function halfStrength(f: Fighter, rng: () => number): boolean {
+  if (f.tested || f.hp <= 0 || f.hp > f.maxHp / 2) return false;
+  f.tested = true;
+  return moraleTest(f, rng);
+}
+
 /** Every unit still in the fight on each side, as fighters. */
 export function fightersOf(b: TrackedBattle, forces: Force[]): Fighter[] {
   return b.sides.flatMap((side) => {
@@ -325,20 +375,116 @@ export function fightersOf(b: TrackedBattle, forces: Force[]): Fighter[] {
   });
 }
 
+/** Battle-wide effects from the sector: who goes first, and whose first fallen unit comes back. */
+export interface AutoOptions {
+  /** Activates first in round 1 (Home Ground). */
+  first?: TeamKey;
+  /** The first of this team's non-hero units destroyed comes back once, at full strength, next round (Endless Tide). */
+  tide?: TeamKey;
+}
+
+/** What the battle's sector modifiers and Galactic Event do in an auto-battle. */
+export interface AutoSetup extends AutoOptions {
+  fighters: Fighter[];
+  /** What's in play, to show. */
+  effects: string[];
+}
+
+const best = (fs: Fighter[], by: (f: Fighter) => number, n: number) => [...fs].sort((a, b) => by(b) - by(a)).slice(0, n);
+
+/** Every unit still in the fight, with the sector's modifiers and the round's Galactic Event applied. */
+export function autoSetup(b: TrackedBattle, forces: Force[], c?: Campaign): AutoSetup {
+  const fighters = fightersOf(b, forces);
+  const setup: AutoSetup = { fighters, effects: [] };
+  const sector = c?.sectors.find((s) => s.id === b.sectorId);
+  const touched = new Set<Fighter>();
+  const give = (fs: Fighter[], note: string, fn: (f: Fighter) => void) => fs.forEach((f) => { fn(f); f.notes.push(note); touched.add(f); });
+  const names = (fs: Fighter[]) => fs.map((f) => f.name).join(' & ');
+  const att = fighters.filter((f) => f.team === b.attacker);
+  const def = fighters.filter((f) => f.team !== b.attacker);
+  const defender = def[0]?.team;
+  if (sector && b.attacker && defender) {
+    for (const m of (sector.modifiers ?? []).map(modifierOf)) {
+      if (!m) continue;
+      const say = (text: string) => setup.effects.push(`${m.name}: ${text}`);
+      const note = `${m.name}: `;
+      switch (m.id) {
+        case 'entrenched': give(def, `${note}+1 to Defense in round 1`, (f) => (f.r1Def += 1)); say('the defenders get +1 to Defense in round 1.'); break;
+        case 'lurkers': {
+          const fs = best(def.filter((f) => !f.fast), (f) => f.melee, 2);
+          give(fs, `${note}Ambush, so can charge in round 1`, (f) => (f.fast = true));
+          if (fs.length) say(`${names(fs)} gain Ambush, so can charge in round 1.`);
+          break;
+        }
+        case 'fanatics': give(def, `${note}+1 to Morale tests`, (f) => (f.morale += 1)); say('the defenders get +1 to Morale tests.'); break;
+        case 'regrowth': {
+          const fs = best(def.filter((f) => !f.hero && f.ignore < 1 / 3), (f) => f.tough * 100 + f.maxHp, 1);
+          give(fs, `${note}Regeneration`, (f) => (f.ignore = 1 / 3));
+          if (fs.length) say(`${names(fs)} gains Regeneration.`);
+          break;
+        }
+        case 'veterans': {
+          const fs = best(def, (f) => f.melee, 2);
+          give(fs, `${note}+1 to hit in melee`, (f) => (f.hitMelee += 1));
+          if (fs.length) say(`${names(fs)} get +1 to hit in melee.`);
+          break;
+        }
+        case 'gunline': {
+          const fs = best(def.filter((f) => f.shoot > 0), (f) => f.shoot, 1);
+          give(fs, `${note}+1 to hit shooting in rounds 1 and 2`, (f) => (f.earlyShoot += 1));
+          if (fs.length) say(`${names(fs)} gets +1 to hit shooting in rounds 1 and 2.`);
+          break;
+        }
+        case 'fog': give(att, `${note}often -1 to hit shooting in rounds 1 and 2 (long range)`, (f) => (f.earlyShoot -= 0.5)); say('the attackers often get -1 to hit shooting in rounds 1 and 2, while the armies are far apart.'); break;
+        case 'minefield': give(att, `${note}charging in rounds 1 and 2 crosses Dangerous terrain`, (f) => (f.mines = true)); say('attackers charging in rounds 1 and 2 lose a wound for each model that rolls a 1.'); break;
+        case 'bastion': give(def, `${note}often +1 to Defense (on objectives)`, (f) => (f.defMod += 0.5)); say('the defenders often get +1 to Defense, holding the objectives.'); break;
+        case 'initiative': setup.first = defender; say('the defender activates first in round 1.'); break;
+        case 'tide': setup.tide = defender; say("the defender's first non-hero unit destroyed comes back once, at full strength, the next round."); break;
+        default: say('no effect in an auto-battle.');
+      }
+    }
+  }
+  const event = c && activeEvent(c);
+  if (event?.id === 'ionStorm') {
+    give(fighters, `${event.name}: often -1 to hit shooting in rounds 1 and 2 (long range)`, (f) => (f.earlyShoot -= 0.5));
+    setup.effects.push(`${event.name}: everyone often gets -1 to hit shooting in rounds 1 and 2, while the armies are far apart.`);
+  } else if (event?.battle) setup.effects.push(`${event.name}: ${event.battle} Not part of the auto-battle: apply it yourself.`);
+  touched.forEach(rate);
+  return setup;
+}
+
 /** Fight it out: units of each team take turns, each attacking once a round, for 4 rounds or until one team is left. */
-export function autoBattle(start: Fighter[], rng: () => number = Math.random, rounds = AUTO_BATTLE.rounds): AutoResult {
+export function autoBattle(start: Fighter[], rng: () => number = Math.random, rounds = AUTO_BATTLE.rounds, opts: AutoOptions = {}): AutoResult {
   const fighters = start.map((f) => ({ ...f, notes: [...f.notes] }));
   const teams = [...new Set(fighters.map((f) => f.team))];
   const moves: Move[] = [];
   const standing = () => teams.filter((t) => fighters.some((f) => f.team === t && f.hp > 0));
   let first = Math.floor(rng() * teams.length);
-  for (let round = 1; round <= rounds && standing().length > 1; round++) {
+  if (opts.first && teams.includes(opts.first)) first = teams.indexOf(opts.first);
+  // Endless Tide: the unit waiting to come back, then '' once it has.
+  let tide: Fighter | '' | undefined;
+  const fallen = (t: Fighter) => {
+    if (t.hp <= 0 && tide === undefined && t.team === opts.tide && !t.hero) tide = t;
+  };
+  // A team wiped out with its Endless Tide unit still to come back fights on.
+  const fighting = () => standing().length + (tide && !standing().includes(tide.team) ? 1 : 0) > 1;
+  for (let round = 1; round <= rounds && fighting(); round++) {
+    if (tide) {
+      Object.assign(tide, { hp: tide.maxHp, shaken: false, tested: false });
+      moves.push({ round, attacker: tide.key, kind: 'return', dmg: 0, back: 0, targetHp: tide.hp, attackerHp: tide.hp });
+      tide = '';
+    }
     // Shuffle each team's activation order, then take turns.
     const queues = teams.map((t) => fighters.filter((f) => f.team === t && f.hp > 0).map((f) => ({ f, r: rng() })).sort((a, b) => a.r - b.r).map((x) => x.f));
     for (let turn = 0; queues.some((q) => q.length); turn++) {
       const q = queues[(first + turn) % teams.length];
       const f = q.shift();
       if (!f || f.hp <= 0) continue;
+      if (f.shaken) {
+        f.shaken = false;
+        moves.push({ round, attacker: f.key, kind: 'rally', dmg: 0, back: 0, targetHp: f.hp, attackerHp: f.hp });
+        continue;
+      }
       const enemies = fighters.filter((x) => x.team !== f.team && x.hp > 0);
       if (!enemies.length) break;
       const t = pickTarget(f, enemies, round, rng);
@@ -347,18 +493,32 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
         moves.push({ round, attacker: f.key, kind, dmg: 0, back: 0, targetHp: t.hp, attackerHp: f.hp });
         continue;
       }
+      // Minefields: charging across them early costs a wound for each model that rolls a 1 (never the last one).
+      const hazard = kind === 'charge' && f.mines && round <= 2 ? Math.min(f.hp - 1, roll(alive(f) / 6, rng)) : 0;
+      f.hp -= hazard;
       const before = t.hp;
-      const dmg = Math.min(t.hp, roll(expected(f, t, kind), rng));
+      const dmg = Math.min(t.hp, roll(expected(f, t, kind, round), rng));
       t.hp -= dmg;
       f.xp += killXp(t, before, t.hp);
+      fallen(t);
       let back = 0;
-      if (kind === 'charge' && t.hp > 0) {
+      const cowed = kind === 'charge' && t.hp > 0 && t.shaken;
+      // A Shaken unit can't strike back.
+      if (kind === 'charge' && t.hp > 0 && !t.shaken) {
         const was = f.hp;
-        back = Math.min(f.hp, roll(expected(t, f, 'charge') * AUTO_BATTLE.strikeBack, rng));
+        back = Math.min(f.hp, roll(expected(t, f, 'charge', round) * AUTO_BATTLE.strikeBack, rng));
         f.hp -= back;
         t.xp += killXp(f, was, f.hp);
+        fallen(f);
       }
-      moves.push({ round, attacker: f.key, target: t.key, kind, dmg, back, targetHp: t.hp, attackerHp: f.hp });
+      const shaken: string[] = [];
+      for (const x of [t, f]) if (halfStrength(x, rng)) shaken.push(x.key);
+      // The loser of a melee tests too.
+      if (kind === 'charge' && dmg !== back) {
+        const loser = dmg < back ? f : t;
+        if (moraleTest(loser, rng)) shaken.push(loser.key);
+      }
+      moves.push({ round, attacker: f.key, target: t.key, kind, dmg, back, targetHp: t.hp, attackerHp: f.hp, ...(hazard ? { hazard } : {}), ...(cowed ? { cowed } : {}), ...(shaken.length ? { shaken } : {}) });
     }
     first = (first + 1) % teams.length;
   }
