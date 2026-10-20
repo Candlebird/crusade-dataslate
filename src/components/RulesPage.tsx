@@ -1,5 +1,5 @@
 import type { MouseEvent, ReactNode } from 'react';
-import { href } from '../route';
+import { href, type RulesSub } from '../route';
 import { useStore } from '../model/store';
 import {
   AGENDAS, CATEGORIES, CATEGORY_HINT, LEVEL_THRESHOLDS, NEXUS_TRAITS, RELICS, RELIC_SLOTS, RELIC_TIER_MIN_XP, RELIC_WEAPON_RULES,
@@ -65,24 +65,44 @@ function Rolls({ title, entries }: { title: string; entries: { text: string }[] 
   );
 }
 
-function RelicTable({ relics }: { relics: RelicDef[] }) {
+/** Who carries each relic, across every force here, so the case shows what's been claimed. */
+function useHolders() {
+  const { state } = useStore();
+  const held = new Map<string, { forceId: string; unitId: string; label: string }[]>();
+  for (const f of state.forces)
+    for (const u of f.units)
+      for (const r of u.relics) held.set(r.name, [...(held.get(r.name) ?? []), { forceId: f.id, unitId: u.id, label: `${u.name} (${f.name})` }]);
+  return held;
+}
+
+/** Relics as a display case: a card per relic, grouped by tier, with who carries it. */
+function RelicCase({ relics }: { relics: RelicDef[] }) {
+  const held = useHolders();
   return (
     <>
       {TIERS.map((tier) => {
         const list = relics.filter((r) => r.tier === tier);
         return list.length ? (
           <div key={tier}>
-            <h3>{tier} relics</h3>
-            <table className="compact small">
-              <tbody>
-                {list.map((r) => (
-                  <tr key={r.name}>
-                    <td><b>{r.name}</b></td>
-                    <td>{[r.profile, r.desc, r.note].filter(Boolean).join(' · ')}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <h3 className={`relic-tier ${tier.toLowerCase()}`}>{tier} <span className="muted small">· hero XP {RELIC_TIER_MIN_XP[tier]}+</span></h3>
+            <div className="relic-case">
+              {list.map((r) => {
+                const by = held.get(r.name) ?? [];
+                return (
+                  <div key={r.name} className={`relic-card ${tier.toLowerCase()}`}>
+                    <div className="relic-name">{r.name}</div>
+                    {r.profile && <div className="relic-profile mono small">{r.profile}</div>}
+                    {r.desc && <p className="small">{r.desc}</p>}
+                    {r.note && <p className="small muted">{r.note}</p>}
+                    <div className="relic-held small">
+                      {by.length
+                        ? <>Carried by {by.map((h, i) => <span key={i}>{i ? ', ' : ''}<a href={href.unit(h.forceId, h.unitId)}>{h.label}</a></span>)}</>
+                        : <span className="muted">Unclaimed</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         ) : null;
       })}
@@ -98,27 +118,35 @@ function Toc({ items }: { items: [string, string][] }) {
   );
 }
 
-function Tabs({ sub }: { sub?: 'nexus' }) {
+const PAGES: { sub?: RulesSub; tab: string; title: string }[] = [
+  { tab: 'Crusade', title: 'Crusade rules' },
+  { sub: 'traits', tab: 'Traits & weapons', title: 'Traits & weapon upgrades' },
+  { sub: 'relics', tab: 'Relics', title: 'Relics' },
+  { sub: 'nexus', tab: 'Nexus Wars', title: 'Nexus Wars' },
+];
+
+function Tabs({ sub }: { sub?: RulesSub }) {
   return (
     <div className="seg">
-      <button className={sub ? '' : 'on'} onClick={() => (window.location.hash = href.rules())}>Crusade</button>
-      <button className={sub ? 'on' : ''} onClick={() => (window.location.hash = href.rules('nexus'))}>Nexus Wars</button>
+      {PAGES.map((p) => (
+        <button key={p.tab} className={p.sub === sub ? 'on' : ''} onClick={() => (window.location.hash = href.rules(p.sub))}>{p.tab}</button>
+      ))}
     </div>
   );
 }
 
-/** The campaign rules: the Crusade rules, and the Nexus Wars expansion on its own sub-page. */
-export default function RulesPage({ sub }: { sub?: 'nexus' }) {
+/** The campaign rules: the Crusade rules, with the trait tables, the relics and the Nexus Wars expansion on their own sub-pages. */
+export default function RulesPage({ sub }: { sub?: RulesSub }) {
   return (
     <>
       <div className="page-head">
         <div>
           <div className="crumbs">Crusade Command · Rules</div>
-          <h1>{sub ? 'Nexus Wars' : 'Crusade rules'}</h1>
+          <h1>{PAGES.find((p) => p.sub === sub)?.title}</h1>
         </div>
         <Tabs sub={sub} />
       </div>
-      {sub ? <NexusRules /> : <CrusadeRules />}
+      {sub === 'traits' ? <TraitRules /> : sub === 'relics' ? <RelicRules /> : sub === 'nexus' ? <NexusRules /> : <CrusadeRules />}
     </>
   );
 }
@@ -132,11 +160,14 @@ function CrusadeRules() {
     <>
       <div className="panel">
         <Prose lines={CRUSADE_TEXT.overview} />
-        <p className="small">Playing Nexus Wars too? Its rules are on the <a href={href.rules('nexus')}>Nexus Wars</a> page.</p>
+        <p className="small">
+          The trait tables and weapon traits are on the <a href={href.rules('traits')}>Traits & weapons</a> page, the relics
+          on the <a href={href.rules('relics')}>Relics</a> page. Playing Nexus Wars too? Its rules are on
+          the <a href={href.rules('nexus')}>Nexus Wars</a> page.
+        </p>
         <Toc items={[
           ['r-start', 'Starting a force'], ['r-xp', 'Experience'], ['r-agendas', 'Agendas'], ['r-req', 'Requisitions'],
           ['r-rewards', 'Reward tables'], ['r-deaths', 'Deaths & scars'], ['r-upgrades', 'Upgrades'], ['r-bp', 'Battle Points'],
-          ['r-traits', 'Trait tables'], ['r-weapons', 'Weapon traits'], ['r-relics', 'Relics'],
         ]} />
       </div>
 
@@ -184,6 +215,7 @@ function CrusadeRules() {
       <Section id="r-upgrades" title="Upgrades">
         <Prose lines={CRUSADE_TEXT.upgrades} />
         <p className="small muted">Level thresholds: {LEVEL_THRESHOLDS.map((t, i) => `L${i + 1} ${t}`).join(' · ')} XP.</p>
+        <p className="small">The tables to pick from are on the <a href={href.rules('traits')}>Traits & weapons</a> page.</p>
       </Section>
 
       <Section id="r-bp" title="Battle Points & Blessings">
@@ -199,20 +231,50 @@ function CrusadeRules() {
         <Prose lines={CRUSADE_TEXT.blessings} />
       </Section>
 
-      <Section id="r-traits" title="Trait tables">
+    </>
+  );
+}
+
+function TraitRules() {
+  return (
+    <>
+      <div className="panel">
+        <p style={{ marginTop: 0 }}>
+          What a unit can pick when it levels up: a trait from its category's table, or a weapon trait. How levelling works is
+          under Upgrades in the <a href={href.rules()}>Crusade rules</a>.
+        </p>
+        <Toc items={[['t-traits', 'Trait tables'], ['t-unique', 'Unique traits'], ['t-weapons', 'Weapon traits'], ['t-nexus', 'Nexus traits']]} />
+      </div>
+
+      <Section id="t-traits" title="Trait tables">
         {Object.entries(TRAIT_TABLES).map(([k, entries]) => <Entries key={k} title={k} entries={entries} />)}
-        <h2 style={{ marginTop: '1.5rem' }}>Unique traits</h2>
-        {CATEGORIES.map((c) => <Entries key={c} title={`${c} (unique)`} entries={UNIQUE_TRAIT_TABLES[c]} />)}
       </Section>
 
-      <Section id="r-weapons" title="Weapon traits">
+      <Section id="t-unique" title="Unique traits">
+        {CATEGORIES.map((c) => <Entries key={c} title={c} entries={UNIQUE_TRAIT_TABLES[c]} />)}
+      </Section>
+
+      <Section id="t-weapons" title="Weapon traits">
         <Entries title="Melee" entries={WEAPON_TRAIT_TABLES.Melee} />
         <Entries title="Ranged" entries={WEAPON_TRAIT_TABLES.Ranged} />
         <Entries title="Melee (unique)" entries={UNIQUE_WEAPON_TRAIT_TABLES.Melee} />
         <Entries title="Ranged (unique)" entries={UNIQUE_WEAPON_TRAIT_TABLES.Ranged} />
       </Section>
 
-      <Section id="r-relics" title="Relics">
+      <Section id="t-nexus" title="Nexus traits">
+        <p className="muted small" style={{ marginTop: 0 }}>
+          <a href={href.rules('nexus')}>Nexus Wars</a> only. Unlocked by Research stations, Research Station homes, Anomalies and the Void table.
+        </p>
+        {CATEGORIES.map((c) => <Entries key={c} title={c} entries={NEXUS_TRAITS[c]} />)}
+      </Section>
+    </>
+  );
+}
+
+function RelicRules() {
+  return (
+    <>
+      <div className="panel">
         <Prose lines={CRUSADE_TEXT.relics} />
         <div className="row small" style={{ flexWrap: 'wrap', gap: '1.5rem', alignItems: 'flex-start' }}>
           <table className="compact" style={{ width: 'auto' }}>
@@ -237,8 +299,20 @@ function CrusadeRules() {
             </tbody>
           </table>
         </div>
-        <RelicTable relics={RELICS.filter((r) => !r.nexus)} />
-        <Entries title="Relic weapon rules" entries={RELIC_WEAPON_RULES} />
+        <Toc items={[['x-crusade', 'Crusade relics'], ['x-nexus', 'Nexus relics'], ['x-rules', 'Relic weapon rules']]} />
+      </div>
+
+      <Section id="x-crusade" title="Crusade relics">
+        <RelicCase relics={RELICS.filter((r) => !r.nexus)} />
+      </Section>
+
+      <Section id="x-nexus" title="Nexus relics">
+        <Prose lines={CRUSADE_TEXT.nexusRelics} />
+        <RelicCase relics={RELICS.filter((r) => r.nexus)} />
+      </Section>
+
+      <Section id="x-rules" title="Relic weapon rules">
+        <Entries entries={RELIC_WEAPON_RULES} />
       </Section>
     </>
   );
@@ -257,8 +331,12 @@ function NexusRules() {
         <Toc items={[
           ['n-map', 'Sectors'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-attack', 'Attacking'],
           ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
-          ['n-shop', 'Umbra Shard shop'], ['n-traits', 'Nexus traits'], ['n-relics', 'Nexus relics'],
+          ['n-shop', 'Umbra Shard shop'],
         ]} />
+        <p className="small">
+          The Nexus traits are on the <a href={href.rules('traits')}>Traits & weapons</a> page and the Nexus relics on
+          the <a href={href.rules('relics')}>Relics</a> page.
+        </p>
       </div>
 
       <Section id="n-map" title="The map">
@@ -316,14 +394,6 @@ function NexusRules() {
         <Entries title="Combat manipulations" entries={COMBAT_MANIPULATIONS} />
       </Section>
 
-      <Section id="n-traits" title="Nexus traits">
-        <p className="muted small" style={{ marginTop: 0 }}>Unlocked by Research stations, Research Station homes, Anomalies and the Void table.</p>
-        {CATEGORIES.map((c) => <Entries key={c} title={c} entries={NEXUS_TRAITS[c]} />)}
-      </Section>
-
-      <Section id="n-relics" title="Nexus relics">
-        <RelicTable relics={RELICS.filter((r) => r.nexus)} />
-      </Section>
     </>
   );
 }

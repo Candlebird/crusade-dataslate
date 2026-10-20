@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, NEXUS_ROUNDS } from './nexusData';
+import { ECHOES, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
 // The tables on that page come straight from data.ts and nexusData.ts; this file holds only the text around them,
@@ -48,6 +48,9 @@ export const CRUSADE_TEXT = {
     'Only heroes can carry relics. Instead of taking an upgrade, a hero may take a relic of a tier its XP allows (buying it with RP as a requisition), as long as it has a free relic slot.',
     'Stealing Relics (optional, both players must agree): if your hero kills a hero that carries a relic, on a 3+ yours takes one of its relics. The hero who lost it gets +1 to hit against the thief. Only one copy of each relic can exist at a time, and players may also trade relics.',
     'Wagering Relics (optional, both players must agree): players may bet relics on a match. The winner takes them and assigns them under the normal relic rules; the loser removes them and adjusts BP.',
+  ],
+  nexusRelics: [
+    `Nexus relics are only found in the Nexus Umbra. Buy one in the Umbra Shard shop (${UMBRA_SHOP.find((x) => x.key === 'relic')?.cost} US on top of the normal relic requisition, ${NEXUS_ROUNDS.relicCollectorDiscount} US less with a Relic Collector home), or roll a 6 on the Void table. Otherwise they follow the normal relic rules.`,
   ],
 };
 

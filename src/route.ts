@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle[/sector/:sectorId[/:attacker]] , #/battle/sheet/:sideId , #/missions , #/campaign , #/books , #/settings , #/rules[/nexus] , #/guide */
+/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle[/sector/:sectorId[/:attacker]] , #/battle/sheet/:sideId , #/missions , #/campaign , #/books , #/settings , #/rules[/nexus|traits|relics] , #/guide */
 export type Route =
   | { page: 'forces' }
   | { page: 'force'; forceId: string }
@@ -13,8 +13,12 @@ export type Route =
   | { page: 'campaign' }
   | { page: 'books' }
   | { page: 'settings' }
-  | { page: 'rules'; sub?: 'nexus' }
+  | { page: 'rules'; sub?: RulesSub }
   | { page: 'guide' };
+
+/** The Rules page's tabs besides the Crusade rules. */
+export type RulesSub = 'traits' | 'relics' | 'nexus';
+const RULES_SUBS: RulesSub[] = ['traits', 'relics', 'nexus'];
 
 export function parseRoute(hash: string): Route {
   const parts = hash.replace(/^#\/?/, '').split('/').filter(Boolean);
@@ -30,7 +34,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'campaign') return { page: 'campaign' };
   if (parts[0] === 'books') return { page: 'books' };
   if (parts[0] === 'settings') return { page: 'settings' };
-  if (parts[0] === 'rules') return { page: 'rules', sub: parts[1] === 'nexus' ? 'nexus' : undefined };
+  if (parts[0] === 'rules') return { page: 'rules', sub: RULES_SUBS.find((x) => x === parts[1]) };
   if (parts[0] === 'guide') return { page: 'guide' };
   return { page: 'forces' };
 }
@@ -50,8 +54,8 @@ export const href = {
   campaign: () => '#/campaign',
   books: () => '#/books',
   settings: () => '#/settings',
-  /** The campaign rules; 'nexus' is the Nexus Wars sub-page. */
-  rules: (sub?: 'nexus') => (sub ? '#/rules/nexus' : '#/rules'),
+  /** The campaign rules; a sub-page for traits & weapon upgrades, relics, or Nexus Wars. */
+  rules: (sub?: RulesSub) => (sub ? `#/rules/${sub}` : '#/rules'),
   guide: () => '#/guide',
 };
 

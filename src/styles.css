@@ -466,6 +466,32 @@ tr.unpicked td { opacity: 0.6; }
   .sheet.compact .sheet-units { grid-template-columns: minmax(0, 1fr); }
   .sheet-rule-cols { columns: 1; }
 }
+/* Relics page: a display case of cards, tinted by tier. */
+.relic-tier { display: flex; align-items: baseline; gap: 0.4rem; margin: 1.2rem 0 0.6rem; }
+.relic-tier.common { color: #b8bcc2; }
+.relic-tier.rare { color: var(--cyan); }
+.relic-tier.legendary { color: var(--gold); }
+.relic-case { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 0.75rem; }
+.relic-card {
+  --tier: #8f959c;
+  display: flex; flex-direction: column; gap: 0.35rem;
+  padding: 0.8rem 0.9rem;
+  background: radial-gradient(ellipse at top, color-mix(in srgb, var(--tier) 14%, transparent), transparent 70%), var(--panel-2);
+  border: 1px solid color-mix(in srgb, var(--tier) 45%, var(--line));
+  border-top: 3px solid var(--tier);
+  border-radius: var(--radius);
+}
+.relic-card.rare { --tier: var(--cyan); }
+.relic-card.legendary { --tier: var(--gold); box-shadow: 0 0 14px rgba(201, 162, 74, 0.15); }
+.relic-card p { margin: 0; }
+.relic-name { font-family: var(--serif); font-size: 1.05rem; color: var(--tier); }
+.relic-card.common .relic-name { color: var(--text); }
+.relic-profile { color: var(--muted-2); overflow-wrap: anywhere; }
+.relic-held { margin-top: auto; padding-top: 0.4rem; border-top: 1px dashed var(--line); }
+@media (max-width: 640px) {
+  .relic-case { grid-template-columns: 1fr; }
+}
+
 @media print {
   @page { margin: 10mm; }
   body { background: #fff; }
