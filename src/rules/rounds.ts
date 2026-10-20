@@ -1,4 +1,5 @@
-import type { AssetUse, Campaign, Force, ForceNexus, RoundSnapshot, Sector } from '../model/types';
+import { uid } from '../model/factory';
+import type { AssetUse, Campaign, CatalogBook, Force, ForceNexus, HeroOffer, RoundSnapshot, Sector, TurnReport } from '../model/types';
 import { CATEGORIES } from './data';
 import { refreshSectors, type Rand } from './hexmap';
 import {
@@ -9,6 +10,11 @@ import { crisisRound, placeCrisis, rollEvent, settleCrisis, type CrisisEnd } fro
 import { pickSpread, spreadInto } from './voidspawn';
 import { factionClaimedRound } from './detachments';
 import { rateSectors } from './difficulty';
+import { explore } from './fog';
+import { placeGuardians } from './guardians';
+import { rollOffers } from './heroes';
+import { accrueProduction, finishConstruction } from './production';
+import { buildReport } from './report';
 
 // Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
 // a Strategic Asset, and one against the Echoes is a patrol). The round closes with the Battle: the sealed-order attacks.
@@ -19,7 +25,10 @@ import { rateSectors } from './difficulty';
 //  - claimed space hulks drift off and new points of interest turn up (refreshSectors, hexmap.ts),
 //  - every sector's difficulty is rescaled to the factions' current Supply, and AI garrisons roll new modifiers,
 //  - the round's Nexus Crisis is settled, a Galactic Event is rolled for the next round, and a new Crisis rises if it's
-//    time (events.ts).
+//    time (events.ts),
+//  - planets bank their production (production.ts), every faction's map is explored (fog.ts), wandering heroes come and
+//    go (heroes.ts) and AI-held sites get guardians (guardians.ts), given the forces and army books,
+//  - and the round's turn report is written (report.ts).
 // Values live in NEXUS_ROUNDS (nexusData.ts).
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
@@ -132,19 +141,34 @@ export interface RoundEnd {
   nextEvent?: string;
   /** A Nexus Crisis rose for the next round: the Lord and where. */
   newCrisis?: { lord: string; sectorName: string };
+  /** Production banked by each sector. */
+  production: { sector: Sector; gained: number }[];
+  built: { sector: Sector; building: string }[];
+  /** Hero offers that turned up and that left (needs the forces and books). */
+  offers?: { fresh: HeroOffer[]; gone: HeroOffer[] };
+  /** Sectors that got a new guardian (needs the forces and books). */
+  guardians: Sector[];
+  report: TurnReport;
 }
 
 /**
  * End the current round: note holdings for income, move the threat, spread the Echoes, start the next round. With the
  * campaign's forces, sector difficulty is rescaled to their Supply too.
  */
-export function endRound(c: Campaign, rand: Rand = Math.random, date = new Date().toISOString().slice(0, 10), forces?: Force[]): RoundEnd {
+export function endRound(
+  c: Campaign, rand: Rand = Math.random, date = new Date().toISOString().slice(0, 10), forces?: Force[], books?: CatalogBook[],
+): RoundEnd {
   const round = currentRound(c);
   const holdings: RoundSnapshot['holdings'] = {};
   for (const f of c.factions) holdings[f.id] = c.sectors.filter((s) => s.owner === f.id).map((s) => s.id);
   const snapshot: RoundSnapshot = { round, date, holdings, underdog: underdogBonus(c) };
   const event = activeEvent(c);
   if (event) snapshot.event = event.id;
+
+  // Income is noted from what was held; production is banked the same way.
+  const production = accrueProduction(c);
+  // Buildings going up are finished; they work from the next round (so a new Barracks didn't bank this round's 500).
+  const built = finishConstruction(c);
 
   const threatBefore = threatOf(c);
   const { wins, voidspawn, patrols } = echoWins(c, round);
@@ -179,10 +203,15 @@ export function endRound(c: Campaign, rand: Rand = Math.random, date = new Date(
   let newCrisis: RoundEnd['newCrisis'];
   if (crisisRound(c.round) && placeCrisis(c, rand))
     newCrisis = { lord: lordById(c.crisis!.lord)?.name ?? '', sectorName: c.sectors.find((s) => s.id === c.crisis!.sectorId)?.name ?? '' };
-  return {
+  explore(c);
+  const offers = forces && books ? rollOffers(c, books, forces, rand, uid) : undefined;
+  const guardians = forces && books ? placeGuardians(c, books, forces, rand, uid) : [];
+  const end: Omit<RoundEnd, 'report'> = {
     round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, difficulty, cleared, fresh,
-    event: event?.id, crisis, nextEvent: c.event?.id, newCrisis,
+    event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, built, offers, guardians,
   };
+  const report = buildReport(c, end, { production, built, offers, guardians }, date, rand);
+  return { ...end, report };
 }
 
 /** One line for the log / a toast. */

@@ -263,6 +263,19 @@ export interface CatalogBook {
 
 export type SectorType = 'home' | 'planet' | 'research' | 'void' | 'anomaly' | 'empty' | 'voidspawn';
 
+/** A building under construction at a sector, and what was paid for it (so cancelling it refunds exactly that). */
+export interface Construction {
+  /** BUILDINGS id. */
+  id: string;
+  /** The round it was started in. */
+  round: number;
+  /** Banked Supply paid. */
+  supply: number;
+  /** Umbra Shards paid, and the force that paid them. */
+  shards: number;
+  forceId?: string;
+}
+
 export interface Sector {
   id: string;
   name: string;
@@ -286,6 +299,20 @@ export interface Sector {
   notes: string;
   /** Sector art as a downscaled data URL. */
   image?: string;
+  /** BUILDINGS ids (nexusData.ts) raised here. They stay when the sector changes hands. */
+  buildings?: string[];
+  /** Production Supply banked here (planets and homes), spent on new units; lost when the sector changes hands. */
+  bank?: number;
+  /** The building going up here: one at a time, finished when the round ends. Lost if the sector changes hands. */
+  construction?: Construction;
+  /** The Void Echoes hero guarding an AI-held point of interest (rules/guardians.ts). */
+  guardian?: SectorGuardian;
+}
+
+export interface SectorGuardian {
+  name: string;
+  tier: RelicTier;
+  unit: Unit;
 }
 
 export interface CampaignFaction {
@@ -317,7 +344,7 @@ export interface CampaignEvent {
   /** The Nexus Crisis battle (every faction against an Echo Lord): not a sector game, `sectorId` is where the Lord rose. */
   crisis?: boolean;
   /** What the game changed, so deleting the entry can put the sector back. */
-  undo?: { owner?: string; rewardClaimed?: boolean; reinforced?: boolean };
+  undo?: { owner?: string; rewardClaimed?: boolean; reinforced?: boolean; bank?: number; construction?: Construction; guardian?: SectorGuardian };
 }
 
 /** What each faction held when a round ended: round income is paid from this. */
@@ -363,6 +390,38 @@ export interface Campaign {
   crisis?: NexusCrisis;
   /** DIFFICULTY_LEVELS id (nexusData.ts): scales every sector rating; 'normal' when unset. */
   difficulty?: string;
+  /** Fog of war: faction id → the sectors it has ever seen (rules/fog.ts). */
+  explored?: Record<string, string[]>;
+  /** Heroes offering to join a faction (rules/heroes.ts). */
+  offers?: HeroOffer[];
+  /** What happened each ended round, newest last (rules/report.ts). */
+  reports?: TurnReport[];
+}
+
+/** A wandering hero a faction can hire with Umbra Shards; it joins one of its forces for good. */
+export interface HeroOffer {
+  id: string;
+  factionId: string;
+  /** The round it turned up; it waits one more round, then leaves. */
+  round: number;
+  unit: Unit;
+  /** Umbra Shards to hire it. */
+  fee: number;
+}
+
+export interface TurnReportLine {
+  icon: string;
+  text: string;
+  /** Only these factions are told about it (everyone when unset). */
+  factions?: string[];
+  /** Where it happened: players only read it when they can see the sector. */
+  sectorId?: string;
+}
+
+export interface TurnReport {
+  round: number;
+  date: string;
+  lines: TurnReportLine[];
 }
 
 export interface GalacticEventState {

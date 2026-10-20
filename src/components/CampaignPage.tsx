@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import { exportCampaign } from '../model/io';
 import type { Campaign, Sector, SectorType } from '../model/types';
 import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionColor, factionName, ownedSectors, recordSectorGame, removeSectorGame, sectorEffect, sidesOf } from '../rules/nexus';
 import { href } from '../route';
+import { useCloud } from '../cloud/CloudSync';
+import { rememberedBy, visibleTo } from '../rules/fog';
+import { placeGuardians } from '../rules/guardians';
+import { reportFor } from '../rules/report';
 import HexMapPanel from './HexMap';
 import OrdersPanel from './NexusOrders';
 import RoundPanel from './RoundPanel';
@@ -17,11 +21,24 @@ export function newCampaign(): Campaign {
   return { id: uid(), name: 'Nexus Wars', updatedAt: nowIso(), factions: [], sectors: [], log: [] };
 }
 
-export default function CampaignPage() {
+/**
+ * The campaign page. Players (and the GM, by default) see the war through their faction's eyes: the fogged map, the
+ * round, their turn report and the games they know of. The GM's page (gm, #/campaign/gm) has the whole map and every
+ * editor and control.
+ */
+export default function CampaignPage({ gm = false }: { gm?: boolean }) {
   const { state, update } = useStore();
+  const cloud = useCloud();
   const importFiles = useImporter();
   const c = state.campaign;
   const [recordAt, setRecordAt] = useState<{ sectorId: string; n: number }>({ sectorId: '', n: 0 });
+  const [pickedView, setViewAs] = useState<string>();
+  // Signed out, this browser is the GM's own copy.
+  const canGm = cloud.isGm || !cloud.email;
+  const mine = state.forces.find((f) => f.nexus?.factionId && (!f.owner || f.owner === cloud.email))?.nexus?.factionId;
+  const myFaction = c?.factions.some((f) => f.id === mine) ? mine : undefined;
+  // The player page's eyes: your faction's, or (for the GM only) any faction's or everything (''). '-' sees nothing.
+  const viewAs = canGm ? pickedView ?? myFaction ?? '' : myFaction ?? '-';
 
   const importer = (
     <Dropzone accept=".json,application/json" onFiles={importFiles}>
@@ -56,14 +73,100 @@ export default function CampaignPage() {
       d.campaign.updatedAt = nowIso();
     });
 
+  const footer = (
+    <div className="cols-2">
+      <div className="panel">
+        <div className="panel-title"><h3>Update from the GM</h3></div>
+        {importer}
+      </div>
+      <div className="panel">
+        <div className="panel-title"><h3>Danger zone</h3></div>
+        <button
+          className="danger"
+          onClick={() => {
+            if (!confirmAction(`Remove "${c.name}" from this browser? Export it first if you are the GM.`)) return;
+            update((d) => {
+              d.campaign = undefined;
+              for (const f of d.forces) f.nexus = undefined;
+            });
+            toast('Campaign removed.');
+          }}
+        >
+          Remove campaign
+        </button>
+      </div>
+    </div>
+  );
+
+  if (gm && !canGm) {
+    return (
+      <>
+        <div className="page-head"><div><h1>{c.name}</h1></div></div>
+        <div className="panel">
+          <p>Only the GM can open the GM's side of the campaign.</p>
+          <a className="btn" href={href.campaign()}>← Back to the campaign</a>
+        </div>
+      </>
+    );
+  }
+
+  if (!gm) {
+    const fog = viewAs || undefined;
+    return (
+      <>
+        <div className="page-head">
+          <div>
+            <div className="crumbs">Nexus Wars · updated {c.updatedAt.slice(0, 10)}</div>
+            <h1>{c.name}</h1>
+          </div>
+          <div className="row">
+            {canGm && (
+              <label className="row small" style={{ gap: '0.35rem' }} title="Whose fog of war the page shows">
+                <span className="muted">Viewing as</span>
+                <select value={viewAs} onChange={(e) => setViewAs(e.target.value)}>
+                  <option value="">Everything</option>
+                  {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </label>
+            )}
+            {canGm && <a className="btn primary" href={href.campaignGm()}>GM controls →</a>}
+          </div>
+        </div>
+        <p className="muted small">
+          {viewAs === '-'
+            ? <>Link one of your forces to a faction (on its force page) to see the war through its eyes.</>
+            : <>The war as {viewAs ? <b>{factionName(c, viewAs)}</b> : 'the GM'} sees it.</>}
+          {' '}Pick a sector on the map to see what's known of it, and <b>Start a battle here</b>. The full rules are on the <a href={href.rules('nexus')}>Rules</a> page.
+        </p>
+
+        <RoundPanel c={c} gm={false} viewer={fog} />
+        <ReportPanel c={c} viewer={fog} />
+        <HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} />
+        <OrdersPanel c={c} />
+        <LogPanel c={c} setC={setC} viewer={fog} />
+        {footer}
+      </>
+    );
+  }
+
+  const guard = () => {
+    let placed: Sector[] = [];
+    setC((d) => void (placed = placeGuardians(d, state.books, state.forces, Math.random, uid)));
+    toast(placed.length
+      ? `Guardians now watch over ${placed.map((s) => s.name).join(', ')}.`
+      : "No new guardians: every guardable sector has one, or the Void Echoes book isn't imported.");
+  };
+
   return (
     <>
       <div className="page-head">
         <div>
-          <div className="crumbs">Nexus Wars · updated {c.updatedAt.slice(0, 10)}</div>
+          <div className="crumbs">Nexus Wars · GM · updated {c.updatedAt.slice(0, 10)}</div>
           <h1><TextField value={c.name} onCommit={(v) => setC((d) => void (d.name = v || 'Nexus Wars'))} /></h1>
         </div>
         <div className="row">
+          <a className="btn" href={href.campaign()}>← Player view</a>
+          <button onClick={guard} title="Give every AI-held planet, station, anomaly and void sector without one a guardian (the round's end does this too)">Place guardians</button>
           <button className="primary" onClick={() => exportCampaign(c)}>Export campaign.json</button>
         </div>
       </div>
@@ -75,6 +178,7 @@ export default function CampaignPage() {
       </p>
 
       <RoundPanel c={c} />
+      <ReportPanel c={c} />
       <FactionsPanel c={c} setC={setC} />
       <HexMapPanel c={c} setC={setC} onRecord={(sectorId) => {
         setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
@@ -86,30 +190,37 @@ export default function CampaignPage() {
         <RecordPanel c={c} setC={setC} preset={recordAt} />
         <LogPanel c={c} setC={setC} />
       </div>
-
-      <div className="cols-2">
-        <div className="panel">
-          <div className="panel-title"><h3>Update from the GM</h3></div>
-          {importer}
-        </div>
-        <div className="panel">
-          <div className="panel-title"><h3>Danger zone</h3></div>
-          <button
-            className="danger"
-            onClick={() => {
-              if (!confirmAction(`Remove "${c.name}" from this browser? Export it first if you are the GM.`)) return;
-              update((d) => {
-                d.campaign = undefined;
-                for (const f of d.forces) f.nexus = undefined;
-              });
-              toast('Campaign removed.');
-            }}
-          >
-            Remove campaign
-          </button>
-        </div>
-      </div>
+      {footer}
     </>
+  );
+}
+
+/** The turn reports: what happened each round, the lines the viewer may read (all of them, with no viewer). */
+function ReportPanel({ c, viewer }: { c: Campaign; viewer?: string }) {
+  const reports = c.reports ?? [];
+  const [pick, setPick] = useState<number>();
+  const report = reports.find((r) => r.round === pick) ?? reports[reports.length - 1];
+  if (!report) return null;
+  const lines = viewer === '-' ? [] : reportFor(report, viewer);
+  const sectorName = (id?: string) => (id ? c.sectors.find((s) => s.id === id)?.name : undefined);
+  return (
+    <Panel id="campaign.report" title={`Turn report: round ${report.round}`} extra={reports.length > 1 && (
+      <select value={report.round} onChange={(e) => setPick(Number(e.target.value))} aria-label="Round">
+        {[...reports].reverse().map((r) => <option key={r.round} value={r.round}>Round {r.round}</option>)}
+      </select>
+    )}>
+      <div className="muted small">Dispatches from the front, {report.date}{viewer ? ': what your faction saw and did.' : '.'}</div>
+      {lines.length === 0 ? <p className="muted small">No news reached you this round.</p> : (
+        <ul className="report">
+          {lines.map((l, i) => (
+            <li key={i} title={sectorName(l.sectorId)}>
+              <span className="report-icon" aria-hidden>{l.icon}</span>
+              <span>{l.text}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
 
@@ -287,11 +398,19 @@ function RecordPanel({ c, setC, preset }: { c: Campaign; setC: SetC; preset: { s
   );
 }
 
-function LogPanel({ c, setC }: { c: Campaign; setC: SetC }) {
+/** The games played. A player's log (viewer) only has the games their faction fought, or that it could see; '-' sees none. */
+function LogPanel({ c, setC, viewer }: { c: Campaign; setC: SetC; viewer?: string }) {
   const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
+  const known = useMemo(() => {
+    if (!viewer || viewer === '-') return undefined;
+    const seen = visibleTo(c, viewer);
+    return new Set([...seen, ...rememberedBy(c, viewer, seen)]);
+  }, [c, viewer]);
+  const log = viewer === '-' ? [] : !known ? c.log
+    : c.log.filter((e) => e.crisis || e.attacker === viewer || e.defender === viewer || e.winner === viewer || known.has(e.sectorId));
   return (
-    <Panel id="campaign.log" title="Campaign log" extra={<span className="muted small">{c.log.length} game{c.log.length === 1 ? '' : 's'}</span>}>
-      {c.log.length === 0 ? <p className="muted small">No games yet.</p> : [...c.log].reverse().map((e) => (
+    <Panel id="campaign.log" title="Campaign log" extra={<span className="muted small">{log.length} game{log.length === 1 ? '' : 's'}</span>}>
+      {log.length === 0 ? <p className="muted small">No games {viewer ? 'you know of ' : ''}yet.</p> : [...log].reverse().map((e) => (
         <div key={e.id} className="list-item small">
           <span className="muted" title={`Round ${e.round ?? 1}`}>R{e.round ?? 1} · {e.date}</span>
           <span className="grow">
@@ -303,9 +422,9 @@ function LogPanel({ c, setC }: { c: Campaign; setC: SetC }) {
             </>}
             {e.notes && <span className="muted"> · {e.notes}</span>}
           </span>
-          <button className="ghost icon" aria-label="Delete log entry"
+          {!viewer && <button className="ghost icon" aria-label="Delete log entry"
             title={e.undo ? 'Delete the entry and put the sector back, unless a later game changed it' : 'Delete the entry'}
-            onClick={() => confirmAction(`Delete this ${e.crisis ? 'Nexus Crisis battle' : e.skirmish ? 'skirmish' : `${sectorName(e.sectorId)} ${e.spread ? 'spread' : 'game'}`} from the log?${e.undo ? ` The sector goes back to how the ${e.spread ? 'spread' : 'game'} found it.` : ''}`) && setC((d) => removeSectorGame(d, e.id))}>✕</button>
+            onClick={() => confirmAction(`Delete this ${e.crisis ? 'Nexus Crisis battle' : e.skirmish ? 'skirmish' : `${sectorName(e.sectorId)} ${e.spread ? 'spread' : 'game'}`} from the log?${e.undo ? ` The sector goes back to how the ${e.spread ? 'spread' : 'game'} found it.` : ''}`) && setC((d) => removeSectorGame(d, e.id))}>✕</button>}
         </div>
       ))}
     </Panel>

@@ -12,11 +12,14 @@ import UmbraShop from './UmbraShop';
 import RoundIncome from './RoundIncome';
 import ExpeditionModal from './ExpeditionModal';
 import PatrolModal from './PatrolModal';
-import type { Force } from '../model/types';
+import type { Campaign, Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
 import { SOLO_PATROL } from '../rules/downtimeData';
-import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, emptyNexus, factionName, homeOf, ownedSectors, unitsUsed, unlockedTables } from '../rules/nexus';
+import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, currentRound, emptyNexus, factionName, homeOf, ownedSectors, unitsUsed, unlockedTables } from '../rules/nexus';
 import { factionClaimedRound, factionForces } from '../rules/detachments';
+import { isReinforced, produce, productionSites } from '../rules/production';
+import { hireBlock, hireHero, offerEnds, openOffers } from '../rules/heroes';
+import { nowIso } from '../model/factory';
 import { DetachmentsBox } from './Detachments';
 import { claimableRounds } from '../rules/rounds';
 import { RESULT_LABEL } from '../rules/battle';
@@ -93,7 +96,11 @@ export default function ForceView({ forceId }: { forceId: string }) {
         <div className="row">
           {armyUrl && <a className="btn" href={armyUrl} target="_blank" rel="noreferrer">Army Forge ↗</a>}
           <button onClick={() => exportForce(f)}>Export force file</button>
-          <button onClick={() => setAdding(true)}>+ Add unit</button>
+          <button onClick={() => {
+            // A Nexus Wars force raises its units at its planets (Production, below); adding one here skips the bank.
+            if (f.nexus && state.campaign && !confirmAction('In Nexus Wars, new units are produced at your planets and paid from their bank (see Production in the Nexus Wars panel). Add a unit anyway, without paying for it?')) return;
+            setAdding(true);
+          }}>+ Add unit</button>
           <button className="primary" onClick={() => go(href.battle(f.id))}>⚔ Record battle</button>
         </div>
       </div>
@@ -356,6 +363,90 @@ export default function ForceView({ forceId }: { forceId: string }) {
   );
 }
 
+/** Producing new units at one of the faction's planets, paid from its bank (Nexus Wars). */
+function ProductionBox({ f, c }: { f: Force; c: Campaign }) {
+  const { state, update } = useStore();
+  const sites = productionSites(c, f.nexus!.factionId);
+  const [siteId, setSite] = useState('');
+  const [adding, setAdding] = useState(false);
+  const site = sites.find((x) => x.id === siteId) ?? sites[0];
+  if (!sites.length) return null;
+  const t = forceTotals(f, state.settings);
+  const room = Math.max(0, t.supplyLimit - t.pointsUsed);
+  const bank = site?.bank ?? 0;
+  const budget = Math.min(room, bank);
+  return (
+    <div className="span-all small">
+      <div className="muted" title="Each planet banks Supply every round; spend it to raise units there. Barracks double it, Training Grounds give new units XP.">Production</div>
+      <div className="row">
+        <select value={site.id} onChange={(e) => setSite(e.target.value)} aria-label="Where to produce" style={{ minWidth: 0, flex: 1 }}>
+          {sites.map((x) => <option key={x.id} value={x.id}>{x.name}: {x.bank ?? 0} Supply banked</option>)}
+        </select>
+        <button disabled={budget <= 0} onClick={() => setAdding(true)}
+          title={bank <= 0 ? 'Nothing banked here yet: it banks more when the round ends' : room <= 0 ? 'No room under your Supply Limit' : `Up to ${budget} pts`}>
+          Produce units…
+        </button>
+      </div>
+      <div className="muted">Up to {budget} pts: {bank} banked at {site.name}, {room} Supply free.</div>
+      {adding && (
+        <AddUnitModal
+          budget={budget}
+          onClose={() => setAdding(false)}
+          onAdd={(newUnits) => {
+            let ok = false;
+            update((d) => {
+              const x = d.campaign?.sectors.find((y) => y.id === site.id);
+              const force = d.forces.find((y) => y.id === f.id);
+              if (!x || !force || !produce(x, newUnits)) return;
+              force.units.push(...newUnits);
+              d.campaign!.updatedAt = nowIso();
+              ok = true;
+            });
+            setAdding(false);
+            const cost = newUnits.reduce((n, u) => n + u.points, 0);
+            toast(ok ? `Produced ${newUnits.length} unit(s) at ${site.name} for ${cost} Supply.` : `${site.name} has only ${bank} Supply banked; that costs ${cost}.`);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Wandering heroes offering to join the faction for Umbra Shards (Nexus Wars). */
+function HeroOffers({ f, c }: { f: Force; c: Campaign }) {
+  const { update } = useStore();
+  const offers = openOffers(c, f.nexus!.factionId);
+  if (!offers.length) return null;
+  return (
+    <div className="span-all small">
+      <div className="muted">Heroes for hire</div>
+      {offers.map((o) => {
+        const block = hireBlock(c, o, f);
+        const relic = o.unit.relics[0];
+        return (
+          <div key={o.id} className="row" title={o.unit.rules.join(', ')}>
+            <span className="grow">
+              ★ <b>{o.unit.unitType}</b> <span className="muted">— level {levelForXp(o.unit.xp)}, {o.unit.points} pts{relic ? <>, carrying <b>{relic.name}</b> ({relic.tier})</> : ''}. {o.fee} US; {offerEnds(o) > currentRound(c) ? 'leaves after next round' : 'leaves when this round ends'}.</span>
+            </span>
+            <button disabled={!!block} title={block ?? `Hire for ${o.fee} Umbra Shards; they join ${f.name} for good`} onClick={() => {
+              if (!confirmAction(`Hire ${o.unit.unitType} into ${f.name} for ${o.fee} Umbra Shards?`)) return;
+              let hired = false;
+              update((d) => {
+                const force = d.forces.find((y) => y.id === f.id);
+                if (d.campaign && force && hireHero(d.campaign, o.id, force, nowIso().slice(0, 10), uid)) {
+                  d.campaign.updatedAt = nowIso();
+                  hired = true;
+                }
+              });
+              toast(hired ? `${o.unit.unitType} joins ${f.name}.` : 'The hero could not be hired.');
+            }}>Hire</button>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function ForceImage({ image, onChange }: { image?: string; onChange: (img: string | undefined) => void }) {
   return (
     <div>
@@ -463,10 +554,12 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
                 <div className="muted">Controlled sectors</div>
                 {ownedSectors(c, n.factionId).map((s) => (
                   <div key={s.id} title={benefitOf(s)?.desc ?? SECTOR_TYPES[s.type].desc}>
-                    <b>{s.name}</b> <span className="muted">— {benefitOf(s)?.name ?? SECTOR_TYPES[s.type].label}{s.reinforced ? ' · reinforced' : ''}</span>
+                    <b>{s.name}</b> <span className="muted">— {benefitOf(s)?.name ?? SECTOR_TYPES[s.type].label}{isReinforced(s) ? ' · reinforced' : ''}{s.buildings?.length ? ` · ${s.buildings.length} building${s.buildings.length === 1 ? '' : 's'}` : ''}</span>
                   </div>
                 ))}
               </div>
+              <ProductionBox f={f} c={c} />
+              <HeroOffers f={f} c={c} />
               {researchHome && (
                 <label className="field span-all">
                   Research Station: permanent table

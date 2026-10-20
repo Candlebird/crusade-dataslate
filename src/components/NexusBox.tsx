@@ -39,7 +39,7 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
   const relics = item.kind === 'relicRoll'
     ? RELICS.filter((r) => r.tier === 'Common' && !r.nexus)
     : item.kind === 'relic'
-      ? RELICS.filter((r) => r.tier === NEXUS_CRISIS.mvpTier)
+      ? RELICS.filter((r) => (item.relic ? r.name === item.relic : r.tier === NEXUS_CRISIS.mvpTier))
       : RELICS.filter((r) => r.nexus && r.tier !== 'Legendary');
 
   let fixed = '';
@@ -116,7 +116,7 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
       {(e?.free || wantsRelic) && (
         <div className="row" style={{ marginTop: '0.5rem' }}>
           {wantsRelic && (
-            <select value={pick.choice} onChange={(ev) => setPick({ choice: ev.target.value })}>
+            <select value={item.relic ?? pick.choice} disabled={!!item.relic} onChange={(ev) => setPick({ choice: ev.target.value })}>
               <option value="">— choose a relic —</option>
               {relics.map((r) => <RelicOption key={r.name} name={r.name} label={`${r.name} (${r.tier})`} taken={relicTaken(held, r.name)} />)}
             </select>

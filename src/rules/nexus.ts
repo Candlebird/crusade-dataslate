@@ -1,9 +1,11 @@
-import type { BattleResult, Campaign, CampaignEvent, Force, ForceNexus, Sector } from '../model/types';
+import type { BattleResult, Campaign, CampaignEvent, Force, ForceNexus, Sector, SectorGuardian } from '../model/types';
 import { CATEGORIES, type Category } from './data';
 import {
-  ANOMALY_TABLE, BENEFITS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, STRONGHOLDS, VOID_TABLE,
+  ANOMALY_TABLE, BENEFITS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRONGHOLDS, VOID_TABLE,
   type GalacticEvent, type NexusTableEntry,
 } from './nexusData';
+import { explore } from './fog';
+import { hasBuilding, loseBank } from './production';
 
 // Nexus Wars: what a faction earns each round and after each match. The tables and costs live in nexusData.ts;
 // the round itself (ending it, income, threat) is in rounds.ts.
@@ -78,13 +80,18 @@ export function markUnitsUsed(f: Force, c: Campaign, ids: string[]) {
 
 export const activeCrisis = (c: Campaign) => (c.crisis && c.crisis.round === currentRound(c) ? c.crisis : undefined);
 
-/** Hand a sector to a new owner, noting the old one; a Reinforce doesn't survive the change. */
+/** Hand a sector to a new owner, noting the old one. A Reinforce, the production bank and a guardian don't survive the change (buildings do; a guardian stays when the Echoes take it). */
 export function changeHands(s: Sector, owner: string, undo: NonNullable<CampaignEvent['undo']>) {
   undo.owner = s.owner ?? '';
   s.owner = owner;
   if (s.reinforced) {
     undo.reinforced = true;
     delete s.reinforced;
+  }
+  loseBank(s, undo);
+  if (s.guardian && owner !== ECHOES.id) {
+    undo.guardian = s.guardian;
+    delete s.guardian;
   }
 }
 
@@ -101,6 +108,7 @@ export function recordSectorGame(c: Campaign, e: CampaignEvent) {
     s.rewardClaimed = true;
   }
   if (Object.keys(undo).length) e.undo = undo;
+  explore(c);
 }
 
 /** Delete a log entry. If nothing has changed the sector since, put it back the way the game found it. */
@@ -126,6 +134,9 @@ export function removeSectorGame(c: Campaign, id: string) {
   }
   if (e.undo.rewardClaimed) delete s.rewardClaimed;
   if (e.undo.reinforced && s.owner === e.undo.owner) s.reinforced = true;
+  if (e.undo.bank && s.owner === e.undo.owner) s.bank = e.undo.bank;
+  if (e.undo.construction && s.owner === e.undo.owner) s.construction = e.undo.construction;
+  if (e.undo.guardian && s.owner === e.undo.owner) s.guardian = e.undo.guardian;
 }
 
 // ---- income and after-match generation ----
@@ -138,6 +149,8 @@ export interface NexusItem {
   source: string;
   us?: number;
   supply?: number;
+  /** kind 'relic': this relic and no other (a slain guardian's). */
+  relic?: string;
 }
 
 export interface NexusPick {
@@ -150,8 +163,17 @@ export interface NexusPick {
 }
 export const emptyNexusPick = (): NexusPick => ({ roll: null, choice: '', target: '', alloc: {} });
 
-/** What one sector pays its owner each round. */
+/** What one sector pays its owner each round: its benefit, then its buildings. */
 export function incomeItems(s: Sector, prefix = ''): NexusItem[] {
+  const key = `${prefix}${s.id}`;
+  const out = benefitItems(s, prefix);
+  const place = `${prefix ? 'Conquest — ' : ''}${s.name}`;
+  if (hasBuilding(s, 'refinery')) out.push({ key: `${key}:refinery`, kind: 'shardRoll', source: `${place}: Shard Refinery` });
+  if (hasBuilding(s, 'depot')) out.push({ key: `${key}:depot`, kind: 'supply', source: `${place}: Supply Depot`, supply: PRODUCTION.depotSupply });
+  return out;
+}
+
+function benefitItems(s: Sector, prefix: string): NexusItem[] {
   const key = `${prefix}${s.id}`;
   const b = benefitOf(s);
   const source = `${prefix ? 'Conquest — ' : ''}${s.name}${b ? `: ${b.name}` : ''}`;
@@ -193,6 +215,12 @@ function retookFromEchoes(c: Campaign, factionId: string, s: Sector) {
   if (isStronghold(s)) return false;
   if (s.owner === ECHOES.id) return true;
   return s.owner === factionId && c.log.some((e) => e.sectorId === s.id && e.winner === factionId && e.undo?.owner === ECHOES.id && (e.round ?? 1) === currentRound(c));
+}
+
+/** The guardian a faction beat at a sector: still standing there (the game isn't logged yet), or taken by its win this round. */
+function slainGuardian(c: Campaign, factionId: string, s: Sector): SectorGuardian | undefined {
+  if (s.guardian) return s.guardian;
+  return c.log.find((e) => e.sectorId === s.id && e.winner === factionId && e.undo?.guardian && (e.round ?? 1) === currentRound(c))?.undo?.guardian;
 }
 
 /** Who challenged a home sector this round: the latest logged game there against its owner. */
@@ -259,6 +287,12 @@ export function nexusGeneration(
   if (fought?.type === 'void' && vsAi && won) {
     if (fought.rewardClaimed) notes.push(`${fought.name}'s one-off reward has already been claimed.`);
     else items.push({ key: 'void', kind: 'void', source: `${fought.name}: Void / Space hulk` });
+  }
+  const guardian = fought && won && vsAi ? slainGuardian(c, factionId, fought) : undefined;
+  if (guardian) {
+    const relic = guardian.unit.relics[0];
+    if (relic) items.push({ key: 'guardian', kind: 'relic', source: `${guardian.name}, guardian of ${fought!.name}: ${relic.name}`, relic: relic.name });
+    notes.push(`Slew ${guardian.name}, the ${guardian.tier} guardian of ${fought!.name}${relic ? `: ${relic.name} is yours to give a unit` : ''}.`);
   }
   if (fought && won && vsAi && retookFromEchoes(c, factionId, fought)) {
     ctx.bounty = true;

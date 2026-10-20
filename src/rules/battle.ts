@@ -256,8 +256,9 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
       ledger.push({ label: `Nexus — ${source}`, rp: 0, supply: 0, us: k });
     };
     const addSupply = (source: string, k: number) => ledger.push({ label: `Nexus — ${source}`, rp: 0, supply: k });
-    const relic = (source: string, pick: NexusPick) => {
-      if (pick.choice && byId.has(pick.target)) relicGains.push({ unitId: pick.target, name: pick.choice });
+    const relic = (source: string, pick: NexusPick, fixed?: string) => {
+      const name = fixed ?? pick.choice;
+      if (name && byId.has(pick.target)) relicGains.push({ unitId: pick.target, name });
       else warnings.push(`${source}: choose a relic and a unit.`);
     };
     for (const item of input.nexus?.items ?? []) {
@@ -282,7 +283,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
           else nexusLines.push(`${src}: rolled ${pick.roll} — no shard.`);
           break;
         case 'relic':
-          relic(src, pick);
+          relic(src, pick, item.relic);
           break;
         case 'relicRoll':
           if (!pick.roll) warnings.push(`${src}: not rolled yet.`);

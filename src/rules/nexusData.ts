@@ -279,3 +279,88 @@ export const ECHO_LORDS: { id: string; name: string; desc: string }[] = [
   { id: 'umbralTitan', name: 'The Umbral Titan', desc: '+6 Tough, and Defense 2+ against shooting from over 12″ away.' },
   { id: 'whisperer', name: 'The Whisperer', desc: 'Ambush. Once per round, an enemy unit within 12″ that fails a Quality test is Shaken.' },
 ];
+
+/**
+ * Fog of war: a faction sees its own sectors and every sector within `sight` hexes of them (`homeSight` from its home).
+ * Sectors it has seen before stay on its map, but only their type and name: who holds them and how well is fogged.
+ */
+export const FOG = {
+  sight: 1,
+  homeSight: 2,
+  /** A Watchtower adds this much sight to its sector. */
+  watchtower: 1,
+};
+
+/**
+ * Planet production: new units aren't bought, they're built. Each round, every planet and home sector a faction holds
+ * banks production Supply, and new units are produced at one of them, paid from its bank (and still need room under
+ * the force's Supply Limit). A bank is lost when the sector changes hands.
+ */
+export const PRODUCTION = {
+  /** Production Supply banked per round. */
+  perRound: 250,
+  /** …with Barracks. */
+  barracks: 500,
+  /** A bank holds at most this many rounds of production. */
+  bankRounds: 4,
+  /** Building slots per sector type. */
+  slots: { home: 3, planet: 2 } as Partial<Record<SectorType, number>>,
+  /** XP a unit produced at Training Grounds starts with. */
+  trainingXp: 6,
+  /** Supply a Supply Depot adds to the round income. */
+  depotSupply: 25,
+};
+
+/**
+ * Buildings a faction raises on its planets and home. Each is paid for when it's started: `cost` from the sector's
+ * production bank, `shards` Umbra Shards from one of the faction's forces. A sector builds one at a time, and it's
+ * finished when the round ends (it works from the next round). Ids are saved; rename names only.
+ *
+ * Balance: the cheap, small ones cost Supply only. The strong ones cost Umbra Shards too, priced against the Umbra
+ * shop: Walls are a Reinforce Sector (3 US) that lasts, but uses a slot, Supply and a round, and the enemy keeps them;
+ * Barracks double a planet's production; a Refinery mines 1 US on a 3+ (about 2 every 3 rounds), so it pays for
+ * itself in about 3 rounds; Training Grounds give every unit made there what 2 Umbral Knowledge would.
+ */
+export const BUILDINGS: { id: string; name: string; icon: string; cost: number; shards: number; desc: string }[] = [
+  { id: 'watchtower', name: 'Watchtower', icon: '👁', cost: 100, shards: 0, desc: `Sight +${FOG.watchtower}: see further through the fog of war.` },
+  { id: 'depot', name: 'Supply Depot', icon: '⛁', cost: 200, shards: 0, desc: `+${PRODUCTION.depotSupply} Supply in the round income.` },
+  { id: 'training', name: 'Training Grounds', icon: '⚔', cost: 200, shards: 1, desc: `Units produced here start with ${PRODUCTION.trainingXp} XP.` },
+  { id: 'walls', name: 'Walls', icon: '⛫', cost: 200, shards: 2, desc: 'The sector is permanently Reinforced: +200 Supply Limit when defending it.' },
+  { id: 'barracks', name: 'Barracks', icon: '⚒', cost: 250, shards: 2, desc: `Production rises to ${PRODUCTION.barracks} Supply a round.` },
+  { id: 'refinery', name: 'Shard Refinery', icon: '◆', cost: 250, shards: 2, desc: `A shard-mine roll in the round income (${NEXUS_ROUNDS.shardMineRoll}+: 1 Umbra Shard).` },
+];
+
+/**
+ * Hero offers: when a round ends, each faction without one may get a wandering hero, a random Hero datasheet from the
+ * army books its forces use. It waits for the round it turns up and the one after, then leaves. Hiring costs Umbra
+ * Shards and the hero joins a force for good, so it needs room under that force's Supply Limit.
+ */
+export const HERO_OFFERS = {
+  /** Chance a faction without an offer gets one when a round ends. */
+  chance: 0.5,
+  /** Rounds an offer stays: the round it turns up and one more. */
+  lasts: 2,
+  /** Weights for the hero's starting level, 0 up. It starts with that level's XP. */
+  levelWeights: [35, 30, 20, 10, 5],
+  /** Chance it brings a relic (of a tier its XP allows). */
+  relicChance: 0.5,
+  /** Fee in Umbra Shards: base + perLevel × level + the relic's. */
+  fee: { base: 1, perLevel: 1, relic: { Common: 1, Rare: 2, Legendary: 3 } },
+};
+
+/**
+ * Guardians: every AI-held planet, research station, anomaly and void sector is guarded by a Void Echoes hero with a
+ * relic and twice its Tough. Its tier follows the sector's threat (sectorThreat, 0–1): under `rare` Common, under
+ * `legendary` Rare, Legendary above. Beat the garrison and the guardian's relic is yours.
+ */
+export const GUARDIANS = {
+  types: ['planet', 'research', 'anomaly', 'void'] as SectorType[],
+  rare: 0.4,
+  legendary: 0.75,
+  /** The guardian's Tough is multiplied by this (a hero without Tough gets Tough(2)). */
+  toughFactor: 2,
+  /** XP the guardian has, so its relic tier is legal. */
+  xp: { Common: 20, Rare: 60, Legendary: 90 },
+  titles: ['the Hollow', 'the Unbound', 'of the Last Light', 'the Shard-Eater', 'the Whispering', 'the Starless', 'of the Ninth Echo', 'the Undying', 'the Pale', 'Who Was Once'],
+  names: ['Vaelrith', 'Orsk', 'Myrrhena', 'Calvaxis', 'Thul', 'Ezhrael', 'Nocturn', 'Isk-Arreth', 'Seraphon', 'Ghaul'],
+};

@@ -19,7 +19,7 @@ export function useEndRound() {
   const { state, update } = useStore();
   return (c: Campaign): RoundEnd => {
     const next = structuredClone(c);
-    const r = endRound(next, Math.random, undefined, state.forces);
+    const r = endRound(next, Math.random, undefined, state.forces, state.books);
     next.updatedAt = nowIso();
     update((d) => void (d.campaign = next));
     toast(roundEndText(next, r));
@@ -27,8 +27,11 @@ export function useEndRound() {
   };
 }
 
-/** The campaign round: the Void Echoes' threat, who's ahead, and the GM's End round button. */
-export default function RoundPanel({ c }: { c: Campaign }) {
+/**
+ * The campaign round: the Void Echoes' threat, who's ahead, and the GM's End round button. A player's panel (gm false)
+ * has no GM controls, and only their own faction's (viewer) Strategic Assets.
+ */
+export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?: boolean; viewer?: string }) {
   const end = useEndRound();
   const { state, update } = useStore();
   const range = difficultyRange(c, state.forces);
@@ -81,7 +84,7 @@ export default function RoundPanel({ c }: { c: Campaign }) {
 
   return (
     <Panel id="campaign.round" title={`Round ${round}`}
-      extra={<button className="primary" onClick={endNow} title="When everyone has played what they're going to play this round">End round…</button>}>
+      extra={gm && <button className="primary" onClick={endNow} title="When everyone has played what they're going to play this round">End round…</button>}>
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         <span className="tag red" title={`Up ${NEXUS_ROUNDS.threatPerRound} each round, down ${NEXUS_ROUNDS.threatPerWin} per Battle won against them (${NEXUS_ROUNDS.threatPerVoidspawnWin} at a Voidspawn) and ${NEXUS_ROUNDS.threatPerPatrolWin} per patrol (a skirmish won against them)`}>
           ☣ {ECHOES.name} threat {threat}/{NEXUS_ROUNDS.threatMax}
@@ -92,7 +95,7 @@ export default function RoundPanel({ c }: { c: Campaign }) {
         <span className="tag" title={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}, × ${difficultyLevel(c).scale} for ${difficultyLevel(c).name} difficulty; rescaled when the round ends`}>
           Sector difficulty {range.min}–{range.max} Supply
         </span>
-        <button className="small" onClick={rescale} title="Rate sectors now against the factions' current Supply (the round's end does this too)">
+        {gm && <><button className="small" onClick={rescale} title="Rate sectors now against the factions' current Supply (the round's end does this too)">
           {rated ? 'Rescale sectors now' : 'Rate sectors'}
         </button>
         <label className="row" style={{ gap: '0.35rem' }} title="Scales every sector rating; changing it rescales the sectors now">
@@ -102,7 +105,7 @@ export default function RoundPanel({ c }: { c: Campaign }) {
               <option key={l.id} value={l.id}>{l.name} (×{l.scale})</option>
             ))}
           </select>
-        </label>
+        </label></>}
       </div>
       {grace && (
         <p className="small" style={{ margin: '0.5rem 0 0' }}>
@@ -121,15 +124,15 @@ export default function RoundPanel({ c }: { c: Campaign }) {
           ))}
         </div>
       )}
-      <EventRow c={c} />
+      <EventRow c={c} gm={gm} />
       {crisis && <CrisisRow c={c} />}
-      {c.factions.length > 0 && <AssetsRow c={c} />}
+      {c.factions.length > 0 && (gm || viewer) && <AssetsRow c={c} only={gm ? undefined : viewer} />}
     </Panel>
   );
 }
 
 /** This round's Galactic Event, which the GM can re-roll or pick by hand. */
-function EventRow({ c }: { c: Campaign }) {
+function EventRow({ c, gm }: { c: Campaign; gm: boolean }) {
   const { update } = useStore();
   const event = activeEvent(c);
   const change = (fn: (d: Campaign) => void) => update((s) => {
@@ -142,11 +145,11 @@ function EventRow({ c }: { c: Campaign }) {
     <div className="small" style={{ marginTop: '0.5rem' }}>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         <span className="tag gold">✦ Galactic Event: {event ? event.name : 'none'}</span>
-        <button className="small" onClick={() => change((d) => rollEvent(d))} title="Roll a D12 on the Galactic Events table">{event ? 'Re-roll' : 'Roll a Galactic Event'}</button>
+        {gm && <><button className="small" onClick={() => change((d) => rollEvent(d))} title="Roll a D12 on the Galactic Events table">{event ? 'Re-roll' : 'Roll a Galactic Event'}</button>
         <select value="" aria-label="Pick the Galactic Event" onChange={(e) => e.target.value && change((d) => setEvent(d, e.target.value))}>
           <option value="">Pick one…</option>
           {GALACTIC_EVENTS.map((x, i) => <option key={x.id} value={x.id}>{i + 1}. {x.name}</option>)}
-        </select>
+        </select></>}
       </div>
       {event && (
         <p style={{ margin: '0.25rem 0 0' }}>
@@ -184,8 +187,8 @@ function CrisisRow({ c }: { c: Campaign }) {
   );
 }
 
-/** Each faction's Strategic Assets this round (one per skirmish won), and spending them on the Battle. */
-function AssetsRow({ c }: { c: Campaign }) {
+/** Each faction's Strategic Assets this round (one per skirmish won), and spending them on the Battle. Only one faction's, with only. */
+function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
   const { update } = useStore();
   const change = (fn: (d: Campaign) => void) => update((s) => {
     if (!s.campaign) return;
@@ -197,7 +200,7 @@ function AssetsRow({ c }: { c: Campaign }) {
       <span className="muted" title={`One per skirmish won this round, up to ${NEXUS_ROUNDS.assetsMax}. Spend them in the Battle; unspent ones are lost when the round ends.`}>
         Strategic Assets, one per skirmish won (up to {NEXUS_ROUNDS.assetsMax}), lost if unspent when the round ends:
       </span>
-      {c.factions.map((f) => {
+      {c.factions.filter((f) => !only || f.id === only).map((f) => {
         const a = assetsOf(c, f.id);
         return (
           <div key={f.id} className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>

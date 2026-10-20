@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, DIFFICULTY_LEVELS, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, UMBRA_SHOP } from './nexusData';
+import { ECHOES, DIFFICULTY_LEVELS, FOG, GUARDIANS, HERO_OFFERS, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP } from './nexusData';
 import { EXPEDITION, SOLO_PATROL, type ExpeditionCheck } from './downtimeData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
@@ -128,6 +128,29 @@ export const NEXUS_TEXT = {
     `Expedition (Expedition… on your force page): send up to ${EXPEDITION.squadMax} active units to one of four sites for ${EXPEDITION.encounters} encounters, drawn from six per site, each in one of three variants. Each encounter offers a few choices; most need a check: ${(Object.keys(EXPEDITION.checks) as ExpeditionCheck[]).map((k) => `${k} ${EXPEDITION.checks[k].dice}D6 needing ${EXPEDITION.checks[k].target}+`).join(', ')}. Rolling all 1s always fails. The squad adds +1 to every roll for each unit after the first and +1 for every ${EXPEDITION.levelsPerBonus} levels across its units, up to +${EXPEDITION.bonusCap}, so a bigger, more experienced squad takes on the hard checks. Rewards deeper in are worth more: XP and Supply ×${EXPEDITION.depth.join(', ×')}.`,
     `After each encounter, head home with the haul (always safe) or press on. A failed roll raises the danger by ${EXPEDITION.failDanger}, or by ${EXPEDITION.fumbleDanger} on a fumble (all 1s, or missing by ${EXPEDITION.fumbleMiss} or more). Pressing on, roll a D6: equal to or under the danger, the squad is ambushed and one unit takes a battle scar (on a ${EXPEDITION.ambushScarOn === 1 ? '1' : `1–${EXPEDITION.ambushScarOn}`}) or is Lost and sits out the next battle. Make it through every encounter for the site's bonus.`,
     `Solo patrol (Patrol… on your force page, or Solo patrol on the Battle page): send up to ${SOLO_PATROL.points} pts of one force out, and it runs into ${SOLO_PATROL.enemyMin}–${SOLO_PATROL.enemyMax} pts of the ${ECHOES.name} (in steps of ${SOLO_PATROL.enemyStep}). Seeing their strength and the mission, fight or turn back. Turning back earns each unit +${SOLO_PATROL.declineXp} XP for the sighting, and those units have still gone out for the round. Fighting is a quick game against the AI of about 45 minutes. Record it like any battle: the units earn ${PARTICIPATION_XP} participation XP plus their kill XP, but no RP, reward rolls or Marked for Greatness. A win still counts as a patrol against the Echoes (lowering their threat) and earns a Strategic Asset.`,
+  ],
+  fog: [
+    `Fog of war: a faction sees the sectors it holds and every sector within ${FOG.sight} hex of them (${FOG.homeSight} from its home, +${FOG.watchtower} with a Watchtower). The rest of the map is uncharted.`,
+    "Sectors you've seen before stay on your map, dimmed: you know their name and type, but not who holds them, their garrison or their buildings until you can see them again.",
+    "The Nexus Wars page shows the war through your faction's eyes. The GM's controls, with the whole map, are on a page of their own.",
+  ],
+  production: [
+    `New units for a Nexus Wars force aren't bought, they're built. When a round ends, every planet and home a faction holds banks ${PRODUCTION.perRound} production Supply (up to ${PRODUCTION.bankRounds} rounds' worth). Produce units at one of them from the Nexus Wars panel on your force page: they're paid from that sector's bank and still need room under the force's Supply Limit.`,
+    `Buildings: a home has ${PRODUCTION.slots.home} building slots and a planet ${PRODUCTION.slots.planet}. Start one from the sector's panel on the map. Each costs banked Supply from that sector, and the stronger ones Umbra Shards too, from one of your forces; you pay when you start it.`,
+    'A sector builds one building at a time, and it is finished when the round ends: it works from the next round. Cancel it before then and everything paid comes back. Tear a finished building down (no refund) to free its slot.',
+    'If the sector is taken, anything still being built is lost with the bank.',
+    'A sector that changes hands loses its bank, but its buildings stay for the new owner.',
+  ],
+  heroes: [
+    `Wandering heroes: when a round ends, each faction without an offer has a ${Math.round(HERO_OFFERS.chance * 100)}% chance of a hero offering to join it: a random Hero from the army books its forces use, at a random level, sometimes carrying a relic. The offer waits for ${HERO_OFFERS.lasts} rounds, then the hero moves on.`,
+    `Hire it from the Nexus Wars panel on your force page for ${HERO_OFFERS.fee.base} Umbra Shard${HERO_OFFERS.fee.base === 1 ? '' : 's'}, +${HERO_OFFERS.fee.perLevel} per level, +${HERO_OFFERS.fee.relic.Common}/${HERO_OFFERS.fee.relic.Rare}/${HERO_OFFERS.fee.relic.Legendary} for a Common/Rare/Legendary relic. It joins that force for good, so it needs room under its Supply Limit.`,
+  ],
+  guardians: [
+    `Guardians: every ${GUARDIANS.types.join(', ')} sector held by the ${ECHOES.name} is watched over by one of their Heroes, with ${GUARDIANS.toughFactor}× its Tough and a relic. The deeper in the map, the stronger: a Common guardian near the homes, Rare further in, Legendary in the far reaches. The relic is of the guardian's tier.`,
+    "The guardian leads the sector's garrison and counts toward its Supply difficulty. Beat the garrison and take the sector, and the guardian's relic is yours. New guardians appear when a round ends.",
+  ],
+  reports: [
+    "When the GM ends a round, a turn report tells what happened: battles won and lost, the Echoes' spread, new sectors on the map, guardians, hero offers and your planets' production. You only read about what your faction fought in or could see.",
   ],
   catchUp: [
     `Factions that fall behind get help: at each round's end, a faction gains +1 Umbra Shard for every ${R.underdogStep} sectors it's behind the faction holding the most (up to +${R.underdogMax}), paid with its round income.`,

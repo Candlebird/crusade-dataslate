@@ -6,6 +6,7 @@ import { NEXUS_CRISIS, activeEvent, benefitOf, ECHOES, factionName, lordById, OR
 import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
 import { aiStyleFor, type AiStyle } from './aiTrees';
 import { aiDefended, modifierOf } from './difficulty';
+import { isReinforced } from './production';
 
 // The battle tracker: one game in progress, scored from the mission it was started with.
 // The mission is copied in, so editing the library mid-game doesn't change a running battle.
@@ -298,7 +299,7 @@ export function nexusNotes(b: TrackedBattle, c: Campaign | undefined, forces: Fo
   const sector = c?.sectors.find((s) => s.id === b.sectorId);
   if (sector && b.attacker) {
     const defenders = b.sides.filter((x) => x.team !== b.attacker);
-    if (sector.reinforced && defenders.length)
+    if (isReinforced(sector) && defenders.length)
       notes.push(`${defenders.map((x) => x.name).join(' & ')} ${defenders.length > 1 ? 'defend' : 'defends'} a Reinforced sector: +200 Supply Limit.`);
     if (sector.difficulty !== undefined && aiDefended(sector)) notes.push(`${sector.name}'s AI garrison: ${sector.difficulty} Supply.`);
     for (const m of (sector.modifiers ?? []).map(modifierOf)) if (m) notes.push(`Sector modifier, ${m.name}: ${m.desc}`);

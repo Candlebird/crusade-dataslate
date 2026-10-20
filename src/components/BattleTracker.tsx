@@ -49,8 +49,10 @@ import {
 } from '../rules/tracker';
 import { AI_TREES } from '../rules/aiTrees';
 import { echoesBook, randomEchoes } from '../rules/echoForce';
+import { garrison as guardedGarrison } from '../rules/guardians';
 import { ECHOES, NEXUS_CRISIS, NEXUS_REINFORCE_BONUS } from '../rules/nexusData';
 import { aiDefended } from '../rules/difficulty';
+import { isReinforced } from '../rules/production';
 import SectorDanger from './SectorDanger';
 import { forceTotals } from '../rules/engine';
 import { SOLO_PATROL } from '../rules/downtimeData';
@@ -395,7 +397,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
             {sector.owner && sector.owner !== ECHOES.id && (
               <p className="small">
                 <b>{factionName(c, sector.owner)} can't make it?</b> The {ECHOES.name} stand in: play <b>1 v AI</b> and generate their army at your points
-                {sector.reinforced ? ` +${NEXUS_REINFORCE_BONUS} (the sector is Reinforced)` : ''}. If they win, {factionName(c, sector.owner)} holds the sector.{' '}
+                {isReinforced(sector) ? ` +${NEXUS_REINFORCE_BONUS} (the sector is Reinforced)` : ''}. If they win, {factionName(c, sector.owner)} holds the sector.{' '}
                 {format.label !== '1 v AI' && <button className="ghost small" onClick={() => choose(FORMATS.find((f) => f.label === '1 v AI')!)}>Use a stand-in</button>}
               </p>
             )}
@@ -629,14 +631,15 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
   // Standing in for a player who can't defend a Reinforced sector, they get its +200 Supply Limit too.
   const sector = state.campaign?.sectors.find((x) => x.id === b.sectorId);
   const defending = !!b.attacker && side.team !== b.attacker;
-  const reinforced = defending && !!sector?.reinforced;
+  const reinforced = defending && !!sector && isReinforced(sector);
   const enemies = b.sides.filter((x) => x.team !== side.team).reduce((n, x) => n + sidePoints(x), 0) + (reinforced ? NEXUS_REINFORCE_BONUS : 0);
   // Holding an AI sector, the Echoes field its garrison: the sector's difficulty rating.
   const garrison = defending && sector && aiDefended(sector) ? sector.difficulty : undefined;
   const [target, setTarget] = useState(() => garrison || enemies || 1000);
   const generate = () => {
     if (!book) return;
-    const units = randomEchoes(book, target);
+    // A guarded sector's garrison is led by its guardian; the rest is random Echoes.
+    const units = garrison && sector?.guardian ? guardedGarrison(sector, book, target) : randomEchoes(book, target);
     if (side.units.length && !confirmAction(`Replace ${side.name}'s ${side.units.length} units with a random ${ECHOES.name} army?`)) return;
     setSide((s) => loadUnits(s, ECHOES.name, units));
     toast(`${ECHOES.name}: ${units.length} units, ${units.reduce((n, u) => n + u.points, 0)} pts.`);

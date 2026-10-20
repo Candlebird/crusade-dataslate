@@ -13,6 +13,11 @@ Crusade and Nexus Wars are homebrew and get rebalanced often, so their numbers a
 | Strategic Assets earned from skirmish wins (`STRATEGIC_ASSETS`; the per-round cap and patrol threat drop are in `NEXUS_ROUNDS`), Reinforce Supply bonus (`NEXUS_REINFORCE_BONUS`) | `nexusData.ts` |
 | Galactic Events, one rolled on a D12 for each round (`GALACTIC_EVENTS`; the effects are applied in `events.ts` and `rounds.ts`) | `nexusData.ts` |
 | The Nexus Crisis: how often it comes, the threat drop, Umbra Shard and MVP relic rewards, the Lord's VP (`NEXUS_CRISIS`), and the Echo Lords (`ECHO_LORDS`). The logic is in `events.ts` | `nexusData.ts` |
+| Fog of war: how far a faction sees from its sectors, its home and a Watchtower (`FOG`). The logic is in `fog.ts` | `nexusData.ts` |
+| Planet production: Supply banked per round, the Barracks rate, the bank cap, building slots, Training Grounds XP (`PRODUCTION`), and the buildings with their Supply and Umbra Shard costs (`BUILDINGS`). The logic is in `production.ts` | `nexusData.ts` |
+| Hero offers: how often one turns up, how long it waits, its level odds, relic chance and fee (`HERO_OFFERS`). The logic is in `heroes.ts` | `nexusData.ts` |
+| Guardians: which sector types get one, the tier thresholds, the Tough multiplier, their XP and names (`GUARDIANS`). The logic is in `guardians.ts` | `nexusData.ts` |
+| The turn report's wording (the `TEXT` lines in `report.ts`, picked at random; `{sector}` and the like are filled in) | `report.ts` |
 | The prose on the in-app **Rules** page (tables there come from the two files above) | `rulesText.ts` |
 | Built-in battle tracker missions: the 18 OPR Advanced Rules missions, deployment styles and the example template | `missions.ts` |
 

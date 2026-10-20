@@ -6,6 +6,7 @@ import { NEXUS_TRAITS, RELICS, type RelicTier } from '../rules/data';
 import { forceTotals, relicCost as relicRp, relicHolders, relicTaken } from '../rules/engine';
 import { unitName } from '../rules/battle';
 import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_ROUNDS, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
+import { isReinforced } from '../rules/production';
 import { Modal, RelicOption, toast } from './ui';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
@@ -34,7 +35,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
   const rpCost = sel === 'relic' ? relicRp(tier) : 0;
 
   const sectorChoices =
-    !c || !fid ? [] : sel === 'reinforce' ? ownedSectors(c, fid).filter((s) => !s.reinforced) : sel === 'expansion' ? c.sectors.filter((s) => !s.owner && s.type !== 'home') : [];
+    !c || !fid ? [] : sel === 'reinforce' ? ownedSectors(c, fid).filter((s) => !isReinforced(s)) : sel === 'expansion' ? c.sectors.filter((s) => !s.owner && s.type !== 'home') : [];
 
   const pick = (k: UmbraBuy) => {
     setSel(k);

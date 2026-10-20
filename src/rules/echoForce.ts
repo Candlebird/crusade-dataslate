@@ -13,14 +13,17 @@ type Rand = () => number;
 
 export const echoesBook = (books: CatalogBook[]) => books.find((b) => b.uid === ECHOES_BOOK) ?? books.find((b) => b.name === 'Void Echoes');
 
-const pick = <T,>(rand: Rand, xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)];
+export const pick = <T,>(rand: Rand, xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)];
 
 /** Take one random option in about half the unit's upgrade sections. */
-function randomSelection(cu: CatalogUnit, rand: Rand): Selection {
+export function randomSelection(cu: CatalogUnit, rand: Rand): Selection {
   const sel: Selection = {};
   for (const s of cu.sections) if (s.options.length && rand() < 0.5) sel[`${s.id}:${pick(rand, s.options).id}`] = 1;
   return sel;
 }
+
+/** A random loadout for the datasheet (the bare datasheet when the upgrades come to nothing). */
+export const randomLoadout = (cu: CatalogUnit, rand: Rand) => applySelection(cu, randomSelection(cu, rand));
 
 export function randomEchoes(book: CatalogBook, target: number, rand: Rand = Math.random): Unit[] {
   const maxCost = Math.floor(target * 0.35);
