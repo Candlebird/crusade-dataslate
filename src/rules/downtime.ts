@@ -1,7 +1,7 @@
 // Downtime between games: Expeditions (a short dice story into the Nexus) and the bookkeeping for solo patrols.
 import type { Force, Unit } from '../model/types';
 import { SCAR_TABLE } from './data';
-import { EXPEDITION, EXPEDITION_SITES, type ExpeditionCheck, type ExpeditionReward, type ExpeditionSite, type ExpeditionVariant } from './downtimeData';
+import { EXPEDITION, EXPEDITION_SITES, SOLO_PATROL, type ExpeditionCheck, type ExpeditionReward, type ExpeditionSite, type ExpeditionVariant } from './downtimeData';
 import { applyScar, levelForXp } from './engine';
 
 type Rand = () => number;
@@ -200,5 +200,20 @@ export function applyExpedition(force: Force, e: Expedition, date: string, newId
   force.umbraShards += e.haul.us;
   const summary = [`Expedition — ${site.name}${e.finished ? ' (completed)' : ''}: ${rewardText(e.haul)}`, ...hurt].join('; ');
   force.ledger.push({ id: newId(), date, label: summary, rp: e.haul.rp, supply: e.haul.supply, ...(e.haul.us ? { us: e.haul.us } : {}) });
+  return summary;
+}
+
+/** The size of the enemy a solo patrol runs into. */
+export function rollPatrolEnemy(rand: Rand = Math.random): number {
+  const steps = Math.floor((SOLO_PATROL.enemyMax - SOLO_PATROL.enemyMin) / SOLO_PATROL.enemyStep);
+  return SOLO_PATROL.enemyMin + Math.min(steps, Math.floor(rand() * (steps + 1))) * SOLO_PATROL.enemyStep;
+}
+
+/** A patrol that turns the fight down: each unit still gets a little XP for spotting the enemy. Returns a one-line summary. */
+export function declinePatrol(force: Force, unitIds: string[], enemyPoints: number, date: string, newId: () => string): string {
+  const units = force.units.filter((u) => unitIds.includes(u.id) && u.status === 'active');
+  for (const u of units) u.xp += SOLO_PATROL.declineXp;
+  const summary = `Solo patrol — turned down a ${enemyPoints} pts enemy: +${SOLO_PATROL.declineXp} XP to ${units.map((u) => u.name || u.unitType).join(', ')}`;
+  force.ledger.push({ id: newId(), date, label: summary, rp: 0, supply: 0 });
   return summary;
 }

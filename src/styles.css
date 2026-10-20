@@ -140,6 +140,12 @@ h3 { font-size: 1rem; text-transform: uppercase; }
 .panel-head button.fold { color: var(--muted); font-size: 1.1rem; line-height: 1; padding: 0.15rem 0.4rem; }
 .panel-head button.fold:hover { color: var(--gold); }
 .panel.collapsed .panel-title { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
+.panel.collapsed .panel-lead { margin-top: 0.75rem; }
+/* The Nexus Wars box on the force page: set apart from the force's own records. */
+.panel.nexus-box { border: 2px solid var(--cyan); color: #bfe3e3; box-shadow: 0 0 12px rgba(95, 179, 179, 0.15); }
+.panel.nexus-box::before, .panel.nexus-box::after { border-color: var(--cyan); }
+.panel.nexus-box .panel-title { border-bottom-color: rgba(95, 179, 179, 0.4); }
+.panel.nexus-box .panel-title h3 { color: var(--cyan); }
 
 .page-head {
   display: flex;
@@ -297,7 +303,7 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 /* ---- unit sheet ---- */
 .profile { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.4rem 0; }
 .profile .stat { background: #0f1114; border: 1px solid var(--line); padding: 0.3rem 0.6rem; align-items: center; }
-.portrait { width: 100%; aspect-ratio: 1; object-fit: cover; border: 1px solid var(--gold-dim); background: #0b0c0e; display: block; }
+.portrait { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border: 1px solid var(--gold-dim); background: #0b0c0e; display: block; }
 .portrait-empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 3rem; font-family: var(--serif); }
 .weapon { border: 1px solid var(--line); padding: 0.5rem 0.6rem; margin-bottom: 0.5rem; background: rgba(0, 0, 0, 0.2); }
 .weapon-head { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }

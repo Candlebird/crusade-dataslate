@@ -11,8 +11,10 @@ import RequisitionShop from './RequisitionShop';
 import UmbraShop from './UmbraShop';
 import RoundIncome from './RoundIncome';
 import ExpeditionModal from './ExpeditionModal';
+import PatrolModal from './PatrolModal';
 import type { Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
+import { SOLO_PATROL } from '../rules/downtimeData';
 import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, emptyNexus, factionName, homeOf, ownedSectors, unitsUsed, unlockedTables } from '../rules/nexus';
 import { factionClaimedRound, factionForces } from '../rules/detachments';
 import { DetachmentsBox } from './Detachments';
@@ -301,8 +303,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
         </div>
 
         <div>
-          <Panel id="force.details" title="Force details" h={3}>
-            <ForceImage image={f.image} onChange={(img) => set((d) => void (d.image = img))} />
+          <Panel id="force.details" title="Force details" h={3} collapsed lead={<ForceImage image={f.image} onChange={(img) => set((d) => void (d.image = img))} />}>
             <div className="fields" style={{ marginTop: '0.75rem' }}>
               <label className="field span-all">Name<TextField value={f.name} onCommit={(v) => set((d) => void (d.name = v))} /></label>
               <label className="field span-all">Faction<TextField value={f.faction} onCommit={(v) => set((d) => void (d.faction = v))} /></label>
@@ -389,15 +390,30 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const researchHome = home?.benefit === 'researchStation';
   const [claiming, setClaiming] = useState(false);
   const [expedition, setExpedition] = useState(false);
+  const [patrol, setPatrol] = useState(false);
   // As many Expeditions a round as there are free units: each unit takes part once a round.
   const expedited = !!c && !f.units.some((u) => u.status === 'active' && !unitsUsed(f, c).includes(u.id));
   const toClaim = c && n && faction ? claimableRounds(c, n, state.forces) : [];
   const claimedThrough = n && factionClaimedRound(state.forces, n.factionId);
+  const patrolRow = (
+    <div className="span-all row">
+      <span className="grow small">
+        {expedited
+          ? <span className="muted">Every unit has already fought this round. They are free again when the GM ends the round.</span>
+          : <><b>Solo patrol:</b> send up to {SOLO_PATROL.points} pts out to find a {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts enemy, then fight it or turn back.</>}
+      </span>
+      <button disabled={expedited || !f.units.some((u) => u.status === 'active')} onClick={() => setPatrol(true)}>Patrol…</button>
+      {patrol && <PatrolModal force={f} onClose={() => setPatrol(false)} />}
+    </div>
+  );
 
   return (
-    <Panel id="force.nexus" title="Nexus Wars" h={3} extra={<button className="primary" onClick={onShop}>Umbra shards…</button>}>
+    <Panel id="force.nexus" title="Nexus Wars" h={3} className="nexus-box" extra={<button className="primary" onClick={onShop}>Spend Umbra Shards</button>}>
       {!c ? (
-        <p className="muted small">No campaign loaded. <a href={href.campaign()}>Import or start one</a> to link this force to a faction.</p>
+        <>
+          <p className="muted small">No campaign loaded. <a href={href.campaign()}>Import or start one</a> to link this force to a faction.</p>
+          {patrolRow}
+        </>
       ) : (
         <div className="fields">
           <label className="field span-all">
@@ -420,6 +436,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
             </select>
           </label>
           {n && !faction && <p className="span-all small" style={{ color: 'var(--warn)', margin: 0 }}>This faction is not in the loaded campaign.</p>}
+          {!(n && faction) && patrolRow}
           {n && faction && (
             <>
               <div className="span-all row">
@@ -440,6 +457,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
                 <button disabled={expedited} onClick={() => setExpedition(true)}>Expedition…</button>
               </div>
               {expedition && <ExpeditionModal force={f} c={c} onClose={() => setExpedition(false)} />}
+              {patrolRow}
               <DetachmentsBox f={f} c={c} />
               <div className="span-all small">
                 <div className="muted">Controlled sectors</div>

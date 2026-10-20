@@ -3,6 +3,12 @@
 /** Solo patrol: a quick game against the AI with a small part of the force. */
 export const SOLO_PATROL = {
   points: 500,
+  /** The enemy the patrol runs into: anywhere from enemyMin to enemyMax pts, in steps of enemyStep. */
+  enemyMin: 400,
+  enemyMax: 700,
+  enemyStep: 50,
+  /** XP each unit gets for spotting the enemy, when the patrol turns the fight down. */
+  declineXp: 1,
 };
 
 /** How hard a choice is. Each tier rolls its dice, adds the squad bonus, and needs the target or more. */

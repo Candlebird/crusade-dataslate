@@ -196,7 +196,7 @@ export function useCollapsed(id: string, initial = false): [boolean, () => void]
 }
 
 /** A panel whose body can be folded away with the chevron next to its heading. `extra` stays visible either way. */
-export function Panel({ id, title, extra, h = 2, className, domId, collapsed, children }: {
+export function Panel({ id, title, extra, h = 2, className, domId, collapsed, lead, children }: {
   id: string;
   title: ReactNode;
   extra?: ReactNode;
@@ -205,6 +205,8 @@ export function Panel({ id, title, extra, h = 2, className, domId, collapsed, ch
   domId?: string;
   /** Start folded until the user opens it. */
   collapsed?: boolean;
+  /** Shown above the children even while the panel is folded. */
+  lead?: ReactNode;
   children: ReactNode;
 }) {
   const [closed, toggle] = useCollapsed(id, collapsed);
@@ -220,6 +222,7 @@ export function Panel({ id, title, extra, h = 2, className, domId, collapsed, ch
         </span>
         {extra}
       </div>
+      {lead && <div className="panel-lead">{lead}</div>}
       {!closed && children}
     </div>
   );

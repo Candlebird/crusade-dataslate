@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type Campaign } from '../model/types';
 import { newForce, newUnit } from '../model/factory';
-import { applyExpedition, checkOdds, chooseOption, currentEncounter, headHome, pressOn, scaledReward, squadBonus, startExpedition } from './downtime';
-import { EXPEDITION, EXPEDITION_SITES } from './downtimeData';
+import { applyExpedition, checkOdds, declinePatrol, rollPatrolEnemy, chooseOption, currentEncounter, headHome, pressOn, scaledReward, squadBonus, startExpedition } from './downtime';
+import { EXPEDITION, EXPEDITION_SITES, SOLO_PATROL } from './downtimeData';
 import { emptyUnitBattle, participationXp, resolveBattle, rewardRows, type BattleInput } from './battle';
 import { STANDARD_MISSION } from './missions';
 import { patrolBattle, wizardPrefill } from './tracker';
@@ -223,5 +223,30 @@ describe('one fight per unit per round', () => {
     expect(unitsUsed(f, c)).toEqual([]);
     markUnitsUsed(f, c, ['d']);
     expect(f.nexus.usedUnits).toEqual({ round: 3, ids: ['d'] });
+  });
+});
+
+describe('solo patrol sightings', () => {
+  it('finds an enemy between the patrol limits, in whole steps', () => {
+    expect(rollPatrolEnemy(() => 0)).toBe(SOLO_PATROL.enemyMin);
+    expect(rollPatrolEnemy(() => 0.9999)).toBe(SOLO_PATROL.enemyMax);
+    for (let i = 0; i < 200; i++) {
+      const p = rollPatrolEnemy();
+      expect(p).toBeGreaterThanOrEqual(400);
+      expect(p).toBeLessThanOrEqual(700);
+      expect((p - SOLO_PATROL.enemyMin) % SOLO_PATROL.enemyStep).toBe(0);
+    }
+  });
+
+  it('turning back gives each patrolling unit pity XP and logs it', () => {
+    const f = newForce('Test');
+    const a = { ...newUnit(), id: 'a', name: 'Alpha', status: 'active' as const, xp: 2 };
+    const b = { ...newUnit(), id: 'b', name: 'Beta', status: 'active' as const, xp: 0 };
+    const c = { ...newUnit(), id: 'c', name: 'Gamma', status: 'active' as const, xp: 0 };
+    f.units = [a, b, c];
+    const summary = declinePatrol(f, ['a', 'b'], 550, '2026-10-20', () => 'x');
+    expect(f.units.map((u) => u.xp)).toEqual([2 + SOLO_PATROL.declineXp, SOLO_PATROL.declineXp, 0]);
+    expect(summary).toContain('550 pts');
+    expect(f.ledger[f.ledger.length - 1]).toMatchObject({ rp: 0, supply: 0, label: summary });
   });
 });
