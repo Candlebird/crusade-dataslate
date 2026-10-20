@@ -42,6 +42,7 @@ import { ForceImage } from './ForceView';
 import TablePicker, { type PickEntry, type PickGroup, type Picked } from './TablePicker';
 import { traitMark } from './marks';
 import { Issues, Panel, Stepper, TextArea, TextField, XpBar, toast } from './ui';
+import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
 
 type Picker =
   | { kind: 'trait' }
@@ -64,6 +65,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
   const [newRule, setNewRule] = useState('');
   const f = state.forces.find((x) => x.id === forceId);
   const u = f?.units.find((x) => x.id === unitId);
+  const { edit } = useEditMode(f);
   if (!f || !u) return <div className="panel empty">Unit not found. <a href={href.forces()}>Back to forces</a></div>;
 
   const set = (fn: (d: Unit) => void) => updateUnit(f.id, u.id, fn);
@@ -197,19 +199,30 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           </div>
         </div>
         <div className="row">
-          {(u.heroicRise || u.category !== 'Hero') && (
+          {edit && (u.heroicRise || u.category !== 'Hero') && (
             <label className="row small muted" title="Requisition: may carry a relic like a Hero">
               <input type="checkbox" checked={!!u.heroicRise} onChange={(e) => set((d) => void (d.heroicRise = e.target.checked || undefined))} />
               Heroic Rise
             </label>
           )}
-          <select value={u.status} onChange={(e) => set((d) => void (d.status = e.target.value as UnitStatus))}>
-            <option value="active">Active</option>
-            <option value="comatose">Comatose (sits out)</option>
-            <option value="removed">Fallen / removed</option>
-          </select>
+          {edit ? (
+            <select value={u.status} onChange={(e) => set((d) => void (d.status = e.target.value as UnitStatus))}>
+              <option value="active">Active</option>
+              <option value="comatose">Comatose (sits out)</option>
+              <option value="removed">Fallen / removed</option>
+            </select>
+          ) : (
+            <>
+              {u.heroicRise && <span className="tag gold">Heroic Rise</span>}
+              {u.status === 'comatose' && <span className="tag cyan">Comatose</span>}
+              {u.status === 'removed' && <span className="tag red">Fallen</span>}
+            </>
+          )}
+          <EditModeButton f={f} />
         </div>
       </div>
+
+      <EditModeNotice f={f} />
 
       {pending > 0 && (
         <div className="panel notice">
@@ -245,6 +258,18 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           <Panel id="unit.profile" title="Profile">
             <div className="fields">
               <label className="field span-2">Crusade name<TextField value={u.name} onCommit={(v) => set((d) => void (d.name = v))} /></label>
+              {!edit && (
+                <>
+                  <label className="field span-2">Datasheet<Fixed>{u.unitType}</Fixed></label>
+                  <label className="field">Models<Fixed>{u.size}</Fixed></label>
+                  <label className="field">Quality<Fixed>{u.quality}+</Fixed></label>
+                  <label className="field">Defense<Fixed>{u.defense}+</Fixed></label>
+                  <label className="field">Tough<Fixed>{u.tough}</Fixed></label>
+                  <label className="field">Points<Fixed>{u.points}</Fixed></label>
+                  <label className="field span-2">Upgrade category<Fixed>{u.category}</Fixed></label>
+                </>
+              )}
+              {edit && <>
               <label className="field span-2">Datasheet<TextField value={u.unitType} onCommit={(v) => set((d) => void (d.unitType = v))} /></label>
               <label className="field">Models<Stepper value={u.size} min={1} onChange={(n) => set((d) => void (d.size = n))} /></label>
               <label className="field">Quality<Stepper value={u.quality} min={2} onChange={(n) => set((d) => void (d.quality = Math.min(6, n)))} /></label>
@@ -274,16 +299,17 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                 </div>
                 <span className="small" style={{ textTransform: 'none', letterSpacing: 0 }}>{CATEGORY_HINT[u.category]}</span>
               </label>
+              </>}
             </div>
             <div style={{ marginTop: '0.75rem' }}>
               <div className="cat" style={{ marginBottom: 4 }}>Special rules</div>
               {u.rules.map((r, i) => (
                 <span key={r + i} className="tag">
                   {r}
-                  <button aria-label={`Remove ${r}`} onClick={() => setRules(u.rules.filter((_, j) => j !== i))}>✕</button>
+                  {edit && <button aria-label={`Remove ${r}`} onClick={() => setRules(u.rules.filter((_, j) => j !== i))}>✕</button>}
                 </span>
               ))}
-              <form
+              {edit && <form
                 className="row"
                 style={{ marginTop: 4 }}
                 onSubmit={(e) => {
@@ -294,14 +320,15 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               >
                 <input value={newRule} placeholder="Add rule, e.g. Tough(3)" onChange={(e) => setNewRule(e.target.value)} />
                 <button type="submit">Add</button>
-              </form>
+              </form>}
             </div>
           </Panel>
 
           {/* XP */}
           <Panel id="unit.xp" title="Experience" extra={<span className="muted small">{used} of {earned} level(s) spent</span>}>
             <XpBar xp={u.xp} />
-            <div className="row" style={{ marginTop: '0.75rem' }}>
+            {!edit && <p className="small muted">{u.xp} XP · {u.battles} battle{u.battles === 1 ? '' : 's'} · {u.kills} kill{u.kills === 1 ? '' : 's'}</p>}
+            {edit && <div className="row" style={{ marginTop: '0.75rem' }}>
               <Stepper value={u.xp} min={0} onChange={(n) => set((d) => void (d.xp = n))} />
               {[1, 2, 3, 5].map((n) => (
                 <button key={n} onClick={() => set((d) => void (d.xp += n))}>+{n}</button>
@@ -309,7 +336,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               <span className="spacer" />
               <label className="field">Battles<Stepper value={u.battles} min={0} onChange={(n) => set((d) => void (d.battles = n))} /></label>
               <label className="field">Kills<Stepper value={u.kills} min={0} onChange={(n) => set((d) => void (d.kills = n))} /></label>
-            </div>
+            </div>}
           </Panel>
 
           {/* Traits */}
@@ -319,12 +346,19 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             extra={
               <div className="row">
                 <span className="muted small">{normalCount}/{MAX_NORMAL_TRAITS} normal · {uniqueCount}/{MAX_UNIQUE_TRAITS} unique</span>
-                <button className="primary" onClick={() => setPicker({ kind: 'trait' })}>+ Trait</button>
+                {edit && <button className="primary" onClick={() => setPicker({ kind: 'trait' })}>+ Trait</button>}
               </div>
             }
           >
             {u.upgrades.length === 0 && <p className="muted small">No traits yet.</p>}
-            {u.upgrades.map((up, i) => (
+            {u.upgrades.map((up, i) => !edit ? (
+              <div key={up.id} className="list-item">
+                <b className="grow">{traitMark(up)} {up.name}</b>
+                {up.nexus && <span className="tag cyan">Nexus</span>}
+                {up.unique && !up.nexus && <span className="tag gold">Unique</span>}
+                {up.free && <span className="tag">Free</span>}
+              </div>
+            ) : (
               <div key={up.id} className="list-item">
                 <div className="grow">
                   <TextField className="wide" value={up.name} onCommit={(v) => set((d) => void (d.upgrades[i].name = v))} />
@@ -345,14 +379,14 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           <Panel
             id="unit.weapons"
             title="Weapons"
-            extra={
+            extra={edit && (
               <button onClick={() => set((d) => void d.weapons.push({ id: uid(), name: 'New weapon', count: 1, range: 0, attacks: 1, rules: [], traits: [] }))}>
                 + Weapon
               </button>
-            }
+            )}
           >
             {u.weapons.length === 0 && <p className="muted small">No weapons.</p>}
-            {u.weapons.map((w, i) => (
+            {u.weapons.map((w, i) => !edit ? <FixedWeapon key={w.id} w={w} /> : (
               <WeaponRow
                 key={w.id}
                 w={w}
@@ -373,7 +407,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               extra={
                 <div className="row">
                   <span className="muted small">{u.relics.length}/{relicSlots(u.xp)} slots</span>
-                  <button onClick={() => setPicker({ kind: 'relic' })}>+ Relic</button>
+                  {edit && <button onClick={() => setPicker({ kind: 'relic' })}>+ Relic</button>}
                 </div>
               }
             >
@@ -384,14 +418,18 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                     <b>{r.name}</b>
                     {r.profile && <div className="muted small">{r.profile}</div>}
                   </div>
-                  <select value={r.tier} onChange={(e) => set((d) => void (d.relics[i].tier = e.target.value as RelicTier))}>
-                    {TIERS.map((t) => <option key={t}>{t}</option>)}
-                  </select>
-                  <button className="ghost icon" aria-label="Remove relic" onClick={() => set((d) => void d.relics.splice(i, 1))}>✕</button>
+                  {edit ? (
+                    <>
+                      <select value={r.tier} onChange={(e) => set((d) => void (d.relics[i].tier = e.target.value as RelicTier))}>
+                        {TIERS.map((t) => <option key={t}>{t}</option>)}
+                      </select>
+                      <button className="ghost icon" aria-label="Remove relic" onClick={() => set((d) => void d.relics.splice(i, 1))}>✕</button>
+                    </>
+                  ) : <span className="tag gold">{r.tier}</span>}
                 </div>
               ))}
             </Panel>
-            <Panel id="unit.scars" title="Battle scars" h={3} extra={<button className="danger" onClick={() => setPicker({ kind: 'scar' })}>+ Scar</button>}>
+            <Panel id="unit.scars" title="Battle scars" h={3} extra={edit && <button className="danger" onClick={() => setPicker({ kind: 'scar' })}>+ Scar</button>}>
               {u.scars.length === 0 && <p className="muted small">Unblemished.</p>}
               {u.scars.map((sc, i) => (
                 <div key={sc.id} className="list-item">
@@ -399,7 +437,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                     <b style={{ color: '#e08a80' }}>{sc.name}</b>
                     {sc.desc && <div className="muted small">{sc.desc}</div>}
                   </div>
-                  <button className="ghost icon" aria-label="Remove scar" onClick={() => set((d) => void d.scars.splice(i, 1))}>✕</button>
+                  {edit && <button className="ghost icon" aria-label="Remove scar" onClick={() => set((d) => void d.scars.splice(i, 1))}>✕</button>}
                 </div>
               ))}
             </Panel>
@@ -417,7 +455,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             </div>
             <label className="field" style={{ marginTop: '0.75rem' }} title="e.g. +1 for Heroic Rise">
               BP adjustment
-              <Stepper value={u.bpAdjust} onChange={(n) => set((d) => void (d.bpAdjust = n))} />
+              {edit ? <Stepper value={u.bpAdjust} onChange={(n) => set((d) => void (d.bpAdjust = n))} /> : <Fixed>{u.bpAdjust > 0 ? `+${u.bpAdjust}` : u.bpAdjust}</Fixed>}
             </label>
           </div>
           <Panel id="unit.validation" title="Validation" h={3}>
@@ -426,7 +464,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           <Panel id="unit.notes" title="Notes" h={3}>
             <TextArea rows={6} value={u.notes} placeholder="Background, honours, grudges…" onCommit={(v) => set((d) => void (d.notes = v))} />
           </Panel>
-          <div className="panel">
+          {edit && <div className="panel">
             <button
               className="danger"
               onClick={() => {
@@ -437,7 +475,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             >
               Delete unit
             </button>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -461,6 +499,27 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
         />
       )}
     </>
+  );
+}
+
+/** A weapon's profile and traits, read-only. */
+function FixedWeapon({ w }: { w: Weapon }) {
+  return (
+    <div className="weapon">
+      <div className="weapon-head">
+        <b>{w.count > 1 ? `${w.count}× ` : ''}{w.name}</b>
+        <span className="muted small">{w.range ? `${w.range}"` : 'Melee'} · A{w.attacks}{w.rules.length ? ` · ${w.rules.join(', ')}` : ''}</span>
+      </div>
+      {w.traits.length > 0 && (
+        <div className="row" style={{ marginTop: 6 }}>
+          {w.traits.map((t) => (
+            <span key={t.id} className={`tag ${t.unique ? 'gold' : 'green'}`} title={t.free ? 'Free' : undefined}>
+              {traitMark(t)} {t.name}{t.free && ' (free)'}
+            </span>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

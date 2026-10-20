@@ -27,6 +27,7 @@ import { listTotals, newList } from '../rules/lists';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
 import { Panel, Stepper, TextArea, TextField, XpBar, confirmAction, toast } from './ui';
+import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
 
 /** Hands the force to another player on the campaign, e.g. when you've been looking after their army. */
 function TransferForce({ f }: { f: Force }) {
@@ -71,6 +72,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const [umbra, setUmbra] = useState(false);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const f = state.forces.find((x) => x.id === forceId);
+  const { edit } = useEditMode(f);
   if (!f) return <div className="panel empty">Force not found. <a href={href.forces()}>Back to forces</a></div>;
 
   const s = state.settings;
@@ -96,14 +98,14 @@ export default function ForceView({ forceId }: { forceId: string }) {
         <div className="row">
           {armyUrl && <a className="btn" href={armyUrl} target="_blank" rel="noreferrer">Army Forge ↗</a>}
           <button onClick={() => exportForce(f)}>Export force file</button>
-          <button onClick={() => {
-            // A Nexus Wars force raises its units at its planets (Production, below); adding one here skips the bank.
-            if (f.nexus && state.campaign && !confirmAction('In Nexus Wars, new units are produced at your planets and paid from their bank (see Production in the Nexus Wars panel). Add a unit anyway, without paying for it?')) return;
-            setAdding(true);
-          }}>+ Add unit</button>
+          {/* A Nexus Wars force raises its units at its planets (Production, in the Nexus Wars panel); adding one here skips the bank. */}
+          {edit && <button onClick={() => setAdding(true)}>+ Add unit</button>}
           <button className="primary" onClick={() => go(href.battle(f.id))}>⚔ Record battle</button>
+          {!theirs && <EditModeButton f={f} />}
         </div>
       </div>
+
+      {!theirs && <EditModeNotice f={f} />}
 
       {theirs && (
         <div className="panel notice">
@@ -161,7 +163,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
             <TagFilter tags={tagsIn(listed.map((u) => unitTags(u, state.books)))} value={tagFilter} onChange={setTagFilter} />
             {listed.length === 0 ? (
               <div className="empty">
-                No units yet. <button onClick={() => setAdding(true)}>+ Add the first one</button>
+                No units yet. {edit ? <button onClick={() => setAdding(true)}>+ Add the first one</button> : 'Produce them at your planets in the Nexus Wars panel.'}
               </div>
             ) : units.length === 0 ? (
               <div className="empty">No units carry all of those tags.</div>
@@ -248,7 +250,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
             extra={
               <div className="row">
                 <button className="primary" onClick={() => setShopping(true)}>Requisition…</button>
-                <button onClick={() => addLedger('Battle reward', 1, 0)}>+1 RP</button>
+                {edit && <button onClick={() => addLedger('Battle reward', 1, 0)}>+1 RP</button>}
                 <button
                   disabled={t.rp < 1}
                   onClick={() => addLedger('Increase Supply', -1, s.supplyPerRp)}
@@ -256,7 +258,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                 >
                   Increase supply (−1 RP)
                 </button>
-                <button onClick={() => addLedger('Adjustment', 0, 0)}>+ Entry</button>
+                {edit && <button onClick={() => addLedger('Adjustment', 0, 0)}>+ Entry</button>}
               </div>
             }
           >
@@ -269,7 +271,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                     <tr><th>Date</th><th>Entry</th><th className="num">RP</th><th className="num">Supply</th><th className="num">US</th><th /></tr>
                   </thead>
                   <tbody>
-                    {f.ledger.map((e, i) => (
+                    {f.ledger.map((e, i) => edit ? (
                       <tr key={e.id}>
                         <td className="s-2" data-label="Date"><input type="date" value={e.date} onChange={(ev) => set((d) => void (d.ledger[i].date = ev.target.value))} /></td>
                         <td className="s-full" data-label="Entry"><TextField className="wide" value={e.label} onCommit={(v) => set((d) => void (d.ledger[i].label = v))} /></td>
@@ -277,6 +279,15 @@ export default function ForceView({ forceId }: { forceId: string }) {
                         <td className="num" data-label="Supply"><input type="number" step={50} value={e.supply} onChange={(ev) => set((d) => void (d.ledger[i].supply = Number(ev.target.value) || 0))} /></td>
                         <td className="num small" data-label="US" title="Umbra Shards (history only — the balance is set in Force details)">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
                         <td className="s-end"><button className="ghost icon" onClick={() => set((d) => void d.ledger.splice(i, 1))} aria-label="Delete entry">✕</button></td>
+                      </tr>
+                    ) : (
+                      <tr key={e.id}>
+                        <td className="s-2 small muted" data-label="Date">{e.date}</td>
+                        <td className="s-full" data-label="Entry">{e.label}</td>
+                        <td className="num" data-label="RP">{e.rp}</td>
+                        <td className="num" data-label="Supply">{e.supply}</td>
+                        <td className="num small" data-label="US">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
+                        <td className="s-end" />
                       </tr>
                     ))}
                   </tbody>
@@ -319,10 +330,21 @@ export default function ForceView({ forceId }: { forceId: string }) {
                 <TextField value={f.armyLink ?? ''} placeholder={armyUrl ?? 'Paste the army or list link'} onCommit={(v) => set((d) => void (d.armyLink = v.trim() || undefined))} />
               </label>
               <label className="field span-all">Player<TextField value={f.player} onCommit={(v) => set((d) => void (d.player = v))} /></label>
-              <label className="field span-all">Starting supply<Stepper value={f.startingSupply} step={50} min={0} onChange={(n) => set((d) => void (d.startingSupply = n))} /></label>
-              <label className="field">Battles<Stepper value={f.battles} min={0} onChange={(n) => set((d) => void (d.battles = n))} /></label>
-              <label className="field">Wins<Stepper value={f.wins} min={0} onChange={(n) => set((d) => void (d.wins = n))} /></label>
-              <label className="field span-all">Umbra shards<Stepper value={f.umbraShards} min={0} onChange={(n) => set((d) => void (d.umbraShards = n))} /></label>
+              {edit ? (
+                <>
+                  <label className="field span-all">Starting supply<Stepper value={f.startingSupply} step={50} min={0} onChange={(n) => set((d) => void (d.startingSupply = n))} /></label>
+                  <label className="field">Battles<Stepper value={f.battles} min={0} onChange={(n) => set((d) => void (d.battles = n))} /></label>
+                  <label className="field">Wins<Stepper value={f.wins} min={0} onChange={(n) => set((d) => void (d.wins = n))} /></label>
+                  <label className="field span-all">Umbra shards<Stepper value={f.umbraShards} min={0} onChange={(n) => set((d) => void (d.umbraShards = n))} /></label>
+                </>
+              ) : (
+                <>
+                  <label className="field span-all">Starting supply<Fixed>{f.startingSupply}</Fixed></label>
+                  <label className="field">Battles<Fixed>{f.battles}</Fixed></label>
+                  <label className="field">Wins<Fixed>{f.wins}</Fixed></label>
+                  <label className="field span-all">Umbra shards<Fixed>{f.umbraShards}</Fixed></label>
+                </>
+              )}
               <label className="field span-all">Description / lore<TextArea rows={5} value={f.description} onCommit={(v) => set((d) => void (d.description = v))} /></label>
             </div>
           </Panel>
@@ -475,6 +497,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const { state, updateForce } = useStore();
   const c = state.campaign;
   const set = (fn: Parameters<typeof updateForce>[1]) => updateForce(f.id, fn);
+  const { edit } = useEditMode(f);
   const n = f.nexus;
   const faction = n && c?.factions.find((x) => x.id === n.factionId);
   const home = c && n ? homeOf(c, n.factionId) : undefined;
@@ -509,7 +532,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
         <div className="fields">
           <label className="field span-all">
             Campaign faction
-            <select value={n?.factionId ?? ''} onChange={(e) => {
+            {!edit && faction ? <Fixed>{faction.name}</Fixed> : <select value={n?.factionId ?? ''} onChange={(e) => {
               const id = e.target.value;
               // Joining a faction that already has a force makes this one a detachment: its Supply comes from the others.
               const detachment = !!id && factionForces(state.forces, id).some((x) => x.id !== f.id);
@@ -524,7 +547,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
             }}>
               <option value="">Not linked</option>
               {c.factions.map((x) => <option key={x.id} value={x.id}>{x.name}{x.player ? ` (${x.player})` : ''}</option>)}
-            </select>
+            </select>}
           </label>
           {n && !faction && <p className="span-all small" style={{ color: 'var(--warn)', margin: 0 }}>This faction is not in the loaded campaign.</p>}
           {!(n && faction) && patrolRow}
@@ -574,13 +597,16 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
                 {unlockedTables(n).length ? unlockedTables(n).join(', ') : 'none'}
                 {n.tempTables === 'all' || n.tempTables.length ? <span className="muted"> (temporary ones last until your next round income)</span> : null}
               </div>
-              <label className="field span-all">Trait tokens<Stepper value={n.traitTokens} min={0} onChange={(v) => set((d) => void (d.nexus!.traitTokens = v))} /></label>
+              <label className="field span-all">
+                Trait tokens
+                {edit ? <Stepper value={n.traitTokens} min={0} onChange={(v) => set((d) => void (d.nexus!.traitTokens = v))} /> : <Fixed>{n.traitTokens}</Fixed>}
+              </label>
               <div className="span-all small">
                 <div className="muted">Pending for next match</div>
                 {n.pending.length === 0 ? <span className="muted">Nothing.</span> : n.pending.map((p, i) => (
                   <div key={i} className="row">
                     <span className="grow">{p}</span>
-                    <button className="ghost icon" aria-label="Remove" onClick={() => set((d) => void d.nexus!.pending.splice(i, 1))}>✕</button>
+                    {edit && <button className="ghost icon" aria-label="Remove" onClick={() => set((d) => void d.nexus!.pending.splice(i, 1))}>✕</button>}
                   </div>
                 ))}
               </div>

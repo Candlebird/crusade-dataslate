@@ -248,6 +248,8 @@ label.field > input, label.field > select, label.field > textarea { text-transfo
 .stepper button:first-child { border-radius: var(--radius) 0 0 var(--radius); }
 .stepper button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
 .stepper input { border-radius: 0; width: 4.5rem; text-align: center; border-left: 0; border-right: 0; }
+/* A value shown in place of its input while a Nexus Wars force is out of edit mode. */
+.fixed { font-size: 1rem; text-transform: none; letter-spacing: normal; color: var(--text); font-weight: 600; padding: 0.35rem 0; }
 
 /* ---- tables ---- */
 table { width: 100%; border-collapse: collapse; }
