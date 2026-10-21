@@ -102,7 +102,7 @@ export default function SettingsPage() {
                 className="danger"
                 disabled={!!cloud.email}
                 onClick={() => {
-                  if (!window.confirm('Replace ALL data in this browser with the starter forces? Export a backup first if unsure.')) return;
+                  if (!window.confirm('Replace ALL data in this browser with the starter army book (no forces)? Export a backup first if unsure.')) return;
                   replaceState(buildSeedState());
                   toast('Reset to the starter data.');
                 }}

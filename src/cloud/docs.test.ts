@@ -19,6 +19,7 @@ describe('cloud docs', () => {
 
   it('syncs only owned forces, and lets players write only their own', () => {
     const s = buildSeedState();
+    s.forces = [newForce('Mine'), newForce('Theirs')];
     s.forces[0].owner = 'me@x';
     s.forces[1].owner = 'them@x';
     const docs = localDocs(s, { email: 'me@x', isGm: false }, new Map());
@@ -29,6 +30,7 @@ describe('cloud docs', () => {
 
   it('applies and deletes forces by id', () => {
     const s = buildSeedState();
+    s.forces = [newForce('Applied')];
     const f = { ...s.forces[0], name: 'Renamed' };
     applyDoc(s, `forces/${f.id}`, f);
     expect(s.forces[0].name).toBe('Renamed');

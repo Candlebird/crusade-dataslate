@@ -7,7 +7,7 @@ describe('unit tags', () => {
   it('are kept on the book per datasheet and shared by its units', () => {
     const s = buildSeedState();
     const book = s.books[0];
-    const fang = s.forces[0].units.find((u) => u.unitType === 'Force Commander')!;
+    const fang = newUnit({ unitType: 'Force Commander' });
     setDatasheetTags(s, book.uid, 'Force Commander', ['Commander', 'All-Rounder', 'Commander']);
     expect(book.unitTags?.['Force Commander']).toEqual(['All-Rounder', 'Commander']);
     expect(book.updatedAt).toBeTruthy();
