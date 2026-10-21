@@ -3,6 +3,7 @@ import { modifierOf } from './difficulty';
 import { hasRule, levelForXp, ruleRating } from './engine';
 import { activeEvent } from './nexus';
 import { teamsOf, type TeamKey, type TrackedBattle } from './tracker';
+import { leadsWith } from './warlords';
 
 // Auto-battle: when there's no time to play a battle out, each unit gets an overall Attack and Defense from its
 // profile (quality, defense, weapons, traits, relics, level), and the units trade blows for 4 rounds. A unit brought
@@ -449,6 +450,19 @@ export function autoSetup(b: TrackedBattle, forces: Force[], c?: Campaign): Auto
     give(fighters, `${event.name}: often -1 to hit shooting in rounds 1 and 2 (long range)`, (f) => (f.earlyShoot -= 0.5));
     setup.effects.push(`${event.name}: everyone often gets -1 to hit shooting in rounds 1 and 2, while the armies are far apart.`);
   } else if (event?.battle) setup.effects.push(`${event.name}: ${event.battle} Not part of the auto-battle: apply it yourself.`);
+  // A Conqueror Warlord's Onslaught: it hits harder and its side holds firmer, while it's in the fight.
+  if (c) for (const side of b.sides) {
+    const force = forces.find((f) => f.id === side.forceId);
+    const lord = force && c.factions.find((x) => x.id === force.nexus?.factionId)?.warlord;
+    if (!force || !lord || !leadsWith(c, force, 'onslaught')) continue;
+    const ours = fighters.filter((f) => f.sideId === side.id);
+    const ids = new Set(side.units.filter((t) => t.unitId === lord.unitId).map((t) => t.id));
+    const leader = ours.filter((f) => ids.has(f.unitId));
+    if (!leader.length) continue;
+    give(leader, 'Warlord (Onslaught): +1 to hit', (f) => { f.hitMelee += 1; f.hitShoot += 1; });
+    give(ours, 'Warlord (Onslaught): +1 to Morale tests', (f) => (f.morale += 1));
+    setup.effects.push(`${lord.name} (Warlord, Onslaught): +1 to hit, and ${force.name} gets +1 to Morale tests.`);
+  }
   touched.forEach(rate);
   return setup;
 }

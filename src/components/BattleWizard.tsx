@@ -76,7 +76,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
     const crisis = source?.battle.crisis;
     // A solo patrol earns no Nexus rewards (a win still counts as a patrol, below).
     const ctx = nexusGeneration(input?.patrol ? undefined : campaign, factionId, input?.sectorId ?? '', input?.result ?? 'draw', !!input?.vsAi, undefined,
-      crisis ? { crisis, forceId: f?.id, mvp: mvpForce(source.battle) } : undefined);
+      { forceId: f?.id, ...(crisis ? { crisis, mvp: mvpForce(source.battle) } : {}) });
     if (factionId && ctx.round) ctx.matchesElsewhere = matchBonusesEarned(state.forces, factionId, ctx.round, f?.id);
     return ctx;
   }, [campaign, factionId, input?.sectorId, input?.result, input?.vsAi, input?.patrol, state.forces, f?.id, source]);

@@ -420,7 +420,7 @@ function ProductionBox({ f, c }: { f: Force; c: Campaign }) {
             update((d) => {
               const x = d.campaign?.sectors.find((y) => y.id === site.id);
               const force = d.forces.find((y) => y.id === f.id);
-              if (!x || !force || !produce(x, newUnits, force)) return;
+              if (!x || !force || !produce(x, newUnits, force, d.campaign)) return;
               force.units.push(...newUnits);
               d.campaign!.updatedAt = nowIso();
               ok = true;

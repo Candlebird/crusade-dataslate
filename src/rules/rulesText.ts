@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, DIFFICULTY_LEVELS, FOG, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP } from './nexusData';
+import { ECHOES, DIFFICULTY_LEVELS, FOG, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP, WARLORDS } from './nexusData';
 import { EXPEDITION, SOLO_PATROL, type ExpeditionCheck } from './downtimeData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
@@ -165,6 +165,11 @@ export const NEXUS_TEXT = {
     `A band starts at ${MARAUDERS.start} Supply (scaled by the campaign's difficulty) and gains ${MARAUDERS.grow} every round, up to ${MARAUDERS.max}. Every round's end it moves ${MARAUDERS.move.min}–${MARAUDERS.move.max} hexes toward the faction world it likes best: rich banks and high production draw it, distance and defences put it off.`,
     `Raid: a band that reaches its target carries off ${Math.round(MARAUDERS.steal * 100)}% of the sector's Materials bank, and the sector produces nothing in the round that follows. Walls (or Reinforce), or a detachment of the owner standing there, throw the band back instead: it stops a hex short and loses ${MARAUDERS.repelLoss} Supply.`,
     `Fight a band in the sector it stands in: the GM fields an AI army at its Supply. Beat it and the band is broken, and you roll on the Guardian loot table: Common below ${MARAUDERS.rareAt} Supply, Rare from ${MARAUDERS.rareAt}, Legendary from ${MARAUDERS.legendaryAt}. Fighting a band never changes who holds the sector, and it isn't the faction's attack for the round.`,
+  ],
+  warlords: [
+    `Each faction names one Hero from its forces its Warlord, on the Warlords panel of the campaign page, and picks a Path for it: ${WARLORDS.paths.map((p) => p.name).join(', ')}. The Path is for the rest of the campaign: a later Warlord follows the same one.`,
+    `Each Path has three perks, unlocked as the Warlord reaches levels ${WARLORDS.levels.join(', ')} (its level comes from its XP, as for any unit). Perks that name the Warlord's force only work for the detachment the Warlord is in; the others help the whole faction.`,
+    `If the Warlord is removed for good, or its force leaves the faction, the perks go. A new Warlord can be named ${WARLORDS.replaceAfter} round${WARLORDS.replaceAfter === 1 ? '' : 's'} later. A Warlord can also step down, with the same wait.`,
   ],
   reports: [
     "When the GM ends a round, a turn report tells what happened: battles won and lost, the Echoes' spread, new sectors on the map, guardians, hero offers and your planets' production. You only read about what your faction fought in or could see.",

@@ -1,5 +1,6 @@
 import type { Campaign, CampaignFaction } from '../model/types';
-import { BUILDINGS, NEXUS_TECH, type Building } from './nexusData';
+import { BUILDINGS, NEXUS_TECH, WARLORDS, type Building } from './nexusData';
+import { hasPerk } from './warlords';
 
 // The tech tree (Nexus Wars). Each building is a tech: tier 1 is known from the start, tiers 2 and 3 are researched
 // with Research, which every faction earns when a round ends (NEXUS_TECH), once the techs they require are known. A
@@ -57,7 +58,8 @@ export function researchRate(c: Campaign, factionId: string): number {
   const held = c.sectors.filter((s) => s.owner === factionId);
   const stations = held.filter((s) => s.type === 'research' || (s.type === 'home' && s.benefit === 'researchStation')).length;
   const observatories = held.filter((s) => s.buildings?.includes('observatory')).length;
-  return NEXUS_TECH.perRound + stations * NEXUS_TECH.perStation + observatories * NEXUS_TECH.perObservatory;
+  return NEXUS_TECH.perRound + stations * NEXUS_TECH.perStation + observatories * NEXUS_TECH.perObservatory
+    + (hasPerk(c, factionId, 'research') ? WARLORDS.research : 0);
 }
 
 /** Round end: every faction earns its Research. Returns what each gained. */

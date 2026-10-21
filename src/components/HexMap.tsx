@@ -13,7 +13,7 @@ import {
 import { pickSpread, spreadInto, spreadTargets } from '../rules/voidspawn';
 import { aiDefended, rateSectors } from '../rules/difficulty';
 import {
-  bankCap, build, buildBlock, buildingById, buildingSlots, cancelBuilding, coreBlock, demolish, exchange, exchangeBlock, freeSlots, hasBuilding, installCore,
+  bankCap, build, buildBlock, buildCost, buildingById, buildingSlots, cancelBuilding, coreBlock, demolish, exchange, exchangeBlock, freeSlots, hasBuilding, installCore,
   isReinforced, produces, productionRate, tradeBonus, type ExchangeTrade,
 } from '../rules/production';
 import { knows } from '../rules/tech';
@@ -588,7 +588,7 @@ function ProductionBox({ s }: { s: Sector }) {
   const k = s.construction;
   const going = k ? buildingById(k.id) : undefined;
   const built = s.buildings ?? [];
-  const free = freeSlots(s);
+  const free = freeSlots(s, c ?? undefined);
   const today = nowIso().slice(0, 10);
   const edit = (fn: (x: Sector, c: Campaign, forces: Force[]) => void) => update((d) => {
     const x = d.campaign?.sectors.find((y) => y.id === s.id);
@@ -597,6 +597,8 @@ function ProductionBox({ s }: { s: Sector }) {
     d.campaign.updatedAt = nowIso();
   });
   const price = (x: { cost: number; shards: number }) => `${x.cost} Materials${x.shards ? ` + ${x.shards} US` : ''}`;
+  // What a building costs here: an Architect Warlord's faction pays less.
+  const priced = (x: { cost: number; shards: number }) => ({ ...x, cost: buildCost(x, s, c ?? undefined) });
   const rate = productionRate(s, c ?? undefined);
   const cap = bankCap(s, c ?? undefined);
   const trade = tradeBonus(s, c ?? undefined);
@@ -612,7 +614,7 @@ function ProductionBox({ s }: { s: Sector }) {
         </span>
       </div>
       <div className="muted" style={{ marginTop: '0.25rem' }}>
-        Buildings: {built.length + (k ? 1 : 0)} of {buildingSlots(s)} slots used{s.core && <> · <span className="tag gold" title="Building Expansion: one more building slot">✦ Building Expansion</span></>}
+        Buildings: {built.length + (k ? 1 : 0)} of {buildingSlots(s, c ?? undefined)} slots used{s.core && <> · <span className="tag gold" title="Building Expansion: one more building slot">✦ Building Expansion</span></>}
       </div>
       {built.map((id) => {
         const x = buildingById(id);
@@ -644,7 +646,7 @@ function ProductionBox({ s }: { s: Sector }) {
             <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Building to start" style={{ minWidth: 0, flex: 1 }}>
               <option value="">Start a building…</option>
               {options.map((x) => (
-                <option key={x.id} value={x.id}>{x.icon} {x.name} — {price(x)}</option>
+                <option key={x.id} value={x.id}>{x.icon} {x.name} — {price(priced(x))}</option>
               ))}
             </select>
             <button className="primary" disabled={!pick || !!block} title={block} onClick={() => {
@@ -666,7 +668,7 @@ function ProductionBox({ s }: { s: Sector }) {
             </div>
           )}
           {b && <div className={block ? '' : 'muted'}>{block ? <span className="tag red">{block}</span>
-            : <>Costs {b.cost} of the {s.bank ?? 0} banked Materials{b.shards ? <> and {b.shards} of {payer?.name}'s {payer?.umbraShards} Umbra Shards</> : ''}, now. Finished when the round ends.</>}</div>}
+            : <>Costs {buildCost(b, s, c ?? undefined)} of the {s.bank ?? 0} banked Materials{b.shards ? <> and {b.shards} of {payer?.name}'s {payer?.umbraShards} Umbra Shards</> : ''}, now. Finished when the round ends.</>}</div>}
         </>
       )}
       {!k && free > 0 && locked > 0 && <div className="muted">{locked} more building{locked === 1 ? '' : 's'} to research in the tech tree (the Research panel).</div>}

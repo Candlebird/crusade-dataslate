@@ -1,8 +1,9 @@
 import type { Campaign, CampaignEvent, Force, ForcePosition, Sector } from '../model/types';
 import { hexDistance, hexKey, isPlaced, neighbors, type Hex } from './hexmap';
 import { activeEvent, currentRound, homeOf, stormed } from './nexus';
-import { NEXUS_MOVE, PRODUCTION } from './nexusData';
+import { NEXUS_MOVE, PRODUCTION, WARLORDS } from './nexusData';
 import { hasBuilding } from './production';
+import { hasPerk, leadsWith } from './warlords';
 
 // Detachments on the Nexus map (Nexus Wars). Each force linked to a faction stands in one sector, its faction's home
 // until it first moves. A round it moves up to NEXUS_MOVE.base hexes: through its faction's sectors and unclaimed empty
@@ -55,6 +56,14 @@ export function moveOf(c: Campaign, force: Force): { move: number; why: string[]
   if (forcedMarch(c, force.id)) {
     move += NEXUS_MOVE.forcedMarch;
     why.push(`+${NEXUS_MOVE.forcedMarch} Forced March`);
+  }
+  if (leadsWith(c, force, 'march')) {
+    move += WARLORDS.march;
+    why.push(`+${WARLORDS.march} Warlord (Spearhead)`);
+  }
+  if (hasPerk(c, fid, 'blitz')) {
+    move += WARLORDS.blitz;
+    why.push(`+${WARLORDS.blitz} Warlord (Blitzkrieg)`);
   }
   const event = activeEvent(c);
   if (event?.move) {

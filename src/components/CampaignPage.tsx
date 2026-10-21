@@ -13,6 +13,7 @@ import HexMapPanel from './HexMap';
 import OrdersPanel from './NexusOrders';
 import RoundPanel from './RoundPanel';
 import TechTreePanel from './TechTree';
+import WarlordsPanel from './Warlords';
 import { useImporter } from './importer';
 import { Dropzone, Panel, TextField, confirmAction, toast } from './ui';
 
@@ -144,6 +145,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
         <ReportPanel c={c} viewer={fog} />
         <HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} />
         {viewAs !== '-' && <TechTreePanel c={c} setC={setC} faction={viewAs || undefined} />}
+        {viewAs !== '-' && <WarlordsPanel c={c} setC={setC} faction={viewAs || undefined} />}
         <OrdersPanel c={c} />
         <LogPanel c={c} setC={setC} viewer={fog} />
         {footer}
@@ -188,6 +190,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
       }} />
       <OrdersPanel c={c} />
       <TechTreePanel c={c} setC={setC} />
+      <WarlordsPanel c={c} setC={setC} />
       <SectorsPanel c={c} setC={setC} />
       <div className="cols-2">
         <RecordPanel c={c} setC={setC} preset={recordAt} />

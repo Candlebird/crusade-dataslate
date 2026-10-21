@@ -7,7 +7,7 @@ import {
   type RelicDef, type RelicTier, type RewardTableKey, type TableEntry,
 } from '../rules/data';
 import {
-  ANOMALY_TABLE, BENEFITS, BUILDINGS, GUARDIAN_LOOT, NEXUS_TECH, TECH_BRANCHES, COMBAT_MANIPULATIONS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE,
+  ANOMALY_TABLE, BENEFITS, BUILDINGS, GUARDIAN_LOOT, NEXUS_TECH, TECH_BRANCHES, COMBAT_MANIPULATIONS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE, WARLORDS,
 } from '../rules/nexusData';
 import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
 import { EXPEDITION_SITES } from '../rules/downtimeData';
@@ -324,7 +324,7 @@ function NexusRules() {
         </p>
         <Toc items={[
           ['n-map', 'Sectors'], ['n-danger', 'Difficulty & modifiers'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'],
-          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-downtime', 'Downtime'], ['n-fog', 'Fog of war'], ['n-production', 'Production'], ['n-tech', 'Tech tree'], ['n-heroes', 'Heroes & guardians'], ['n-marauders', 'Marauders'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
+          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-downtime', 'Downtime'], ['n-fog', 'Fog of war'], ['n-production', 'Production'], ['n-tech', 'Tech tree'], ['n-heroes', 'Heroes & guardians'], ['n-marauders', 'Marauders'], ['n-warlords', 'Warlords'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
           ['n-shop', 'Umbra Shard shop'],
         ]} />
         <p className="small">
@@ -428,6 +428,13 @@ function NexusRules() {
 
       <Section id="n-marauders" title="Marauders">
         <Prose lines={NEXUS_TEXT.marauders} />
+      </Section>
+
+      <Section id="n-warlords" title="Warlords">
+        <Prose lines={NEXUS_TEXT.warlords} />
+        {WARLORDS.paths.map((p) => (
+          <Entries key={p.id} title={`${p.icon} ${p.name}: ${p.desc}`} entries={p.perks.map((k, i) => ({ name: `Level ${WARLORDS.levels[i]}: ${k.name}`, desc: k.desc }))} />
+        ))}
       </Section>
 
       <Section id="n-catchup" title="Catching up">

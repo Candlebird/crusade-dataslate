@@ -539,3 +539,67 @@ export const GUARDIANS = {
   titles: ['the Hollow', 'the Unbound', 'of the Last Light', 'the Shard-Eater', 'the Whispering', 'the Starless', 'of the Ninth Echo', 'the Undying', 'the Pale', 'Who Was Once'],
   names: ['Vaelrith', 'Orsk', 'Myrrhena', 'Calvaxis', 'Thul', 'Ezhrael', 'Nocturn', 'Isk-Arreth', 'Seraphon', 'Ghaul'],
 };
+
+export type WarlordPathId = 'architect' | 'conqueror' | 'warmaster' | 'shadow' | 'reaver';
+export type WarlordPerkId =
+  | 'cheapBuild' | 'research' | 'homeSlot'
+  | 'march' | 'onslaught' | 'blitz'
+  | 'drilled' | 'strategist' | 'veterans'
+  | 'scouts' | 'unseen' | 'spymaster'
+  | 'plunder' | 'bounty' | 'warlust';
+
+/**
+ * Warlords (rules/warlords.ts): each faction names one Hero from its forces its Warlord, on a Path it keeps for good.
+ * The Path's perks unlock as the Warlord levels up (at `levels`). Lose the Warlord (killed for good, or its force leaves
+ * the faction) and the perks go with it; a new one can be named `replaceAfter` rounds later. (Path and perk ids are
+ * saved in campaigns: rename names, not ids.)
+ */
+export const WARLORDS = {
+  levels: [1, 3, 5],
+  replaceAfter: 1,
+  /** Architect: buildings cost this share less. */
+  buildDiscount: 0.25,
+  research: 1,
+  homeSlots: 1,
+  /** Conqueror: extra move. */
+  march: 1,
+  blitz: 1,
+  /** Warmaster: XP produced units start with. */
+  drilledXp: 3,
+  veteransXp: 7,
+  assets: 1,
+  /** Shadow: extra sight; how much less a Shadow faction's worlds draw marauders. */
+  scouts: 1,
+  spymaster: 1,
+  unseenWeight: 0.5,
+  /** Reaver: Umbra Shards on top of a win by the Warlord's force. */
+  plunder: 1,
+  warlust: 1,
+  paths: [
+    { id: 'architect', name: 'Architect', icon: '🏗', desc: 'A builder: cheaper buildings, faster research, a bigger home.', perks: [
+      { id: 'cheapBuild', name: 'Master Builder', desc: 'Buildings cost 25% fewer Materials.' },
+      { id: 'research', name: 'Visionary', desc: '+1 Research a round.' },
+      { id: 'homeSlot', name: 'Grand Design', desc: '+1 building slot at the home sector.' },
+    ] },
+    { id: 'conqueror', name: 'Conqueror', icon: '⚔', desc: 'Leads from the front: faster detachments, harder fighting.', perks: [
+      { id: 'march', name: 'Spearhead', desc: "+1 move for the Warlord's detachment." },
+      { id: 'onslaught', name: 'Onslaught', desc: "In auto-battles, the Warlord gets +1 to hit and its force +1 to Morale tests." },
+      { id: 'blitz', name: 'Blitzkrieg', desc: "+1 move for every detachment of the faction (the Warlord's too)." },
+    ] },
+    { id: 'warmaster', name: 'Warmaster', icon: '🎖', desc: 'Raises armies: produced units come trained, and plans are sharper.', perks: [
+      { id: 'drilled', name: 'Drill Sergeant', desc: 'Units produced start with +3 XP.' },
+      { id: 'strategist', name: 'Strategist', desc: '+1 Strategic Asset every round.' },
+      { id: 'veterans', name: 'Veteran Cadre', desc: 'Units produced start with +7 more XP (+10 in all: a level).' },
+    ] },
+    { id: 'shadow', name: 'Shadow', icon: '👁', desc: 'Sees all, is seen little: wider sight, and raiders look elsewhere.', perks: [
+      { id: 'scouts', name: 'Pathfinders', desc: 'Detachments see 1 hex further.' },
+      { id: 'unseen', name: 'Unseen', desc: "Marauders are half as drawn to the faction's worlds." },
+      { id: 'spymaster', name: 'Spymaster', desc: 'Every held sector sees 1 hex further.' },
+    ] },
+    { id: 'reaver', name: 'Reaver', icon: '💀', desc: 'Lives for plunder: more Umbra Shards, richer spoils.', perks: [
+      { id: 'plunder', name: 'Plunder', desc: "+1 Umbra Shard when the Warlord's force wins a game." },
+      { id: 'bounty', name: 'Headhunter', desc: 'A beaten marauder band rolls its loot one tier higher.' },
+      { id: 'warlust', name: 'Warlust', desc: "+1 more Umbra Shard when the Warlord's force wins (+2 in all)." },
+    ] },
+  ] as { id: WarlordPathId; name: string; icon: string; desc: string; perks: { id: WarlordPerkId; name: string; desc: string }[] }[],
+};

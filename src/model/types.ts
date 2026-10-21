@@ -346,6 +346,21 @@ export interface CampaignFaction {
   cores?: number;
   /** Archive unlocks not used yet (from a Lost Archive): research any one building, ignoring its requirements. */
   archives?: number;
+  /** The faction's Warlord (rules/warlords.ts): a Hero in one of its forces. `level` is kept up to date from the unit's XP. */
+  warlord?: Warlord;
+  /** The Warlord's Path: chosen with the first Warlord, kept for good. */
+  path?: string;
+  /** The round its Warlord was lost: a new one can be named a round later. */
+  warlordLost?: number;
+}
+
+export interface Warlord {
+  forceId: string;
+  unitId: string;
+  name: string;
+  level: number;
+  /** The round it was named. */
+  since: number;
 }
 
 export interface CampaignEvent {

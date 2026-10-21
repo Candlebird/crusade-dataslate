@@ -4,7 +4,7 @@ import { CATEGORIES } from './data';
 import { refreshSectors, type Rand } from './hexmap';
 import {
   ECHOES, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRATEGIC_ASSETS, activeCrisis, activeEvent, currentRound, emptyNexusPick, eventById, nexusEntry,
-  factionName, incomeItems, lordById, type NexusItem, type NexusPick,
+  WARLORDS, factionName, incomeItems, lordById, type NexusItem, type NexusPick,
 } from './nexus';
 import { crisisRound, placeCrisis, rollEvent, settleCrisis, type CrisisEnd } from './events';
 import { pickSpread, spreadInto } from './voidspawn';
@@ -18,6 +18,7 @@ import { rollOffers } from './heroes';
 import { accrueProduction, buildingsHeld, finishConstruction, warded } from './production';
 import { accrueResearch } from './tech';
 import { buildReport } from './report';
+import { hasPerk, syncWarlords } from './warlords';
 
 // Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
 // a Strategic Asset, and one against the Echoes is a patrol). The round closes with the Battle: the sealed-order attacks.
@@ -103,8 +104,9 @@ export const skirmishWins = (c: Campaign, factionId: string) =>
 
 /** Strategic Assets a faction has this round: earned (one per skirmish win, capped), spent, and left. */
 export function assetsOf(c: Campaign, factionId: string) {
-  // A Strategium gives one more, won skirmish or not.
-  const earned = Math.min(NEXUS_ROUNDS.assetsMax, skirmishWins(c, factionId)) + Math.min(1, buildingsHeld(c, factionId, 'strategium'));
+  // A Strategium gives one more, won skirmish or not, and so does a Warmaster Warlord's Strategist.
+  const earned = Math.min(NEXUS_ROUNDS.assetsMax, skirmishWins(c, factionId)) + Math.min(1, buildingsHeld(c, factionId, 'strategium'))
+    + (hasPerk(c, factionId, 'strategist') ? WARLORDS.assets : 0);
   const spent = (c.assetsSpent ?? []).filter((a) => a.factionId === factionId && a.round === currentRound(c));
   return { earned, spent, left: Math.max(0, earned - spent.length) };
 }
@@ -157,6 +159,8 @@ export interface RoundEnd {
   guardians: Sector[];
   /** What the Marauders did: raids (and raids thrown back), and bands that turned up. */
   marauders: { raids: Raid[]; spawned: Marauder[] };
+  /** Warlords lost and levelled (when the forces were given). */
+  warlords?: ReturnType<typeof syncWarlords>;
   report: TurnReport;
 }
 
@@ -168,6 +172,8 @@ export function endRound(
   c: Campaign, rand: Rand = Math.random, date = new Date().toISOString().slice(0, 10), forces?: Force[], books?: CatalogBook[],
 ): RoundEnd {
   const round = currentRound(c);
+  // Warlords' levels are brought up to date, and fallen ones lost, before their perks count.
+  const warlords = forces ? syncWarlords(c, forces) : undefined;
   const holdings: RoundSnapshot['holdings'] = {};
   for (const f of c.factions) holdings[f.id] = c.sectors.filter((s) => s.owner === f.id).map((s) => s.id);
   const snapshot: RoundSnapshot = { round, date, holdings, underdog: underdogBonus(c) };
@@ -223,7 +229,7 @@ export function endRound(
   const guardians = forces && books ? placeGuardians(c, books, forces, rand, uid) : [];
   const end: Omit<RoundEnd, 'report'> = {
     round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, difficulty, cleared, fresh,
-    event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, research, built, offers, guardians, marauders,
+    event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, research, built, offers, guardians, marauders, warlords,
   };
   const report = buildReport(c, end, { production, research, built, offers, guardians }, date, rand);
   return { ...end, report };
@@ -243,7 +249,8 @@ export function roundEndText(c: Campaign, r: RoundEnd) {
   const sector = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'the map edge';
   const raids = r.marauders.raids.map((x) => x.repelled ? ` ${x.band} were thrown back from ${x.sector}.` : ` ${x.band} raided ${x.sector} (−${x.stolen} Materials).`).join('');
   const bands = r.marauders.spawned.map((m) => ` Marauders! ${m.name} (${m.strength} Supply) turned up at ${sector(m.sectorId)}.`).join('');
-  return `Round ${r.round} ended.${crisis} ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${gone('void', 'Space hulk', 'drifted off')}${gone('archive', 'Lost Archive', 'faded')}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''}${raids}${bands} Round ${currentRound(c)} begins.${next}`;
+  const lords = (r.warlords?.lost ?? []).map((w) => ` ${factionName(c, w.factionId)} lost its Warlord, ${w.name}.`).join('');
+  return `Round ${r.round} ended.${crisis} ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${gone('void', 'Space hulk', 'drifted off')}${gone('archive', 'Lost Archive', 'faded')}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''}${raids}${bands}${lords} Round ${currentRound(c)} begins.${next}`;
 }
 
 /**

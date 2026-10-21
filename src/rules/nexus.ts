@@ -1,13 +1,14 @@
 import type { BattleResult, Campaign, CampaignEvent, Force, ForceNexus, Sector, SectorGuardian } from '../model/types';
 import { CATEGORIES, type Category } from './data';
 import {
-  ANOMALY_TABLE, BENEFITS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, GUARDIAN_LOOT, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRONGHOLDS, VOID_TABLE,
+  ANOMALY_TABLE, BENEFITS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, GUARDIAN_LOOT, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRONGHOLDS, VOID_TABLE, WARLORDS,
   type GalacticEvent, type NexusTableEntry,
 } from './nexusData';
 import { explore } from './fog';
 import { MARAUDER_ID, unrecordMarauderGame } from './marauders';
 import { settleGame, unsettleGame } from './movement';
 import { bankCap, hasBuilding, loseBank, produces } from './production';
+import { hasPerk } from './warlords';
 
 // Nexus Wars: what a faction earns each round and after each match. The tables and costs live in nexusData.ts;
 // the round itself (ending it, income, threat) is in rounds.ts.
@@ -351,6 +352,11 @@ export function nexusGeneration(
     if (vsAi) notes.push(`A patrol against the ${ECHOES.name}: their threat goes down ${NEXUS_ROUNDS.threatPerPatrolWin} at the round's end.`);
   }
   items.push({ key: 'matchBonus', kind: 'matchBonus', source: 'Match bonus', us: NEXUS_ROUNDS.matchBonusUs });
+  // A Reaver Warlord's force takes more from its wins.
+  const lord = c.factions.find((f) => f.id === factionId)?.warlord;
+  const reaver = won && battle?.forceId && lord?.forceId === battle.forceId
+    ? (hasPerk(c, factionId, 'plunder') ? WARLORDS.plunder : 0) + (hasPerk(c, factionId, 'warlust') ? WARLORDS.warlust : 0) : 0;
+  if (reaver) items.push({ key: 'warlord', kind: 'us', source: `Warlord ${lord!.name} (Reaver)`, us: reaver });
   const home = homeOf(c, factionId);
   if (won && home?.benefit === 'relicCollector') items.push({ key: home.id, kind: 'relicRoll', source: `${home.name}: Relic Collector` });
 

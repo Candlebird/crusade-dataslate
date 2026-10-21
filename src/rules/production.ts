@@ -1,7 +1,8 @@
 import type { Campaign, CampaignEvent, Force, Sector, Unit } from '../model/types';
 import { hexDistance, isPlaced } from './hexmap';
-import { BUILDINGS, PRODUCTION } from './nexusData';
+import { BUILDINGS, PRODUCTION, WARLORDS, type Building } from './nexusData';
 import { knows } from './tech';
+import { hasPerk } from './warlords';
 
 // Planet production (Nexus Wars). New units for a Nexus force aren't bought, they're built: every planet and home a
 // faction holds banks Materials each round (PRODUCTION.perRound, or more with Barracks, up to bankRounds rounds'
@@ -18,7 +19,9 @@ export const isReinforced = (s: Sector) => !!s.reinforced || hasBuilding(s, 'wal
 
 export const produces = (s: Sector) => (PRODUCTION.slots[s.type] ?? 0) > 0;
 /** Building slots a sector has (0 for sectors that don't produce): a Building Expansion adds one. */
-export const buildingSlots = (s: Sector) => (produces(s) ? (PRODUCTION.slots[s.type] ?? 0) + (s.core ? PRODUCTION.coreSlots : 0) : 0);
+export const buildingSlots = (s: Sector, c?: Campaign) => (produces(s)
+  ? (PRODUCTION.slots[s.type] ?? 0) + (s.core ? PRODUCTION.coreSlots : 0) + (s.type === 'home' && hasPerk(c, s.owner, 'homeSlot') ? WARLORDS.homeSlots : 0)
+  : 0);
 
 /** A Trade Hub's Materials a round: for each other producing sector its owner holds nearby. */
 export function tradeBonus(s: Sector, c?: Campaign): number {
@@ -63,7 +66,11 @@ export function accrueProduction(c: Campaign): { sector: Sector; gained: number 
 }
 
 /** Slots not built on or under construction. */
-export const freeSlots = (s: Sector) => buildingSlots(s) - (s.buildings?.length ?? 0) - (s.construction ? 1 : 0);
+export const freeSlots = (s: Sector, c?: Campaign) => buildingSlots(s, c) - (s.buildings?.length ?? 0) - (s.construction ? 1 : 0);
+
+/** The Materials a building costs at this sector: less for an Architect Warlord's faction. */
+export const buildCost = (b: Pick<Building, 'cost'>, s: Sector, c?: Campaign) =>
+  hasPerk(c, s.owner, 'cheapBuild') ? Math.round(b.cost * (1 - WARLORDS.buildDiscount)) : b.cost;
 
 /**
  * Why the building can't be started here, if it can't. `payer` is the force paying its Umbra Shards; pass the campaign
@@ -77,8 +84,8 @@ export function buildBlock(s: Sector, id: string, payer?: Force, c?: Campaign): 
   if (b.homeOnly && s.type !== 'home') return 'Only a home sector can build it';
   if (c && !knows(c.factions.find((f) => f.id === s.owner), b)) return 'Not researched yet (see the tech tree)';
   if (s.construction) return `${buildingById(s.construction.id)?.name ?? 'A building'} is already going up here: one at a time`;
-  if (freeSlots(s) <= 0) return `No free slot (${buildingSlots(s)})`;
-  if ((s.bank ?? 0) < b.cost) return `Needs ${b.cost} Materials (${s.bank ?? 0} banked here)`;
+  if (freeSlots(s, c) <= 0) return `No free slot (${buildingSlots(s, c)})`;
+  if ((s.bank ?? 0) < buildCost(b, s, c)) return `Needs ${buildCost(b, s, c)} Materials (${s.bank ?? 0} banked here)`;
   if (b.shards && (payer?.umbraShards ?? 0) < b.shards) return `Needs ${b.shards} Umbra Shard${b.shards === 1 ? '' : 's'}${payer ? ` (${payer.name} has ${payer.umbraShards})` : ' from one of your forces (none loaded here)'}`;
   return undefined;
 }
@@ -87,8 +94,9 @@ export function buildBlock(s: Sector, id: string, payer?: Force, c?: Campaign): 
 export function build(c: Campaign, s: Sector, id: string, payer?: Force, date = '', newId: () => string = () => ''): boolean {
   if (buildBlock(s, id, payer, c)) return false;
   const b = buildingById(id)!;
-  s.bank = (s.bank ?? 0) - b.cost;
-  s.construction = { id, round: c.round ?? 1, supply: b.cost, shards: b.shards };
+  const cost = buildCost(b, s, c);
+  s.bank = (s.bank ?? 0) - cost;
+  s.construction = { id, round: c.round ?? 1, supply: cost, shards: b.shards };
   if (b.shards && payer) {
     payer.umbraShards -= b.shards;
     payer.ledger.push({ id: newId(), date, label: `Nexus — ${b.name} at ${s.name}`, rp: 0, supply: 0, us: -b.shards });
@@ -141,13 +149,15 @@ export const produceCost = (s: Sector, units: Pick<Unit, 'points' | 'tough'>[]) 
 
 /**
  * Produce units at a sector: pay their Materials from its bank. Training Grounds give them their starting XP, an
- * Armoury a free weapon upgrade (noted on the unit), a War Academy a trait token for `force`. False when the bank is short.
+ * Armoury a free weapon upgrade (noted on the unit), a War Academy a trait token for `force`, a Warmaster Warlord more
+ * XP (pass the campaign). False when the bank is short.
  */
-export function produce(s: Sector, units: Unit[], force?: Force): boolean {
+export function produce(s: Sector, units: Unit[], force?: Force, c?: Campaign): boolean {
   const cost = produceCost(s, units);
   if (cost > (s.bank ?? 0)) return false;
   s.bank = (s.bank ?? 0) - cost;
-  const xp = hasBuilding(s, 'training') ? PRODUCTION.trainingXp : 0;
+  const xp = (hasBuilding(s, 'training') ? PRODUCTION.trainingXp : 0)
+    + (hasPerk(c, s.owner, 'drilled') ? WARLORDS.drilledXp : 0) + (hasPerk(c, s.owner, 'veterans') ? WARLORDS.veteransXp : 0);
   const perks = [hasBuilding(s, 'armoury') && 'a free weapon upgrade (Armoury)', hasBuilding(s, 'academy') && 'a free trait token (War Academy)'].filter(Boolean);
   for (const u of units) {
     u.xp = Math.max(u.xp, xp);

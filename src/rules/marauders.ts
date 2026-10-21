@@ -4,8 +4,9 @@ import { difficultyLevel } from './difficulty';
 import { colOf, hexKey, isPlaced, neighbors, type Hex, type Rand } from './hexmap';
 import { positionOf } from './movement';
 import { rollGuardianLoot } from './nexus';
-import { MARAUDERS, NEXUS_ROUNDS } from './nexusData';
+import { MARAUDERS, NEXUS_ROUNDS, WARLORDS } from './nexusData';
 import { isReinforced, produces, productionRate } from './production';
+import { hasPerk } from './warlords';
 
 // Marauders (Nexus Wars): raider bands that belong to no one. Once the opening rounds are over, a band can turn up at a
 // round's end (from the map's edge or the Voidspawn) while there are fewer than the threat allows. Every round each
@@ -36,6 +37,11 @@ export const isRaided = (c: Campaign, s: Sector) => s.raided === (c.round ?? 1);
 /** The loot tier a band rolls at when beaten. */
 export const marauderTier = (m: Marauder): RelicTier =>
   m.strength >= MARAUDERS.legendaryAt ? 'Legendary' : m.strength >= MARAUDERS.rareAt ? 'Rare' : 'Common';
+
+const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
+/** The tier a faction loots a beaten band at: one higher for a Reaver Warlord's Headhunter. */
+export const lootTier = (c: Campaign, m: Marauder, factionId: string): RelicTier =>
+  TIERS[Math.min(TIERS.length - 1, TIERS.indexOf(marauderTier(m)) + (hasPerk(c, factionId, 'bounty') ? 1 : 0))];
 
 /** Does a detachment of the sector's owner stand there (with the forces, or by recorded position without them)? */
 function garrisoned(c: Campaign, s: Sector, forces?: Force[]) {
@@ -71,7 +77,9 @@ function targetOf(c: Campaign, dist: Map<string, number>, forces?: Force[]) {
   for (const s of c.sectors) {
     const d = dist.get(s.id);
     if (!d || !isPlaced(s) || !produces(s) || !c.factions.some((f) => f.id === s.owner) || isRaided(c, s)) continue;
-    const score = ((s.bank ?? 0) + productionRate(s, c)) * (repels(c, s, forces) ? MARAUDERS.defendedWeight : 1) / (1 + d);
+    // A Shadow Warlord's worlds (Unseen) draw them less.
+    const score = ((s.bank ?? 0) + productionRate(s, c)) * (repels(c, s, forces) ? MARAUDERS.defendedWeight : 1)
+      * (hasPerk(c, s.owner, 'unseen') ? WARLORDS.unseenWeight : 1) / (1 + d);
     if (!best || score > best.score) best = { s, score };
   }
   return best?.s;
@@ -174,7 +182,7 @@ export function recordMarauderGame(c: Campaign, e: CampaignEvent, bandId: string
   const s = c.sectors.find((x) => x.id === m.sectorId);
   // The spoils go to the sector's bank if the winner holds it, otherwise home.
   const bank = s?.owner === e.winner ? s : c.sectors.find((x) => x.type === 'home' && x.owner === e.winner);
-  if (bank) e.loot = rollGuardianLoot(c, bank, { tier: marauderTier(m) }, e.winner, rand);
+  if (bank) e.loot = rollGuardianLoot(c, bank, { tier: lootTier(c, m, e.winner) }, e.winner, rand);
 }
 
 /** A deleted marauder game: the band it broke is back (if nothing took its place). */
