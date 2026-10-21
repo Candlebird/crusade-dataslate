@@ -3,7 +3,7 @@ import type { AssetUse, Campaign, CatalogBook, Force, ForceNexus, HeroOffer, Rou
 import { CATEGORIES } from './data';
 import { refreshSectors, type Rand } from './hexmap';
 import {
-  ANOMALY_TABLE, ECHOES, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, STRATEGIC_ASSETS, activeCrisis, activeEvent, currentRound, emptyNexusPick, eventById,
+  ECHOES, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRATEGIC_ASSETS, activeCrisis, activeEvent, currentRound, emptyNexusPick, eventById, nexusEntry,
   factionName, incomeItems, lordById, type NexusItem, type NexusPick,
 } from './nexus';
 import { crisisRound, placeCrisis, rollEvent, settleCrisis, type CrisisEnd } from './events';
@@ -13,7 +13,8 @@ import { rateSectors } from './difficulty';
 import { explore } from './fog';
 import { placeGuardians } from './guardians';
 import { rollOffers } from './heroes';
-import { accrueProduction, finishConstruction } from './production';
+import { accrueProduction, buildingsHeld, finishConstruction, warded } from './production';
+import { accrueResearch } from './tech';
 import { buildReport } from './report';
 
 // Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
@@ -26,7 +27,7 @@ import { buildReport } from './report';
 //  - every sector's difficulty is rescaled to the factions' current Supply, and AI garrisons roll new modifiers,
 //  - the round's Nexus Crisis is settled, a Galactic Event is rolled for the next round, and a new Crisis rises if it's
 //    time (events.ts),
-//  - planets bank their production (production.ts), every faction's map is explored (fog.ts), wandering heroes come and
+//  - planets bank their Materials (production.ts), factions earn Research (tech.ts), every faction's map is explored (fog.ts), wandering heroes come and
 //    go (heroes.ts) and AI-held sites get guardians (guardians.ts), given the forces and army books,
 //  - and the round's turn report is written (report.ts).
 // Values live in NEXUS_ROUNDS (nexusData.ts).
@@ -84,7 +85,8 @@ export function nextThreat(c: Campaign) {
   const { wins, voidspawn, patrols } = echoWins(c, currentRound(c));
   const R = NEXUS_ROUNDS;
   const event = activeEvent(c)?.threat ?? 0;
-  const threat = clamp(threatOf(c) + R.threatPerRound + event - wins * R.threatPerWin - voidspawn * R.threatPerVoidspawnWin - patrols * R.threatPerPatrolWin, 0, R.threatMax);
+  const spires = c.factions.reduce((n, f) => n + buildingsHeld(c, f.id, 'spire'), 0) * PRODUCTION.spire.threat;
+  const threat = clamp(threatOf(c) + R.threatPerRound + event - wins * R.threatPerWin - voidspawn * R.threatPerVoidspawnWin - patrols * R.threatPerPatrolWin - spires, 0, R.threatMax);
   // The Crisis: a win pushes the Echoes back further; otherwise they rage at full threat.
   const crisis = activeCrisis(c);
   if (!crisis) return threat;
@@ -99,7 +101,8 @@ export const skirmishWins = (c: Campaign, factionId: string) =>
 
 /** Strategic Assets a faction has this round: earned (one per skirmish win, capped), spent, and left. */
 export function assetsOf(c: Campaign, factionId: string) {
-  const earned = Math.min(NEXUS_ROUNDS.assetsMax, skirmishWins(c, factionId));
+  // A Strategium gives one more, won skirmish or not.
+  const earned = Math.min(NEXUS_ROUNDS.assetsMax, skirmishWins(c, factionId)) + Math.min(1, buildingsHeld(c, factionId, 'strategium'));
   const spent = (c.assetsSpent ?? []).filter((a) => a.factionId === factionId && a.round === currentRound(c));
   return { earned, spent, left: Math.max(0, earned - spent.length) };
 }
@@ -141,8 +144,10 @@ export interface RoundEnd {
   nextEvent?: string;
   /** A Nexus Crisis rose for the next round: the Lord and where. */
   newCrisis?: { lord: string; sectorName: string };
-  /** Production banked by each sector. */
+  /** Materials banked by each sector. */
   production: { sector: Sector; gained: number }[];
+  /** Research each faction earned. */
+  research: { factionId: string; gained: number }[];
   built: { sector: Sector; building: string }[];
   /** Hero offers that turned up and that left (needs the forces and books). */
   offers?: { fresh: HeroOffer[]; gone: HeroOffer[] };
@@ -167,6 +172,7 @@ export function endRound(
 
   // Income is noted from what was held; production is banked the same way.
   const production = accrueProduction(c);
+  const research = accrueResearch(c);
   // Buildings going up are finished; they work from the next round (so a new Barracks didn't bank this round's 500).
   const built = finishConstruction(c);
 
@@ -178,8 +184,10 @@ export function endRound(
 
   // The Echoes go for whoever is ahead; while the campaign is young, they only take unclaimed space.
   const ahead = new Set(leaders(c));
-  const weight = (s: Sector) => (s.owner && ahead.has(s.owner) ? NEXUS_ROUNDS.leaderWeight : 1);
-  const only = inGrace(c) ? (s: Sector) => !s.owner : () => true;
+  // An Umbral Spire draws them to its owner; an Echo Ward keeps them out.
+  const weight = (s: Sector) =>
+    (s.owner && ahead.has(s.owner) ? NEXUS_ROUNDS.leaderWeight : 1) * (s.owner && buildingsHeld(c, s.owner, 'spire') ? PRODUCTION.spire.weight : 1);
+  const only = (s: Sector) => (!inGrace(c) || !s.owner) && !warded(c, s);
   const spread: Sector[] = [];
   for (let i = 0; i < Math.max(0, spreadsAt(threat) + (event?.spread ?? 0)); i++) {
     const target = pickSpread(c, rand, weight, only);
@@ -208,9 +216,9 @@ export function endRound(
   const guardians = forces && books ? placeGuardians(c, books, forces, rand, uid) : [];
   const end: Omit<RoundEnd, 'report'> = {
     round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, difficulty, cleared, fresh,
-    event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, built, offers, guardians,
+    event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, research, built, offers, guardians,
   };
-  const report = buildReport(c, end, { production, built, offers, guardians }, date, rand);
+  const report = buildReport(c, end, { production, research, built, offers, guardians }, date, rand);
   return { ...end, report };
 }
 
@@ -297,13 +305,14 @@ export function resolveRoundIncome(
         n.pending.push(`${MANIPULATION_PREFIX}: ${pick.choice || 'any'} (free)`);
         out.lines.push(`${src}: a free Combat Manipulation for your next match.`);
         break;
+      case 'medicae':
       case 'anomaly': {
-        const e = pick.roll ? ANOMALY_TABLE[pick.roll - 1] : null;
+        const e = nexusEntry(item, pick);
         if (!e) {
           out.warnings.push(`${src}: not rolled yet.`);
           break;
         }
-        const label = `${src} (${pick.roll}): ${e.text}`;
+        const label = `${src}${pick.roll && item.kind !== 'medicae' ? ` (${pick.roll})` : ''}: ${e.text}`;
         if (e.us) addUs(label, e.us);
         if (e.supply) addSupply(label, e.supply);
         if (e.removeScar) {

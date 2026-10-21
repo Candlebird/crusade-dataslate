@@ -7,6 +7,7 @@ import { hasRule, relicHolders, relicTierAllowed } from './engine';
 import type { Rand } from './hexmap';
 import { currentRound } from './nexus';
 import { HERO_OFFERS } from './nexusData';
+import { hasBuilding } from './production';
 import { randomRelic } from './relicPick';
 
 // Hero offers (Nexus Wars). When a round ends, each faction without an open offer may be offered a wandering hero: a
@@ -83,9 +84,11 @@ export function rollOffers(
   const taken = takenRelics(c, forces);
   const fresh: HeroOffer[] = [];
   for (const f of c.factions) {
-    if (offers.some((o) => o.factionId === f.id) || rand() >= HERO_OFFERS.chance) continue;
+    // A Mercenary Hall brings one every round, and for less.
+    const hall = c.sectors.some((s) => s.owner === f.id && hasBuilding(s, 'mercHall'));
+    if (offers.some((o) => o.factionId === f.id) || (!hall && rand() >= HERO_OFFERS.chance)) continue;
     const hero = rollHero(books, forces, f.id, taken, rand, newId);
-    if (hero) fresh.push({ id: newId(), factionId: f.id, round, ...hero });
+    if (hero) fresh.push({ id: newId(), factionId: f.id, round, ...hero, fee: hall ? Math.max(1, hero.fee - HERO_OFFERS.hallDiscount) : hero.fee });
   }
   c.offers = [...offers, ...fresh];
   if (!c.offers.length) delete c.offers;

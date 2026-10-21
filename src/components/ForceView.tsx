@@ -17,7 +17,7 @@ import { CATEGORIES, type Category } from '../rules/data';
 import { SOLO_PATROL } from '../rules/downtimeData';
 import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, currentRound, emptyNexus, factionName, homeOf, ownedSectors, unitsUsed, unlockedTables } from '../rules/nexus';
 import { factionClaimedRound, factionForces } from '../rules/detachments';
-import { isReinforced, produce, productionSites } from '../rules/production';
+import { isReinforced, produce, produceCost, produceDiscount, productionSites } from '../rules/production';
 import { hireBlock, hireHero, offerEnds, openOffers } from '../rules/heroes';
 import { nowIso } from '../model/factory';
 import { DetachmentsBox } from './Detachments';
@@ -396,20 +396,21 @@ function ProductionBox({ f, c }: { f: Force; c: Campaign }) {
   const t = forceTotals(f, state.settings);
   const room = Math.max(0, t.supplyLimit - t.pointsUsed);
   const bank = site?.bank ?? 0;
-  const budget = Math.min(room, bank);
+  // A Foundry here makes every point cheaper: the bank stretches further (a Vehicle Bay's discount is checked on produce).
+  const budget = Math.min(room, site ? Math.floor(bank / (1 - produceDiscount(site, { tough: 0 }))) : 0);
   return (
     <div className="span-all small">
-      <div className="muted" title="Each planet banks Supply every round; spend it to raise units there. Barracks double it, Training Grounds give new units XP.">Production</div>
+      <div className="muted" title="Each planet banks Materials every round; spend them to raise units there. Barracks double it, Training Grounds give new units XP.">Production</div>
       <div className="row">
         <select value={site.id} onChange={(e) => setSite(e.target.value)} aria-label="Where to produce" style={{ minWidth: 0, flex: 1 }}>
-          {sites.map((x) => <option key={x.id} value={x.id}>{x.name}: {x.bank ?? 0} Supply banked</option>)}
+          {sites.map((x) => <option key={x.id} value={x.id}>{x.name}: {x.bank ?? 0} Materials banked</option>)}
         </select>
         <button disabled={budget <= 0} onClick={() => setAdding(true)}
           title={bank <= 0 ? 'Nothing banked here yet: it banks more when the round ends' : room <= 0 ? 'No room under your Supply Limit' : `Up to ${budget} pts`}>
           Produce units…
         </button>
       </div>
-      <div className="muted">Up to {budget} pts: {bank} banked at {site.name}, {room} Supply free.</div>
+      <div className="muted">Up to {budget} pts: {bank} Materials banked at {site.name}, {room} Supply free.</div>
       {adding && (
         <AddUnitModal
           budget={budget}
@@ -419,14 +420,14 @@ function ProductionBox({ f, c }: { f: Force; c: Campaign }) {
             update((d) => {
               const x = d.campaign?.sectors.find((y) => y.id === site.id);
               const force = d.forces.find((y) => y.id === f.id);
-              if (!x || !force || !produce(x, newUnits)) return;
+              if (!x || !force || !produce(x, newUnits, force)) return;
               force.units.push(...newUnits);
               d.campaign!.updatedAt = nowIso();
               ok = true;
             });
             setAdding(false);
-            const cost = newUnits.reduce((n, u) => n + u.points, 0);
-            toast(ok ? `Produced ${newUnits.length} unit(s) at ${site.name} for ${cost} Supply.` : `${site.name} has only ${bank} Supply banked; that costs ${cost}.`);
+            const cost = produceCost(site, newUnits);
+            toast(ok ? `Produced ${newUnits.length} unit(s) at ${site.name} for ${cost} Materials.` : `${site.name} has only ${bank} Materials banked; that costs ${cost}.`);
           }}
         />
       )}

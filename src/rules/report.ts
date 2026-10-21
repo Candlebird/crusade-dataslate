@@ -14,6 +14,7 @@ import type { RoundEnd } from './rounds';
 /** What else happened at round end, beside RoundEnd. */
 export interface ReportExtras {
   production?: { sector: Sector; gained: number }[];
+  research?: { factionId: string; gained: number }[];
   built?: { sector: Sector; building: string }[];
   offers?: { fresh: HeroOffer[]; gone: HeroOffer[] };
   guardians?: Sector[];
@@ -53,7 +54,8 @@ const TEXT = {
   threatSame: ['The {echoes} watch and wait: threat holds at {threat}.'],
   hulkGone: ['The space hulk {sector} drifted back into the warp.'],
   fresh: ['Scanners caught something new: {sector}.', 'A signal from the dark: {sector} has appeared.'],
-  production: ['Your forges worked through the night: +{gained} Supply banked across {sites}.'],
+  production: ['Your forges worked through the night: +{gained} Materials banked across {sites}.'],
+  research: ['Your scholars pored over Nexus echoes: +{gained} Research ({total} to spend).'],
   built: [
     'The scaffolds came down at {sector}: the {building} is finished.',
     'Work crews at {sector} report the {building} complete and ready.',
@@ -86,7 +88,10 @@ function battleLine(c: Campaign, e: CampaignEvent, name: (id: string) => string,
   const echoes = !e.defender || e.defender === ECHOES.id || e.defender === 'ai';
   if (!e.winner) return { icon: '⚖', text: say(rand, TEXT.draw, vars) };
   if (e.winner !== e.attacker) return { icon: '🛡', text: say(rand, echoes ? TEXT.repelled : TEXT.held, vars) };
-  if (e.undo?.guardian) return { icon: '⚔', text: `${say(rand, echoes ? TEXT.claimed : TEXT.captured, vars)} ${say(rand, TEXT.guardianSlain, vars)}` };
+  if (e.undo?.guardian) {
+    const loot = e.loot ? ` Among its remains: ${e.loot.name}${e.loot.amount ? ` (+${e.loot.amount}${e.loot.id === 'research' ? ' Research' : ' Materials'})` : ''}.` : '';
+    return { icon: '⚔', text: `${say(rand, echoes ? TEXT.claimed : TEXT.captured, vars)} ${say(rand, TEXT.guardianSlain, vars)}${loot}` };
+  }
   return { icon: '⚔', text: say(rand, echoes ? TEXT.claimed : TEXT.captured, vars) };
 }
 
@@ -137,6 +142,8 @@ export function buildReport(c: Campaign, r: Omit<RoundEnd, 'report'>, x: ReportE
       const sites = made.length === 1 ? made[0].sector.name : `${made.length} worlds`;
       lines.push({ icon: '⚒', text: say(rand, TEXT.production, { gained, sites }), factions: [f.id] });
     }
+    const learnt = (x.research ?? []).find((y) => y.factionId === f.id);
+    if (learnt?.gained) lines.push({ icon: '🔬', text: say(rand, TEXT.research, { gained: learnt.gained, total: f.research ?? 0 }), factions: [f.id] });
     for (const b of (x.built ?? []).filter((y) => y.sector.owner === f.id)) {
       const name = buildingById(b.building)?.name ?? b.building;
       lines.push({ icon: '🏗', sectorId: b.sector.id, text: say(rand, TEXT.built, { sector: b.sector.name, building: name }), factions: [f.id] });

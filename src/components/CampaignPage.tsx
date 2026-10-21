@@ -12,6 +12,7 @@ import { reportFor } from '../rules/report';
 import HexMapPanel from './HexMap';
 import OrdersPanel from './NexusOrders';
 import RoundPanel from './RoundPanel';
+import TechTreePanel from './TechTree';
 import { useImporter } from './importer';
 import { Dropzone, Panel, TextField, confirmAction, toast } from './ui';
 
@@ -142,6 +143,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
         <RoundPanel c={c} gm={false} viewer={fog} />
         <ReportPanel c={c} viewer={fog} />
         <HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} />
+        {viewAs !== '-' && <TechTreePanel c={c} setC={setC} faction={viewAs || undefined} />}
         <OrdersPanel c={c} />
         <LogPanel c={c} setC={setC} viewer={fog} />
         {footer}
@@ -185,6 +187,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
         setTimeout(() => document.getElementById('record-game')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
       }} />
       <OrdersPanel c={c} />
+      <TechTreePanel c={c} setC={setC} />
       <SectorsPanel c={c} setC={setC} />
       <div className="cols-2">
         <RecordPanel c={c} setC={setC} preset={recordAt} />
@@ -420,6 +423,7 @@ function LogPanel({ c, setC, viewer }: { c: Campaign; setC: SetC; viewer?: strin
               <b>{sectorName(e.sectorId)}</b>: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} —{' '}
               {e.winner ? <b>{factionName(c, e.winner)} wins</b> : 'draw'}
             </>}
+            {e.loot && <span title={`Guardian loot (rolled ${e.loot.roll})`}> · 🎁 {factionName(c, e.loot.factionId)} looted {e.loot.name}{e.loot.amount ? ` (+${e.loot.amount}${e.loot.id === 'research' ? ' Research' : ' Materials'})` : ''}</span>}
             {e.notes && <span className="muted"> · {e.notes}</span>}
           </span>
           {!viewer && <button className="ghost icon" aria-label="Delete log entry"

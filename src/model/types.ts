@@ -269,7 +269,7 @@ export interface Construction {
   id: string;
   /** The round it was started in. */
   round: number;
-  /** Banked Supply paid. */
+  /** Materials paid (saved as `supply`). */
   supply: number;
   /** Umbra Shards paid, and the force that paid them. */
   shards: number;
@@ -301,8 +301,12 @@ export interface Sector {
   image?: string;
   /** BUILDINGS ids (nexusData.ts) raised here. They stay when the sector changes hands. */
   buildings?: string[];
-  /** Production Supply banked here (planets and homes), spent on new units; lost when the sector changes hands. */
+  /** Materials banked here (planets and homes), spent on new units and buildings; lost when the sector changes hands. */
   bank?: number;
+  /** A Building Expansion is installed here (Guardian loot): one more building slot. It stays when the sector changes hands. */
+  core?: boolean;
+  /** The round this sector's Grand Exchange was last used (once a round). */
+  exchanged?: number;
   /** The building going up here: one at a time, finished when the round ends. Lost if the sector changes hands. */
   construction?: Construction;
   /** The Void Echoes hero guarding an AI-held point of interest (rules/guardians.ts). */
@@ -320,6 +324,13 @@ export interface CampaignFaction {
   name: string;
   player: string;
   color: string;
+  /** Research points not spent yet (the tech tree, rules/tech.ts). */
+  research?: number;
+  /** BUILDINGS ids researched (tier 1 is known without being listed). */
+  techs?: string[];
+  /** Guardian loot not used yet: Blueprints (a free tech) and Building Expansions (a planet's extra slot). */
+  blueprints?: number;
+  cores?: number;
 }
 
 export interface CampaignEvent {
@@ -345,6 +356,8 @@ export interface CampaignEvent {
   crisis?: boolean;
   /** What the game changed, so deleting the entry can put the sector back. */
   undo?: { owner?: string; rewardClaimed?: boolean; reinforced?: boolean; bank?: number; construction?: Construction; guardian?: SectorGuardian };
+  /** The slain guardian's loot (GUARDIAN_LOOT): what it gave, and to whom, so deleting the entry can take it back. */
+  loot?: { roll: number; id: string; name: string; factionId: string; amount?: number; sectorId?: string };
 }
 
 /** What each faction held when a round ended: round income is paid from this. */

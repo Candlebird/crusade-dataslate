@@ -3,11 +3,12 @@ import { hexDistance, isPlaced } from './hexmap';
 import { FOG } from './nexusData';
 
 // Fog of war (Nexus Wars). A faction sees the sectors it holds and every placed sector within sight of them: FOG.sight
-// hexes, FOG.homeSight from its home, more with a Watchtower. Sectors it has seen before stay on its map but only their
+// hexes, FOG.homeSight from its home, more with a Watchtower and a Listening Post. Sectors it has seen before stay on its map but only their
 // type and name; who holds them, their garrison and buildings stay hidden until it can see them again.
 
 /** How far a held sector sees. */
-export const sightOf = (s: Sector) => (s.type === 'home' ? FOG.homeSight : FOG.sight) + (s.buildings?.includes('watchtower') ? FOG.watchtower : 0);
+export const sightOf = (s: Sector) =>
+  (s.type === 'home' ? FOG.homeSight : FOG.sight) + (s.buildings?.includes('watchtower') ? FOG.watchtower : 0) + (s.buildings?.includes('listeningPost') ? FOG.listeningPost : 0);
 
 /** The sectors a faction can see right now. */
 export function visibleTo(c: Campaign, factionId: string): Set<string> {

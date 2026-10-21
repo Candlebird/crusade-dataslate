@@ -704,3 +704,30 @@ fieldset.fields:disabled { opacity: 0.6; }
 
 .randomizer { margin-top: 0.6rem; gap: 0.9rem; flex-wrap: wrap; }
 .randomizer .stepper input { width: 3rem; }
+
+/* ---- tech tree (Nexus Wars research) ---- */
+.tech-head { display: flex; gap: 1.25rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.tech-tree { display: grid; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.25rem; }
+.tech-branch { font-family: var(--serif); color: var(--gold); border-bottom: 1px solid var(--gold-dim); padding: 0.2rem 0; }
+.tech-icon { font-family: var(--sans); }
+.tech-tier { display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--muted); font-size: 0.75rem; border-right: 1px solid var(--line); }
+.tech-tier b { font-family: var(--serif); font-size: 1.1rem; color: var(--text); }
+.tech-cell { display: flex; flex-direction: column; gap: 0.5rem; }
+.tech-card {
+  background: linear-gradient(160deg, var(--panel-2), var(--bg-2));
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--line-2);
+  padding: 0.45rem 0.55rem;
+  display: flex; flex-direction: column; gap: 0.25rem;
+}
+.tech-card.known { border-left-color: var(--green); }
+.tech-card.open { border-left-color: var(--gold); border-color: var(--gold-dim); }
+.tech-card.locked { opacity: 0.55; }
+.tech-name { display: flex; justify-content: space-between; align-items: baseline; gap: 0.4rem; font-weight: 600; }
+.tech-name .tag { margin: 0; }
+.tech-tags .tag { margin-bottom: 0; }
+.tech-met { color: #9cc274; }
+.tech-actions { gap: 0.35rem; }
+@media (max-width: 640px) {
+  .tech-head { gap: 0.75rem; }
+}

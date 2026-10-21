@@ -7,7 +7,7 @@ import {
   type RelicDef, type RelicTier, type RewardTableKey, type TableEntry,
 } from '../rules/data';
 import {
-  ANOMALY_TABLE, BENEFITS, BUILDINGS, COMBAT_MANIPULATIONS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE,
+  ANOMALY_TABLE, BENEFITS, BUILDINGS, GUARDIAN_LOOT, NEXUS_TECH, TECH_BRANCHES, COMBAT_MANIPULATIONS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE,
 } from '../rules/nexusData';
 import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
 import { EXPEDITION_SITES } from '../rules/downtimeData';
@@ -324,7 +324,7 @@ function NexusRules() {
         </p>
         <Toc items={[
           ['n-map', 'Sectors'], ['n-danger', 'Difficulty & modifiers'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'],
-          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-downtime', 'Downtime'], ['n-fog', 'Fog of war'], ['n-production', 'Production'], ['n-heroes', 'Heroes & guardians'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
+          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-downtime', 'Downtime'], ['n-fog', 'Fog of war'], ['n-production', 'Production'], ['n-tech', 'Tech tree'], ['n-heroes', 'Heroes & guardians'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
           ['n-shop', 'Umbra Shard shop'],
         ]} />
         <p className="small">
@@ -403,12 +403,27 @@ function NexusRules() {
 
       <Section id="n-production" title="Production & buildings">
         <Prose lines={NEXUS_TEXT.production} />
-        <Entries title="Buildings" entries={BUILDINGS.map((b) => ({ name: `${b.icon} ${b.name}`, desc: `${b.cost} banked Supply${b.shards ? ` + ${b.shards} Umbra Shard${b.shards === 1 ? '' : 's'}` : ''}. ${b.desc}` }))} />
+      </Section>
+
+      <Section id="n-tech" title="Tech tree & buildings">
+        <Prose lines={NEXUS_TEXT.tech} />
+        {TECH_BRANCHES.map((br) => (
+          <Entries key={br.id} title={`${br.icon} ${br.name} — ${br.desc}`} entries={BUILDINGS.filter((b) => b.branch === br.id).map((b) => ({
+            name: `${b.icon} ${b.name}`,
+            desc: [
+              `Tier ${b.tier}${b.tier > 1 ? ` (${NEXUS_TECH.cost[b.tier]} Research${b.requires?.length ? `, after ${b.requires.map((r) => BUILDINGS.find((x) => x.id === r)?.name ?? r).join(' and ')}` : ''})` : ''}.`,
+              `${b.cost} Materials${b.shards ? ` + ${b.shards} Umbra Shard${b.shards === 1 ? '' : 's'}` : ''}${b.homeOnly ? ', home only' : ''}.`,
+              b.desc,
+              b.rule === 'table' ? '(At the table.)' : '',
+            ].filter(Boolean).join(' '),
+          }))} />
+        ))}
       </Section>
 
       <Section id="n-heroes" title="Wandering heroes & guardians">
         <Prose lines={NEXUS_TEXT.heroes} />
         <Prose lines={NEXUS_TEXT.guardians} />
+        <Entries title="Guardian loot (D6 + tier bonus)" roll entries={GUARDIAN_LOOT.table.map((l) => ({ name: l.name, desc: l.desc }))} />
       </Section>
 
       <Section id="n-catchup" title="Catching up">

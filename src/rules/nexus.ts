@@ -1,11 +1,11 @@
 import type { BattleResult, Campaign, CampaignEvent, Force, ForceNexus, Sector, SectorGuardian } from '../model/types';
 import { CATEGORIES, type Category } from './data';
 import {
-  ANOMALY_TABLE, BENEFITS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRONGHOLDS, VOID_TABLE,
+  ANOMALY_TABLE, BENEFITS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, GUARDIAN_LOOT, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRONGHOLDS, VOID_TABLE,
   type GalacticEvent, type NexusTableEntry,
 } from './nexusData';
 import { explore } from './fog';
-import { hasBuilding, loseBank } from './production';
+import { bankCap, hasBuilding, loseBank, produces } from './production';
 
 // Nexus Wars: what a faction earns each round and after each match. The tables and costs live in nexusData.ts;
 // the round itself (ending it, income, threat) is in rounds.ts.
@@ -95,8 +95,49 @@ export function changeHands(s: Sector, owner: string, undo: NonNullable<Campaign
   }
 }
 
+/**
+ * Roll the slain guardian's loot for the faction that beat it: D6 + its tier's bonus (GUARDIAN_LOOT), and give it.
+ * Materials go to the sector's bank (or the faction's home, if the sector has none), up to the bank's cap.
+ */
+export function rollGuardianLoot(c: Campaign, s: Sector, g: SectorGuardian, factionId: string, rand = Math.random): NonNullable<CampaignEvent['loot']> | undefined {
+  const f = c.factions.find((x) => x.id === factionId);
+  if (!f) return undefined;
+  const T = GUARDIAN_LOOT.table;
+  const roll = Math.min(T.length, 1 + Math.floor(rand() * 6) + (GUARDIAN_LOOT.bonus[g.tier as keyof typeof GUARDIAN_LOOT.bonus] ?? 0));
+  const l = T[roll - 1];
+  const loot: NonNullable<CampaignEvent['loot']> = { roll, id: l.id, name: l.name, factionId };
+  if (l.id === 'materials') {
+    const bank = produces(s) ? s : c.sectors.find((x) => x.type === 'home' && x.owner === factionId);
+    if (bank) {
+      const before = bank.bank ?? 0;
+      bank.bank = Math.max(before, Math.min(bankCap(bank, c), before + (l.amount ?? 0)));
+      loot.amount = bank.bank - before;
+      loot.sectorId = bank.id;
+    }
+  } else if (l.id === 'research') {
+    loot.amount = l.amount ?? 0;
+    f.research = (f.research ?? 0) + loot.amount;
+  } else if (l.id === 'blueprint') f.blueprints = (f.blueprints ?? 0) + 1;
+  else f.cores = (f.cores ?? 0) + 1;
+  return loot;
+}
+
+/** Take a guardian's loot back (its log entry was deleted), as far as it hasn't been spent. */
+function returnGuardianLoot(c: Campaign, loot: NonNullable<CampaignEvent['loot']>) {
+  const f = c.factions.find((x) => x.id === loot.factionId);
+  const take = (n: number | undefined, k: number) => Math.max(0, (n ?? 0) - k) || undefined;
+  if (loot.id === 'materials') {
+    const s = c.sectors.find((x) => x.id === loot.sectorId);
+    if (s && s.owner === loot.factionId) s.bank = take(s.bank, loot.amount ?? 0);
+  }
+  if (!f) return;
+  if (loot.id === 'research') f.research = take(f.research, loot.amount ?? 0);
+  if (loot.id === 'blueprint') f.blueprints = take(f.blueprints, 1);
+  if (loot.id === 'core') f.cores = take(f.cores, 1);
+}
+
 /** Apply a reported sector game to the campaign. Home sectors and Voidspawns never change hands. Skirmishes (no sector) are only logged. */
-export function recordSectorGame(c: Campaign, e: CampaignEvent) {
+export function recordSectorGame(c: Campaign, e: CampaignEvent, rand = Math.random) {
   e.round ??= currentRound(c);
   c.log.push(e);
   const s = c.sectors.find((x) => x.id === e.sectorId);
@@ -107,6 +148,7 @@ export function recordSectorGame(c: Campaign, e: CampaignEvent) {
     undo.rewardClaimed = true;
     s.rewardClaimed = true;
   }
+  if (undo.guardian) e.loot = rollGuardianLoot(c, s, undo.guardian, e.winner, rand);
   if (Object.keys(undo).length) e.undo = undo;
   explore(c);
 }
@@ -137,11 +179,12 @@ export function removeSectorGame(c: Campaign, id: string) {
   if (e.undo.bank && s.owner === e.undo.owner) s.bank = e.undo.bank;
   if (e.undo.construction && s.owner === e.undo.owner) s.construction = e.undo.construction;
   if (e.undo.guardian && s.owner === e.undo.owner) s.guardian = e.undo.guardian;
+  if (e.loot) returnGuardianLoot(c, e.loot);
 }
 
 // ---- income and after-match generation ----
 
-export type NexusItemKind = 'us' | 'supply' | 'shardRoll' | 'relicRoll' | 'research' | 'manipulation' | 'anomaly' | 'void' | 'matchBonus' | 'relic';
+export type NexusItemKind = 'us' | 'supply' | 'shardRoll' | 'relicRoll' | 'research' | 'manipulation' | 'anomaly' | 'void' | 'matchBonus' | 'relic' | 'medicae';
 
 export interface NexusItem {
   key: string;
@@ -170,6 +213,8 @@ export function incomeItems(s: Sector, prefix = ''): NexusItem[] {
   const place = `${prefix ? 'Conquest — ' : ''}${s.name}`;
   if (hasBuilding(s, 'refinery')) out.push({ key: `${key}:refinery`, kind: 'shardRoll', source: `${place}: Shard Refinery` });
   if (hasBuilding(s, 'depot')) out.push({ key: `${key}:depot`, kind: 'supply', source: `${place}: Supply Depot`, supply: PRODUCTION.depotSupply });
+  if (hasBuilding(s, 'medicae')) out.push({ key: `${key}:medicae`, kind: 'medicae', source: `${place}: Medicae Ward` });
+  if (hasBuilding(s, 'spire')) out.push({ key: `${key}:spire`, kind: 'us', source: `${place}: Umbral Spire`, us: 1 });
   return out;
 }
 
@@ -316,8 +361,12 @@ function crisisGeneration(c: Campaign, won: boolean, forceId: string | undefined
 
 export const ROLL_SIDES: Partial<Record<NexusItemKind, number>> = { shardRoll: 6, relicRoll: 6, anomaly: 6, void: 6 };
 
-/** The table entry a rolled item resolves to, for anomaly / void rolls. */
+/** A Medicae Ward's round income: no roll. */
+export const MEDICAE_ENTRY: NexusTableEntry = { text: 'Remove 1 battle scar from a unit', removeScar: true };
+
+/** The table entry an item resolves to: anomaly / void rolls, and the Medicae Ward. */
 export function nexusEntry(item: NexusItem, pick: NexusPick | undefined): NexusTableEntry | null {
+  if (item.kind === 'medicae') return MEDICAE_ENTRY;
   const roll = pick?.roll;
   if (!roll) return null;
   if (item.kind === 'anomaly') return ANOMALY_TABLE[roll - 1] ?? null;

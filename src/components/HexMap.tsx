@@ -12,9 +12,13 @@ import {
 } from '../rules/nexus';
 import { pickSpread, spreadInto, spreadTargets } from '../rules/voidspawn';
 import { aiDefended, rateSectors } from '../rules/difficulty';
-import { bankCap, build, buildBlock, buildingById, buildingSlots, cancelBuilding, demolish, freeSlots, hasBuilding, isReinforced, produces, productionRate } from '../rules/production';
+import {
+  bankCap, build, buildBlock, buildingById, buildingSlots, cancelBuilding, coreBlock, demolish, exchange, exchangeBlock, freeSlots, hasBuilding, installCore,
+  isReinforced, produces, productionRate, tradeBonus, type ExchangeTrade,
+} from '../rules/production';
+import { knows } from '../rules/tech';
 import { sightMap, type Sight } from '../rules/fog';
-import { BUILDINGS } from '../rules/nexusData';
+import { BUILDINGS, PRODUCTION } from '../rules/nexusData';
 import { href } from '../route';
 import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 import SectorDanger from './SectorDanger';
@@ -458,7 +462,12 @@ function ProductionBox({ s }: { s: Sector }) {
   const b = pick ? buildingById(pick) : undefined;
   // Shards come from the chosen force, or the richest one.
   const payer = forces.find((f) => f.id === payerId) ?? [...forces].sort((x, y) => y.umbraShards - x.umbraShards)[0];
-  const block = pick ? buildBlock(s, pick, payer) : undefined;
+  const c = state.campaign;
+  const owner = c?.factions.find((f) => f.id === s.owner);
+  const block = pick ? buildBlock(s, pick, payer, c) : undefined;
+  // What the owner can build here: researched, and home-only ones at home.
+  const options = BUILDINGS.filter((x) => !hasBuilding(s, x.id) && knows(owner, x) && (!x.homeOnly || s.type === 'home'));
+  const locked = BUILDINGS.filter((x) => !knows(owner, x)).length;
   const k = s.construction;
   const going = k ? buildingById(k.id) : undefined;
   const built = s.buildings ?? [];
@@ -470,21 +479,32 @@ function ProductionBox({ s }: { s: Sector }) {
     fn(x, d.campaign, d.forces);
     d.campaign.updatedAt = nowIso();
   });
-  const price = (x: { cost: number; shards: number }) => `${x.cost} Supply${x.shards ? ` + ${x.shards} US` : ''}`;
+  const price = (x: { cost: number; shards: number }) => `${x.cost} Materials${x.shards ? ` + ${x.shards} US` : ''}`;
+  const rate = productionRate(s, c ?? undefined);
+  const cap = bankCap(s, c ?? undefined);
+  const trade = tradeBonus(s, c ?? undefined);
+  const X = PRODUCTION.exchange;
+  const coreBlocked = c ? coreBlock(c, s) : 'No campaign';
+  const trade1 = (t: ExchangeTrade) => (c ? exchangeBlock(c, s, t, payer) : 'No campaign');
   return (
     <div className="small" style={{ margin: '0.5rem 0' }}>
       <div>
         <b>⚒ Production</b>{' '}
-        <span className="muted" title={`Banks ${productionRate(s)} Supply each round, up to ${bankCap(s)}. Lost if the sector is taken.`}>
-          {s.bank ?? 0}/{bankCap(s)} Supply banked · +{productionRate(s)} a round
+        <span className="muted" title={`Banks ${rate} Materials each round${trade ? ` (${trade} from its Trade Hub)` : ''}, up to ${cap}. Lost if the sector is taken.`}>
+          {s.bank ?? 0}/{cap} Materials banked · +{rate} a round
         </span>
       </div>
-      <div className="muted" style={{ marginTop: '0.25rem' }}>Buildings: {built.length + (k ? 1 : 0)} of {buildingSlots(s)} slots used</div>
+      <div className="muted" style={{ marginTop: '0.25rem' }}>
+        Buildings: {built.length + (k ? 1 : 0)} of {buildingSlots(s)} slots used{s.core && <> · <span className="tag gold" title="Building Expansion: one more building slot">✦ Building Expansion</span></>}
+      </div>
       {built.map((id) => {
         const x = buildingById(id);
         return (
           <div key={id} className="row" title={x?.desc}>
-            <span className="grow">{x?.icon} {x?.name ?? id} <span className="muted">— {x?.desc}</span></span>
+            <span className="grow">
+              {x?.icon} {x?.name ?? id} {x?.rule === 'table' && <span className="tag" title="The app doesn't apply this one: remember it at the table">at the table</span>}{' '}
+              <span className="muted">— {x?.desc}</span>
+            </span>
             <button className="ghost icon" aria-label={`Tear down ${x?.name ?? id}`} title="Tear down (no refund)"
               onClick={() => confirmAction(`Tear down the ${x?.name ?? id} at ${s.name}? There's no refund.`) && edit((y) => demolish(y, id))}>✕</button>
           </div>
@@ -506,7 +526,7 @@ function ProductionBox({ s }: { s: Sector }) {
           <div className="row" style={{ marginTop: '0.25rem' }}>
             <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Building to start" style={{ minWidth: 0, flex: 1 }}>
               <option value="">Start a building…</option>
-              {BUILDINGS.filter((x) => !hasBuilding(s, x.id)).map((x) => (
+              {options.map((x) => (
                 <option key={x.id} value={x.id}>{x.icon} {x.name} — {price(x)}</option>
               ))}
             </select>
@@ -529,15 +549,39 @@ function ProductionBox({ s }: { s: Sector }) {
             </div>
           )}
           {b && <div className={block ? '' : 'muted'}>{block ? <span className="tag red">{block}</span>
-            : <>Costs {b.cost} of the {s.bank ?? 0} banked Supply{b.shards ? <> and {b.shards} of {payer?.name}'s {payer?.umbraShards} Umbra Shards</> : ''}, now. Finished when the round ends.</>}</div>}
+            : <>Costs {b.cost} of the {s.bank ?? 0} banked Materials{b.shards ? <> and {b.shards} of {payer?.name}'s {payer?.umbraShards} Umbra Shards</> : ''}, now. Finished when the round ends.</>}</div>}
         </>
       )}
+      {!k && free > 0 && locked > 0 && <div className="muted">{locked} more building{locked === 1 ? '' : 's'} to research in the tech tree (the Research panel).</div>}
       {!k && free <= 0 && <div className="muted">Every slot is built. Tear one down (✕) to build something else.</div>}
+      {hasBuilding(s, 'exchange') && (
+        <div className="row" style={{ marginTop: '0.25rem' }}>
+          <span className="grow">⇄ Grand Exchange{s.exchanged === (c?.round ?? 1) ? <span className="muted"> — traded this round</span> : <span className="muted"> — once a round, with {payer?.name ?? 'a force'}</span>}</span>
+          {([['buyShard', `${X.materials} Materials → 1 US`], ['sellShard', `1 US → ${X.back} Materials`]] as [ExchangeTrade, string][]).map(([t, label]) => (
+            <button key={t} disabled={!!trade1(t)} title={trade1(t)} onClick={() => {
+              edit((y, cc, fs) => {
+                const f = fs.find((x) => x.id === payer?.id);
+                if (f) exchange(cc, y, t, f, today, uid);
+              });
+              toast(`Traded ${label} at ${s.name}.`);
+            }}>{label}</button>
+          ))}
+        </div>
+      )}
+      {s.type === 'planet' && !s.core && (owner?.cores ?? 0) > 0 && (
+        <div className="row" style={{ marginTop: '0.25rem' }}>
+          <span className="grow">✦ {owner?.name} has {owner?.cores} Building Expansion{owner?.cores === 1 ? '' : 's'}: install one here for a building slot more, for good.</span>
+          <button disabled={!!coreBlocked} title={coreBlocked} onClick={() => confirmAction(`Install a Building Expansion at ${s.name}? It can't be moved again, and stays if the planet is taken.`)
+            && edit((y, cc) => void installCore(cc, y))}>Install</button>
+        </div>
+      )}
       <details className="muted" style={{ marginTop: '0.25rem' }}>
         <summary>How building works</summary>
         <ul style={{ margin: '0.25rem 0', paddingLeft: '1.2rem' }}>
           <li>A sector builds <b>one building at a time</b>. Pay when you start it; it's <b>finished when the round ends</b> and works from the next round.</li>
-          <li>Every building costs banked Supply from this sector. The stronger ones (Walls, Barracks, Training Grounds, Shard Refinery) also cost Umbra Shards from one of your forces.</li>
+          <li>Every building costs banked Materials from this sector. The stronger ones also cost Umbra Shards from one of your forces.</li>
+          <li>Tier 1 buildings are known from the start; the others are researched in the tech tree first. Some can only be built at a home.</li>
+          <li>Buildings marked <i>at the table</i> aren't applied by the app: remember them when you play here.</li>
           <li>Changed your mind? Cancel before the round ends and everything paid comes back.</li>
           <li>If the sector is taken, its bank and anything still being built are lost; finished buildings stay, for the new owner.</li>
           <li>New units are produced here from the force page, paid from the same bank.</li>

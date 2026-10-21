@@ -1,6 +1,7 @@
 import type { Campaign, CampaignEvent, Force } from '../model/types';
-import { frontier, isPlaced } from './hexmap';
-import { homeChallengeBlock, stormed } from './nexus';
+import { frontier, hexDistance, isPlaced } from './hexmap';
+import { PRODUCTION, homeChallengeBlock, stormed } from './nexus';
+import { hasBuilding } from './production';
 
 // Nexus Wars sealed orders: each player picks what their detachments attack next game (or holds),
 // nobody sees anyone else's picks until the GM reveals them. Each force linked to a faction is a
@@ -42,9 +43,12 @@ export function myDetachments(c: Campaign, forces: Force[], email: string | null
 export const playedDetachments = (c: Campaign, forces: Force[]) =>
   forces.filter((f) => f.owner && f.nexus && c.factions.some((x) => x.id === f.nexus!.factionId));
 
-/** Sectors a faction may attack: placed ones next to its territory, by name. */
+/** Sectors a faction may attack: placed ones next to its territory, or in a Warp Gate's reach, by name. */
 export function attackTargets(c: Campaign, factionId: string) {
   const front = frontier(c, factionId);
+  const gates = c.sectors.filter((s) => s.owner === factionId && hasBuilding(s, 'warpGate')).filter(isPlaced);
+  for (const s of c.sectors)
+    if (s.owner !== factionId && isPlaced(s) && gates.some((g) => hexDistance(g, s) <= PRODUCTION.warpRange)) front.add(s.id);
   return c.sectors.filter((s) => isPlaced(s) && front.has(s.id) && !stormed(c, s.id)).sort((a, b) => a.name.localeCompare(b.name));
 }
 

@@ -97,7 +97,7 @@ describe('planet production', () => {
     const c = campaign();
     const s = sector(c, 'pA');
     const f = force('A', 1000, 1);
-    expect(buildBlock(s, 'walls', f)).toMatch(/banked Supply/);
+    expect(buildBlock(s, 'walls', f)).toMatch(/200 Materials/);
     s.bank = 1000;
     expect(buildBlock(s, 'walls', f)).toMatch(/2 Umbra Shards/);
     f.umbraShards = 3;
@@ -114,7 +114,7 @@ describe('planet production', () => {
     expect(build(c, s, 'depot')).toBe(true); // no shards needed
     finishConstruction(c);
     expect(buildBlock(s, 'watchtower', f)).toMatch(/No free slot/);
-    expect(BUILDINGS.filter((b) => b.shards === 0).map((b) => b.id).sort()).toEqual(['depot', 'watchtower']);
+    expect(BUILDINGS.filter((b) => b.shards === 0).every((b) => b.cost <= 200)).toBe(true);
   });
 
   it('loses a building going up when the sector is taken, and ends the round with it built', () => {

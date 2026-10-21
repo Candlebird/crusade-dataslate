@@ -301,6 +301,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
           n.pending.push(`${MANIPULATION_PREFIX}: ${pick.choice || 'any'} (free)`);
           nexusLines.push(`${src}: a free Combat Manipulation for the next match.`);
           break;
+        case 'medicae':
         case 'anomaly':
         case 'void': {
           const e = nexusEntry(item, pick);
@@ -308,7 +309,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
             warnings.push(`${src}: not rolled yet.`);
             break;
           }
-          const label = `${src} (${pick.roll}): ${e.text}`;
+          const label = `${src}${pick.roll && item.kind !== 'medicae' ? ` (${pick.roll})` : ''}: ${e.text}`;
           if (e.us) addUs(label, e.us);
           if (e.supply) addSupply(label, e.supply);
           if (e.xp) {
