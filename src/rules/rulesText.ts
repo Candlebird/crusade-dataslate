@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, DIFFICULTY_LEVELS, FOG, GUARDIANS, GUARDIAN_LOOT, HERO_OFFERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP } from './nexusData';
+import { ECHOES, DIFFICULTY_LEVELS, FOG, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP } from './nexusData';
 import { EXPEDITION, SOLO_PATROL, type ExpeditionCheck } from './downtimeData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
@@ -89,7 +89,9 @@ export const NEXUS_TEXT = {
     'Record a skirmish in the app by finishing the battle with "Skirmish (no sector)" picked: the win goes into the campaign log.',
   ],
   attacking: [
-    "The Battle: each detachment secretly picks one sector to attack this round, or holds. The GM reveals everyone's orders at once, and then the attacks are played. Only Battle games take sectors, challenge home sectors or earn the Echoes bounty.",
+    "The Battle: each detachment secretly picks where it goes this round: a move, an attack, or hold. The GM reveals everyone's orders at once, moves the detachments that moved, and then the attacks are played. Only Battle games take sectors, challenge home sectors or earn the Echoes bounty.",
+    `Movement: every detachment stands in a sector on the map, its faction's home until it first moves. A round it goes up to ${NEXUS_MOVE.base} hexes: through its own faction's sectors and unclaimed empty space freely, and into anything else (a held, unclaimed or guarded sector) as an attack, which ends its move. Win the attack and it stands in the sector it took; lose and it stays where it started. A detachment whose sector someone else takes falls back to its faction's nearest sector. Storm-swallowed sectors can't be entered.`,
+    `Moving further: +${NEXUS_MOVE.beacon} for starting in or next to a Hyperlane Beacon, +${NEXUS_MOVE.forcedMarch} for a Forced March (a Strategic Asset), and the round's Galactic Event (Warp Currents +1, Ion Storm −1). A detachment always moves at least ${NEXUS_MOVE.min}. A Warp Gate lets it reach anything within ${PRODUCTION.warpRange} hexes of the gate as well.`,
     "Unclaimed sectors: the attacker plays the AI's garrison, at the sector's difficulty, unless another faction attacks it too: then the two fight each other for it. Claimed sectors: the owner defends. The winner takes the sector, and the sector's modifiers always favour its defender.",
     'Reinforcements stay with the sector, not the faction: when a sector changes hands, any Reinforce Sector on it is lost.',
     `Defender can't make it: the ${ECHOES.name} stand in. Play against the AI, with an army at the attacker's points (+${NEXUS_REINFORCE_BONUS} if the sector is Reinforced). If the Echoes win, the owner holds the sector; if the attacker wins, they take it.`,
@@ -130,7 +132,7 @@ export const NEXUS_TEXT = {
     `Solo patrol (Patrol… on your force page, or Solo patrol on the Battle page): send up to ${SOLO_PATROL.points} pts of one force out, and it runs into ${SOLO_PATROL.enemyMin}–${SOLO_PATROL.enemyMax} pts of the ${ECHOES.name} (in steps of ${SOLO_PATROL.enemyStep}). Seeing their strength and the mission, fight or turn back. Turning back earns each unit +${SOLO_PATROL.declineXp} XP for the sighting, and those units have still gone out for the round. Fighting is a quick game against the AI of about 45 minutes. Record it like any battle: the units earn ${PARTICIPATION_XP} participation XP plus their kill XP, but no RP, reward rolls or Marked for Greatness. A win still counts as a patrol against the Echoes (lowering their threat) and earns a Strategic Asset.`,
   ],
   fog: [
-    `Fog of war: a faction sees the sectors it holds and every sector within ${FOG.sight} hex of them (${FOG.homeSight} from its home, +${FOG.watchtower} with a Watchtower, +${FOG.listeningPost} more with a Listening Post). The rest of the map is uncharted.`,
+    `Fog of war: a faction sees the sectors it holds and every sector within ${FOG.sight} hex of them (${FOG.homeSight} from its home, +${FOG.watchtower} with a Watchtower, +${FOG.listeningPost} more with a Listening Post). Your detachments see ${FOG.forceSight} hex around wherever they stand. The rest of the map is uncharted.`,
     "Sectors you've seen before stay on your map, dimmed: you know their name and type, but not who holds them, their garrison or their buildings until you can see them again.",
     "The Nexus Wars page shows the war through your faction's eyes. The GM's controls, with the whole map, are on a page of their own.",
   ],

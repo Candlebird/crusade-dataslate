@@ -379,7 +379,8 @@ export function sectorGame(b: TrackedBattle, c: Campaign | undefined, forces: Fo
   const sc = score(b);
   const notes = `${b.mission.name}: ${teamsOf(b).map((t) => `${teamName(b, t)} ${sc[t]!.total}`).join(', ')} VP.`
     + (standIn ? ` The ${ECHOES.name} stood in for ${factionName(c, standIn)}.` : '');
-  return { event: { sectorId: sector.id, attacker, defender, winner: won, notes, battleId: b.id } };
+  const forceId = membersOf(b, b.attacker).map((x) => forces.find((f) => f.id === x.forceId)).find((f) => f?.nexus?.factionId === attacker)?.id;
+  return { event: { sectorId: sector.id, attacker, defender, winner: won, notes, battleId: b.id, ...(forceId ? { forceId } : {}) } };
 }
 
 /**

@@ -18,6 +18,8 @@ import {
 } from '../rules/production';
 import { knows } from '../rules/tech';
 import { sightMap, type Sight } from '../rules/fog';
+import { positionOf, reach, setPosition } from '../rules/movement';
+import { detachmentName } from '../rules/detachments';
 import { BUILDINGS, PRODUCTION } from '../rules/nexusData';
 import { href } from '../route';
 import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
@@ -75,7 +77,7 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
   const [paintType, setPaintType] = useState<SectorType>('planet');
   const [paintOwner, setPaintOwner] = useState('');
   const [gmView, setViewAs] = useState('');
-  // Whose eyes the map is seen through: that faction's fog of war, and the sectors bordering its territory.
+  // Whose eyes the map is seen through: that faction's fog of war, and where its detachments can reach this round.
   const viewAs = gm ? gmView : fog ?? '';
   const sight = useMemo(() => sightMap(c, viewAs || undefined), [c, viewAs]);
   const [sel, setSel] = useState<Hex | null>(null);
@@ -106,7 +108,15 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
   }, [map.seed, bounds]);
 
   const bySector = new Map(c.sectors.filter(isPlaced).map((s) => [hexKey(s.q, s.r), s]));
-  const front = viewAs ? frontier(c, viewAs) : null;
+  const forces = useStore().state.forces;
+  // Where the detachments stand, and where the viewer's can get to this round (the sectors bordering its territory if it has none).
+  const posted = useMemo(() => detachmentsBySector(c, forces), [c, forces]);
+  const front = useMemo(() => {
+    if (!viewAs) return null;
+    const mine = forces.filter((f) => f.nexus?.factionId === viewAs);
+    if (!mine.length) return frontier(c, viewAs);
+    return new Set(mine.flatMap((f) => [...reach(c, f).keys()]));
+  }, [c, forces, viewAs]);
   const unplaced = c.sectors.filter((s) => !isPlaced(s));
   const color = (id?: string) => factionColor(c, id);
   const selSector = sel ? bySector.get(hexKey(sel.q, sel.r)) : undefined;
@@ -255,7 +265,7 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
           <span className="spacer" />
           <label className="row small">
             View as
-            <select value={viewAs} onChange={(e) => setViewAs(e.target.value)} title="See the map as that faction does: its fog of war, and the sectors bordering its territory">
+            <select value={viewAs} onChange={(e) => setViewAs(e.target.value)} title="See the map as that faction does: its fog of war, and where its detachments can reach this round">
               <option value="">Everything (GM)</option>
               {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
@@ -331,6 +341,17 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
                     {activeCrisis(c)?.sectorId === s.id && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name}</title>☠</text>}
                     {s.guardian && <text x={p.x + 15} y={p.y - 17} className="hex-mark"><title>Guardian: {s.guardian.name} ({s.guardian.tier})</title>♛</text>}
                     {s.difficulty !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff"><title>AI garrison: {s.difficulty} Supply</title>{s.difficulty}</text>}
+                    {/* Detachments: your own always, anyone else's only while you can see the sector. */}
+                    {(() => {
+                      const here = (posted.get(s.id) ?? []).filter((f) => !viewAs || known === 'visible' || f.nexus?.factionId === viewAs);
+                      return here.length > 0 && (
+                        <g className="hex-force" transform={`translate(${p.x - 19}, ${p.y + 9})`}>
+                          <title>{here.map((x) => detachmentName(c, forces, x)).join(', ')}</title>
+                          <circle r={6.5} fill={color(here[0].nexus?.factionId) ?? '#888'} stroke="#07080b" strokeWidth={1.5} />
+                          <text y={3} className="hex-force-n">{here.length > 1 ? here.length : '⚑'}</text>
+                        </g>
+                      );
+                    })()}
                   </g>
                 );
               })}
@@ -346,7 +367,7 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
             {!sel && <SideIntro c={c} unplaced={gm ? unplaced : []} />}
             {sel && selSector && selSight !== 'hidden' && (editing && gm
               ? <SectorEditor c={c} s={selSector} setSector={(fn) => setSector(selSector.id, fn)} setC={setC} onDone={() => setEditing(false)} onDeleted={() => setSel(null)} />
-              : <SectorView c={c} s={selSector} sight={selSight!} gm={gm} viewer={viewAs}
+              : <SectorView c={c} s={selSector} sight={selSight!} gm={gm} viewer={viewAs} setC={setC}
                 onEdit={() => setEditing(true)} onRecord={onRecord && (() => onRecord(selSector.id))} />)}
             {sel && (selSector ? selSight === 'hidden' : !gm) && <Uncharted />}
             {sel && !selSector && gm && <EmptyHex c={c} h={sel} unplaced={unplaced} setC={setC} />}
@@ -392,9 +413,10 @@ function Uncharted() {
   );
 }
 
-function SectorView({ c, s, sight, gm, viewer, onEdit, onRecord }: {
-  c: Campaign; s: Sector; sight: Sight; gm: boolean; viewer: string; onEdit: () => void; onRecord?: () => void;
+function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
+  c: Campaign; s: Sector; sight: Sight; gm: boolean; viewer: string; setC: SetC; onEdit: () => void; onRecord?: () => void;
 }) {
+  const forces = useStore().state.forces;
   const benefit = benefitOf(s);
   const games = c.log.filter((e) => e.sectorId === s.id).slice(-4).reverse();
   const blocked = homeChallengeBlock(c, s);
@@ -435,6 +457,7 @@ function SectorView({ c, s, sight, gm, viewer, onEdit, onRecord }: {
         </p>
       )}
       {manage && <ProductionBox s={s} />}
+      <DetachmentsHere c={c} s={s} forces={forces} gm={gm} setC={setC} />
       {s.notes && <p className="small lore">{s.notes}</p>}
       {games.length > 0 && (
         <div className="small">
@@ -450,6 +473,47 @@ function SectorView({ c, s, sight, gm, viewer, onEdit, onRecord }: {
         {gm && <button onClick={onEdit}>Edit</button>}
       </div>
     </>
+  );
+}
+
+/** Each placed sector's detachments (forces linked to a faction), where they stand. */
+function detachmentsBySector(c: Campaign, forces: Force[]) {
+  const out = new Map<string, Force[]>();
+  for (const f of forces) {
+    if (!f.nexus || !c.factions.some((x) => x.id === f.nexus!.factionId)) continue;
+    const at = positionOf(c, f);
+    if (at) out.set(at.id, [...(out.get(at.id) ?? []), f]);
+  }
+  return out;
+}
+
+/** The detachments in a sector (the viewer's own, or anyone's it can see), and the GM moving one here by hand. */
+function DetachmentsHere({ c, s, forces, gm, setC }: { c: Campaign; s: Sector; forces: Force[]; gm: boolean; setC: SetC }) {
+  const all = detachmentsBySector(c, forces);
+  const here = all.get(s.id) ?? [];
+  const elsewhere = [...all.entries()].filter(([id]) => id !== s.id).flatMap(([, fs]) => fs);
+  const move = (f: Force) => setC((d) => setPosition(d, f.id, { sectorId: s.id, factionId: f.nexus!.factionId }));
+  if (!here.length && !gm) return null;
+  return (
+    <div className="small">
+      {here.length > 0 && (
+        <p style={{ margin: '0.4rem 0' }}>
+          <b>Detachments here:</b>{' '}
+          {here.map((f) => (
+            <span key={f.id} className="tag" style={{ borderColor: factionColor(c, f.nexus?.factionId) }}>
+              ⚑ {detachmentName(c, forces, f)}
+            </span>
+          ))}
+        </p>
+      )}
+      {gm && elsewhere.length > 0 && (
+        <select value="" aria-label="Move a detachment here" title="Put a detachment here by hand, outside the orders"
+          onChange={(e) => { const f = elsewhere.find((x) => x.id === e.target.value); if (f) move(f); }}>
+          <option value="">Move a detachment here…</option>
+          {elsewhere.map((f) => <option key={f.id} value={f.id}>{detachmentName(c, forces, f)} ({positionOf(c, f)?.name})</option>)}
+        </select>
+      )}
+    </div>
   );
 }
 
@@ -769,6 +833,7 @@ const MAP_EXPORT_CSS = `
   .hex-empty .hex-glyph { fill: #666; }
   .hex-name { fill: #d9d4c7; font: 600 7.5px 'Segoe UI', sans-serif; text-anchor: middle; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }
   .hex-mark { fill: #d9d4c7; font: 11px sans-serif; text-anchor: middle; }
+  .hex-force-n { fill: #07080b; font: 700 8px sans-serif; text-anchor: middle; }
 `;
 
 /** Let the Void Echoes spread one sector by hand (the Echoes also spread when the GM ends a round). */

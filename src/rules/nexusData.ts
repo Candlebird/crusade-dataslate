@@ -124,11 +124,27 @@ export const MANIPULATION_PREFIX = 'Combat Manipulation';
 /** Supply Limit a Reinforced sector's defender gets (a Void Echoes stand-in too). */
 export const NEXUS_REINFORCE_BONUS = 200;
 
+/**
+ * Detachments on the map: each of a faction's forces stands in one sector (its home until it moves) and moves up to
+ * `base` hexes a round, through sectors its faction holds and unclaimed empty space. Moving into a sector held by
+ * someone else, an unclaimed one worth having or a guarded one is an attack: the detachment ends its move there.
+ *  beacon — a Hyperlane Beacon in or next to the sector it starts in;
+ *  forcedMarch — the Forced March Strategic Asset, for one detachment and one round;
+ *  min — Galactic Events (Ion Storm) never slow a detachment below this.
+ */
+export const NEXUS_MOVE = {
+  base: 2,
+  beacon: 1,
+  forcedMarch: 1,
+  min: 1,
+};
+
 export const STRATEGIC_ASSETS: { key: string; name: string; desc: string }[] = [
   { key: 'mission', name: 'Change of plans', desc: 'Re-roll the mission or the deployment of your Battle.' },
   { key: 'manipulation', name: 'Covert support', desc: '+1 Combat Manipulation in your Battle (pick it as if you had bought it).' },
   { key: 'reserve', name: 'Held in reserve', desc: 'One of your units gains Ambush for your Battle.' },
   { key: 'rerolls', name: 'Fortune favours', desc: '+2 re-rolls in your Battle: each re-rolls one die.' },
+  { key: 'forcedMarch', name: 'Forced March', desc: `One of your detachments moves ${NEXUS_MOVE.forcedMarch} hex further this round.` },
   { key: 'tie', name: 'Right of way', desc: 'Win the tie when another faction attacks the same sector: you fight for it and their attack lapses. If both spend one, play a multiplayer battle.' },
 ];
 
@@ -221,7 +237,8 @@ export const SECTOR_MODIFIERS: { id: string; name: string; desc: string }[] = [
  *  storm — this many random sectors are cut off: they can't be attacked that round;
  *  noHome — no home-sector challenges that round;
  *  income — added to every faction's income for the round;
- *  hulks — extra space hulks that drift into the contested middle when the round ends.
+ *  hulks — extra space hulks that drift into the contested middle when the round ends;
+ *  move — added to how far every detachment moves that round (NEXUS_MOVE).
  * (Event ids are stored in saved campaigns, so rename an event's name, not its id.)
  */
 export interface GalacticEvent {
@@ -235,10 +252,11 @@ export interface GalacticEvent {
   noHome?: boolean;
   income?: { us?: number; supply?: number };
   hulks?: number;
+  move?: number;
 }
 
 export const GALACTIC_EVENTS: GalacticEvent[] = [
-  { id: 'quiet', name: 'Quiet Stars', desc: 'Nothing stirs between the stars. No effect this round.' },
+  { id: 'warpCurrents', name: 'Warp Currents', desc: 'Fast currents run through the Nexus: every detachment moves 1 hex further this round.', move: 1 },
   { id: 'warpStorm', name: 'Warp Storm', desc: 'Two random sectors are swallowed by the storm: they can’t be attacked this round.', storm: 2 },
   { id: 'ceasefire', name: 'Ceasefire Accords', desc: 'The factions agree to leave each other’s homeworlds alone: no home-sector challenges this round.', noHome: true },
   { id: 'shardRush', name: 'Shard Rush', desc: 'Umbra seams surface everywhere: +1 Umbra Shard in every faction’s income for this round.', income: { us: 1 } },
@@ -247,7 +265,7 @@ export const GALACTIC_EVENTS: GalacticEvent[] = [
   { id: 'voidLull', name: 'Void Lull', desc: 'The Echoes fall silent: they don’t spread when this round ends (their threat still moves).', spread: -99 },
   { id: 'risingDark', name: 'Rising Dark', desc: 'Something vast stirs in the Voidspawn: the Echoes’ threat rises 1 more when this round ends.', threat: 1 },
   { id: 'glory', name: 'Glory Seekers', desc: 'Warriors fight to be remembered.', battle: 'Every unit that survives the battle earns +1 XP (add it as Bonus XP).' },
-  { id: 'ionStorm', name: 'Ion Storm', desc: 'Charged clouds scatter targeting systems.', battle: 'Shooting at targets over 18″ away is at −1 to hit.' },
+  { id: 'ionStorm', name: 'Ion Storm', desc: 'Charged clouds scatter targeting systems and slow the fleets: every detachment moves 1 hex less this round (at least 1).', move: -1, battle: 'Shooting at targets over 18″ away is at −1 to hit.' },
   { id: 'derelicts', name: 'Derelict Fleet', desc: 'A lost fleet drifts into the Nexus: 2 extra space hulks appear in the contested middle when this round ends.', hulks: 2 },
   { id: 'resonance', name: 'Nexus Resonance', desc: 'The Nexus hums with power.', battle: 'Casters get +1 to their casting rolls.' },
 ];
@@ -291,7 +309,10 @@ export const FOG = {
   watchtower: 1,
   /** …and a Listening Post this much. */
   listeningPost: 2,
+  /** A detachment sees this far around the sector it's in. */
+  forceSight: 1,
 };
+
 
 /**
  * Planet production: new units aren't bought, they're built. Each round, every planet and home sector a faction holds
@@ -381,6 +402,7 @@ export const BUILDINGS: Building[] = [
   { id: 'refinery', name: 'Shard Refinery', icon: '◆', cost: 250, shards: 2, branch: 'economy', tier: 1, desc: `A shard-mine roll in the round income (${NEXUS_ROUNDS.shardMineRoll}+: 1 Umbra Shard).` },
   { id: 'logistics', name: 'Logistics Hub', icon: '⛟', cost: 200, shards: 0, branch: 'economy', tier: 1, desc: `The bank holds ${PRODUCTION.logisticsRounds} more rounds of Materials.` },
   { id: 'tradeHub', name: 'Trade Hub', icon: '⚖', cost: 300, shards: 1, branch: 'economy', tier: 2, requires: ['depot'], desc: `+${PRODUCTION.tradeHub.perPlanet} Materials a round for each other planet you hold within ${PRODUCTION.tradeHub.range} hexes (up to +${PRODUCTION.tradeHub.max}).` },
+  { id: 'beacon', name: 'Hyperlane Beacon', icon: '✧', cost: 200, shards: 1, branch: 'economy', tier: 2, requires: ['logistics'], desc: `Your detachments that start a round's move here or next to it move ${NEXUS_MOVE.beacon} hex further.` },
   { id: 'foundry', name: 'Foundry', icon: '⚙', cost: 250, shards: 1, branch: 'economy', tier: 2, requires: ['logistics'], desc: `Units produced here cost ${PRODUCTION.foundryDiscount * 100}% fewer Materials.` },
   { id: 'exchange', name: 'Grand Exchange', icon: '⇄', cost: 400, shards: 3, branch: 'economy', tier: 3, requires: ['tradeHub', 'foundry'], homeOnly: true, desc: `Once a round: trade ${PRODUCTION.exchange.materials} Materials for 1 Umbra Shard, or 1 Umbra Shard for ${PRODUCTION.exchange.back} Materials.` },
   // Military
@@ -401,7 +423,7 @@ export const BUILDINGS: Building[] = [
   { id: 'listeningPost', name: 'Listening Post', icon: '📡', cost: 150, shards: 0, branch: 'intelligence', tier: 2, requires: ['watchtower'], desc: `Sight +${FOG.listeningPost} (stacks with a Watchtower).` },
   { id: 'jammer', name: 'Signal Jammer', icon: '⌁', cost: 250, shards: 1, branch: 'intelligence', tier: 2, requires: ['watchtower'], rule: 'table', desc: "Attackers can't use Combat Manipulations against this sector or the sectors next to it." },
   { id: 'strategium', name: 'Strategium', icon: '♜', cost: 300, shards: 2, branch: 'intelligence', tier: 2, requires: ['watchtower'], homeOnly: true, desc: 'One more Strategic Asset every round, won skirmish or not.' },
-  { id: 'warpGate', name: 'Warp Gate', icon: '⌬', cost: 400, shards: 3, branch: 'intelligence', tier: 3, requires: ['listeningPost', 'jammer'], desc: `Your detachments can attack any sector within ${PRODUCTION.warpRange} hexes of this one.` },
+  { id: 'warpGate', name: 'Warp Gate', icon: '⌬', cost: 400, shards: 3, branch: 'intelligence', tier: 3, requires: ['listeningPost', 'jammer'], desc: `Your detachments can move or attack anywhere within ${PRODUCTION.warpRange} hexes of this one, from wherever they are.` },
   // Umbra
   { id: 'observatory', name: 'Nexus Observatory', icon: '🔭', cost: 150, shards: 0, branch: 'umbra', tier: 1, desc: '+1 Research every round.' },
   { id: 'echoWard', name: 'Echo Ward', icon: '☉', cost: 300, shards: 2, branch: 'umbra', tier: 2, requires: ['observatory'], desc: `The ${ECHOES.name} can't spread into this sector or the sectors next to it.` },

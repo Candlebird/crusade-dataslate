@@ -355,7 +355,11 @@ export interface CampaignEvent {
   /** The Nexus Crisis battle (every faction against an Echo Lord): not a sector game, `sectorId` is where the Lord rose. */
   crisis?: boolean;
   /** What the game changed, so deleting the entry can put the sector back. */
-  undo?: { owner?: string; rewardClaimed?: boolean; reinforced?: boolean; bank?: number; construction?: Construction; guardian?: SectorGuardian };
+  undo?: { owner?: string; rewardClaimed?: boolean; reinforced?: boolean; bank?: number; construction?: Construction; guardian?: SectorGuardian;
+    /** Where detachments the game moved stood before (null: they had no position yet). */
+    positions?: Record<string, ForcePosition | null> };
+  /** The detachment that attacked: it moves into the sector when it takes or holds it. */
+  forceId?: string;
   /** The slain guardian's loot (GUARDIAN_LOOT): what it gave, and to whom, so deleting the entry can take it back. */
   loot?: { roll: number; id: string; name: string; factionId: string; amount?: number; sectorId?: string };
 }
@@ -409,6 +413,17 @@ export interface Campaign {
   offers?: HeroOffer[];
   /** What happened each ended round, newest last (rules/report.ts). */
   reports?: TurnReport[];
+  /** Where each detachment stands, by force id (rules/movement.ts). A force with none stands at its faction's home. */
+  positions?: Record<string, ForcePosition>;
+  /** The last round whose revealed moves the GM has applied. */
+  movedOrders?: number;
+}
+
+/** Where a detachment stands on the Nexus map. */
+export interface ForcePosition {
+  sectorId: string;
+  /** The faction it moved for: if the force has changed faction since, the position doesn't count. */
+  factionId: string;
 }
 
 /** A wandering hero a faction can hire with Umbra Shards; it joins one of its forces for good. */
@@ -466,6 +481,8 @@ export interface AssetUse {
   /** StrategicAsset key (nexusData.ts). */
   asset: string;
   date: string;
+  /** The detachment it was spent on (Forced March). */
+  forceId?: string;
 }
 
 export interface RuleText {

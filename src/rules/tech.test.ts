@@ -46,7 +46,7 @@ function force(factionId: string, shards = 0): Force {
 
 describe('the tech tree', () => {
   it('has every building in a branch, its requirements a tier lower in the same tree', () => {
-    expect(BUILDINGS).toHaveLength(26);
+    expect(BUILDINGS).toHaveLength(27);
     expect(new Set(BUILDINGS.map((b) => b.id)).size).toBe(BUILDINGS.length);
     for (const b of BUILDINGS) {
       expect(TECH_BRANCHES.some((br) => br.id === b.branch)).toBe(true);

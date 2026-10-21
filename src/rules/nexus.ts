@@ -5,6 +5,7 @@ import {
   type GalacticEvent, type NexusTableEntry,
 } from './nexusData';
 import { explore } from './fog';
+import { settleGame, unsettleGame } from './movement';
 import { bankCap, hasBuilding, loseBank, produces } from './production';
 
 // Nexus Wars: what a faction earns each round and after each match. The tables and costs live in nexusData.ts;
@@ -149,6 +150,7 @@ export function recordSectorGame(c: Campaign, e: CampaignEvent, rand = Math.rand
     s.rewardClaimed = true;
   }
   if (undo.guardian) e.loot = rollGuardianLoot(c, s, undo.guardian, e.winner, rand);
+  settleGame(c, e, s, undo);
   if (Object.keys(undo).length) e.undo = undo;
   explore(c);
 }
@@ -180,6 +182,7 @@ export function removeSectorGame(c: Campaign, id: string) {
   if (e.undo.construction && s.owner === e.undo.owner) s.construction = e.undo.construction;
   if (e.undo.guardian && s.owner === e.undo.owner) s.guardian = e.undo.guardian;
   if (e.loot) returnGuardianLoot(c, e.loot);
+  if (e.undo.positions) unsettleGame(c, e.undo.positions);
 }
 
 // ---- income and after-match generation ----

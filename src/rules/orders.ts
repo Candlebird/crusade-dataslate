@@ -2,10 +2,11 @@ import type { Campaign, CampaignEvent, Force } from '../model/types';
 import { frontier, hexDistance, isPlaced } from './hexmap';
 import { PRODUCTION, homeChallengeBlock, stormed } from './nexus';
 import { hasBuilding } from './production';
+import { isOpen, reach, setPosition } from './movement';
 
-// Nexus Wars sealed orders: each player picks what their detachments attack next game (or holds),
+// Nexus Wars sealed orders: each player picks where their detachments move or what they attack next game (or holds),
 // nobody sees anyone else's picks until the GM reveals them. Each force linked to a faction is a
-// detachment and declares its own attack.
+// detachment and declares its own order, within its reach on the map (movement.ts).
 
 export const HOLD = 'hold';
 
@@ -43,7 +44,7 @@ export function myDetachments(c: Campaign, forces: Force[], email: string | null
 export const playedDetachments = (c: Campaign, forces: Force[]) =>
   forces.filter((f) => f.owner && f.nexus && c.factions.some((x) => x.id === f.nexus!.factionId));
 
-/** Sectors a faction may attack: placed ones next to its territory, or in a Warp Gate's reach, by name. */
+/** Sectors a faction may attack: placed ones next to its territory, or in a Warp Gate's reach, by name (orders picked per faction). */
 export function attackTargets(c: Campaign, factionId: string) {
   const front = frontier(c, factionId);
   const gates = c.sectors.filter((s) => s.owner === factionId && hasBuilding(s, 'warpGate')).filter(isPlaced);
@@ -64,14 +65,25 @@ export interface Attack {
   flags: string[];
 }
 
+/** A detachment moving through its own or empty space: no game, the GM moves it on the map. */
+export interface Move {
+  email: string;
+  factionId: string;
+  forceId: string;
+  sectorId: string;
+  flags: string[];
+}
+
 export interface Revealed {
   attacks: Attack[];
+  moves: Move[];
   holds: { email: string; factionId: string; forceId?: string }[];
 }
 
 /** Turn everyone's revealed orders into a list of attacks, flagging clashes and stale picks. */
 export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number, forces: Force[] = []): Revealed {
   const attacks: Attack[] = [];
+  const moves: Move[] = [];
   const holds: Revealed['holds'] = [];
   const seen = new Set<string>();
   for (const o of orders) {
@@ -89,7 +101,14 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
       const s = c.sectors.find((x) => x.id === pick);
       if (!s) continue;
       const flags: string[] = [];
-      if (!frontier(c, factionId).has(s.id)) flags.push('No longer next to their territory');
+      if (force && forceId) {
+        // A detachment's order: a move if it's open ground, else an attack, either one within its reach.
+        if (!reach(c, force).has(s.id)) flags.push('Out of reach');
+        if (isOpen(s, factionId)) {
+          moves.push({ email: o.email, factionId, forceId, sectorId: s.id, flags });
+          continue;
+        }
+      } else if (!frontier(c, factionId).has(s.id)) flags.push('No longer next to their territory');
       const blocked = homeChallengeBlock(c, s);
       if (blocked) flags.push(blocked);
       attacks.push({ email: o.email, factionId, ...(forceId ? { forceId } : {}), sectorId: s.id, defender: s.owner ?? '', flags });
@@ -105,7 +124,20 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
     if (a.defender && a.defender !== a.factionId && attacks.some((x) => x.factionId === a.defender && c.sectors.find((s) => s.id === x.sectorId)?.owner === a.factionId))
       a.flags.push(`${name(a.defender)} is attacking them too`);
   }
-  return { attacks, holds };
+  return { attacks, moves, holds };
+}
+
+/** Make the revealed moves on the map: those still in reach. Returns how many detachments moved. */
+export function applyMoves(c: Campaign, moves: Move[], forces: Force[]): number {
+  let n = 0;
+  for (const m of moves) {
+    const force = forces.find((f) => f.id === m.forceId);
+    const s = c.sectors.find((x) => x.id === m.sectorId);
+    if (!force || !s || force.nexus?.factionId !== m.factionId || reach(c, force).get(s.id)?.kind !== 'move') continue;
+    setPosition(c, force.id, { sectorId: s.id, factionId: m.factionId });
+    n++;
+  }
+  return n;
 }
 
 /** The game already recorded for a revealed attack this round, if it has been fought. */

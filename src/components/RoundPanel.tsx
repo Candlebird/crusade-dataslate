@@ -5,6 +5,7 @@ import {
   ECHOES, GALACTIC_EVENTS, NEXUS_CRISIS, NEXUS_ROUNDS, STRATEGIC_ASSETS, activeCrisis, activeEvent, currentRound, factionColor, factionName, lordById,
 } from '../rules/nexus';
 import { crisisForfeits, rollEvent, setEvent } from '../rules/events';
+import { detachmentName } from '../rules/detachments';
 import { href } from '../route';
 import {
   assetName, assetsOf, echoWins, endRound, inGrace, leaders, nextThreat, refundAsset, roundEndText, sectorCounts, spendAsset, spreadsAt, threatOf,
@@ -189,7 +190,7 @@ function CrisisRow({ c }: { c: Campaign }) {
 
 /** Each faction's Strategic Assets this round (one per skirmish won), and spending them on the Battle. Only one faction's, with only. */
 function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
-  const { update } = useStore();
+  const { state: { forces }, update } = useStore();
   const change = (fn: (d: Campaign) => void) => update((s) => {
     if (!s.campaign) return;
     fn(s.campaign);
@@ -207,16 +208,25 @@ function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
             <span className="tag" style={{ borderColor: factionColor(c, f.id) }}>{f.name}: {a.left} of {a.earned} left</span>
             {a.spent.map((u) => (
               <span key={u.id} className="tag gold" title={STRATEGIC_ASSETS.find((x) => x.key === u.asset)?.desc}>
-                {assetName(u.asset)}
+                {assetName(u.asset)}{u.forceId && `: ${forces.find((d) => d.id === u.forceId)?.name ?? 'a detachment'}`}
                 <button className="ghost icon" aria-label={`Take back ${assetName(u.asset)}`} title="Spent by mistake: take it back"
                   onClick={() => change((d) => refundAsset(d, u.id))}>✕</button>
               </span>
             ))}
             {a.left > 0 && (
               <select value="" aria-label={`Spend a Strategic Asset for ${f.name}`}
-                onChange={(e) => e.target.value && change((d) => void spendAsset(d, f.id, e.target.value, uid(), nowIso().slice(0, 10)))}>
+                onChange={(e) => {
+                  const [key, forceId] = e.target.value.split(':');
+                  if (key) change((d) => void spendAsset(d, f.id, key, uid(), nowIso().slice(0, 10), forceId));
+                }}>
                 <option value="">Spend one…</option>
-                {STRATEGIC_ASSETS.map((x) => <option key={x.key} value={x.key} title={x.desc}>{x.name}: {x.desc}</option>)}
+                {STRATEGIC_ASSETS.map((x) => x.key === 'forcedMarch' ? (
+                  <optgroup key={x.key} label={`${x.name}: ${x.desc}`}>
+                    {forces.filter((d) => d.nexus?.factionId === f.id).map((d) => (
+                      <option key={d.id} value={`${x.key}:${d.id}`} title={x.desc}>{x.name}: {detachmentName(c, forces, d)}</option>
+                    ))}
+                  </optgroup>
+                ) : <option key={x.key} value={x.key} title={x.desc}>{x.name}: {x.desc}</option>)}
               </select>
             )}
           </div>

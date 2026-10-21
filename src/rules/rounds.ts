@@ -11,6 +11,7 @@ import { pickSpread, spreadInto } from './voidspawn';
 import { factionClaimedRound } from './detachments';
 import { rateSectors } from './difficulty';
 import { explore } from './fog';
+import { regroup } from './movement';
 import { placeGuardians } from './guardians';
 import { rollOffers } from './heroes';
 import { accrueProduction, buildingsHeld, finishConstruction, warded } from './production';
@@ -110,9 +111,9 @@ export function assetsOf(c: Campaign, factionId: string) {
 export const assetName = (key: string) => STRATEGIC_ASSETS.find((a) => a.key === key)?.name ?? key;
 
 /** Spend one of a faction's Strategic Assets this round. False when it has none left. */
-export function spendAsset(c: Campaign, factionId: string, asset: string, id: string, date: string): boolean {
+export function spendAsset(c: Campaign, factionId: string, asset: string, id: string, date: string, forceId?: string): boolean {
   if (assetsOf(c, factionId).left < 1) return false;
-  const use: AssetUse = { id, round: currentRound(c), factionId, asset, date };
+  const use: AssetUse = { id, round: currentRound(c), factionId, asset, date, ...(forceId ? { forceId } : {}) };
   c.assetsSpent = [...(c.assetsSpent ?? []), use];
   return true;
 }
@@ -211,6 +212,8 @@ export function endRound(
   let newCrisis: RoundEnd['newCrisis'];
   if (crisisRound(c.round) && placeCrisis(c, rand))
     newCrisis = { lord: lordById(c.crisis!.lord)?.name ?? '', sectorName: c.sectors.find((s) => s.id === c.crisis!.sectorId)?.name ?? '' };
+  // Detachments in sectors that drifted off or changed hands fall back.
+  regroup(c);
   explore(c);
   const offers = forces && books ? rollOffers(c, books, forces, rand, uid) : undefined;
   const guardians = forces && books ? placeGuardians(c, books, forces, rand, uid) : [];

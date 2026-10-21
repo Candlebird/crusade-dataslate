@@ -5,7 +5,9 @@ import type { Campaign, Force } from '../model/types';
 import { detachmentName } from '../rules/detachments';
 import { aiDefended } from '../rules/difficulty';
 import { ECHOES, currentRound, factionName } from '../rules/nexus';
-import { HOLD, attackTargets, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
+import { moveOf, moveTargets, positionOf } from '../rules/movement';
+import { HOLD, applyMoves, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
+import { nowIso } from '../model/factory';
 import { spreadsAt, nextThreat } from '../rules/rounds';
 import { href } from '../route';
 import { useEndRound } from './RoundPanel';
@@ -15,7 +17,7 @@ type Firebase = typeof import('../cloud/firebase');
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-/** Sealed attack orders: every player picks a target (or holds) per faction; the GM reveals them all at once. */
+/** Sealed orders: every player picks a move, an attack or a hold per detachment; the GM reveals them all at once. */
 export default function OrdersPanel({ c }: { c: Campaign }) {
   const { state } = useStore();
   const endRound = useEndRound();
@@ -64,7 +66,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     return panel(
       <>
         <p className="muted small">
-          Before each game, every player picks a sector next to their territory to attack, or holds. Nobody sees anyone's picks until the GM reveals them.
+          Before each game, every detachment picks a sector it can reach to move to or attack, or holds. Nobody sees anyone's picks until the GM reveals them.
         </p>
         {cloud.isGm ? <button className="primary" onClick={open}>Open orders for the next game</button> : <p className="muted small">Waiting for the GM to open orders.</p>}
       </>
@@ -106,16 +108,23 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
           <p className="muted small">Your picks are sealed: only you can see them until the GM reveals the round. You can change them until then.</p>
           {mine.length === 0 && <p className="muted small">Link one of your forces to a faction to declare orders for it.</p>}
           {mine.map((f) => {
-            const targets = attackTargets(c, f.nexus!.factionId);
+            const { moves, attacks } = moveTargets(c, f);
+            const at = positionOf(c, f);
+            const { move, why } = moveOf(c, f);
             return (
               <label key={f.id} className="field">
-                <span>{label(f)}</span>
+                <span>{label(f)} <span className="muted small" title={why.join(', ')}>at {at?.name ?? '—'}, moves {move}</span></span>
                 <select value={own?.picks[f.id] ?? own?.picks[f.nexus!.factionId] ?? ''} onChange={(e) => pick(f.id, e.target.value)}>
                   <option value="">— Not declared —</option>
-                  <option value={HOLD}>Hold: no attack</option>
-                  {targets.length > 0 && (
+                  <option value={HOLD}>Hold: stay put, no attack</option>
+                  {moves.length > 0 && (
+                    <optgroup label="Move">
+                      {moves.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.owner ? factionName(c, s.owner) : 'empty space'})</option>)}
+                    </optgroup>
+                  )}
+                  {attacks.length > 0 && (
                     <optgroup label="Attack">
-                      {targets.map((s) => <option key={s.id} value={s.id}>{s.name} ({factionName(c, s.owner)}){s.difficulty !== undefined && aiDefended(s) ? ` — ${s.difficulty} Supply` : ''}</option>)}
+                      {attacks.map((s) => <option key={s.id} value={s.id}>{s.name} ({factionName(c, s.owner)}){s.difficulty !== undefined && aiDefended(s) ? ` — ${s.difficulty} Supply` : ''}</option>)}
                     </optgroup>
                   )}
                 </select>
@@ -135,7 +144,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
           )}
         </>
       )}
-      {revealed && <RevealedOrders c={c} orders={orders} round={current.round} />}
+      {revealed && <RevealedOrders c={c} orders={orders} round={current.round} gm={cloud.isGm} />}
       {revealed && cloud.isGm && (
         <div className="row" style={{ marginTop: 8 }}>
           <button onClick={openNext}>Open orders for the next game</button>
@@ -145,17 +154,42 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
   );
 }
 
-function RevealedOrders({ c, orders, round }: { c: Campaign; orders: PlayerOrders[]; round: number }) {
-  const { state } = useStore();
-  const { attacks, holds } = revealOrders(c, orders, round, state.forces);
+function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerOrders[]; round: number; gm: boolean }) {
+  const { state, update } = useStore();
+  const { attacks, moves, holds } = revealOrders(c, orders, round, state.forces);
+  const moved = c.movedOrders === round;
+  const makeMoves = () => {
+    let n = 0;
+    update((s) => {
+      if (!s.campaign) return;
+      n = applyMoves(s.campaign, moves, s.forces);
+      s.campaign.movedOrders = round;
+      s.campaign.updatedAt = nowIso();
+    });
+    toast(`${n} detachment${n === 1 ? '' : 's'} moved on the map.`);
+  };
   const who = (factionId: string, forceId?: string) => {
     const f = forceId && state.forces.find((x) => x.id === forceId);
     return f ? detachmentName(c, state.forces, f) : factionName(c, factionId);
   };
   const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
-  if (!attacks.length && !holds.length) return <p className="muted small">Nobody declared this round.</p>;
+  if (!attacks.length && !moves.length && !holds.length) return <p className="muted small">Nobody declared this round.</p>;
   return (
     <>
+      {moves.map((m) => (
+        <div key={m.forceId} className="list-item small">
+          <span className="grow">
+            <b>{who(m.factionId, m.forceId)}</b> moves to <b>{sectorName(m.sectorId)}</b>
+            {!moved && m.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}>⚠ {f}</span>)}
+          </span>
+          {moved && <span className="tag green">✓ Moved</span>}
+        </div>
+      ))}
+      {moves.length > 0 && gm && !moved && (
+        <div className="row" style={{ margin: '4px 0 8px' }}>
+          <button className="primary" title="Move every detachment whose move is still in reach; attackers move when they win their battle" onClick={makeMoves}>Move detachments</button>
+        </div>
+      )}
       {attacks.map((a) => {
         const fought = foughtFor(c, a, round);
         return (
