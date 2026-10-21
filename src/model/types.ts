@@ -261,7 +261,7 @@ export interface CatalogBook {
 
 // ---- Nexus Wars campaign (kept by the GM, imported by players) ----
 
-export type SectorType = 'home' | 'planet' | 'research' | 'void' | 'anomaly' | 'empty' | 'voidspawn';
+export type SectorType = 'home' | 'planet' | 'research' | 'void' | 'anomaly' | 'empty' | 'voidspawn' | 'archive';
 
 /** A building under construction at a sector, and what was paid for it (so cancelling it refunds exactly that). */
 export interface Construction {
@@ -311,6 +311,19 @@ export interface Sector {
   construction?: Construction;
   /** The Void Echoes hero guarding an AI-held point of interest (rules/guardians.ts). */
   guardian?: SectorGuardian;
+  /** Marauders raided it: it produces nothing in this round. */
+  raided?: number;
+}
+
+/** A Marauder band (rules/marauders.ts): raiders belonging to no one, always on the map. */
+export interface Marauder {
+  id: string;
+  name: string;
+  sectorId: string;
+  /** The band's Supply: what the GM fields against a faction fighting it. It grows every round. */
+  strength: number;
+  /** The round it turned up in. */
+  since: number;
 }
 
 export interface SectorGuardian {
@@ -331,6 +344,8 @@ export interface CampaignFaction {
   /** Guardian loot not used yet: Blueprints (a free tech) and Building Expansions (a planet's extra slot). */
   blueprints?: number;
   cores?: number;
+  /** Archive unlocks not used yet (from a Lost Archive): research any one building, ignoring its requirements. */
+  archives?: number;
 }
 
 export interface CampaignEvent {
@@ -356,12 +371,16 @@ export interface CampaignEvent {
   crisis?: boolean;
   /** What the game changed, so deleting the entry can put the sector back. */
   undo?: { owner?: string; rewardClaimed?: boolean; reinforced?: boolean; bank?: number; construction?: Construction; guardian?: SectorGuardian;
+    /** The winner took a Lost Archive's Archive unlock. */
+    archive?: boolean;
     /** Where detachments the game moved stood before (null: they had no position yet). */
     positions?: Record<string, ForcePosition | null> };
   /** The detachment that attacked: it moves into the sector when it takes or holds it. */
   forceId?: string;
   /** The slain guardian's loot (GUARDIAN_LOOT): what it gave, and to whom, so deleting the entry can take it back. */
   loot?: { roll: number; id: string; name: string; factionId: string; amount?: number; sectorId?: string };
+  /** A game against a Marauder band (not for the sector): the band as it was, so deleting a win brings it back. */
+  marauder?: Marauder;
 }
 
 /** What each faction held when a round ended: round income is paid from this. */
@@ -415,6 +434,8 @@ export interface Campaign {
   reports?: TurnReport[];
   /** Where each detachment stands, by force id (rules/movement.ts). A force with none stands at its faction's home. */
   positions?: Record<string, ForcePosition>;
+  /** Marauder bands on the map (rules/marauders.ts). */
+  marauders?: Marauder[];
   /** The last round whose revealed moves the GM has applied. */
   movedOrders?: number;
 }

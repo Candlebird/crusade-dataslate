@@ -5,6 +5,7 @@ import { visibleTo } from './fog';
 import type { Rand } from './hexmap';
 import { ECHOES, NEXUS_ROUNDS, eventById, factionName } from './nexus';
 import type { RoundEnd } from './rounds';
+import { MARAUDER_ID } from './marauders';
 
 // The turn report (Nexus Wars): what happened in a round, told like a war correspondent would, built when the GM ends
 // the round. Each line says who may read it: a line about a sector goes to the factions that fought there and the ones
@@ -53,6 +54,7 @@ const TEXT = {
   threatDown: ['The {echoes} falter: threat fell to {threat}.'],
   threatSame: ['The {echoes} watch and wait: threat holds at {threat}.'],
   hulkGone: ['The space hulk {sector} drifted back into the warp.'],
+  archiveGone: ['{sector}, plundered of its last secrets, faded from every star chart.'],
   fresh: ['Scanners caught something new: {sector}.', 'A signal from the dark: {sector} has appeared.'],
   production: ['Your forges worked through the night: +{gained} Materials banked across {sites}.'],
   research: ['Your scholars pored over Nexus echoes: +{gained} Research ({total} to spend).'],
@@ -66,6 +68,23 @@ const TEXT = {
     '{unit} (level {level}{relic}) arrived at your camp, looking for a war worth fighting. Their price: {fee} Umbra Shards.',
   ],
   offerGone: ['{unit} grew tired of waiting and moved on.'],
+  bandBroken: [
+    '{winner} broke {band} at {sector}.',
+    '{band} were cut down at {sector}: {winner} left none standing.',
+  ],
+  bandHeld: ['{band} saw off {attacker} at {sector}, and grow fat on the spoils.'],
+  bandNew: [
+    'Marauders! {band} ({strength} Supply) came out of {sector}.',
+    'Raider sails were sighted at {sector}: {band}, {strength} strong.',
+  ],
+  raid: [
+    "{band} fell on {sector} and carried off {stolen} Materials. {owner}'s forges there stand cold this round.",
+    '{sector} burns: {band} looted {stolen} Materials from {owner}, and nothing will be made there this round.',
+  ],
+  raidRepelled: [
+    "{band} hit {sector}, but {owner}'s defenders threw them back.",
+    'The defences of {sector} held: {band} limped off, bloodied.',
+  ],
   guardian: [
     '{guardian}, a {tier} guardian, now stands watch over {sector}.',
     'Something stirs at {sector}: {guardian} ({tier}) guards it now.',
@@ -79,18 +98,25 @@ function watchers(c: Campaign, sectorId: string, involved: (string | undefined)[
   return out.size === c.factions.length ? undefined : [...out];
 }
 
+const lootText = (e: CampaignEvent) =>
+  e.loot ? ` Among its remains: ${e.loot.name}${e.loot.amount ? ` (+${e.loot.amount}${e.loot.id === 'research' ? ' Research' : ' Materials'})` : ''}.` : '';
+
 function battleLine(c: Campaign, e: CampaignEvent, name: (id: string) => string, rand: Rand): TurnReportLine {
   const vars = {
     sector: name(e.sectorId), echoes: ECHOES.name,
     attacker: factionName(c, e.attacker), defender: factionName(c, e.defender), winner: factionName(c, e.winner),
     loser: factionName(c, e.winner === e.attacker ? e.defender : e.attacker), guardian: e.undo?.guardian?.name ?? '',
   };
+  if (e.marauder) {
+    const band = { ...vars, band: e.marauder.name };
+    if (e.winner === MARAUDER_ID || !e.winner) return { icon: '🏴', text: say(rand, TEXT.bandHeld, band) };
+    return { icon: '⚔', text: `${say(rand, TEXT.bandBroken, band)}${lootText(e)}` };
+  }
   const echoes = !e.defender || e.defender === ECHOES.id || e.defender === 'ai';
   if (!e.winner) return { icon: '⚖', text: say(rand, TEXT.draw, vars) };
   if (e.winner !== e.attacker) return { icon: '🛡', text: say(rand, echoes ? TEXT.repelled : TEXT.held, vars) };
   if (e.undo?.guardian) {
-    const loot = e.loot ? ` Among its remains: ${e.loot.name}${e.loot.amount ? ` (+${e.loot.amount}${e.loot.id === 'research' ? ' Research' : ' Materials'})` : ''}.` : '';
-    return { icon: '⚔', text: `${say(rand, echoes ? TEXT.claimed : TEXT.captured, vars)} ${say(rand, TEXT.guardianSlain, vars)}${loot}` };
+    return { icon: '⚔', text: `${say(rand, echoes ? TEXT.claimed : TEXT.captured, vars)} ${say(rand, TEXT.guardianSlain, vars)}${lootText(e)}` };
   }
   return { icon: '⚔', text: say(rand, echoes ? TEXT.claimed : TEXT.captured, vars) };
 }
@@ -109,7 +135,9 @@ export function buildReport(c: Campaign, r: Omit<RoundEnd, 'report'>, x: ReportE
   // The war.
   for (const e of c.log) {
     if ((e.round ?? 1) !== r.round || e.spread || e.skirmish || e.crisis) continue;
-    at(e.sectorId, [e.attacker, e.defender], battleLine(c, e, name, rand));
+    // Marauders are news everywhere.
+    if (e.marauder) lines.push({ sectorId: e.sectorId, ...battleLine(c, e, name, rand) });
+    else at(e.sectorId, [e.attacker, e.defender], battleLine(c, e, name, rand));
   }
   if (r.crisis)
     lines.push({
@@ -130,8 +158,17 @@ export function buildReport(c: Campaign, r: Omit<RoundEnd, 'report'>, x: ReportE
   for (const s of x.guardians ?? [])
     at(s.id, [], { icon: '♛', text: say(rand, TEXT.guardian, { guardian: s.guardian!.name, tier: s.guardian!.tier, sector: s.name }) });
 
+  // The Marauders, seen by all.
+  for (const x of r.marauders?.raids ?? [])
+    lines.push({
+      icon: '🏴', sectorId: x.sectorId,
+      text: say(rand, x.repelled ? TEXT.raidRepelled : TEXT.raid, { band: x.band, sector: x.sector, stolen: x.stolen, owner: factionName(c, x.owner) }),
+    });
+  for (const m of r.marauders?.spawned ?? [])
+    lines.push({ icon: '🏴', sectorId: m.sectorId, text: say(rand, TEXT.bandNew, { band: m.name, strength: m.strength, sector: name(m.sectorId) }) });
+
   // The map.
-  for (const s of r.cleared) at(s.id, [], { icon: '✧', text: say(rand, TEXT.hulkGone, { sector: s.name }) });
+  for (const s of r.cleared) at(s.id, [], { icon: '✧', text: say(rand, s.type === 'archive' ? TEXT.archiveGone : TEXT.hulkGone, { sector: s.name }) });
   for (const s of r.fresh) at(s.id, [], { icon: '✦', text: say(rand, TEXT.fresh, { sector: s.name }) });
 
   // Each faction's own news.

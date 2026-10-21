@@ -70,9 +70,9 @@ describe('the tech tree', () => {
   it('researches with a Blueprint for free', () => {
     const c = campaign();
     const f = faction(c, 'A');
-    expect(researchBlock(f, 'foundry', true)).toMatch(/Blueprint/);
+    expect(researchBlock(f, 'foundry', 'blueprint')).toMatch(/Blueprint/);
     f.blueprints = 1;
-    expect(research(c, 'A', 'foundry', true)).toBe(true);
+    expect(research(c, 'A', 'foundry', 'blueprint')).toBe(true);
     expect([f.blueprints, f.research, f.techs]).toEqual([undefined, undefined, ['foundry']]);
   });
 

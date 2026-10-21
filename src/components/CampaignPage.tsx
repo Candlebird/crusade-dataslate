@@ -168,7 +168,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
         </div>
         <div className="row">
           <a className="btn" href={href.campaign()}>← Player view</a>
-          <button onClick={guard} title="Give every AI-held planet, station, anomaly and void sector without one a guardian (the round's end does this too)">Place guardians</button>
+          <button onClick={guard} title="Give every AI-held planet, station, anomaly, void sector and Lost Archive without one a guardian (the round's end does this too)">Place guardians</button>
           <button className="primary" onClick={() => exportCampaign(c)}>Export campaign.json</button>
         </div>
       </div>
@@ -410,7 +410,7 @@ function LogPanel({ c, setC, viewer }: { c: Campaign; setC: SetC; viewer?: strin
     return new Set([...seen, ...rememberedBy(c, viewer, seen)]);
   }, [c, viewer]);
   const log = viewer === '-' ? [] : !known ? c.log
-    : c.log.filter((e) => e.crisis || e.attacker === viewer || e.defender === viewer || e.winner === viewer || known.has(e.sectorId));
+    : c.log.filter((e) => e.crisis || e.marauder || e.attacker === viewer || e.defender === viewer || e.winner === viewer || known.has(e.sectorId));
   return (
     <Panel id="campaign.log" title="Campaign log" extra={<span className="muted small">{log.length} game{log.length === 1 ? '' : 's'}</span>}>
       {log.length === 0 ? <p className="muted small">No games {viewer ? 'you know of ' : ''}yet.</p> : [...log].reverse().map((e) => (
@@ -419,6 +419,7 @@ function LogPanel({ c, setC, viewer }: { c: Campaign; setC: SetC; viewer?: strin
           <span className="grow">
             {e.skirmish ? <>⚔ Skirmish: <b>{factionName(c, e.winner)} wins</b>{e.defender === ECHOES.id ? <> a patrol against the {ECHOES.name}</> : ''}</>
               : e.crisis ? <>☠ Nexus Crisis at <b>{sectorName(e.sectorId)}</b>: {e.winner === ECHOES.id ? <b>the Echo Lord prevails</b> : <b>the factions defeat the Echo Lord</b>}</>
+              : e.marauder ? <>🏴 <b>{sectorName(e.sectorId)}</b>: {factionName(c, e.attacker)} vs <b>{e.marauder.name}</b> ({e.marauder.strength} Supply) — {e.winner === e.attacker ? <b>the band is broken</b> : <b>the Marauders hold</b>}</>
               : e.spread ? <>☣ <b>{factionName(c, e.winner)}</b> spread to <b>{sectorName(e.sectorId)}</b>{e.defender && <> from {factionName(c, e.defender)}</>}</> : <>
               <b>{sectorName(e.sectorId)}</b>: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} —{' '}
               {e.winner ? <b>{factionName(c, e.winner)} wins</b> : 'draw'}

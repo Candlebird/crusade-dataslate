@@ -11,6 +11,7 @@ export const SECTOR_TYPES: Record<SectorType, { label: string; desc: string }> =
   void: { label: 'Void / Space hulk', desc: 'Defeat an AI opponent here for a one-off D6 reward. Salvage: +25 Supply each round while you hold it.' },
   anomaly: { label: 'Anomaly', desc: 'Roll a D6 on the Anomaly table each round.' },
   empty: { label: 'Empty space', desc: 'No benefit.' },
+  archive: { label: 'Lost Archive', desc: "A guarded vault of forgotten designs; there's never more than one. Beat its garrison to take it and an Archive unlock: research any one building, even one whose requirements you don't know. Plundered, it fades from the map when the round ends." },
   voidspawn: { label: 'Voidspawn', desc: "The Void Echoes' home sector. It can be attacked but never controlled. When a round ends the Echoes spread from their territory; beating them here lowers their threat the most." },
 };
 export const SECTOR_TYPE_KEYS = Object.keys(SECTOR_TYPES) as SectorType[];
@@ -180,6 +181,8 @@ export const NEXUS_MAP = {
   /** New points of interest each round: this many in each faction's half of the map, and this many in the contested middle. */
   refreshPerFaction: 1,
   refreshContested: 1,
+  /** When the round ends with no Lost Archive on the map, the odds one turns up in the contested middle. */
+  archiveChance: 0.5,
 };
 
 /**
@@ -200,7 +203,7 @@ export const NEXUS_DIFFICULTY = {
   step: 100,
   /** How much of the rating comes from distance to the nearest home (0–1); the type bonus adds to it. */
   distanceWeight: 0.8,
-  typeBonus: { home: 0, planet: 0.05, research: 0.1, void: 0.2, anomaly: 0.15, empty: -0.1, voidspawn: 1 } as Record<SectorType, number>,
+  typeBonus: { home: 0, planet: 0.05, research: 0.1, void: 0.2, anomaly: 0.15, empty: -0.1, voidspawn: 1, archive: 0.25 } as Record<SectorType, number>,
   /** Sectors rated at least this far up the scale get a second modifier. */
   hardAt: 0.6,
 };
@@ -458,6 +461,36 @@ export interface GuardianLoot {
  * most). Materials go to the bank of the sector it guarded, if that produces, or else to the faction's home. The
  * Building Expansion is the only way to give a planet a third building slot.
  */
+/**
+ * Marauders (rules/marauders.ts): raider bands that turn up at a round's end, after the opening rounds, while there are
+ * fewer than `capByThreat[threat]`. Strengths are Supply, scaled by the campaign's difficulty level.
+ */
+export const MARAUDERS = {
+  capByThreat: [0, 1, 1, 2, 2, 3, 3],
+  spawnChance: 0.5,
+  /** A new band comes out of the Voidspawn this often, otherwise from an unclaimed sector at the map's edge. */
+  voidspawnChance: 0.3,
+  /** A new band's Supply; it gains `grow` every round, up to `max`, and loses `repelLoss` (not below `min`) when thrown back. */
+  start: 600,
+  grow: 100,
+  max: 2000,
+  min: 400,
+  repelLoss: 200,
+  /** Hexes a band moves each round. */
+  move: { min: 1, max: 2 },
+  /** The share of a world's bank a raid carries off. */
+  steal: 0.5,
+  /** How much less a defended world (Walls, Reinforce or a garrison) draws a band. */
+  defendedWeight: 0.4,
+  /** Beaten, a band rolls Guardian loot as Rare from this Supply, Legendary from that. */
+  rareAt: 1000,
+  legendaryAt: 1500,
+  names: {
+    adjective: ['Crimson', 'Ashen', 'Howling', 'Iron', 'Black', 'Rust', 'Grinning', 'Bleeding', 'Starving', 'Hollow', 'Gilded', 'Feral'],
+    noun: ['Corsairs', 'Reavers', 'Jackals', 'Wreckers', 'Raiders', 'Butchers', 'Scavengers', 'Vultures', 'Brigands', 'Freebooters'],
+  },
+};
+
 export const GUARDIAN_LOOT = {
   bonus: { Common: 0, Rare: 1, Legendary: 2 } as Record<'Common' | 'Rare' | 'Legendary', number>,
   table: [
@@ -491,12 +524,12 @@ export const HERO_OFFERS = {
 };
 
 /**
- * Guardians: every AI-held planet, research station, anomaly and void sector is guarded by a Void Echoes hero with a
+ * Guardians: every AI-held planet, research station, anomaly, void sector and Lost Archive is guarded by a Void Echoes hero with a
  * relic and twice its Tough. Its tier follows the sector's threat (sectorThreat, 0–1): under `rare` Common, under
  * `legendary` Rare, Legendary above. Beat the garrison and the guardian's relic is yours, with a roll on GUARDIAN_LOOT.
  */
 export const GUARDIANS = {
-  types: ['planet', 'research', 'anomaly', 'void'] as SectorType[],
+  types: ['planet', 'research', 'anomaly', 'void', 'archive'] as SectorType[],
   rare: 0.4,
   legendary: 0.75,
   /** The guardian's Tough is multiplied by this (a hero without Tough gets Tough(2)). */

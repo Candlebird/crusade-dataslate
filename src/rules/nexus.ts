@@ -5,6 +5,7 @@ import {
   type GalacticEvent, type NexusTableEntry,
 } from './nexusData';
 import { explore } from './fog';
+import { MARAUDER_ID, unrecordMarauderGame } from './marauders';
 import { settleGame, unsettleGame } from './movement';
 import { bankCap, hasBuilding, loseBank, produces } from './production';
 
@@ -34,7 +35,7 @@ export const ownedSectors = (c: Campaign, factionId: string) => c.sectors.filter
 export const homeOf = (c: Campaign, factionId: string) => c.sectors.find((s) => s.type === 'home' && s.owner === factionId);
 
 export const factionName = (c: Campaign, id: string | undefined) =>
-  id === ECHOES.id ? ECHOES.name : c.factions.find((f) => f.id === id)?.name ?? (id ? 'Unknown faction' : 'Unclaimed');
+  id === ECHOES.id ? ECHOES.name : id === MARAUDER_ID ? 'Marauders' : c.factions.find((f) => f.id === id)?.name ?? (id ? 'Unknown faction' : 'Unclaimed');
 
 export const factionColor = (c: Campaign, id: string | undefined) => (id === ECHOES.id ? ECHOES.color : c.factions.find((f) => f.id === id)?.color);
 
@@ -100,7 +101,7 @@ export function changeHands(s: Sector, owner: string, undo: NonNullable<Campaign
  * Roll the slain guardian's loot for the faction that beat it: D6 + its tier's bonus (GUARDIAN_LOOT), and give it.
  * Materials go to the sector's bank (or the faction's home, if the sector has none), up to the bank's cap.
  */
-export function rollGuardianLoot(c: Campaign, s: Sector, g: SectorGuardian, factionId: string, rand = Math.random): NonNullable<CampaignEvent['loot']> | undefined {
+export function rollGuardianLoot(c: Campaign, s: Sector, g: Pick<SectorGuardian, 'tier'>, factionId: string, rand = Math.random): NonNullable<CampaignEvent['loot']> | undefined {
   const f = c.factions.find((x) => x.id === factionId);
   if (!f) return undefined;
   const T = GUARDIAN_LOOT.table;
@@ -149,6 +150,16 @@ export function recordSectorGame(c: Campaign, e: CampaignEvent, rand = Math.rand
     undo.rewardClaimed = true;
     s.rewardClaimed = true;
   }
+  // The first to beat a Lost Archive's garrison carries off its Archive unlock; plundered, it fades when the round ends.
+  if (s.type === 'archive' && e.defender === 'ai' && !s.rewardClaimed) {
+    undo.rewardClaimed = true;
+    s.rewardClaimed = true;
+    const f = c.factions.find((x) => x.id === e.winner);
+    if (f) {
+      undo.archive = true;
+      f.archives = (f.archives ?? 0) + 1;
+    }
+  }
   if (undo.guardian) e.loot = rollGuardianLoot(c, s, undo.guardian, e.winner, rand);
   settleGame(c, e, s, undo);
   if (Object.keys(undo).length) e.undo = undo;
@@ -160,6 +171,12 @@ export function removeSectorGame(c: Campaign, id: string) {
   const i = c.log.findIndex((x) => x.id === id);
   if (i < 0) return;
   const [e] = c.log.splice(i, 1);
+  // A game against marauders didn't change the map: the band it broke comes back, and its loot goes.
+  if (e.marauder) {
+    unrecordMarauderGame(c, e);
+    if (e.loot) returnGuardianLoot(c, e.loot);
+    return;
+  }
   // A Crisis battle didn't change the map: deleting it means the Crisis hasn't been fought yet (while its round lasts).
   if (e.crisis) {
     const crisis = activeCrisis(c);
@@ -177,6 +194,11 @@ export function removeSectorGame(c: Campaign, id: string) {
     else delete s.owner;
   }
   if (e.undo.rewardClaimed) delete s.rewardClaimed;
+  const winner = c.factions.find((x) => x.id === e.winner);
+  if (e.undo.archive && winner) {
+    winner.archives = Math.max(0, (winner.archives ?? 0) - 1);
+    if (!winner.archives) delete winner.archives;
+  }
   if (e.undo.reinforced && s.owner === e.undo.owner) s.reinforced = true;
   if (e.undo.bank && s.owner === e.undo.owner) s.bank = e.undo.bank;
   if (e.undo.construction && s.owner === e.undo.owner) s.construction = e.undo.construction;
@@ -336,6 +358,10 @@ export function nexusGeneration(
     if (fought.rewardClaimed) notes.push(`${fought.name}'s one-off reward has already been claimed.`);
     else items.push({ key: 'void', kind: 'void', source: `${fought.name}: Void / Space hulk` });
   }
+  if (fought?.type === 'archive' && vsAi && won)
+    notes.push(fought.rewardClaimed
+      ? `${fought.name} has already been plundered.`
+      : `Took ${fought.name}: +1 Archive unlock for ${factionName(c, factionId)}, to research any one building from the tech tree, ignoring its requirements.`);
   const guardian = fought && won && vsAi ? slainGuardian(c, factionId, fought) : undefined;
   if (guardian) {
     const relic = guardian.unit.relics[0];

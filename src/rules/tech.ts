@@ -3,7 +3,7 @@ import { BUILDINGS, NEXUS_TECH, type Building } from './nexusData';
 
 // The tech tree (Nexus Wars). Each building is a tech: tier 1 is known from the start, tiers 2 and 3 are researched
 // with Research, which every faction earns when a round ends (NEXUS_TECH), once the techs they require are known. A
-// Blueprint (Guardian loot) researches one for free. Doesn't import production.ts: production imports this.
+// Blueprint (Guardian loot) researches an open one for free, and an Archive unlock (a Lost Archive) any one at all. Doesn't import production.ts: production imports this.
 
 const byId = (id: string) => BUILDINGS.find((b) => b.id === id);
 
@@ -20,26 +20,33 @@ export function techStatus(f: CampaignFaction | undefined, b: Building): TechSta
 
 export const techCost = (b: Building) => NEXUS_TECH.cost[b.tier];
 
+/** How a tech is researched: with Research, a Blueprint (an open tech, free) or an Archive unlock (any tech, free). */
+export type ResearchVia = 'research' | 'blueprint' | 'archive';
+
 /** Why the faction can't research it now, if it can't. */
-export function researchBlock(f: CampaignFaction | undefined, id: string, blueprint = false): string | undefined {
+export function researchBlock(f: CampaignFaction | undefined, id: string, via: ResearchVia = 'research'): string | undefined {
   const b = byId(id);
   if (!b) return 'Unknown building';
   if (!f) return 'Only a faction researches';
   const st = techStatus(f, b);
   if (st === 'known') return 'Already researched';
+  if (via === 'archive') return (f.archives ?? 0) > 0 ? undefined : 'No Archive unlock (Lost Archive)';
   if (st === 'locked') return `Needs ${(b.requires ?? []).filter((r) => !byId(r) || !knows(f, byId(r)!)).map((r) => byId(r)?.name ?? r).join(' and ')} first`;
-  if (blueprint) return (f.blueprints ?? 0) > 0 ? undefined : 'No Blueprint (Guardian loot)';
+  if (via === 'blueprint') return (f.blueprints ?? 0) > 0 ? undefined : 'No Blueprint (Guardian loot)';
   if ((f.research ?? 0) < techCost(b)) return `Needs ${techCost(b)} Research (${f.research ?? 0} banked)`;
   return undefined;
 }
 
-/** Research a building for a faction: with Research, or with one of its Blueprints. False when it can't. */
-export function research(c: Campaign, factionId: string, id: string, blueprint = false): boolean {
+/** Research a building for a faction: with Research, one of its Blueprints or one of its Archive unlocks. False when it can't. */
+export function research(c: Campaign, factionId: string, id: string, via: ResearchVia = 'research'): boolean {
   const f = c.factions.find((x) => x.id === factionId);
-  if (researchBlock(f, id, blueprint) || !f) return false;
-  if (blueprint) {
+  if (researchBlock(f, id, via) || !f) return false;
+  if (via === 'blueprint') {
     f.blueprints = (f.blueprints ?? 0) - 1;
     if (!f.blueprints) delete f.blueprints;
+  } else if (via === 'archive') {
+    f.archives = (f.archives ?? 0) - 1;
+    if (!f.archives) delete f.archives;
   } else f.research = (f.research ?? 0) - techCost(byId(id)!);
   f.techs = [...(f.techs ?? []), id];
   return true;

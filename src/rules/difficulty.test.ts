@@ -154,7 +154,8 @@ describe('the default map and the round refresh', () => {
     expect(defaultMap(2)).toMatchObject({ cols: 12, rows: 12 });
     expect(defaultMap(3)).toMatchObject({ cols: 14, rows: 14 });
     const counts = defaultCounts(2);
-    const all = 2 + Object.values(counts).reduce((a, b) => a + b, 0);
+    // The Lost Archive takes over clear space, so it doesn't add a sector.
+    const all = 2 + Object.values(counts).reduce((a, b) => a + b, 0) - counts.archive;
     expect(all).toBe(Math.round(144 * NEXUS_MAP.fill));
     expect(counts.planet + counts.research + counts.void + counts.anomaly).toBe(Math.round(all * NEXUS_MAP.poiShare));
     expect(counts.planet).toBeGreaterThan(counts.research);
@@ -186,7 +187,8 @@ describe('the default map and the round refresh', () => {
 
   it("adds new points of interest in each faction's half and the middle, away from the homes", () => {
     for (const factions of [2, 3]) {
-      const c = generate(campaign(factions), 'c3');
+      // A seed whose Lost Archive leaves clear space in the middle (otherwise its new point of interest grows the board).
+      const c = generate(campaign(factions), 'c6');
       const before = c.sectors.length;
       const r = refreshSectors(c, rng('fresh'));
       expect(r.fresh).toHaveLength(factions * NEXUS_MAP.refreshPerFaction + NEXUS_MAP.refreshContested);

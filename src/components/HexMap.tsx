@@ -2,7 +2,7 @@ import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } fro
 import { nowIso, uid } from '../model/factory';
 import { useStore } from '../model/store';
 import { readImageAsDataUrl } from '../model/io';
-import type { Campaign, Force, Sector, SectorType } from '../model/types';
+import type { Campaign, CampaignEvent, Force, Sector, SectorType } from '../model/types';
 import {
   cells, clampToMap, defaultCounts, defaultMap, frontier, generateMap, hexCorners, hexKey, isPlaced, randomSeed, rng, rollSector, toPixel,
   type GenCounts, type GenOptions, type Hex,
@@ -20,6 +20,7 @@ import { knows } from '../rules/tech';
 import { sightMap, type Sight } from '../rules/fog';
 import { positionOf, reach, setPosition } from '../rules/movement';
 import { detachmentName } from '../rules/detachments';
+import { MARAUDER_ID, bandsAt, isRaided, marauderTier, recordMarauderGame } from '../rules/marauders';
 import { BUILDINGS, PRODUCTION } from '../rules/nexusData';
 import { href } from '../route';
 import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
@@ -29,7 +30,7 @@ type SetC = (fn: (c: Campaign) => void) => void;
 type Tool = 'select' | 'type' | 'owner' | 'move' | 'unplace';
 
 const SIZE = 40;
-const GLYPH: Record<SectorType, string> = { home: '♜', planet: '◉', research: '⌬', void: '✠', anomaly: '✺', empty: '·', voidspawn: '☣' };
+const GLYPH: Record<SectorType, string> = { home: '♜', planet: '◉', research: '⌬', void: '✠', anomaly: '✺', empty: '·', voidspawn: '☣', archive: '❖' };
 const TOOLS: { key: Tool; label: string; hint: string }[] = [
   { key: 'select', label: 'Select', hint: 'Click a hex to see or edit it' },
   { key: 'type', label: 'Paint type', hint: 'Click hexes to set their type (creates a sector on empty space)' },
@@ -355,6 +356,20 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
                   </g>
                 );
               })}
+              {/* Marauders: everyone sees them, fog or not. */}
+              {(c.marauders ?? []).map((m, i, all) => {
+                const s = c.sectors.find((x) => x.id === m.sectorId);
+                if (!s || !isPlaced(s)) return null;
+                const p = toPixel(s as Hex, SIZE);
+                const n = all.slice(0, i).filter((x) => x.sectorId === m.sectorId).length;
+                return (
+                  <g key={m.id} data-q={s.q} data-r={s.r} className="hex-band" transform={`translate(${p.x + 19 - n * 9}, ${p.y + 9})`}>
+                    <title>{m.name}: Marauders, {m.strength} Supply</title>
+                    <circle r={6.5} />
+                    <text y={3}>🏴</text>
+                  </g>
+                );
+              })}
             </svg>
             <div className="map-zoom">
               <button className="icon" aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(4, z * 1.25))}>+</button>
@@ -370,6 +385,7 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
               : <SectorView c={c} s={selSector} sight={selSight!} gm={gm} viewer={viewAs} setC={setC}
                 onEdit={() => setEditing(true)} onRecord={onRecord && (() => onRecord(selSector.id))} />)}
             {sel && (selSector ? selSight === 'hidden' : !gm) && <Uncharted />}
+            {selSector && <MarauderBox c={c} s={selSector} gm={gm} setC={setC} />}
             {sel && !selSector && gm && <EmptyHex c={c} h={sel} unplaced={unplaced} setC={setC} />}
           </div>
         </div>
@@ -379,6 +395,7 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
           <span>⛨ Reinforced</span>
           <span>✓ Reward claimed</span>
           <span>♛ Guardian</span>
+          <span>🏴 Marauders</span>
           {sidesOf(c).map((f) => <span key={f.id}><i className="swatch" style={{ background: f.color }} /> {f.name}</span>)}
         </div>
 
@@ -446,6 +463,7 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
         {s.type === 'void' && s.rewardClaimed && <span className="tag">✓ Reward claimed</span>}
         {stormed(c, s.id) && <span className="tag red">🌀 {activeEvent(c)?.name}: can't be attacked this round</span>}
         {activeCrisis(c)?.sectorId === s.id && <span className="tag red">☠ Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name} rises here</span>}
+        {isRaided(c, s) && <span className="tag red">🏴 Raided: produces nothing this round</span>}
       </div>
       <p className="small">{benefit ? <><b>{benefit.name}:</b> {benefit.desc}</> : SECTOR_TYPES[s.type].desc}</p>
       <SectorDanger s={s} />
@@ -473,6 +491,41 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
         {gm && <button onClick={onEdit}>Edit</button>}
       </div>
     </>
+  );
+}
+
+/** The Marauder bands in a sector, and (for the GM) logging a game against one. */
+function MarauderBox({ c, s, gm, setC }: { c: Campaign; s: Sector; gm: boolean; setC: SetC }) {
+  const bands = bandsAt(c, s.id);
+  const [by, setBy] = useState('');
+  if (!bands.length) return null;
+  const who = by || s.owner && c.factions.some((f) => f.id === s.owner) && s.owner || c.factions[0]?.id || '';
+  const fight = (bandId: string, won: boolean) => setC((d) => {
+    const e: CampaignEvent = { id: uid(), date: nowIso().slice(0, 10), sectorId: s.id, attacker: who, defender: MARAUDER_ID, winner: won ? who : MARAUDER_ID, notes: '' };
+    recordMarauderGame(d, e, bandId);
+    toast(won ? `${factionName(d, who)} broke the band${e.loot ? ` and found ${e.loot.name}` : ''}.` : 'The Marauders held.');
+  });
+  return (
+    <div className="marauder-box small">
+      {bands.map((m) => {
+        const tier = marauderTier(m);
+        return (
+          <div key={m.id}>
+            <span className="tag red">🏴 Marauders</span> <b>{m.name}</b>: <b>{m.strength} Supply</b>, about since round {m.since}.
+            {' '}Beat them and roll <span className={`tag${tier === 'Legendary' ? ' gold' : tier === 'Rare' ? ' red' : ''}`}>{tier}</span> Guardian loot.
+            {gm && c.factions.length > 0 && (
+              <div className="row" style={{ marginTop: '0.35rem' }}>
+                <select value={who} onChange={(e) => setBy(e.target.value)} aria-label="Faction fighting the band">
+                  {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+                <button onClick={() => fight(m.id, true)} title="Log the game: the band is broken and the winner rolls loot">Beat them</button>
+                <button onClick={() => fight(m.id, false)} title="Log the game: the band stays">Lost</button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -829,6 +882,7 @@ const MAP_EXPORT_CSS = `
   .hex-glyph { fill: #c9a24a; font: 20px Georgia, serif; text-anchor: middle; }
   .hex-research .hex-glyph { fill: #8fc1e3; }
   .hex-void .hex-glyph { fill: #5fb3b3; }
+  .hex-archive .hex-glyph { fill: #e3c97a; }
   .hex-anomaly .hex-glyph { fill: #b583d6; }
   .hex-empty .hex-glyph { fill: #666; }
   .hex-name { fill: #d9d4c7; font: 600 7.5px 'Segoe UI', sans-serif; text-anchor: middle; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }

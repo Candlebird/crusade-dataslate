@@ -409,11 +409,15 @@ table.compact .stepper input { width: 2.6rem; }
 .hex-glyph { fill: var(--gold); font: 20px var(--serif); text-anchor: middle; pointer-events: none; }
 .hex-research .hex-glyph { fill: #8fc1e3; }
 .hex-void .hex-glyph { fill: var(--cyan); }
+.hex-archive .hex-glyph { fill: #e3c97a; }
 .hex-anomaly .hex-glyph { fill: #b583d6; }
 .hex-voidspawn .hex-glyph { fill: #a66bff; }
 .hex-empty .hex-glyph { fill: #666; }
 .hex-name { fill: var(--text); font: 600 7.5px var(--sans); text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }
 .hex-mark { fill: var(--text); font: 11px var(--sans); text-anchor: middle; }
+.hex-band circle { fill: #2a0d0d; stroke: #e05a4a; stroke-width: 1.5px; }
+.hex-band text { font: 8px var(--sans); text-anchor: middle; pointer-events: none; }
+.marauder-box { margin: 0.5rem 0; padding: 0.5rem; border: 1px solid #e05a4a55; border-radius: 6px; display: grid; gap: 0.5rem; }
 .hex-force-n { fill: #07080b; font: 700 8px var(--sans); text-anchor: middle; pointer-events: none; }
 .hex-diff { fill: #e08a7a; font: 600 9px var(--sans); text-anchor: middle; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }
 .map-zoom { position: absolute; right: 0.5rem; top: 0.5rem; display: flex; flex-direction: column; gap: 0.25rem; }

@@ -142,5 +142,5 @@ export function applyMoves(c: Campaign, moves: Move[], forces: Force[]): number 
 
 /** The game already recorded for a revealed attack this round, if it has been fought. */
 export function foughtFor(c: Campaign, a: Pick<Attack, 'factionId' | 'sectorId'>, round: number): CampaignEvent | undefined {
-  return [...c.log].reverse().find((e) => e.round === round && e.sectorId === a.sectorId && e.attacker === a.factionId && !e.spread && !e.skirmish && !e.crisis);
+  return [...c.log].reverse().find((e) => e.round === round && e.sectorId === a.sectorId && e.attacker === a.factionId && !e.spread && !e.skirmish && !e.crisis && !e.marauder);
 }

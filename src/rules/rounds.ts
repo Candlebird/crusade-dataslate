@@ -1,5 +1,5 @@
 import { uid } from '../model/factory';
-import type { AssetUse, Campaign, CatalogBook, Force, ForceNexus, HeroOffer, RoundSnapshot, Sector, TurnReport } from '../model/types';
+import type { AssetUse, Campaign, CatalogBook, Force, ForceNexus, HeroOffer, Marauder, RoundSnapshot, Sector, TurnReport } from '../model/types';
 import { CATEGORIES } from './data';
 import { refreshSectors, type Rand } from './hexmap';
 import {
@@ -12,6 +12,7 @@ import { factionClaimedRound } from './detachments';
 import { rateSectors } from './difficulty';
 import { explore } from './fog';
 import { regroup } from './movement';
+import { moveMarauders, type Raid } from './marauders';
 import { placeGuardians } from './guardians';
 import { rollOffers } from './heroes';
 import { accrueProduction, buildingsHeld, finishConstruction, warded } from './production';
@@ -24,7 +25,7 @@ import { buildReport } from './report';
 //  - every faction's holdings are noted, and each force claims that round's sector income whenever its player is ready,
 //  - the Void Echoes' threat moves (up each round, down for every win against them), and they spread that many sectors,
 //  - unspent Strategic Assets are lost,
-//  - claimed space hulks drift off and new points of interest turn up (refreshSectors, hexmap.ts),
+//  - claimed space hulks and Lost Archives fade and new points of interest turn up (refreshSectors, hexmap.ts),
 //  - every sector's difficulty is rescaled to the factions' current Supply, and AI garrisons roll new modifiers,
 //  - the round's Nexus Crisis is settled, a Galactic Event is rolled for the next round, and a new Crisis rises if it's
 //    time (events.ts),
@@ -133,7 +134,7 @@ export interface RoundEnd {
   spread: Sector[];
   /** The new range of sector ratings, when the forces were given to rescale them. */
   difficulty?: { min: number; max: number };
-  /** Claimed space hulks that drifted off, as they were. */
+  /** Claimed space hulks and Lost Archives that faded, as they were. */
   cleared: Sector[];
   /** New points of interest. */
   fresh: Sector[];
@@ -154,6 +155,8 @@ export interface RoundEnd {
   offers?: { fresh: HeroOffer[]; gone: HeroOffer[] };
   /** Sectors that got a new guardian (needs the forces and books). */
   guardians: Sector[];
+  /** What the Marauders did: raids (and raids thrown back), and bands that turned up. */
+  marauders: { raids: Raid[]; spawned: Marauder[] };
   report: TurnReport;
 }
 
@@ -201,7 +204,7 @@ export function endRound(
   c.round = round + 1;
   // Strategic Assets don't carry over.
   delete c.assetsSpent;
-  // The map moves on: claimed hulks drift off and new points of interest turn up. The round's income still counts the hulks.
+  // The map moves on: claimed hulks and archives fade and new points of interest turn up. The round's income still counts the hulks.
   const { cleared, fresh } = refreshSectors(c, rand, event?.hulks ?? 0);
   const held = new Set(Object.values(holdings).flat());
   const was = cleared.filter((s) => held.has(s.id));
@@ -215,11 +218,12 @@ export function endRound(
   // Detachments in sectors that drifted off or changed hands fall back.
   regroup(c);
   explore(c);
+  const marauders = moveMarauders(c, threat, rand, uid, forces);
   const offers = forces && books ? rollOffers(c, books, forces, rand, uid) : undefined;
   const guardians = forces && books ? placeGuardians(c, books, forces, rand, uid) : [];
   const end: Omit<RoundEnd, 'report'> = {
     round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, difficulty, cleared, fresh,
-    event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, research, built, offers, guardians,
+    event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, research, built, offers, guardians, marauders,
   };
   const report = buildReport(c, end, { production, research, built, offers, guardians }, date, rand);
   return { ...end, report };
@@ -227,12 +231,19 @@ export function endRound(
 
 /** One line for the log / a toast. */
 export function roundEndText(c: Campaign, r: RoundEnd) {
+  const gone = (type: string, what: string, did: string) => {
+    const g = r.cleared.filter((s) => s.type === type);
+    return g.length ? ` ${what}${g.length === 1 ? '' : 's'} ${did}: ${g.map((s) => s.name).join(', ')}.` : '';
+  };
   const where = r.spread.length ? `spread to ${r.spread.map((s) => s.name).join(', ')}` : 'did not spread';
   const crisis = !r.crisis ? ''
     : r.crisis.result === 'won' ? ` The Nexus Crisis was won: ${r.crisis.lord} is beaten.`
     : ` The Nexus Crisis was lost: ${r.crisis.lord} took ${r.crisis.lost.map((s) => s.name).join(', ') || 'nothing'}.`;
   const next = `${r.nextEvent ? ` Galactic event: ${eventById(r.nextEvent)?.name}.` : ''}${r.newCrisis ? ` Nexus Crisis! ${r.newCrisis.lord} rises at ${r.newCrisis.sectorName}.` : ''}`;
-  return `Round ${r.round} ended.${crisis} ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${r.cleared.length ? ` Space hulk${r.cleared.length === 1 ? '' : 's'} drifted off: ${r.cleared.map((s) => s.name).join(', ')}.` : ''}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''} Round ${currentRound(c)} begins.${next}`;
+  const sector = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'the map edge';
+  const raids = r.marauders.raids.map((x) => x.repelled ? ` ${x.band} were thrown back from ${x.sector}.` : ` ${x.band} raided ${x.sector} (−${x.stolen} Materials).`).join('');
+  const bands = r.marauders.spawned.map((m) => ` Marauders! ${m.name} (${m.strength} Supply) turned up at ${sector(m.sectorId)}.`).join('');
+  return `Round ${r.round} ended.${crisis} ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${gone('void', 'Space hulk', 'drifted off')}${gone('archive', 'Lost Archive', 'faded')}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''}${raids}${bands} Round ${currentRound(c)} begins.${next}`;
 }
 
 /**

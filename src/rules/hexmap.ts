@@ -123,6 +123,8 @@ function nameFor(rand: Rand, type: SectorType): string {
       return pick(rand, [`The ${n} Rift`, `${n} Maelstrom`, `Eye of ${n}`, `The ${n} Scar`]);
     case 'empty':
       return pick(rand, [`${n} Expanse`, `${n} Deep`, `Dust of ${n}`, `The ${n} Reach`]);
+    case 'archive':
+      return pick(rand, [`The Lost Archive of ${n}`, `The ${n} Codex Vault`, `The Sealed Stacks of ${n}`, `The Library of ${n}`]);
     case 'home':
       return `${n} Bastion`;
     case 'voidspawn':
@@ -150,6 +152,10 @@ const LORE: Record<SectorType, [string[], string[]]> = {
   empty: [
     ['A dead stretch of space', 'A dust-choked nebula', 'A graveyard of shattered moons', 'A silent void lane'],
     ['crossed only by the desperate.', 'patrolled by nothing at all.', 'where sensors fail.', 'littered with the debris of old battles.'],
+  ],
+  archive: [
+    ['A vault of pre-Umbra designs', 'A drowned library-ship', 'A data-crypt sealed since the first war', 'A drifting reliquary of schematics'],
+    ['whose keepers never left.', 'that only opens to the victor.', 'that will not stay found for long.', 'humming with knowledge nobody remembers writing.'],
   ],
   home: [
     ['A fortified stronghold', 'A sprawling fortress-world', 'An armoured citadel'],
@@ -201,7 +207,7 @@ export function defaultCounts(factions: number, cols?: number, rows?: number): G
   const poi = Math.round(total * NEXUS_MAP.poiShare);
   const kinds = Object.entries(NEXUS_MAP.poiWeights) as [keyof GenCounts, number][];
   const sum = kinds.reduce((n, [, w]) => n + w, 0);
-  const counts: GenCounts = { planet: 0, research: 0, void: 0, anomaly: 0, empty: 0, voidspawn: 1 };
+  const counts: GenCounts = { planet: 0, research: 0, void: 0, anomaly: 0, archive: 1, empty: 0, voidspawn: 1 };
   // Largest remainder, so the points of interest add up exactly.
   const exact = kinds.map(([t, w]) => ({ t, x: (poi * w) / sum }));
   for (const e of exact) counts[e.t] = Math.floor(e.x);
@@ -311,7 +317,8 @@ export function generateMap(c: Campaign, o: GenOptions) {
   const share: SectorType[] = [];
   const middle: SectorType[] = [];
   for (const t of Object.keys(o.counts) as (keyof GenCounts)[]) {
-    if (t === 'voidspawn') continue;
+    // The Lost Archive takes over clear space once the map is laid out.
+    if (t === 'voidspawn' || t === 'archive') continue;
     const need = Math.max(0, o.counts[t] - c.sectors.filter((s) => s.type === t).length);
     const each = placedHomes.length > 1 ? Math.floor(need / placedHomes.length) : 0;
     for (let i = 0; i < each; i++) share.push(t);
@@ -373,11 +380,27 @@ export function generateMap(c: Campaign, o: GenOptions) {
     for (const h of path) put(make('empty'), h);
   }
 
+  // The Lost Archive (never more than one) takes over the clear space fairest to every home, then nearest the Voidspawn.
+  if (o.counts.archive > 0 && !c.sectors.some((s) => s.type === 'archive')) {
+    const gap = (x: Hex) => {
+      const d = placedHomes.map((h) => hexDistance(h, x));
+      return { min: d.length ? Math.min(...d) : Infinity, spread: d.length ? Math.max(...d) - Math.min(...d) : 0 };
+    };
+    const open = c.sectors.filter((s): s is Sector & Hex => isPlaced(s) && s.type === 'empty' && !s.owner && gap(s).min >= 3);
+    const s = nearest(open, (x) => gap(x).spread * 10 + (spawnsPlaced[0] ? hexDistance(spawnsPlaced[0], x) : toward(x))) as (Sector & Hex) | undefined;
+    if (s) {
+      let name = nameFor(rand, 'archive');
+      for (let i = 0; i < 20 && used.has(name); i++) name = nameFor(rand, 'archive');
+      used.add(name);
+      Object.assign(s, { type: 'archive', name, notes: loreFor(rand, 'archive') });
+    }
+  }
+
   // Starting territory: round-robin, each faction takes its nearest unclaimed sector.
   for (let round = 0; round < o.startingSectors; round++) {
     for (const h of placedHomes) {
       if (!h.owner) continue;
-      const open = c.sectors.filter((s) => isPlaced(s) && !s.owner && s.type !== 'void' && !isStronghold(s));
+      const open = c.sectors.filter((s) => isPlaced(s) && !s.owner && s.type !== 'void' && s.type !== 'archive' && !isStronghold(s));
       if (!open.length) break;
       const near = open.reduce((a, b) => (hexDistance(h as Hex, a as Hex) <= hexDistance(h as Hex, b as Hex) ? a : b));
       near.owner = h.owner;
@@ -385,18 +408,18 @@ export function generateMap(c: Campaign, o: GenOptions) {
   }
 }
 
-/** What the end-of-round refresh changed. `cleared` holds the space hulks as they were before they went. */
+/** What the end-of-round refresh changed. `cleared` holds the space hulks and Lost Archives as they were before they went. */
 export interface Refresh {
   cleared: Sector[];
   fresh: Sector[];
 }
 
 /**
- * The map moves on at the end of a round: space hulks whose reward has been claimed drift off and leave clear space
+ * The map moves on at the end of a round: space hulks and Lost Archives whose reward has been claimed fade and leave clear space
  * (still held by whoever held it), and new points of interest turn up, NEXUS_MAP.refreshPerFaction in each faction's
  * half and NEXUS_MAP.refreshContested in the contested middle. New ones appear in unclaimed clear space, or at the edge
  * of the map's sectors when there is none, never right next to a home. `hulks` more space hulks drift into the
- * contested middle too (the Derelict Fleet event). Mutates `c`.
+ * contested middle too (the Derelict Fleet event), and with no Lost Archive left, one may (NEXUS_MAP.archiveChance). Mutates `c`.
  */
 export function refreshSectors(c: Campaign, rand: Rand = Math.random, hulks = 0): Refresh {
   const cleared: Sector[] = [];
@@ -410,13 +433,13 @@ export function refreshSectors(c: Campaign, rand: Rand = Math.random, hulks = 0)
   };
 
   for (const s of c.sectors) {
-    if (s.type !== 'void' || !s.rewardClaimed) continue;
+    if ((s.type !== 'void' && s.type !== 'archive') || !s.rewardClaimed) continue;
     cleared.push(structuredClone(s));
     const r = named('empty');
     s.type = 'empty';
     s.name = r.name;
-    const was = cleared[cleared.length - 1].name;
-    s.notes = `Where ${/hulk/i.test(was) ? was : `the space hulk ${was}`} drifted until it was picked clean.`;
+    const { name: was, type: wasType } = cleared[cleared.length - 1];
+    s.notes = wasType === 'archive' ? `Where ${was} stood, until its last secrets were carried off.` : `Where ${/hulk/i.test(was) ? was : `the space hulk ${was}`} drifted until it was picked clean.`;
     delete s.benefit;
     delete s.rewardClaimed;
     delete s.modifiers;
@@ -478,6 +501,7 @@ export function refreshSectors(c: Campaign, rand: Rand = Math.random, hulks = 0)
   });
   for (let k = 0; k < NEXUS_MAP.refreshContested; k++) spawn(-1, spawns[0]);
   for (let k = 0; k < hulks; k++) spawn(-1, spawns[0], 'void');
+  if (!c.sectors.some((s) => s.type === 'archive') && rand() < NEXUS_MAP.archiveChance) spawn(-1, spawns[0], 'archive');
   return { cleared, fresh };
 }
 

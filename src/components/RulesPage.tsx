@@ -324,7 +324,7 @@ function NexusRules() {
         </p>
         <Toc items={[
           ['n-map', 'Sectors'], ['n-danger', 'Difficulty & modifiers'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'],
-          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-downtime', 'Downtime'], ['n-fog', 'Fog of war'], ['n-production', 'Production'], ['n-tech', 'Tech tree'], ['n-heroes', 'Heroes & guardians'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
+          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-downtime', 'Downtime'], ['n-fog', 'Fog of war'], ['n-production', 'Production'], ['n-tech', 'Tech tree'], ['n-heroes', 'Heroes & guardians'], ['n-marauders', 'Marauders'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
           ['n-shop', 'Umbra Shard shop'],
         ]} />
         <p className="small">
@@ -424,6 +424,10 @@ function NexusRules() {
         <Prose lines={NEXUS_TEXT.heroes} />
         <Prose lines={NEXUS_TEXT.guardians} />
         <Entries title="Guardian loot (D6 + tier bonus)" roll entries={GUARDIAN_LOOT.table.map((l) => ({ name: l.name, desc: l.desc }))} />
+      </Section>
+
+      <Section id="n-marauders" title="Marauders">
+        <Prose lines={NEXUS_TEXT.marauders} />
       </Section>
 
       <Section id="n-catchup" title="Catching up">

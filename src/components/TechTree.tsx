@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { Campaign } from '../model/types';
 import { BUILDINGS, NEXUS_TECH, TECH_BRANCHES, type Building } from '../rules/nexusData';
-import { research, researchBlock, researchRate, techCost, techStatus } from '../rules/tech';
+import { research, researchBlock, researchRate, techCost, techStatus, type ResearchVia } from '../rules/tech';
 import { Panel, confirmAction, toast } from './ui';
 
 type SetC = (fn: (c: Campaign) => void) => void;
@@ -11,7 +11,7 @@ const nameOf = (id: string) => BUILDINGS.find((b) => b.id === id)?.name ?? id;
 
 /**
  * The tech tree (Nexus Wars): every building is a tech, laid out by branch (columns) and tier (rows). A faction researches
- * a tier 2 or 3 building with Research, or a Blueprint, once its requirements are known. `faction` is whose tree it is;
+ * a tier 2 or 3 building with Research, or a Blueprint, once its requirements are known; an Archive unlock researches any. `faction` is whose tree it is;
  * with none (the GM seeing everything) the panel picks one.
  */
 export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC: SetC; faction?: string }) {
@@ -21,11 +21,11 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
   if (!f) return null;
   const known = BUILDINGS.filter((b) => techStatus(f, b) === 'known').length;
 
-  const go = (b: Building, blueprint: boolean) => {
-    if (blueprint && !confirmAction(`Spend a Blueprint to research ${b.name}?`)) return;
+  const go = (b: Building, via: ResearchVia) => {
+    if (via !== 'research' && !confirmAction(`Spend ${via === 'archive' ? 'an Archive unlock' : 'a Blueprint'} to research ${b.name}?`)) return;
     let ok = false;
-    setC((d) => void (ok = research(d, f.id, b.id, blueprint)));
-    toast(ok ? `${f.name} researched ${b.icon} ${b.name}: it can be built at any of its sectors.` : researchBlock(f, b.id, blueprint) ?? 'Not researched.');
+    setC((d) => void (ok = research(d, f.id, b.id, via)));
+    toast(ok ? `${f.name} researched ${b.icon} ${b.name}: it can be built at any of its sectors.` : researchBlock(f, b.id, via) ?? 'Not researched.');
   };
 
   return (
@@ -40,6 +40,9 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
           <b>+{researchRate(c, f.id)}</b><span className="muted small">a round</span>
         </span>
         <span className="stat" title="Guardian loot: research any open tech for free"><b>{f.blueprints ?? 0}</b><span className="muted small">Blueprints</span></span>
+        {(f.archives ?? 0) > 0 && (
+          <span className="stat" title="From a Lost Archive: research any one tech for free, ignoring its requirements"><b>{f.archives}</b><span className="muted small">Archive unlocks</span></span>
+        )}
         <span className="stat" title="Guardian loot: installed on a planet from its map panel"><b>{f.cores ?? 0}</b><span className="muted small">Building Expansions</span></span>
         <span className="stat"><b>{known}/{BUILDINGS.length}</b><span className="muted small">buildings known</span></span>
       </div>
@@ -60,7 +63,8 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
                 {BUILDINGS.filter((b) => b.branch === br.id && b.tier === tier).map((b) => {
                   const st = techStatus(f, b);
                   const why = researchBlock(f, b.id);
-                  const whyBp = researchBlock(f, b.id, true);
+                  const whyBp = researchBlock(f, b.id, 'blueprint');
+                  const archive = st !== 'known' && (f.archives ?? 0) > 0;
                   return (
                     <div key={b.id} className={`tech-card ${st}`}>
                       <div className="tech-name">
@@ -78,10 +82,11 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
                           <span key={r} className={techStatus(f, BUILDINGS.find((x) => x.id === r)!) === 'known' ? 'tech-met' : undefined}>{nameOf(r)}</span>
                         )).reduce<ReactNode[]>((a, x, i) => (i ? [...a, ' and ', x] : [x]), [])}</div>
                       )}
-                      {st === 'open' && (
+                      {(st === 'open' || archive) && (
                         <div className="row tech-actions">
-                          <button className="primary" disabled={!!why} title={why} onClick={() => go(b, false)}>Research</button>
-                          {(f.blueprints ?? 0) > 0 && <button disabled={!!whyBp} title={whyBp ?? 'Spend a Blueprint'} onClick={() => go(b, true)}>Blueprint</button>}
+                          {st === 'open' && <button className="primary" disabled={!!why} title={why} onClick={() => go(b, 'research')}>Research</button>}
+                          {st === 'open' && (f.blueprints ?? 0) > 0 && <button disabled={!!whyBp} title={whyBp ?? 'Spend a Blueprint'} onClick={() => go(b, 'blueprint')}>Blueprint</button>}
+                          {archive && <button title="Spend an Archive unlock: ignores requirements" onClick={() => go(b, 'archive')}>Archive</button>}
                         </div>
                       )}
                     </div>

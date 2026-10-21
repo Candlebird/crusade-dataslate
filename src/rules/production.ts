@@ -49,6 +49,12 @@ export function accrueProduction(c: Campaign): { sector: Sector; gained: number 
   const out: { sector: Sector; gained: number }[] = [];
   for (const s of c.sectors) {
     if (!produces(s) || !s.owner || !c.factions.some((f) => f.id === s.owner)) continue;
+    // Marauders raided it: nothing this round.
+    if (s.raided !== undefined) {
+      const raided = s.raided === (c.round ?? 1);
+      delete s.raided;
+      if (raided) continue;
+    }
     const before = s.bank ?? 0;
     s.bank = Math.max(before, Math.min(bankCap(s, c), before + productionRate(s, c)));
     if (s.bank > before) out.push({ sector: s, gained: s.bank - before });
