@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import { exportCampaign } from '../model/io';
@@ -9,7 +9,6 @@ import { useCloud } from '../cloud/CloudSync';
 import { rememberedBy, visibleTo } from '../rules/fog';
 import { placeGuardians } from '../rules/guardians';
 import { reportFor } from '../rules/report';
-import HexMapPanel from './HexMap';
 import OrdersPanel from './NexusOrders';
 import RoundPanel from './RoundPanel';
 import TechTreePanel from './TechTree';
@@ -17,8 +16,11 @@ import WarlordsPanel from './Warlords';
 import DuelsPanel from './Duels';
 import JournalPanel from './Journal';
 import { useImporter } from './importer';
-import { Dropzone, Panel, TextField, confirmAction, toast } from './ui';
+import { Dropzone, Loading, Panel, TextField, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
+
+// The map is the page's heaviest part; it loads with the Map tab.
+const HexMapPanel = lazy(() => import('./HexMap'));
 
 const COLORS = ['#c0392b', '#2e86c1', '#27ae60', '#d4ac0d', '#8e44ad', '#d35400', '#17a589', '#7f8c8d'];
 
@@ -150,7 +152,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
         {tab === 'map' && (
           <>
             <ReportPanel c={c} viewer={fog} />
-            <HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} />
+            <Suspense fallback={<Loading />}><HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} /></Suspense>
             <OrdersPanel c={c} />
             {viewAs !== '-' && <TechTreePanel c={c} setC={setC} faction={viewAs || undefined} />}
           </>
@@ -204,11 +206,11 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
         <>
           <ReportPanel c={c} />
           <FactionsPanel c={c} setC={setC} />
-          <HexMapPanel c={c} setC={setC} onRecord={(sectorId) => {
+          <Suspense fallback={<Loading />}><HexMapPanel c={c} setC={setC} onRecord={(sectorId) => {
             setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
             setTab('log');
             setTimeout(() => document.getElementById('record-game')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-          }} />
+          }} /></Suspense>
           <OrdersPanel c={c} />
           <TechTreePanel c={c} setC={setC} />
           <SectorsPanel c={c} setC={setC} />

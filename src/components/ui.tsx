@@ -163,6 +163,11 @@ export function Toaster() {
   return msg ? <div className={`toast ${msg.kind === 'error' ? 'error' : ''}`}>{msg.text}</div> : null;
 }
 
+/** The brief stand-in while a lazily loaded page or panel arrives. */
+export function Loading() {
+  return <div className="loading muted small" role="status"><span className="spinner" aria-hidden /> Loading…</div>;
+}
+
 export const confirmAction = (text: string) => window.confirm(text);
 
 // ---- collapsible panels ----

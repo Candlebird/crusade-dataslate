@@ -743,3 +743,6 @@ fieldset.fields:disabled { opacity: 0.6; }
 .warlord h3 { margin: 0 0 0.35rem; }
 .warlord ul { margin: 0.25rem 0 0.5rem; padding-left: 1.1rem; }
 .campaign-tabs { margin: 0 0 1rem; }
+.loading { display: flex; align-items: center; gap: 0.5rem; padding: 1.5rem 0.25rem; }
+.spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
