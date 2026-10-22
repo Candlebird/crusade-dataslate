@@ -228,9 +228,13 @@ function MoveText({ m, byKey, b }: { m: Move; byKey: Map<string, Fighter>; b: Tr
   const t = m.target ? byKey.get(m.target) : undefined;
   const who = (f: Fighter) => <span className={`team-${f.team}`} style={{ color: 'var(--team)' }}>{f.name}</span>;
   const side = (team: TeamKey) => b.sides.length > 2 ? <span className="muted"> ({teamName(b, team)})</span> : null;
-  if (m.kind === 'rally') return <>R{m.round}: {who(a)}{side(a.team)} is Shaken, and spends its turn rallying.</>;
+  // What its abilities did along the way.
+  const notes = m.notes?.length ? <span className="muted"> ({m.notes.join('; ')})</span> : null;
+  if (m.kind === 'rally') return <>R{m.round}: {who(a)}{side(a.team)} is Shaken, and spends its turn rallying.{notes}</>;
+  if (m.kind === 'stunned') return <>R{m.round}: {who(a)}{side(a.team)} is <b>stunned</b>, and loses its turn.{notes}</>;
   if (m.kind === 'return') return <>R{m.round}: {who(a)}{side(a.team)} <b>returns at full strength</b> (Endless Tide)!</>;
-  if (m.kind === 'advance' || !t) return <>R{m.round}: {who(a)}{side(a.team)} advances.</>;
+  if (m.kind === 'heal' && t) return <>R{m.round}: {who(a)}{side(a.team)} heals {who(t)} for <b>{m.dmg}</b>.{notes}</>;
+  if (m.kind === 'advance' || !t) return <>R{m.round}: {who(a)}{side(a.team)} advances{t && m.targetHp <= 0 ? <>; {who(t)} <b>destroyed!</b></> : null}.{notes}</>;
   const shaken = (m.shaken ?? []).map((k) => byKey.get(k)?.name).filter(Boolean);
   return (
     <>
@@ -241,6 +245,7 @@ function MoveText({ m, byKey, b }: { m: Move; byKey: Map<string, Fighter>; b: Tr
       {m.kind === 'charge' && m.targetHp > 0 && (m.cowed ? '; too Shaken to strike back'
         : <>; strikes back for {m.back ? <b>{m.back}</b> : 'nothing'}{m.attackerHp <= 0 && <> — <b>{a.name} destroyed!</b></>}</>)}
       {shaken.length > 0 && <>. <b>{shaken.join(' and ')} {shaken.length > 1 ? 'are' : 'is'} Shaken.</b></>}
+      {notes}
     </>
   );
 }

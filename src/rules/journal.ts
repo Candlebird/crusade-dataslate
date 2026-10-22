@@ -1,6 +1,7 @@
 import type { Campaign, CampaignFaction, CrossroadsJournal, Force, JournalMark, JournalOption, JournalRoll, Unit } from '../model/types';
 import { MAX_SCARS, SCAR_TABLE } from './data';
 import { applyScar, hasRule, ruleRating } from './engine';
+import { abilitiesOf, type Effect } from './abilities';
 import { visibleTo } from './fog';
 import { hexDistance, isPlaced, type Hex, type Rand } from './hexmap';
 import {
@@ -93,13 +94,46 @@ export function journalUnit(j: CrossroadsJournal, forces: Force[]): Unit | undef
   return u && u.status !== 'removed' ? u : undefined;
 }
 
-/** +1 for each special rule that helps the skill, up to JOURNAL.maxBonus; Command gets +1 from a seasoned Warlord. */
+/** Which skill an ability helps, by what it does. */
+function skillOf(e: Effect): JournalSkillId | undefined {
+  switch (e.kind) {
+    case 'sixes': case 'frenzy': case 'deathBlast': return 'might';
+    case 'lastStand': case 'revive': return 'resolve';
+    case 'shield': case 'thorns': case 'leech': return 'endurance';
+    case 'heal': return e.ally ? 'command' : 'endurance';
+    case 'redeploy': return 'speed';
+    case 'barrage': return 'lore';
+    case 'aura': return e.stat === 'range' ? 'lore' : 'command';
+    case 'field': return 'guile';
+    case 'onHit': return e.status === 'mark' || e.status === 'daze' ? 'guile' : e.status === 'slow' ? 'speed' : 'might';
+    default: return undefined;
+  }
+}
+
+/** Gear and rules counted in the unit's numbers that still help a skill. */
+const SKILL_NAMES: Partial<Record<JournalSkillId, string[]>> = {
+  speed: ['Swift', 'Aura of Swiftness', 'Nexus Engine', 'Wraithstep', 'Phase-Step Harness', 'Dark Age Jump Pack'],
+  guile: ['Ghostly', 'Shadowmeld', 'Shadow Veil Emitter'],
+  lore: ['Echoing Grimoire'],
+  might: ['Tough +3', 'Toughened Scars', 'Enhanced'],
+  endurance: ['Tough +3', 'Toughened Scars', 'Enhanced'],
+  command: ['Rallying Cry', 'Inspiring Aura', 'Iron Discipline', 'Shard-Crown of Command', 'Nexus Resonance'],
+};
+
+/**
+ * +1 for each special rule that helps the skill, and each ability or piece of gear that does, up to JOURNAL.maxBonus;
+ * Command gets +1 from a seasoned Warlord.
+ */
 export function skillBonus(u: Unit, skill: JournalSkillId, level: number): number {
   const s = skillById(skill);
   if (!s) return 0;
+  const counted = new Set(s.bonuses.map((b) => b.rule.toLowerCase()));
   const rules = s.bonuses.filter((b) => (b.min == null ? hasRule(u.rules, b.rule) : (ruleRating(u.rules, b.rule) ?? 0) >= b.min)).length;
+  const names = [...u.rules, ...u.upgrades.map((x) => x.name), ...u.relics.map((x) => x.name), ...u.scars.map((x) => x.name)].map((n) => n.replace(/\s*\(.*\)$/, '').toLowerCase());
+  const gear = (SKILL_NAMES[skill] ?? []).filter((n) => names.includes(n.toLowerCase())).length;
+  const abilities = abilitiesOf(u).filter((a) => !counted.has(a.source.toLowerCase()) && a.effects.some((e) => skillOf(e) === skill)).length;
   const command = skill === 'command' && level >= JOURNAL.commandLevel ? 1 : 0;
-  return Math.min(rules + command, JOURNAL.maxBonus);
+  return Math.min(rules + gear + abilities + command, JOURNAL.maxBonus);
 }
 
 /** What a check needs on a D6: the skill's stat, less the bonus, plus any penalty (2+ at best, 6+ at worst). */

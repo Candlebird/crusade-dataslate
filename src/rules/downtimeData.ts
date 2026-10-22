@@ -496,17 +496,23 @@ export const TRAINING = {
   auraRadius: 2,
   /** Fortifications have this many times their wounds. */
   fortificationHp: 2,
-  /** Every unit's Tough counts this many times over, so a swarm that reaches it doesn't wipe it out at once. */
-  toughMul: 3,
+  /** Every unit's Tough counts this many times over, so a swarm that reaches it doesn't wipe it out at once (and a unit that ends up in melee lasts). */
+  toughMul: 9,
+  /** Every enemy has this many times its listed wounds. */
+  enemyHp: 2,
   /** Each enemy fighting a Vehicle/Monster takes this much damage a second, plus a third of its Impact. */
   crushDps: 1,
-  /** Upgrades: +1 wound, +1 damage a hit, this much faster fire, +1 tile to weapons and aura. */
+  /** A level-up gives all at once: +1 Tough, +1 damage a hit, this much faster fire, +1 tile to shooting weapons and aura. */
   ratePerLevel: 0.7,
-  /** The first upgrade's cost in credits; each one bought after it costs this many times the one before. */
-  upgradeBase: 10,
+  /** Melee weapons get no reach from a level-up; they get this much damage a hit instead of +1. */
+  meleeDmgPerLevel: 3,
+  /** A unit's first level-up costs this many credits; each one after costs this many times its last (units level apart). */
+  upgradeBase: 40,
   upgradeGrowth: 1.25,
-  /** A wave drops credits enough for about this many upgrades, if every enemy in it dies. */
-  upgradesPerWave: 3,
+  /** A wave drops credits enough for about this many level-ups, if every enemy in it dies (priced at the squad's average level by then). */
+  upgradesPerWave: 0.9,
+  /** A bought heal mends this share of a unit's wounds, for this share of its next level-up's cost. */
+  heal: { share: 0.5, cost: 0.35 },
   /** Waves scale with the squad's power: its points, with each level adding this share. */
   levelPower: 0.05,
   /** Wave 1's enemies cost this much for every 100 power, growing by `budgetGrowth` a wave. */
@@ -518,20 +524,57 @@ export const TRAINING = {
   bossPower: 700,
   /** Past this many cost-points in a wave, enemies get tougher instead of more numerous. */
   maxBudget: 70,
+  /**
+   * A squad of more than this much power is a big one: for every time over it is, a wave may hold that many times as many
+   * enemies (up to `bigCountMax` times), and more of them come as veterans (`vetPer` more for each time over, up to `vetMax`).
+   */
+  bigSquad: 1000,
+  bigCountMax: 2.5,
+  /** Share of any squad's enemies (bar Echo Lords) that come as veterans, at random. */
+  vetBase: 0.1,
+  vetPer: 0.5,
+  vetMax: 0.75,
+  /** A veteran enemy: this many times the wounds, and +1 to hit and +1 AP on all its attacks. */
+  vet: { hp: 2, hit: 1, ap: 1 },
   /** Each wave sends this many times the enemies its budget buys, for the same credits. */
   enemyCount: 1.5,
   /** An Echo Lord comes every this many waves. */
   bossEvery: 5,
   /** Share of a wave that comes from the direction shown before it, within `arc` degrees either side. */
-  favoured: 0.7,
-  arc: 35,
+  favoured: 0.9,
+  arc: 20,
   /** Scouts and Ambushers come from the opposite side, within this many degrees of it. */
   flankArc: 40,
+  /** Cover: short ridges of raised ground laid out at random each run, between `near` and `far` tiles from the base.
+   * A shot that passes over a cover tile (other than the shooter's own) is at `hit` to hit; blows in melee ignore it. */
+  /**
+   * Boon cards: after every `every` waves cleared, pick one of `offer` drawn. Each card's rarity is drawn with these odds
+   * (Legendary first). Numbers for the cards that need them: base HP a wall card adds, a bounty's share more credits, a
+   * ration's share of wounds mended, a ridge card's ridges.
+   */
+  cards: { every: 3, offer: 3, odds: { Legendary: 0.1, Rare: 0.3 }, walls: 5, ramparts: 12, bounty: 0.25, rations: 0.5, ridges: 2 },
+  cover: { ridges: 6, length: [1, 3] as [number, number], near: 2.5, far: 6.5, hit: -2 },
   /** Ambushers appear this far from the base (tiles). */
   ambushRange: [4.5, 6] as [number, number],
+  /** Seconds in an ability round: an ability that comes back every 2 rounds comes back every 12 seconds. */
+  abilityRound: 6,
+  /** Seconds each status lasts once a hit leaves it. */
+  status: { stun: 1, slow: 2.5, daze: 3, mark: 4, bleed: 3 },
+  /** A slowed enemy moves at this share of its speed. */
+  slowMul: 0.5,
+  /** A marked enemy takes this much more damage from every hit. */
+  markDmg: 1,
+  /** A bleeding enemy loses this much a second, credited to whoever made it bleed. */
+  bleedDps: 1,
+  /** A knock pushes an enemy this many tiles straight back from the base. */
+  knock: 1.5,
+  /** An execute finishes off an enemy (not the boss) below this share of its wounds. */
+  executeAt: 0.25,
+  /** A field's slow or daze lingers this many seconds after an enemy leaves it. */
+  fieldLinger: 0.5,
 };
 
-export type TrainingEnemyKind = 'swarm' | 'drone' | 'carapace' | 'spitter' | 'outrider' | 'stalker' | 'brute' | 'lord';
+export type TrainingEnemyKind = 'swarm' | 'drone' | 'carapace' | 'mirror' | 'spitter' | 'outrider' | 'stalker' | 'brute' | 'lord';
 
 export interface TrainingEnemyDef {
   name: string;
@@ -544,10 +587,11 @@ export interface TrainingEnemyDef {
   attacks: number;
   quality: number;
   ap: number;
-  /** Tiles it shoots from; 0 = it fights in melee. */
-  range: number;
   /** A gun it fires on the move at the nearest unit in reach (tiles), as well as fighting in melee. */
   gun?: { range: number; attacks: number; ap: number };
+  /** Damage it takes from shooting (guns, blasts, barrages) and from melee (blows, thorns, crushing), as multiples. */
+  shotMul?: number;
+  meleeMul?: number;
   /** Its share of the wave's budget, and of the credits. */
   cost: number;
   /** The first wave it can turn up in. */
@@ -557,15 +601,23 @@ export interface TrainingEnemyDef {
   color: string;
   /** Drawn radius, in tiles. */
   size: number;
+  /** How it's drawn, by role: pointed shapes rush in to fight, rounder ones hang back and shoot, heavy ones are thick-walled. */
+  shape: TrainingEnemyShape;
 }
 
+/** dart: a melee rusher, pointing where it's going. diamond: a line shooter. pentagon: a heavy shooter, weak in melee.
+ *  chevron: a fast raider. hexagon: armoured. shield: shrugs off shots. star: an ambusher's blades. spikes: a heavy
+ *  brawler. crown: the boss. */
+export type TrainingEnemyShape = 'dart' | 'diamond' | 'pentagon' | 'chevron' | 'hexagon' | 'shield' | 'star' | 'spikes' | 'crown';
+
 export const TRAINING_ENEMIES: Record<TrainingEnemyKind, TrainingEnemyDef> = {
-  swarm: { name: 'Swarmling', desc: 'Fast and frail, in numbers.', hp: 3, speed: 1.6, armor: 0, attacks: 1, quality: 5, ap: 0, range: 0, cost: 1, from: 1, spawn: 'main', color: '#c9b458', size: 0.18 },
-  drone: { name: 'Echo Drone', desc: 'The line infantry of the Echoes. Shoots on the move (4 tiles).', hp: 6, speed: 1.1, armor: 0, attacks: 2, quality: 4, ap: 0, range: 0, gun: { range: 4, attacks: 1, ap: 0 }, cost: 2, from: 1, spawn: 'main', color: '#8fa7c4', size: 0.24 },
-  spitter: { name: 'Spitter', desc: 'Stops 3 tiles out and shoots the nearest unit, or the base.', hp: 5, speed: 0.9, armor: 0, attacks: 2, quality: 4, ap: 0, range: 3, cost: 3, from: 2, spawn: 'main', color: '#7fbf6a', size: 0.22 },
-  outrider: { name: 'Outrider', desc: 'Scout: races in from the opposite side as the wave starts, shooting (3 tiles).', hp: 5, speed: 2, armor: 0, attacks: 2, quality: 4, ap: 0, range: 0, gun: { range: 3, attacks: 1, ap: 0 }, cost: 3, from: 2, spawn: 'scout', color: '#e0a040', size: 0.22 },
-  carapace: { name: 'Carapace', desc: 'Armour 1: each hit does 1 less damage. Bring AP. Shoots on the move (4 tiles).', hp: 10, speed: 0.8, armor: 1, attacks: 2, quality: 4, ap: 1, range: 0, gun: { range: 4, attacks: 2, ap: 0 }, cost: 4, from: 3, spawn: 'main', color: '#6c7a89', size: 0.28 },
-  stalker: { name: 'Stalker', desc: 'Ambush: appears mid-wave, close in on the opposite side.', hp: 7, speed: 1.3, armor: 0, attacks: 3, quality: 4, ap: 1, range: 0, cost: 4, from: 3, spawn: 'ambush', color: '#b05cc8', size: 0.24 },
-  brute: { name: 'Brute', desc: 'Slow, huge, and hits hard. Shoots on the move (3 tiles).', hp: 22, speed: 0.6, armor: 0, attacks: 4, quality: 3, ap: 1, range: 0, gun: { range: 3, attacks: 2, ap: 1 }, cost: 6, from: 4, spawn: 'main', color: '#c0583e', size: 0.34 },
-  lord: { name: 'Echo Lord', desc: `Every ${TRAINING.bossEvery}th wave. Armour 1. Shoots on the move (5 tiles).`, hp: 80, speed: 0.5, armor: 1, attacks: 6, quality: 3, ap: 2, range: 0, gun: { range: 5, attacks: 3, ap: 1 }, cost: 20, from: 1, spawn: 'boss', color: '#e04a6a', size: 0.45 },
+  swarm: { name: 'Swarmling', desc: 'Fast and frail, in numbers.', hp: 3, speed: 1.6, armor: 0, attacks: 1, quality: 5, ap: 0, cost: 1, from: 1, spawn: 'main', color: '#c9b458', size: 0.18, shape: 'dart' },
+  drone: { name: 'Echo Drone', desc: 'The line infantry of the Echoes. Shoots on the move (4 tiles).', hp: 6, speed: 1.1, armor: 0, attacks: 2, quality: 4, ap: 0, gun: { range: 4, attacks: 1, ap: 0 }, cost: 2, from: 1, spawn: 'main', color: '#8fa7c4', size: 0.24, shape: 'diamond' },
+  spitter: { name: 'Spitter', desc: 'Spits hard as it comes on (3 tiles); weak in melee.', hp: 5, speed: 0.9, armor: 0, attacks: 1, quality: 4, ap: 0, gun: { range: 3, attacks: 3, ap: 0 }, cost: 3, from: 2, spawn: 'main', color: '#7fbf6a', size: 0.22, shape: 'pentagon' },
+  outrider: { name: 'Outrider', desc: 'Scout: races in from the opposite side as the wave starts, shooting (3 tiles).', hp: 5, speed: 2, armor: 0, attacks: 2, quality: 4, ap: 0, gun: { range: 3, attacks: 1, ap: 0 }, cost: 3, from: 2, spawn: 'scout', color: '#e0a040', size: 0.22, shape: 'chevron' },
+  carapace: { name: 'Carapace', desc: 'Armour 1: each hit does 1 less damage. Bring AP. Shoots on the move (4 tiles).', hp: 10, speed: 0.8, armor: 1, attacks: 2, quality: 4, ap: 1, gun: { range: 4, attacks: 2, ap: 0 }, cost: 4, from: 3, spawn: 'main', color: '#6c7a89', size: 0.28, shape: 'hexagon' },
+  mirror: { name: 'Mirrorshell', desc: 'Its mirrored hide turns shots: shooting does less than half its damage, but melee does half again as much. Meet it with blades.', hp: 10, speed: 0.85, armor: 0, attacks: 3, quality: 4, ap: 1, shotMul: 0.4, meleeMul: 1.5, cost: 5, from: 4, spawn: 'main', color: '#a8dce8', size: 0.3, shape: 'shield' },
+  stalker: { name: 'Stalker', desc: 'Ambush: appears mid-wave, close in on the opposite side.', hp: 7, speed: 1.3, armor: 0, attacks: 3, quality: 4, ap: 1, cost: 4, from: 3, spawn: 'ambush', color: '#b05cc8', size: 0.24, shape: 'star' },
+  brute: { name: 'Brute', desc: 'Slow, huge, and hits hard. Shoots on the move (3 tiles).', hp: 22, speed: 0.6, armor: 0, attacks: 4, quality: 3, ap: 1, gun: { range: 3, attacks: 2, ap: 1 }, cost: 6, from: 4, spawn: 'main', color: '#c0583e', size: 0.34, shape: 'spikes' },
+  lord: { name: 'Echo Lord', desc: `Every ${TRAINING.bossEvery}th wave. Armour 1. Shoots on the move (5 tiles).`, hp: 80, speed: 0.5, armor: 1, attacks: 6, quality: 3, ap: 2, gun: { range: 5, attacks: 3, ap: 1 }, cost: 20, from: 1, spawn: 'boss', color: '#e04a6a', size: 0.45, shape: 'crown' },
 };

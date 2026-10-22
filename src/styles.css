@@ -774,6 +774,71 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-unit { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 6px; }
 .training-ups { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 4px 0; }
 .training-log { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 4px; }
+.training-summary { margin-top: 12px; overflow-x: auto; }
+.training-summary table { width: 100%; border-collapse: collapse; }
+.training-summary th, .training-summary td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.training-summary th:first-child, .training-summary td:first-child { text-align: left; }
+.training-summary th { color: var(--muted-2); font-weight: 600; }
+.training-summary tr.mvp td { color: var(--gold); }
+
+/* Training cards: a full-screen offer, the cards rising from below. */
+.training-cards {
+  position: fixed; inset: 0; z-index: 55; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+  padding: 16px; overflow: hidden; background: radial-gradient(ellipse at center, rgba(40, 34, 22, 0.9), rgba(6, 7, 9, 0.94) 70%);
+  animation: cards-fade 0.3s ease-out both;
+}
+.training-cards::before {
+  content: ''; position: absolute; left: 50%; top: 55%; width: 140vmax; height: 140vmax; translate: -50% -50%; pointer-events: none; opacity: 0.25;
+  background: repeating-conic-gradient(from 0deg, var(--ray, rgba(217, 212, 199, 0.18)) 0deg 6deg, transparent 6deg 18deg);
+  animation: cards-rays 30s linear infinite, cards-fade 1s ease-out both;
+  mask-image: radial-gradient(circle, #000 0, transparent 55%);
+}
+.training-cards.rare { --ray: rgba(179, 53, 43, 0.45); }
+.training-cards.legendary { --ray: rgba(201, 162, 74, 0.6); }
+.training-cards-title { position: relative; text-align: center; animation: cards-drop 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+.training-cards-title h2 { margin: 0; font-size: 1.8rem; color: var(--gold); text-shadow: 0 0 18px rgba(201, 162, 74, 0.55); }
+.training-cards-kicker { font-family: var(--serif); letter-spacing: 0.2em; text-transform: uppercase; font-size: 0.75rem; color: var(--muted-2); }
+.training-cards-row { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 16px; max-width: 760px; }
+.training-card {
+  all: unset; box-sizing: border-box; position: relative; overflow: hidden; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  width: 210px; min-height: 230px; justify-content: center; padding: 18px 14px; text-align: center; border-radius: 8px;
+  background: linear-gradient(180deg, #2a2e35, #181b20); border: 2px solid var(--line-2); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+  --glow: rgba(217, 212, 199, 0.25);
+  animation: card-rise 0.75s cubic-bezier(0.18, 1.3, 0.4, 1) both;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.training-card:hover:not(:disabled), .training-card:focus-visible { transform: translateY(-10px) scale(1.04); box-shadow: 0 0 28px var(--glow), 0 14px 34px rgba(0, 0, 0, 0.8); }
+.training-card:disabled { cursor: default; }
+.training-card.rare { border-color: var(--red); background: linear-gradient(180deg, #3a2220, #1b1515); --glow: rgba(179, 53, 43, 0.75); box-shadow: 0 0 18px rgba(179, 53, 43, 0.45), 0 10px 30px rgba(0, 0, 0, 0.7); }
+.training-card.legendary {
+  border-color: var(--gold); background: linear-gradient(180deg, #43361a, #1d1810); --glow: rgba(232, 197, 90, 0.9);
+  animation: card-rise 0.75s cubic-bezier(0.18, 1.3, 0.4, 1) both, card-glow 1.6s ease-in-out 0.9s infinite alternate;
+}
+.training-card.chosen { transform: translateY(-14px) scale(1.06); box-shadow: 0 0 36px var(--glow), 0 14px 34px rgba(0, 0, 0, 0.8); }
+.training-card .tag { margin: 0; }
+.training-card-name { font-family: var(--serif); font-size: 1.15rem; color: var(--text); line-height: 1.2; }
+.training-card.legendary .training-card-name { color: var(--gold); }
+.training-card-unit { display: inline-flex; align-items: center; gap: 4px; color: var(--muted-2); font-size: 0.85rem; }
+.training-card-text { font-size: 0.92rem; color: var(--text); line-height: 1.35; }
+.training-card-shine {
+  position: absolute; inset: -40% auto -40% -60%; width: 40%; pointer-events: none; transform: rotate(20deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+  animation: card-shine 0.9s ease-out both; animation-delay: inherit;
+}
+.training-card.legendary .training-card-shine { background: linear-gradient(90deg, transparent, rgba(255, 230, 150, 0.5), transparent); animation: card-shine 2.4s ease-in-out infinite; }
+@keyframes cards-fade { from { opacity: 0; } }
+@keyframes cards-rays { to { rotate: 360deg; } }
+@keyframes cards-drop { from { opacity: 0; transform: translateY(-30px) scale(0.9); } }
+@keyframes card-rise { from { opacity: 0; transform: translateY(100vh) rotate(-6deg) scale(0.85); } 70% { opacity: 1; } }
+@keyframes card-shine { from { left: -60%; } to { left: 130%; } }
+@keyframes card-glow { from { box-shadow: 0 0 14px rgba(201, 162, 74, 0.4), 0 10px 30px rgba(0, 0, 0, 0.7); } to { box-shadow: 0 0 38px rgba(232, 197, 90, 0.95), 0 10px 30px rgba(0, 0, 0, 0.7); } }
+@media (max-width: 700px) {
+  .training-cards { justify-content: flex-start; overflow-y: auto; }
+  .training-card { width: 100%; max-width: 340px; min-height: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .training-cards, .training-cards::before, .training-cards-title, .training-card, .training-card-shine { animation: none !important; }
+}
 @media (max-width: 700px) {
   .training { grid-template-columns: 1fr; }
 }

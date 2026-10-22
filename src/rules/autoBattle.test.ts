@@ -138,3 +138,40 @@ describe('auto-battle morale and sector effects', () => {
     expect(returns.every((r) => r.length <= 1)).toBe(true);
   });
 });
+
+describe('auto-battle abilities', () => {
+  const fight = (a: Unit, b: Unit, seed = 3) => autoBattle(fightersOf(battle([a], [b]), []), seeded(seed));
+  const notes = (r: ReturnType<typeof autoBattle>) => r.moves.flatMap((m) => m.notes ?? []);
+
+  it('lists what a unit can do, and takes penalties off its numbers', () => {
+    expect(rate(squad({ upgrades: [{ id: 'u', name: 'Field Medic', unique: false }] })).notes.some((n) => n.startsWith('Field Medic'))).toBe(true);
+    expect(rate(squad({ scars: [{ id: 's', name: 'Crippling Injury' }] })).attack).toBeLessThan(rate(squad()).attack);
+  });
+
+  it('shields soak wounds, and a lucky unit gets back up once', () => {
+    let soaked = false;
+    let up = false;
+    for (let seed = 1; seed <= 20; seed++) {
+      const n = notes(fight(squad({ rules: ['Guard Stance', 'Lucky'] }), squad({ quality: 3, defense: 3 }), seed));
+      soaked ||= n.some((x) => x.includes('shield soaks'));
+      up ||= n.some((x) => x.includes('gets back up'));
+    }
+    expect(soaked).toBe(true);
+    expect(up).toBe(true);
+  });
+
+  it('a medic heals a hurt ally as its own move', () => {
+    let healed = false;
+    for (let seed = 1; seed <= 20 && !healed; seed++) {
+      const r = autoBattle(fightersOf(battle([squad({ upgrades: [{ id: 'u', name: 'Field Medic', unique: false }] }), squad()], [squad(), squad()]), []), seeded(seed));
+      healed = r.moves.some((m) => m.kind === 'heal' && m.dmg > 0) || notes(r).some((x) => x.startsWith('Field Medic'));
+    }
+    expect(healed).toBe(true);
+  });
+
+  it('a stunned unit loses its turn', () => {
+    let stunned = false;
+    for (let seed = 1; seed <= 30 && !stunned; seed++) stunned = fight(squad({ rules: ['Temporal Rift'] }), squad(), seed).moves.some((m) => m.kind === 'stunned');
+    expect(stunned).toBe(true);
+  });
+});

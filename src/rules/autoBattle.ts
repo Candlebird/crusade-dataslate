@@ -1,4 +1,5 @@
 import type { Campaign, Force, Unit, Weapon } from '../model/types';
+import { abilitiesOf, describe, effects, modelled, type Ability, type Status } from './abilities';
 import { modifierOf } from './difficulty';
 import { hasRule, levelForXp, ruleRating } from './engine';
 import { activeEvent } from './nexus';
@@ -102,9 +103,17 @@ export interface Fighter {
   notes: string[];
   /** Kill XP earned so far. */
   xp: number;
+  /** What its rules, traits, relics and scars do beyond the numbers. */
+  abilities: Ability[];
+  /** Wounds a shield soaks before its own. */
+  shield: number;
+  /** Left on it by enemy hits, until its next activation. */
+  status: Status[];
+  /** Has used its once-a-battle revive. */
+  revived: boolean;
 }
 
-export type MoveKind = 'shoot' | 'charge' | 'advance' | 'rally' | 'return';
+export type MoveKind = 'shoot' | 'charge' | 'advance' | 'rally' | 'return' | 'stunned' | 'heal';
 
 export interface Move {
   round: number;
@@ -122,6 +131,8 @@ export interface Move {
   shaken?: string[];
   targetHp: number;
   attackerHp: number;
+  /** What its abilities did along the way. */
+  notes?: string[];
 }
 
 export interface AutoResult {
@@ -240,7 +251,7 @@ export function fighter(u: Unit | undefined, t: { id: string; name: string; woun
   let hitShoot = 0;
   let hitMelee = 0;
   if (has('Specialists') || has('Elite')) { hitShoot += 0.5; hitMelee += 0.5; note(has('Elite') ? 'Elite' : 'Specialists', 'better hit rolls'); }
-  if (has('Berserkers') || has('Furious') || has('Bloodthirsty')) { hitMelee += 0.5; note(['Berserkers', 'Furious', 'Bloodthirsty'].find(has)!, 'more hits in melee'); }
+  if (has('Berserkers')) { hitMelee += 0.5; note('Berserkers', 'more hits in melee'); }
   if (has('Point Blank') || has('Targeting Array')) { hitShoot += 0.3; note(['Point Blank', 'Targeting Array'].find(has)!, 'more hits when shooting'); }
   if (has('Damaged Equipment')) { hitShoot -= 1; note('Damaged Equipment', '-1 to hit when shooting'); }
   if (has('Weakened Muscles')) { hitMelee -= 1; note('Weakened Muscles', '-1 to hit in melee'); }
@@ -248,29 +259,38 @@ export function fighter(u: Unit | undefined, t: { id: string; name: string; woun
   known.push('Blade Master', 'Mutations', 'Precise Strikes', 'Regeneration', 'Protected', 'Ghostly', 'Heroic Presence', 'Artisan Bionics', 'Evasive', 'Stealth', 'Tough +3', 'Toughened Scars');
 
   const impact = (ruleRating(names, 'Impact') ?? 0) + 3 * count(upgrades, 'Impact +3') + 6 * count(upgrades, 'Impact +6') + (has('Momentum') ? size : 0);
-  const fast = ['Fast', 'Flying', 'Scout', 'Ambush', 'Swift', 'Aura of Swiftness', 'Flying + Fast', 'Orbital Drop'].some(has);
+  const abilities = abilitiesOf(u);
+  const fast = ['Aura of Swiftness'].some(has) || effects(abilities, 'redeploy').length > 0;
   const morale = has('Fearless') ? 1 : 0;
   if (morale) notes.push('Fearless: +1 to Morale tests');
 
   // Everything else it has earned still counts, a little each.
   let atkBonus = 1;
   let defBonus = 1;
+  for (const a of abilities) for (const e of a.effects) {
+    notes.push(`${a.source}${a.gun ? ` (${a.gun})` : ''}: ${describe(e)}`);
+    if (e.kind !== 'penalty') continue;
+    if (e.stat === 'hit') { hitShoot -= e.n; hitMelee -= e.n; }
+    if (e.stat === 'save') defMod -= e.n;
+    if (e.stat === 'rate') atkBonus *= 1 - e.n;
+    if (e.stat === 'hp') defBonus *= 1 - e.n;
+  }
   const level = u ? levelForXp(u.xp) : 0;
   if (level) { atkBonus += level * AUTO_BATTLE.perLevel; defBonus += level * AUTO_BATTLE.perLevel; notes.push(`Level ${level}: +${Math.round(level * AUTO_BATTLE.perLevel * 100)}%`); }
   if (u && hasRule(u.rules, 'Hero')) { atkBonus += AUTO_BATTLE.hero; defBonus += AUTO_BATTLE.hero; notes.push(`Hero: +${AUTO_BATTLE.hero * 100}%`); }
-  const other = (u?.upgrades ?? []).filter((x) => !known.includes(x.name) && !hasRule(['Fast', 'Swift', 'Impact +3', 'Impact +6', 'Momentum'], x.name));
+  const other = (u?.upgrades ?? []).filter((x) => !known.includes(x.name) && !modelled(abilities, x.name) && !hasRule(['Fast', 'Swift', 'Impact +3', 'Impact +6', 'Momentum'], x.name));
   if (other.length) {
     const add = other.reduce((n, x) => n + (x.unique ? AUTO_BATTLE.uniqueTrait : AUTO_BATTLE.trait), 0);
     atkBonus += add / 2; defBonus += add / 2;
     notes.push(`${other.map((x) => x.name).join(', ')}: +${Math.round(add * 100)}%`);
   }
-  const relics = (u?.relics ?? []).filter((r) => !r.profile);
+  const relics = (u?.relics ?? []).filter((r) => !r.profile && !modelled(abilities, r.name));
   if (relics.length) {
     const add = relics.reduce((n, r) => n + AUTO_BATTLE.relic[r.tier], 0);
     atkBonus += add / 2; defBonus += add / 2;
     notes.push(`${relics.map((r) => r.name).join(', ')}: +${Math.round(add * 100)}%`);
   }
-  const otherScars = scars.filter((s) => !['Weakened Armor', 'Damaged Equipment', 'Weakened Muscles', 'Faulty Aim'].includes(s));
+  const otherScars = scars.filter((s) => !['Weakened Armor', 'Damaged Equipment', 'Weakened Muscles', 'Faulty Aim'].includes(s) && !modelled(abilities, s));
   if (otherScars.length) {
     atkBonus += (otherScars.length * AUTO_BATTLE.scar) / 2; defBonus += (otherScars.length * AUTO_BATTLE.scar) / 2;
     notes.push(`${otherScars.join(', ')}: ${Math.round(otherScars.length * AUTO_BATTLE.scar * 100)}%`);
@@ -282,6 +302,7 @@ export function fighter(u: Unit | undefined, t: { id: string; name: string; woun
     quality, defense, size, tough, hp: t.wounds, maxHp: t.maxWounds, guns, defMod, fortified, ignore, evasive, impact, hitShoot, hitMelee, fast,
     hero: !!u && hasRule(u.rules, 'Hero'), morale, r1Def: 0, earlyShoot: 0, mines: false, shaken: false, tested: false,
     atkBonus: Math.max(0.5, atkBonus), defBonus: Math.max(0.5, defBonus), shoot: 0, melee: 0, attack: 0, def: 0, notes, xp: 0,
+    abilities, shield: 0, status: [], revived: false,
   };
   return rate(f);
 }
@@ -315,9 +336,9 @@ function damage(f: Fighter, t: Target, kind: MoveKind, targetModels: number, hit
 }
 
 /** Expected wounds `f` deals to `t` in this round, with the round's sector effects. */
-function expected(f: Fighter, t: Fighter, kind: MoveKind, round: number) {
+function expected(f: Fighter, t: Fighter, kind: MoveKind, round: number, hitMod = 0) {
   const target = round === 1 && t.r1Def ? { ...t, defMod: t.defMod + t.r1Def } : t;
-  const hit = hitBonus(f, kind) + (kind === 'shoot' && round <= 2 ? f.earlyShoot : 0);
+  const hit = hitBonus(f, kind) + (kind === 'shoot' && round <= 2 ? f.earlyShoot : 0) + hitMod;
   return damage(f, target, kind, alive(t), hit) / t.defBonus;
 }
 
@@ -470,14 +491,102 @@ export function autoSetup(b: TrackedBattle, forces: Force[], c?: Campaign): Auto
   return setup;
 }
 
+/** Does an effect count for this attack: its `only`, and its weapon if it's a weapon's. */
+function applies(f: Fighter, e: { only?: 'melee' | 'shoot'; gun?: string }, melee: boolean): boolean {
+  if (e.only && (e.only === 'melee') !== melee) return false;
+  const g = e.gun && f.guns.find((x) => x.name === e.gun);
+  return !g || g.melee === melee;
+}
+
+/** Due this round: every N rounds, from round 1. */
+const due = (every: number, round: number) => (round - 1) % Math.max(1, Math.round(every)) === 0;
+
+/** How much harder `f` hits this time: 6s to hit, a frenzy, a last stand. Notes say why. */
+function fury(f: Fighter, melee: boolean, round: number, notes: string[]): number {
+  let mul = 1;
+  for (const e of effects(f.abilities, 'sixes')) if (applies(f, e, melee)) mul += (e.again ? 1 / 6 : 0) + (e.dmg ?? 0) / 8 + (e.rend ? 0.1 : 0);
+  for (const e of effects(f.abilities, 'frenzy')) {
+    if (!due(e.every, round)) continue;
+    mul *= 1 + (e.mul - 1) * Math.min(1, e.time);
+    notes.push(`${e.source}: ${f.name} frenzies`);
+  }
+  if (f.hp <= f.maxHp / 2) for (const e of effects(f.abilities, 'lastStand')) {
+    mul *= e.mul;
+    notes.push(`${e.source}: ${f.name} makes a last stand`);
+  }
+  return mul;
+}
+
+/** Wounds onto a fighter: its shield soaks first. Returns wounds lost. */
+function hurt(t: Fighter, n: number, notes: string[]): number {
+  const soak = Math.min(t.shield, n);
+  if (soak) { t.shield -= soak; notes.push(`${t.name}'s shield soaks ${soak}`); }
+  const lost = Math.min(t.hp, n - soak);
+  t.hp -= lost;
+  return lost;
+}
+
+/** `t` has just fallen to `by`: it may get back up, blast as it goes, and feed the killer's leech. */
+function falls(t: Fighter, by: Fighter, rng: () => number, notes: string[]) {
+  if (t.hp > 0) return;
+  const rev = effects(t.abilities, 'revive')[0];
+  if (rev && !t.revived) {
+    t.revived = true;
+    t.hp = Math.max(1, Math.round(t.maxHp * rev.n));
+    notes.push(`${rev.source}: ${t.name} gets back up`);
+    return;
+  }
+  for (const e of effects(t.abilities, 'deathBlast')) {
+    if (by.hp <= 0) break;
+    const n = Math.min(by.hp, roll((e.dmg * failChance(by.defense, 1, by.defMod)) / by.defBonus, rng));
+    if (n) { by.hp -= n; notes.push(`${e.source}: ${n} to ${by.name}`); }
+  }
+  for (const e of effects(by.abilities, 'leech')) {
+    const n = Math.min(by.maxHp - by.hp, e.n);
+    if (by.hp > 0 && n > 0) { by.hp += n; notes.push(`${e.source}: ${by.name} heals ${n}`); }
+  }
+}
+
+const STATUS_TEXT: Record<Status, string> = { slow: 'slowed', stun: 'stunned', daze: 'dazed', mark: 'marked', bleed: 'bleeding', knock: 'knocked back', execute: 'finished off' };
+
+/** Each wound dealt is a chance to leave a status on the target, until its next activation. */
+function procs(f: Fighter, t: Fighter, melee: boolean, dmg: number, rng: () => number, notes: string[]) {
+  if (dmg <= 0) return;
+  for (const e of effects(f.abilities, 'onHit')) {
+    if (t.hp <= 0 || !applies(f, e, melee) || (e.status !== 'execute' && t.status.includes(e.status))) continue;
+    if (e.status === 'execute' && t.hp > t.maxHp / 4) continue;
+    if (rng() >= 1 - Math.pow(1 - e.chance, dmg)) continue;
+    if (e.status === 'execute') t.hp = 0;
+    else t.status.push(e.status);
+    notes.push(`${e.source}: ${t.name} ${STATUS_TEXT[e.status]}`);
+  }
+}
+
+/** Auras at the start: each lifts its unit and up to 2 allies near it. */
+function auras(fighters: Fighter[], rng: () => number) {
+  for (const f of fighters) {
+    const list = effects(f.abilities, 'aura');
+    if (!list.length) continue;
+    const near = fighters.filter((x) => x.team === f.team && x !== f).map((x) => ({ x, r: rng() })).sort((a, b) => a.r - b.r).slice(0, 2).map((a) => a.x);
+    for (const e of list) for (const x of [f, ...near]) {
+      if (e.stat === 'hit') { x.hitShoot += e.n; x.hitMelee += e.n; }
+      if (e.stat === 'save') x.defMod += e.n;
+      if (e.stat === 'rate') x.atkBonus *= 1 + e.n;
+      if (e.stat === 'range') x.earlyShoot += 0.5;
+      if (x !== f) x.notes.push(`${e.source} (${f.name}): ${describe(e)}`);
+    }
+  }
+}
+
 /** Fight it out: units of each team take turns, each attacking once a round, for 4 rounds or until one team is left. */
 export function autoBattle(start: Fighter[], rng: () => number = Math.random, rounds = AUTO_BATTLE.rounds, opts: AutoOptions = {}): AutoResult {
-  const fighters = start.map((f) => ({ ...f, notes: [...f.notes] }));
+  const fighters = start.map((f) => ({ ...f, notes: [...f.notes], status: [...f.status] }));
   const teams = [...new Set(fighters.map((f) => f.team))];
   const moves: Move[] = [];
   const standing = () => teams.filter((t) => fighters.some((f) => f.team === t && f.hp > 0));
   let first = Math.floor(rng() * teams.length);
   if (opts.first && teams.includes(opts.first)) first = teams.indexOf(opts.first);
+  auras(fighters, rng);
   // Endless Tide: the unit waiting to come back, then '' once it has.
   let tide: Fighter | '' | undefined;
   const fallen = (t: Fighter) => {
@@ -487,7 +596,7 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
   const fighting = () => standing().length + (tide && !standing().includes(tide.team) ? 1 : 0) > 1;
   for (let round = 1; round <= rounds && fighting(); round++) {
     if (tide) {
-      Object.assign(tide, { hp: tide.maxHp, shaken: false, tested: false });
+      Object.assign(tide, { hp: tide.maxHp, shaken: false, tested: false, status: [] });
       moves.push({ round, attacker: tide.key, kind: 'return', dmg: 0, back: 0, targetHp: tide.hp, attackerHp: tide.hp });
       tide = '';
     }
@@ -497,45 +606,102 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
       const q = queues[(first + turn) % teams.length];
       const f = q.shift();
       if (!f || f.hp <= 0) continue;
+      // What enemy hits left on it lasts until now.
+      const st = f.status;
+      f.status = [];
+      const notes: string[] = [];
+      const say = () => (notes.length ? { notes } : {});
+      if (st.includes('bleed') && f.hp > 1) { f.hp -= 1; notes.push(`${f.name} bleeds 1`); }
+      if (st.includes('stun')) {
+        moves.push({ round, attacker: f.key, kind: 'stunned', dmg: 0, back: 0, targetHp: f.hp, attackerHp: f.hp, ...say() });
+        continue;
+      }
       if (f.shaken) {
         f.shaken = false;
-        moves.push({ round, attacker: f.key, kind: 'rally', dmg: 0, back: 0, targetHp: f.hp, attackerHp: f.hp });
+        moves.push({ round, attacker: f.key, kind: 'rally', dmg: 0, back: 0, targetHp: f.hp, attackerHp: f.hp, ...say() });
         continue;
       }
       const enemies = fighters.filter((x) => x.team !== f.team && x.hp > 0);
       if (!enemies.length) break;
+      // Heals and shields come before it acts.
+      for (const e of effects(f.abilities, 'heal')) {
+        if (!due(e.every, round)) continue;
+        const pool: Fighter[] = e.ally ? fighters.filter((x) => x.team === f.team && x.hp > 0) : [f];
+        const who: Fighter = [...pool].sort((a, b) => b.maxHp - b.hp - (a.maxHp - a.hp))[0];
+        const n = Math.min(e.n, who.maxHp - who.hp);
+        if (n <= 0) continue;
+        who.hp += n;
+        if (who === f) notes.push(`${e.source}: heals ${n}`);
+        else moves.push({ round, attacker: f.key, target: who.key, kind: 'heal', dmg: n, back: 0, targetHp: who.hp, attackerHp: f.hp, notes: [e.source] });
+      }
+      for (const e of effects(f.abilities, 'shield')) {
+        if (!due(e.every, round) || f.shield >= e.n) continue;
+        f.shield = e.n;
+        notes.push(`${e.source}: shield of ${e.n}`);
+      }
       const t = pickTarget(f, enemies, round, rng);
-      const kind = moveKind(f, round, t);
+      let kind = moveKind(f, round, t);
+      // Slowed or knocked back: no charging this turn.
+      if (kind === 'charge' && (st.includes('slow') || st.includes('knock'))) {
+        kind = expected(f, t, 'shoot', round) > 0 ? 'shoot' : 'advance';
+        notes.push(`${f.name} can't charge (${st.includes('slow') ? 'slowed' : 'knocked back'})`);
+      }
+      const before = t.hp;
+      // Barrages land whatever else it does.
+      for (const e of effects(f.abilities, 'barrage')) {
+        if (!due(e.every, round) || t.hp <= 0) continue;
+        const ap = Math.max(0, e.ap - (t.fortified ? 1 : 0));
+        const lost = hurt(t, roll((e.hits * failChance(t.defense, ap, t.defMod) * (1 - t.ignore)) / t.defBonus, rng), notes);
+        notes.push(`${e.source}: ${lost} to ${t.name}`);
+        falls(t, f, rng, notes);
+      }
       if (kind === 'advance') {
-        moves.push({ round, attacker: f.key, kind, dmg: 0, back: 0, targetHp: t.hp, attackerHp: f.hp });
+        f.xp += killXp(t, before, Math.min(before, t.hp));
+        fallen(t);
+        fallen(f);
+        moves.push({ round, attacker: f.key, ...(t.hp < before ? { target: t.key } : {}), kind, dmg: Math.max(0, before - t.hp), back: 0, targetHp: t.hp, attackerHp: f.hp, ...say() });
         continue;
       }
+      const melee = kind === 'charge';
       // Minefields: charging across them early costs a wound for each model that rolls a 1 (never the last one).
-      const hazard = kind === 'charge' && f.mines && round <= 2 ? Math.min(f.hp - 1, roll(alive(f) / 6, rng)) : 0;
+      const hazard = melee && f.mines && round <= 2 ? Math.min(f.hp - 1, roll(alive(f) / 6, rng)) : 0;
       f.hp -= hazard;
-      const before = t.hp;
-      const dmg = Math.min(t.hp, roll(expected(f, t, kind, round), rng));
-      t.hp -= dmg;
-      f.xp += killXp(t, before, t.hp);
+      // Dazed, or charging into a field of fear: -1 to hit. Into a slowing field: a softer charge. Marked: it takes more.
+      const fields = effects(t.abilities, 'field');
+      const dazed = st.includes('daze') || (melee && fields.some((e) => e.status === 'daze'));
+      const soft = melee && fields.some((e) => e.status === 'slow') ? 0.75 : 1;
+      const marked = t.status.includes('mark') ? 1.25 : 1;
+      if (t.hp > 0) {
+        const n = hurt(t, roll(expected(f, t, kind, round, dazed ? -1 : 0) * fury(f, melee, round, notes) * soft * marked, rng), notes);
+        procs(f, t, melee, n, rng, notes);
+        falls(t, f, rng, notes);
+      }
+      const dmg = Math.max(0, before - t.hp);
+      f.xp += killXp(t, before, Math.min(before, t.hp));
       fallen(t);
+      fallen(f);
       let back = 0;
-      const cowed = kind === 'charge' && t.hp > 0 && t.shaken;
+      const cowed = melee && t.hp > 0 && t.shaken;
       // A Shaken unit can't strike back.
-      if (kind === 'charge' && t.hp > 0 && !t.shaken) {
+      if (melee && t.hp > 0 && !t.shaken && f.hp > 0) {
         const was = f.hp;
-        back = Math.min(f.hp, roll(expected(t, f, 'charge', round) * AUTO_BATTLE.strikeBack, rng));
-        f.hp -= back;
-        t.xp += killXp(f, was, f.hp);
+        let n = roll(expected(t, f, 'charge', round, t.status.includes('daze') ? -1 : 0) * AUTO_BATTLE.strikeBack * fury(t, true, round, notes), rng);
+        for (const e of effects(t.abilities, 'thorns')) if (rng() < e.chance) { n += e.n; notes.push(`${e.source}: ${e.n} back`); }
+        hurt(f, n, notes);
+        procs(t, f, true, was - f.hp, rng, notes);
+        falls(f, t, rng, notes);
+        back = Math.max(0, was - f.hp);
+        t.xp += killXp(f, was, Math.min(was, f.hp));
         fallen(f);
       }
       const shaken: string[] = [];
       for (const x of [t, f]) if (halfStrength(x, rng)) shaken.push(x.key);
       // The loser of a melee tests too.
-      if (kind === 'charge' && dmg !== back) {
+      if (melee && dmg !== back) {
         const loser = dmg < back ? f : t;
         if (moraleTest(loser, rng)) shaken.push(loser.key);
       }
-      moves.push({ round, attacker: f.key, target: t.key, kind, dmg, back, targetHp: t.hp, attackerHp: f.hp, ...(hazard ? { hazard } : {}), ...(cowed ? { cowed } : {}), ...(shaken.length ? { shaken } : {}) });
+      moves.push({ round, attacker: f.key, target: t.key, kind, dmg, back, targetHp: t.hp, attackerHp: f.hp, ...(hazard ? { hazard } : {}), ...(cowed ? { cowed } : {}), ...(shaken.length ? { shaken } : {}), ...say() });
     }
     first = (first + 1) % teams.length;
   }
