@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, DIFFICULTY_LEVELS, FOG, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP, WARLORDS } from './nexusData';
+import { ECHOES, DIFFICULTY_LEVELS, FOG, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_DUELS, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP, WARLORDS } from './nexusData';
 import { EXPEDITION, SOLO_PATROL, type ExpeditionCheck } from './downtimeData';
 
 // The prose of the Rules page: the group's Crusade and Nexus Wars docs, reworded where the app's rules have moved on.
@@ -170,6 +170,12 @@ export const NEXUS_TEXT = {
     `Each faction names one Hero from its forces its Warlord, on the Warlords panel of the campaign page, and picks a Path for it: ${WARLORDS.paths.map((p) => p.name).join(', ')}. The Path is for the rest of the campaign: a later Warlord follows the same one.`,
     `Each Path has three perks, unlocked as the Warlord reaches levels ${WARLORDS.levels.join(', ')} (its level comes from its XP, as for any unit). Perks that name the Warlord's force only work for the detachment the Warlord is in; the others help the whole faction.`,
     `If the Warlord is removed for good, or its force leaves the faction, the perks go. A new Warlord can be named ${WARLORDS.replaceAfter} round${WARLORDS.replaceAfter === 1 ? '' : 's'} later. A Warlord can also step down, with the same wait.`,
+  ],
+  duels: [
+    "A Nexus Duel is a battle between two players' own armies, away from the map, for a wager. Challenge another faction on the Nexus Duels panel of the campaign page and pick which force fights on each side. Nothing is forced: the other player can decline.",
+    'Each side puts something up: Umbra Shards, Materials, Research, Blueprints, Building Expansions, Archive unlocks, relics its force carries, and anything else you agree on (written as a note, settled at the table). Either player can change either wager until the result is in, but any change asks both of you to agree again.',
+    `Once both sides agree, play the battle as usual and record it for XP and rewards, then record the duel's result: the loser's stakes go to the winner. Materials come out of the loser's fullest banks and go into the winner's (home first, up to each bank's cap). A side that can't cover its stake pays what it has. A draw moves nothing. The duel doesn't change who holds any sector, and it isn't the faction's attack for the round. The last ${NEXUS_DUELS.keep} results stay on the panel.`,
+    "Umbra Shards and relics belong to forces, so each player's app pays or collects its own: the loser's are taken as soon as it opens the campaign page, and the winner picks which Hero carries a won relic.",
   ],
   reports: [
     "When the GM ends a round, a turn report tells what happened: battles won and lost, the Echoes' spread, new sectors on the map, guardians, hero offers and your planets' production. You only read about what your faction fought in or could see.",

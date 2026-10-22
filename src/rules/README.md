@@ -20,6 +20,7 @@ Crusade and Nexus Wars are homebrew and get rebalanced often, so their numbers a
 | Guardians: which sector types get one, the tier thresholds, the Tough multiplier, their XP and names (`GUARDIANS`). The logic is in `guardians.ts` | `nexusData.ts` |
 | Guardian loot: the D6 table (Materials, Research, Blueprint, Building Expansion…) and the Rare/Legendary roll bonus (`GUARDIAN_LOOT`). Rolled in `nexus.ts` when the game is recorded | `nexusData.ts` |
 | Warlords: the five Paths and their perks, the levels that unlock them, the wait before a new Warlord, and each perk's number (build discount, Research, move, XP, sight, Marauder weight, Umbra Shards) (`WARLORDS`). The logic is in `warlords.ts`; each perk is applied where its rule lives (`production.ts`, `tech.ts`, `movement.ts`, `fog.ts`, `rounds.ts`, `marauders.ts`, `nexus.ts`, `autoBattle.ts`) | `nexusData.ts` |
+| Nexus Duels: how many settled duels the campaign keeps (`NEXUS_DUELS`). The logic (agreeing, wagers, moving faction stakes, each force paying or collecting its Umbra Shards and relics) is in `duels.ts`; the panel is `components/Duels.tsx` | `nexusData.ts` |
 | The turn report's wording (the `TEXT` lines in `report.ts`, picked at random; `{sector}` and the like are filled in) | `report.ts` |
 | The prose on the in-app **Rules** page (tables there come from the two files above) | `rulesText.ts` |
 | Built-in battle tracker missions: the 18 OPR Advanced Rules missions, deployment styles and the example template | `missions.ts` |

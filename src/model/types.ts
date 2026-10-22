@@ -137,6 +137,8 @@ export interface ForceNexus {
   patrolRound?: number;
   /** Units that already fought a game or went on an Expedition in this round: each unit takes part once a round. */
   usedUnits?: { round: number; ids: string[] };
+  /** Settled Nexus Duels whose Umbra Shards and relics this force has paid or collected. */
+  duelsPaid?: string[];
 }
 
 /** A battle list: a printable selection of the force's units for one game. */
@@ -453,6 +455,43 @@ export interface Campaign {
   marauders?: Marauder[];
   /** The last round whose revealed moves the GM has applied. */
   movedOrders?: number;
+  /** Nexus Duels: battles two players agreed to fight for a wager (rules/duels.ts). */
+  duels?: NexusDuel[];
+}
+
+/** What one side of a Nexus Duel puts up. Each count is taken from the side's faction (or force, for Umbra Shards). */
+export interface DuelWager {
+  shards?: number;
+  materials?: number;
+  research?: number;
+  blueprints?: number;
+  cores?: number;
+  archives?: number;
+  /** Relics carried by the side's force: a copy, so the winner gets it as it was. */
+  relics?: (Relic & { unitId: string })[];
+  /** Anything else agreed that the app doesn't move (a favour, a sector, a promise). */
+  note?: string;
+}
+
+export interface DuelSide {
+  factionId: string;
+  forceId: string;
+  wager: DuelWager;
+  /** Happy with both wagers as they stand. Any change to either wager clears it. */
+  agreed?: boolean;
+}
+
+/** A battle between two players for a wager. Open while they haggle; settled when the result is in. */
+export interface NexusDuel {
+  id: string;
+  date: string;
+  round: number;
+  challenger: DuelSide;
+  challenged: DuelSide;
+  status: 'open' | 'settled';
+  /** Once settled: the winning faction, or '' for a draw. */
+  winner?: string;
+  settledOn?: string;
 }
 
 /** Where a detachment stands on the Nexus map. */

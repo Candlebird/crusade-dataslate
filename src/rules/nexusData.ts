@@ -76,6 +76,12 @@ export const NEXUS_ROUNDS = {
   keepRounds: 8,
 };
 
+/** Nexus Duels: player-against-player battles for a wager (rules/duels.ts). */
+export const NEXUS_DUELS = {
+  /** Settled duels the campaign keeps to look back on. */
+  keep: 10,
+};
+
 /** Detachments: further forces linked to a faction that already has one. Each declares its own attack in the Battle. */
 export const NEXUS_DETACHMENTS = {
   /** A detachment's Starting Supply: it gets its Supply from the faction's other forces when they reorganise. */
