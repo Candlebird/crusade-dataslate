@@ -81,6 +81,19 @@ At the end, fill in the sections below and give a short chat summary.
   - `e4bb8b7`: deleting a game won at an unclaimed sector took the guardian's loot back but never restored the guardian (or Reinforce, bank, construction).
   - `78aef3e`: revealed orders compared the orders counter with the campaign round, so after a second set of orders in one round an attack never showed as fought.
 
+- **Remaining pages bug hunt (area 2)**: Army Forge import, books, dice, tables.
+  - `2afe5ee`: an upgrade that names the weapon in the plural or with a count ("Replace all Rifles") never matched, so the unit kept the old weapon and got the new one on top (e.g. the Recruit Squad in the bundled Spears of Dothea book; over a dozen units in the bundled books). **Lists imported before this keep the extra weapons until imported again.**
+  - `31548cb`: a combined (doubled) unit lost its second half's weapons, and a hero joined to that half.
+  - `670af46`: opening another army book kept the last book's search, tags and edit mode, so it could look empty; an empty book now says so.
+  - `6d80381`: the dice roller kept a 6+ target after switching to a D3, so every roll showed 0 successes.
+  - `ab41bb7`: rolling an empty trait table crashed.
+
+- **Tests for saving, loading and sync (area 3)**: 51 new tests for import/export (`2523ada`), the store (`3f7c626`) and the cloud sync engine and document mapping (`ba455d1`). Firebase is never loaded in tests. Bugs they found:
+  - `49cf4fb`: a force imported as a copy came out with empty battle lists (they pointed at the original's unit ids).
+  - `a1ee42b`: something deleted right after it was created (before the server had seen it) came back with "Only the GM can change that" instead of being deleted.
+  - `2a685d0`: saved data that failed to load was silently replaced by the starter data on the next save. It is now kept under `opr-crusade-tracker:unreadable` first.
+  - `447fdaf`: restoring a backup with only some point values lost the defaults for the rest.
+
 ## Open questions
 - **Duel stakes when the loser can't pay.** The winner collects the full stake even if the loser has fewer shards/materials than staked (the loser is clamped at 0). Fair fix: the loser pays first and the winner gets what was actually paid, which needs a "paid" record on the duel. Want that?
 - **Deleting a Warlord's force.** The Warlord stays on the faction, because a deleted force looks the same as one that just isn't loaded in this browser. Options: clear the Warlord when the owner deletes the force on their own device, or give the GM a "clear Warlord" button.
@@ -95,6 +108,9 @@ At the end, fill in the sections below and give a short chat summary.
 - **Changing a force's faction** keeps its old Nexus state (claimed round, used units, patrol round). Reset it?
 - **Unclaimed income rounds expire.** Only the last few rounds are kept, so a faction that doesn't claim income for longer loses the older ones. Keep unclaimed rounds until claimed?
 - **Painting a Voidspawn back** to another sector type leaves the Echoes as its owner. Echoes can hold ordinary sectors, so I left it; clear the owner instead?
+- **A save that fails to load** is now kept under `opr-crusade-tracker:unreadable`, but nothing tells the player. Show a notice with a download button?
+- **A force imported as a copy** keeps its campaign faction, its battle records' links to tracked battles, and its created date. Should a copy drop these?
+- **Campaign import** only checks that `sectors` is a list, with no migration of older campaign files. Worth hardening?
 
 ## Test by hand
 - **Campaign tabs:** switch tabs on the player and GM pages, reload, and the tab should stay. On the GM map, "Record a game here" should open the Log tab at the record form. (My local data had no map, so this jump wasn't clicked.)
