@@ -221,4 +221,16 @@ describe('SyncEngine', () => {
     engine.setRemote('forces', [R('a', 'other')], false);
     expect(log).toEqual(['push forces/a 2', 'apply forces/a other']);
   });
+
+  it('deletes a new document deleted before the server showed it, instead of bringing it back', () => {
+    const { engine, log } = setup();
+    engine.setRemote('forces', [], false);
+    engine.setLocal([L('a', '1')]);
+    engine.setLocal([]);
+    expect(log).toEqual(['push forces/a 1', 'remove forces/a']);
+    // The snapshots that follow (the write, then the delete) change nothing.
+    engine.setRemote('forces', [{ ...R('a', '1'), confirmed: false }], false);
+    engine.setRemote('forces', [], false);
+    expect(log).toEqual(['push forces/a 1', 'remove forces/a']);
+  });
 });

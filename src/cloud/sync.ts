@@ -123,8 +123,9 @@ export class SyncEngine {
     }
     if (rj === null) return;
     if (S !== undefined) {
-      // Deleted locally since the last sync.
-      if (R && this.host.canDelete(R)) return this.remove(path, rj);
+      // Deleted locally since the last sync. With no remote copy yet, it is our own new document whose write
+      // hasn't shown up in a snapshot: take it back.
+      if (R ? this.host.canDelete(R) : this.pushing.has(path)) return this.remove(path, rj);
       return this.pull(path, rj, true);
     }
     this.pull(path, rj);
