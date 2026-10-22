@@ -92,7 +92,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
   const openNext = () => {
     if (!confirmAction('Open orders for the next game? These orders will be hidden again.')) return;
     const spreads = spreadsAt(nextThreat(c));
-    if (confirmAction(`Also end round ${currentRound(c)}? Sector income is fixed for the round and the ${ECHOES.name} spread ${spreads} sector${spreads === 1 ? '' : 's'}. Cancel to keep playing this round.`)) endRound(c);
+    if (confirmAction(`Also end round ${currentRound(c)}? Sector income is fixed for the round and the ${ECHOES.name} spread ${spreads} sector${spreads === 1 ? '' : 's'}. Cancel to keep playing this round.`)) endRound();
     open();
   };
   const reveal = () => {

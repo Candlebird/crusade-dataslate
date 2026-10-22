@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { DEFAULT_SETTINGS, type AppState, type CatalogBook, type Force, type Unit } from './types';
 import { buildSeedState } from './seed';
 import { migrateForce } from '../rules/migrate';
@@ -40,6 +40,9 @@ const Ctx = createContext<Store | null>(null);
 
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<AppState>(load);
+  // The latest state, so update() can apply a change right away: a handler can read what it just wrote, and two
+  // changes in the same tick both land.
+  const latest = useRef(state);
 
   useEffect(() => {
     try {
@@ -51,11 +54,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   const update = useCallback((fn: (d: AppState) => void) => {
-    setState((s) => {
-      const draft = structuredClone(s);
-      fn(draft);
-      return draft;
-    });
+    const draft = structuredClone(latest.current);
+    fn(draft);
+    latest.current = draft;
+    setState(draft);
   }, []);
 
   const updateForce = useCallback(
@@ -89,7 +91,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [update],
   );
 
-  const replaceState = useCallback((s: AppState) => setState(s), []);
+  const replaceState = useCallback((s: AppState) => {
+    latest.current = s;
+    setState(s);
+  }, []);
 
   return (
     <Ctx.Provider value={{ state, update, updateForce, updateUnit, addBook, replaceState }}>{children}</Ctx.Provider>

@@ -17,14 +17,18 @@ import { Panel, confirmAction, toast } from './ui';
 
 /** End the current round on a copy of the campaign (the spread is random, so it's rolled once, here) and store the result. */
 export function useEndRound() {
-  const { state, update } = useStore();
-  return (c: Campaign): RoundEnd => {
-    const next = structuredClone(c);
-    const r = endRound(next, Math.random, undefined, state.forces, state.books);
-    next.updatedAt = nowIso();
-    update((d) => void (d.campaign = next));
-    toast(roundEndText(next, r));
-    return r;
+  const { update } = useStore();
+  // Ends the round on the latest campaign in the store, so a change made since the page last drew isn't lost.
+  return (): RoundEnd | undefined => {
+    let out: { r: RoundEnd; c: Campaign } | undefined;
+    update((d) => {
+      if (!d.campaign) return;
+      const r = endRound(d.campaign, Math.random, undefined, d.forces, d.books);
+      d.campaign.updatedAt = nowIso();
+      out = { r, c: d.campaign };
+    });
+    if (out) toast(roundEndText(out.c, out.r));
+    return out?.r;
   };
 }
 
@@ -57,7 +61,7 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
       + (unspent ? ` ${unspent} unspent Strategic Asset${unspent === 1 ? ' is' : 's are'} lost.` : '')
       + ' Claimed space hulks drift off and new points of interest appear on the map, and a Galactic Event is rolled for the next round.'
       + ` Sector difficulty is rescaled to ${range.min}–${range.max} Supply and AI-held sectors roll new modifiers.`)) return;
-    end(c);
+    end();
   };
   const rescale = () => {
     if (rated && !confirmAction(`Rescale every sector to ${range.min}–${range.max} Supply? Sectors keep their modifiers; unrated ones roll theirs.`)) return;

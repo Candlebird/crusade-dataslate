@@ -254,14 +254,14 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
           <table className="compact stack">
             <thead><tr><th /><th>Faction</th><th>Player</th><th>Sectors</th><th>Linked forces here</th><th /></tr></thead>
             <tbody>
-              {c.factions.map((fa, i) => {
+              {c.factions.map((fa) => {
                 const owned = ownedSectors(c, fa.id);
                 const linked = state.forces.filter((f) => f.nexus?.factionId === fa.id);
                 return (
                   <tr key={fa.id}>
-                    <td className="s-end" data-label="Colour"><input type="color" value={fa.color} onChange={(e) => setC((d) => void (d.factions[i].color = e.target.value))} /></td>
-                    <td className="s-2" data-label="Faction"><TextField value={fa.name} onCommit={(v) => setC((d) => void (d.factions[i].name = v))} /></td>
-                    <td className="s-full" data-label="Player"><TextField value={fa.player} placeholder="Player" onCommit={(v) => setC((d) => void (d.factions[i].player = v))} /></td>
+                    <td className="s-end" data-label="Colour"><input type="color" value={fa.color} onChange={(e) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.color = e.target.value; })} /></td>
+                    <td className="s-2" data-label="Faction"><TextField value={fa.name} onCommit={(v) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.name = v; })} /></td>
+                    <td className="s-full" data-label="Player"><TextField value={fa.player} placeholder="Player" onCommit={(v) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.player = v; })} /></td>
                     <td className="small s-full" data-label="Sectors">
                       {owned.map((s) => <span key={s.id} className={`tag${s.type === 'home' ? ' gold' : ''}`} title={benefitOf(s)?.desc ?? SECTOR_TYPES[s.type].desc}>{s.name}</span>)}
                     </td>
@@ -288,7 +288,10 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
 }
 
 function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
-  const setS = (i: number, fn: (s: Sector) => void) => setC((d) => fn(d.sectors[i]));
+  const setS = (id: string, fn: (s: Sector) => void) => setC((d) => {
+    const s = d.sectors.find((x) => x.id === id);
+    if (s) fn(s);
+  });
   const add = () => setC((d) => void d.sectors.push({ id: uid(), name: `Sector ${d.sectors.length + 1}`, type: 'planet', notes: '' }));
   return (
     <Panel id="campaign.sectors" title="Sectors" extra={<button onClick={add}>+ Add sector</button>}>
@@ -297,16 +300,16 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
           <table className="compact stack">
             <thead><tr><th>Name</th><th>Type</th><th>Benefit</th><th>Controlled by</th><th>Flags</th><th>Lore</th><th /></tr></thead>
             <tbody>
-              {c.sectors.map((s, i) => {
+              {c.sectors.map((s) => {
                 const benefits = BENEFITS.filter((b) => b.type === s.type);
                 return (
                   <tr key={s.id}>
                     <td className="s-2" data-label="Name">
-                      <TextField value={s.name} onCommit={(v) => setS(i, (d) => void (d.name = v))} />
+                      <TextField value={s.name} onCommit={(v) => setS(s.id, (d) => void (d.name = v))} />
                       {c.map && s.q == null && <span className="muted small" title="Place it from the map"> · off map</span>}
                     </td>
                     <td data-label="Type">
-                      <select value={s.type} title={SECTOR_TYPES[s.type].desc} onChange={(e) => setS(i, (d) => {
+                      <select value={s.type} title={SECTOR_TYPES[s.type].desc} onChange={(e) => setS(s.id, (d) => {
                         d.type = e.target.value as SectorType;
                         if (!BENEFITS.some((b) => b.type === d.type && b.id === d.benefit)) d.benefit = undefined;
                         if (d.type === 'voidspawn') d.owner = ECHOES.id;
@@ -316,7 +319,7 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                     </td>
                     <td className="s-2" data-label="Benefit">
                       {benefits.length > 0 ? (
-                        <select value={s.benefit ?? ''} title={benefitOf(s)?.desc} onChange={(e) => setS(i, (d) => void (d.benefit = e.target.value || undefined))}>
+                        <select value={s.benefit ?? ''} title={benefitOf(s)?.desc} onChange={(e) => setS(s.id, (d) => void (d.benefit = e.target.value || undefined))}>
                           <option value="">— choose —</option>
                           {benefits.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
@@ -325,18 +328,18 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                     <td className="s-2" data-label="Controlled by">
                       <span className="row" style={{ flexWrap: 'nowrap' }}>
                         <span style={{ flex: 'none', width: 10, height: 10, borderRadius: 2, background: factionColor(c, s.owner) ?? 'transparent', border: '1px solid currentColor' }} />
-                        <select value={s.owner ?? ''} disabled={s.type === 'voidspawn'} onChange={(e) => setS(i, (d) => void (d.owner = e.target.value || undefined))}>
+                        <select value={s.owner ?? ''} disabled={s.type === 'voidspawn'} onChange={(e) => setS(s.id, (d) => void (d.owner = e.target.value || undefined))}>
                           <option value="">Unclaimed</option>
                           {sidesOf(c).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                         </select>
                       </span>
                     </td>
                     <td className="small" data-label="Flags">
-                      <label className="row" title="Reinforce Sector: +200 supply when defending"><input type="checkbox" checked={!!s.reinforced} onChange={(e) => setS(i, (d) => void (d.reinforced = e.target.checked || undefined))} /> Reinforced</label>
-                      {s.type === 'void' && <label className="row" title="One-off reward already taken"><input type="checkbox" checked={!!s.rewardClaimed} onChange={(e) => setS(i, (d) => void (d.rewardClaimed = e.target.checked || undefined))} /> Claimed</label>}
+                      <label className="row" title="Reinforce Sector: +200 supply when defending"><input type="checkbox" checked={!!s.reinforced} onChange={(e) => setS(s.id, (d) => void (d.reinforced = e.target.checked || undefined))} /> Reinforced</label>
+                      {s.type === 'void' && <label className="row" title="One-off reward already taken"><input type="checkbox" checked={!!s.rewardClaimed} onChange={(e) => setS(s.id, (d) => void (d.rewardClaimed = e.target.checked || undefined))} /> Claimed</label>}
                     </td>
-                    <td className="s-full" data-label="Lore"><TextField value={s.notes} placeholder="Lore, terrain…" onCommit={(v) => setS(i, (d) => void (d.notes = v))} /></td>
-                    <td className="s-end"><button className="ghost icon" aria-label="Remove sector" onClick={() => setC((d) => void d.sectors.splice(i, 1))}>✕</button></td>
+                    <td className="s-full" data-label="Lore"><TextField value={s.notes} placeholder="Lore, terrain…" onCommit={(v) => setS(s.id, (d) => void (d.notes = v))} /></td>
+                    <td className="s-end"><button className="ghost icon" aria-label="Remove sector" onClick={() => setC((d) => void (d.sectors = d.sectors.filter((x) => x.id !== s.id)))}>✕</button></td>
                   </tr>
                 );
               })}
