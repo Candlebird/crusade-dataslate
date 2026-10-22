@@ -648,6 +648,11 @@ fieldset.fields:disabled { opacity: 0.6; }
   .seg button { flex: 1 1 0; min-width: 0; padding: 0.4rem 0.25rem; font-size: 0.72rem; letter-spacing: 0.04em; }
   .list-item { flex-wrap: wrap; }
   .list-item > .grow:has(input) { flex-basis: 100%; }
+  /* Journal and Duels: let a choice's text drop under its button, and keep small buttons tappable. */
+  .option { flex-wrap: wrap; }
+  .option > .small, .option > div { flex: 1 1 12rem; min-width: 0; }
+  .option > button { max-width: 100%; text-align: left; }
+  .warlord button.ghost, .option-section button.ghost { min-height: 2.25rem; padding: 0.35rem 0.7rem; }
   .sheet-units { gap: 6px; }
 
   table.stack, table.stack tbody { display: block; }

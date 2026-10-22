@@ -284,8 +284,8 @@ function Settled({ c, d, own }: { c: Campaign; d: NexusDuel; own: Force[] }) {
       {d.settledOn}: {factionName(c, d.challenger.factionId)} vs {factionName(c, d.challenged.factionId)} —{' '}
       {loser ? <><b>{factionName(c, d.winner!)}</b> won {wagerText(loser.wager)}</> : 'a draw'}.
       {collector && (
-        <span className="row" style={{ display: 'inline-flex', marginLeft: '0.5rem' }}>
-          <select value={unitId || carriers[0]?.id || ''} onChange={(e) => setUnitId(e.target.value)} aria-label="Relic carrier">
+        <span className="row" style={{ display: 'inline-flex', marginLeft: '0.5rem', maxWidth: '100%' }}>
+          <select style={{ maxWidth: '100%' }} value={unitId || carriers[0]?.id || ''} onChange={(e) => setUnitId(e.target.value)} aria-label="Relic carrier">
             {carriers.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
           <button className="primary small" disabled={!carriers.length} onClick={collect}>Collect winnings</button>
