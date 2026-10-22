@@ -10,6 +10,7 @@ import {
   JOURNAL, JOURNAL_CATALYSTS, JOURNAL_COMPLICATIONS, JOURNAL_CONTEXTS, JOURNAL_REWARDS, JOURNAL_SKILLS, JOURNAL_TABLES, JOURNAL_THREADS,
   JOURNAL_TWISTS, rewardValue, tierBand,
 } from './journalData';
+import { journalRequest } from './journalAi';
 import { moveOf } from './movement';
 
 // Crossroads Journal variety: the tables stay inside their balance bands, and the twists, rivals, story threads, marks
@@ -180,6 +181,29 @@ describe('journal variety', () => {
     pickOption(c, 'j1', offer.indexOf('threadMap'), fs, '2026-10-21');
     expect(c.factions[0].thread).toBeUndefined();
     expect(c.factions[0].journalSeen).toContain('rew:threadMap');
+  });
+
+  it('tells Claude about the twist, rival, thread, sector and recent endings', () => {
+    const c = campaign();
+    const fs = forces();
+    const u = fs[0].units[0];
+    c.factions[0].thread = { id: 'map', step: 1, since: 1 };
+    c.factions[0].journalSeen = ['rew:salvage1'];
+    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    j.twist = { id: JOURNAL_TWISTS[0].id, roll: pass };
+    j.rival = { factionId: 'B', name: 'Kor' };
+    j.approach = { id: 'a', roll: pass };
+    j.climax = pass;
+    const r = journalRequest(c, j, u, fs);
+    expect(r.warlordRules).toEqual(['Hero', 'Fearless', 'Tough(3)']);
+    expect(r.sector).toBe('A Home (home)');
+    expect(r.steps).toHaveLength(4);
+    expect(r.steps[3].label).toContain(JOURNAL_TWISTS[0].name);
+    expect(r.scene.rival).toBe('Kor, Warlord of Bravo');
+    expect(r.scene.thread).toContain('The star-chart');
+    expect(r.required).toBe('threadMap');
+    expect(r.rewards.some((x) => x.id === 'threadMap')).toBe(true);
+    expect(JSON.stringify(r)).not.toContain('{rival}');
   });
 
   it('marks: an order mark changes the next move, a quirk stays, and the GM can strike one off', () => {

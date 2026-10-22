@@ -1,6 +1,7 @@
 import type { Campaign, CrossroadsJournal, Force, Unit } from '../model/types';
 import {
-  catalystById, complicationById, contextById, eligibleRewards, localOffer, minNothing, recentRewards, skillById, tierCap, validOffer,
+  catalystById, complicationById, contextById, eligibleRewards, journalText, localOffer, minNothing, recentRewards, requiredReward, skillById,
+  successes, threadBeat, tierCap, twistById, validOffer,
 } from './journal';
 import type { Rand } from './hexmap';
 
@@ -19,12 +20,19 @@ export interface JournalPick {
 export interface JournalRequest {
   faction: string;
   warlord: string;
-  scene: { context: string; catalyst: string; complication: string; note?: string };
+  /** The Warlord's special rules, for endings that suit them. */
+  warlordRules: string[];
+  /** Where the Warlord's detachment stood when the journal was dealt. */
+  sector?: string;
+  scene: { context: string; catalyst: string; complication: string; note?: string; twist?: string; rival?: string; thread?: string };
   steps: { label: string; skill?: string; target?: number; rolls?: number[]; pass?: boolean }[];
   successes: number;
   tierCap: number;
   minNothing: number;
-  rewards: { id: string; name: string; desc: string; tier: number }[];
+  /** A story thread's payoff that must be one of the four. */
+  required?: string;
+  /** `recent`: the faction had this ending lately, so pick it only if nothing else fits. */
+  rewards: { id: string; name: string; desc: string; tier: number; recent?: boolean }[];
 }
 
 const rolled = (r: { skill: string; target: number; rolls: number[]; pass: boolean } | undefined) =>
@@ -36,25 +44,37 @@ export function journalRequest(c: Campaign, j: CrossroadsJournal, u: Unit, force
   const comp = complicationById(j.complication);
   const approach = cat?.approaches.find((a) => a.id === j.approach?.id);
   const choice = comp?.choices.find((x) => x.id === j.choice?.id);
+  const say = (s: string | undefined) => journalText(j, s ?? '');
   const steps: JournalRequest['steps'] = [
     { label: `Approach: ${approach?.label ?? '?'} — ${approach?.text ?? ''}`, ...rolled(j.approach?.roll) },
-    { label: `Complication: ${choice?.label ?? '?'} — ${choice?.text ?? ''}`, ...rolled(j.choice?.roll) },
+    { label: `Complication: ${say(choice?.label) || '?'} — ${say(choice?.text)}`, ...rolled(j.choice?.roll) },
     { label: `Climax: ${cat?.climax.text ?? ''}`, ...rolled(j.climax) },
   ];
+  const twist = twistById(j.twist?.id);
+  if (twist) steps.push({ label: `Twist: ${twist.name} — ${journalText(j, twist.text)}`, ...rolled(j.twist?.roll) });
+  const sector = c.sectors.find((x) => x.id === j.sectorId);
+  const beat = threadBeat(j);
+  const recent = recentRewards(c, j.factionId);
   return {
     faction: c.factions.find((f) => f.id === j.factionId)?.name ?? j.factionId,
     warlord: `${j.warlord}${u.name && u.name !== j.warlord ? ` (${u.name})` : ''}`,
+    warlordRules: u.rules.slice(0, 20),
+    ...(sector ? { sector: `${sector.name} (${sector.type})` } : {}),
     scene: {
       context: `${ctx?.name ?? j.context}. ${ctx?.text ?? ''}`,
       catalyst: `${cat?.name ?? j.catalyst}. ${cat?.text ?? ''}`,
-      complication: `${comp?.name ?? j.complication}. ${comp?.text ?? ''}`,
+      complication: `${comp ? say(comp.name) : j.complication}. ${say(comp?.text)}`,
       ...(j.note ? { note: j.note } : {}),
+      ...(twist ? { twist: `${twist.name}. ${journalText(j, twist.text)}` } : {}),
+      ...(j.rival ? { rival: `${j.rival.name}, Warlord of ${c.factions.find((f) => f.id === j.rival!.factionId)?.name ?? 'a rival faction'}` } : {}),
+      ...(beat ? { thread: `${beat.name}, beat ${beat.step + 1} of ${beat.of}: ${beat.text}` } : {}),
     },
     steps,
-    successes: steps.filter((s) => s.pass).length,
+    successes: successes(j),
     tierCap: tierCap(j),
     minNothing: minNothing(j),
-    rewards: eligibleRewards(j, u, forces).map((r) => ({ id: r.id, name: r.name, desc: r.desc, tier: r.tier })),
+    ...(requiredReward(j) ? { required: requiredReward(j) } : {}),
+    rewards: eligibleRewards(j, u, forces).map((r) => ({ id: r.id, name: r.name, desc: r.desc, tier: r.tier, ...(recent.has(r.id) ? { recent: true } : {}) })),
   };
 }
 
