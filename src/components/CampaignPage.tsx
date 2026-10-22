@@ -38,6 +38,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
   const c = state.campaign;
   const [recordAt, setRecordAt] = useState<{ sectorId: string; n: number }>({ sectorId: '', n: 0 });
   const [pickedView, setViewAs] = useState<string>();
+  const [tab, setTab] = useCampaignTab();
   // Signed out, this browser is the GM's own copy.
   const canGm = cloud.isGm || !cloud.email;
   const mine = state.forces.find((f) => f.nexus?.factionId && (!f.owner || f.owner === cloud.email))?.nexus?.factionId;
@@ -145,14 +146,25 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
         </p>
 
         <RoundPanel c={c} gm={false} viewer={fog} />
-        <ReportPanel c={c} viewer={fog} />
-        <HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} />
-        {viewAs !== '-' && <TechTreePanel c={c} setC={setC} faction={viewAs || undefined} />}
-        {viewAs !== '-' && <WarlordsPanel c={c} setC={setC} faction={viewAs || undefined} gm={canGm} />}
-        <DuelsPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />
-        <JournalPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />
-        <OrdersPanel c={c} />
-        <LogPanel c={c} setC={setC} viewer={fog} />
+        <CampaignTabs tab={tab} setTab={setTab} />
+        {tab === 'map' && (
+          <>
+            <ReportPanel c={c} viewer={fog} />
+            <HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} />
+            <OrdersPanel c={c} />
+            {viewAs !== '-' && <TechTreePanel c={c} setC={setC} faction={viewAs || undefined} />}
+          </>
+        )}
+        {tab === 'warlord' && (viewAs !== '-'
+          ? <WarlordsPanel c={c} setC={setC} faction={viewAs || undefined} gm={canGm} />
+          : <div className="panel"><p className="muted">Link one of your forces to a faction (on its force page) to see your Warlord.</p></div>)}
+        {tab === 'duels' && (
+          <>
+            <DuelsPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />
+            <JournalPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />
+          </>
+        )}
+        {tab === 'log' && <LogPanel c={c} setC={setC} viewer={fog} />}
         {footer}
       </>
     );
@@ -187,24 +199,75 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
       </p>
 
       <RoundPanel c={c} />
-      <ReportPanel c={c} />
-      <FactionsPanel c={c} setC={setC} />
-      <HexMapPanel c={c} setC={setC} onRecord={(sectorId) => {
-        setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
-        setTimeout(() => document.getElementById('record-game')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
-      }} />
-      <OrdersPanel c={c} />
-      <TechTreePanel c={c} setC={setC} />
-      <WarlordsPanel c={c} setC={setC} gm />
-      <DuelsPanel c={c} setC={setC} gm />
-      <JournalPanel c={c} setC={setC} gm />
-      <SectorsPanel c={c} setC={setC} />
-      <div className="cols-2">
-        <RecordPanel c={c} setC={setC} preset={recordAt} />
-        <LogPanel c={c} setC={setC} />
-      </div>
+      <CampaignTabs tab={tab} setTab={setTab} />
+      {tab === 'map' && (
+        <>
+          <ReportPanel c={c} />
+          <FactionsPanel c={c} setC={setC} />
+          <HexMapPanel c={c} setC={setC} onRecord={(sectorId) => {
+            setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
+            setTab('log');
+            setTimeout(() => document.getElementById('record-game')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+          }} />
+          <OrdersPanel c={c} />
+          <TechTreePanel c={c} setC={setC} />
+          <SectorsPanel c={c} setC={setC} />
+        </>
+      )}
+      {tab === 'warlord' && <WarlordsPanel c={c} setC={setC} gm />}
+      {tab === 'duels' && (
+        <>
+          <DuelsPanel c={c} setC={setC} gm />
+          <JournalPanel c={c} setC={setC} gm />
+        </>
+      )}
+      {tab === 'log' && (
+        <div className="cols-2">
+          <RecordPanel c={c} setC={setC} preset={recordAt} />
+          <LogPanel c={c} setC={setC} />
+        </div>
+      )}
       {footer}
     </>
+  );
+}
+
+type CampaignTab = 'map' | 'warlord' | 'duels' | 'log';
+const TABS: { id: CampaignTab; label: string }[] = [
+  { id: 'map', label: 'Map' },
+  { id: 'warlord', label: 'Warlord' },
+  { id: 'duels', label: 'Duels & Journal' },
+  { id: 'log', label: 'Log' },
+];
+const TAB_KEY = 'opr-campaign-tab';
+
+/** The campaign page's open tab, remembered per device. */
+function useCampaignTab(): [CampaignTab, (t: CampaignTab) => void] {
+  const [tab, setTab] = useState<CampaignTab>(() => {
+    try {
+      const t = localStorage.getItem(TAB_KEY);
+      return TABS.some((x) => x.id === t) ? (t as CampaignTab) : 'map';
+    } catch {
+      return 'map';
+    }
+  });
+  return [tab, (t) => {
+    setTab(t);
+    try {
+      localStorage.setItem(TAB_KEY, t);
+    } catch {
+      // Blocked storage: the tab still opens, it just isn't remembered.
+    }
+  }];
+}
+
+function CampaignTabs({ tab, setTab }: { tab: CampaignTab; setTab: (t: CampaignTab) => void }) {
+  return (
+    <div className="seg campaign-tabs" role="tablist">
+      {TABS.map((t) => (
+        <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'on' : ''} onClick={() => setTab(t.id)}>{t.label}</button>
+      ))}
+    </div>
   );
 }
 
