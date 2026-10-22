@@ -58,6 +58,13 @@ At the end, fill in the sections below and give a short chat summary.
 - **UX and performance (areas 4 and 5)**:
   - `8f907ee`: the campaign page has tabs: Map, Warlord, Duels & Journal, Log. The round stays above them, and each device remembers its open tab. On the GM page, Factions and Sectors are under Map and Record a game is under Log ("Record a game here" on the map switches to it). Panel ids are unchanged, so folded panels stay folded.
   - `28ee383`: every page except the force pages, plus the hex map, loads on first use with a small spinner. The main bundle went from 982 kB to 614 kB (Firebase is its own 674 kB chunk, as before).
+  - `74f5ed2`: Warlords, Duels and Journal start open, since each now has its own tab (a panel you fold stays folded). With no factions, the Warlord tab says to add them on the Map tab.
+  - Phone check at 390 px: forces, force, unit, battle, books, rules and both campaign views have no sideways scroll; the tabs fit.
+  - The hex map already memoises its heavy selectors (sight, cells, fronts), so there was nothing more to memoise there.
+
+- **Tests (area 3)**:
+  - `79002ed`: 41 tests for fog of war, turn reports, guardians and the Claude journal request (what each faction sees, who reads each report line, which sectors get guardians and relics, and that a journal request never leaks another faction's Warlord, forces or sectors).
+  - `a0ecd5d`: they found that a Claude reply with a `null` ending threw, which left the journal stuck on "busy". It now falls back to the tables.
 
 ## Open questions
 - **Duel stakes when the loser can't pay.** The winner collects the full stake even if the loser has fewer shards/materials than staked (the loser is clamped at 0). Fair fix: the loser pays first and the winner gets what was actually paid, which needs a "paid" record on the duel. Want that?
