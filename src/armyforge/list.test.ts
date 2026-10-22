@@ -49,6 +49,18 @@ describe('Army Forge list import', () => {
     expect(f.units[0]).toMatchObject({ size: 10, points: 340 });
   });
 
+  it('a combined unit brings its weapons, and a hero joined to either half joins the merged unit', () => {
+    const one = listToForce({ ...save, list: { ...save.list, units: [unit('6ynjJBf', 'x1')] } }, [book]).units[0];
+    const two = {
+      ...save,
+      list: { ...save.list, units: [unit('6ynjJBf', 'x1'), unit('6ynjJBf', 'x2', [], 'x1', true), unit('2_M9XA9', 'h', [], 'x2')] },
+    };
+    const f = listToForce(two, [book]);
+    const [bros, hero] = f.units;
+    expect(bros.weapons.map((w) => [w.name, w.count])).toEqual(one.weapons.map((w) => [w.name, w.count * 2]));
+    expect(f.lists![0].joins).toEqual({ [hero.id]: bros.id });
+  });
+
   it('asks for the army book when it is missing', () => {
     expect(() => listToForce(save, [])).toThrow(MissingBooksError);
   });

@@ -28,6 +28,8 @@ export function listToForce(raw: Raw, books: CatalogBook[]): Force {
   const bySelection = new Map<string, Unit>();
   const joins: [string, string][] = [];
   const combined: [Unit, string][] = [];
+  /** Combined copies, by selection id, to the unit they were merged into (a hero may be joined to either half). */
+  const merged = new Map<string, Unit>();
   for (const lu of raw.list.units as Raw[]) {
     const book = books.find((b) => b.uid === (lu.armyId ?? raw.armyId))!;
     const cu = book.units.find((u) => u.id === lu.id);
@@ -50,7 +52,13 @@ export function listToForce(raw: Raw, books: CatalogBook[]): Force {
     if (!base) continue;
     base.size += copy.size;
     base.points += copy.points;
-    for (const [k, v] of bySelection) if (v === copy) bySelection.delete(k);
+    // The copy's models bring their weapons, upgrades included.
+    for (const w of copy.weapons) {
+      const same = base.weapons.find((x) => x.name === w.name && x.range === w.range && x.attacks === w.attacks && x.rules.join() === w.rules.join());
+      if (same) same.count += w.count;
+      else base.weapons.push(w);
+    }
+    for (const [k, v] of bySelection) if (v === copy) { bySelection.delete(k); merged.set(k, base); }
   }
 
   f.units = [...bySelection.values()];
@@ -60,7 +68,7 @@ export function listToForce(raw: Raw, books: CatalogBook[]): Force {
   list.unitIds = f.units.map((u) => u.id);
   for (const [hero, target] of joins) {
     const h = bySelection.get(hero);
-    const t = bySelection.get(target);
+    const t = bySelection.get(target) ?? merged.get(target);
     if (h && t) list.joins[h.id] = t.id;
   }
   f.lists = [list];
