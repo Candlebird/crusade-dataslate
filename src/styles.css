@@ -139,6 +139,7 @@ h3 { font-size: 1rem; text-transform: uppercase; }
 .panel-head { display: flex; align-items: center; gap: 0.3rem; min-width: 0; }
 .panel-head button.fold { color: var(--muted); font-size: 1.1rem; line-height: 1; padding: 0.15rem 0.4rem; }
 .panel-head button.fold:hover { color: var(--gold); }
+.panel-head .fold-title { cursor: pointer; user-select: none; }
 .panel.collapsed .panel-title { border-bottom: 0; padding-bottom: 0; margin-bottom: 0; }
 .panel.collapsed .panel-lead { margin-top: 0.75rem; }
 /* The Nexus Wars box on the force page: set apart from the force's own records. */

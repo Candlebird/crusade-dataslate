@@ -218,7 +218,8 @@ export function Panel({ id, title, extra, h = 2, className, domId, collapsed, le
           <button type="button" className="ghost icon fold" onClick={toggle} aria-expanded={!closed} title={closed ? 'Expand' : 'Collapse'}>
             {closed ? '▸' : '▾'}
           </button>
-          <H>{title}</H>
+          {/* The title folds it too: a bigger target on phones. The arrow stays the keyboard control. */}
+          <H className="fold-title" onClick={toggle}>{title}</H>
         </span>
         {extra}
       </div>
