@@ -145,7 +145,7 @@ function SideSetup({ b, side, set }: { b: TrackedBattle; side: TrackerSide; set:
   const pick = (forceId: string, listId: string) => {
     const f = forces.find((x) => x.id === forceId);
     if (!f) return setSide((s) => Object.assign(s, { forceId: undefined, listId: undefined, units: [], roster: undefined, bp: 0, manipulations: [] }));
-    setSide((s) => loadForce(s, f, f.lists?.find((l) => l.id === listId), state.settings));
+    setSide((s) => loadForce(s, f, f.lists?.find((l) => l.id === listId), state.settings, state.campaign));
   };
   const generate = () => {
     if (!book) return;

@@ -248,7 +248,9 @@ export function roundEndText(c: Campaign, r: RoundEnd) {
     : ` The Nexus Crisis was lost: ${r.crisis.lord} took ${r.crisis.lost.map((s) => s.name).join(', ') || 'nothing'}.`;
   const next = `${r.nextEvent ? ` Galactic event: ${eventById(r.nextEvent)?.name}.` : ''}${r.newCrisis ? ` Nexus Crisis! ${r.newCrisis.lord} rises at ${r.newCrisis.sectorName}.` : ''}`;
   const sector = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'the map edge';
-  const raids = r.marauders.raids.map((x) => x.repelled ? ` ${x.band} were thrown back from ${x.sector}.` : ` ${x.band} raided ${x.sector} (−${x.stolen} Materials).`).join('');
+  const raids = r.marauders.raids.map((x) => x.repelled
+    ? ` ${x.band} were thrown back from ${x.sector}${x.garrison === 'held' ? ' by its garrison' : ''}.`
+    : ` ${x.band} raided ${x.sector} (−${x.stolen} Materials${x.garrison ? ', halved by its garrison' : ''}).`).join('');
   const bands = r.marauders.spawned.map((m) => ` Marauders! ${m.name} (${m.strength} Supply) turned up at ${sector(m.sectorId)}.`).join('');
   const lords = (r.warlords?.lost ?? []).map((w) => ` ${factionName(c, w.factionId)} lost its Warlord, ${w.name}.`).join('');
   return `Round ${r.round} ended.${crisis} ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${gone('void', 'Space hulk', 'drifted off')}${gone('archive', 'Lost Archive', 'faded')}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''}${raids}${bands}${lords} Round ${currentRound(c)} begins.${next}`;

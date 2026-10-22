@@ -409,3 +409,163 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
     ],
   },
 ];
+
+// Unit tasks (Nexus Wars): one unit, one task, for the whole round. A unit on a task is busy: it fights in no battle
+// that round, the round's main Battle included. Each takes effect when it's set.
+
+/** Mentoring: a veteran teaches a unit of the same category and a lower level. Both are busy. */
+export const MENTORING = {
+  /** XP the pupil gains for each of the mentor's levels. */
+  xpPerLevel: 3,
+};
+
+/** Garrison: units stand guard on one of their faction's worlds through the round, against the Marauders. */
+export const GARRISON = {
+  /** The garrison throws a raid back when its points are at least this share of the band's Supply. */
+  holdShare: 0.5,
+  /** Weaker than that, the band still gets in but carries off only this share of what it would have. */
+  weakTheft: 0.5,
+  /** XP for each unit in the garrison when a band comes, held or not. */
+  raidXp: 2,
+  /** Rounds a garrison is kept on the sector after it stood, waiting for its units to take their XP. */
+  keepRounds: 3,
+};
+
+/** Recon: a unit scouts beyond the faction's sight. */
+export const RECON = {
+  /** How far the target can be from one of the faction's sectors or detachments. */
+  range: 3,
+  /** The target and everything within this many hexes of it are seen. */
+  radius: 1,
+  /** Seen this round and the next. */
+  rounds: 2,
+};
+
+export interface ProjectDef {
+  id: string;
+  name: string;
+  desc: string;
+  /** Progress it takes. Each unit set to it adds a D3. */
+  goal: number;
+  /** Not on a world already Reinforced (or Walled). */
+  needsUnfortified?: boolean;
+  reward: { reinforce?: boolean; materials?: number; research?: number; relic?: 'Common' | 'Rare' };
+}
+
+/** Projects: worked on a world the faction holds, one at a time per world, a D3 of progress per unit per round. */
+export const PROJECT_DIE = 3;
+export const PROJECTS: ProjectDef[] = [
+  { id: 'fortify', name: 'Fortify', goal: 6, needsUnfortified: true, desc: 'Dig in: the world is Reinforced (+200 Supply defending it, and Marauders are thrown back).', reward: { reinforce: true } },
+  { id: 'salvage', name: 'Salvage', goal: 4, desc: 'Strip wrecks and old works: +150 Materials into the world\'s bank.', reward: { materials: 150 } },
+  { id: 'research', name: 'Research', goal: 6, desc: 'Study what the world holds: +2 Research for the faction.', reward: { research: 2 } },
+  { id: 'relic', name: 'Forge a relic', goal: 8, desc: 'A free Common relic, taken in the Requisition shop by the force that finishes it.', reward: { relic: 'Common' } },
+  { id: 'rareRelic', name: 'Forge a rare relic', goal: 18, desc: 'A long work: a free Rare relic, taken in the Requisition shop by the force that finishes it.', reward: { relic: 'Rare' } },
+];
+
+/**
+ * Training sim: a tower-defense run between games. The squad stands around a base and holds off endless waves of Echo
+ * drones. Nothing in it touches the campaign but XP: units don't become busy, and a unit that dies there is only out of
+ * the run. The logic is in training.ts; the game is components/TrainingModal.tsx.
+ */
+export const TRAINING = {
+  squadMax: 5,
+  /** XP each unit still standing earns for every `xpEvery` waves cleared, up to `xpCap` a run. */
+  xpPerWave: 1,
+  xpEvery: 3,
+  xpCap: 3,
+  /** The map is this many tiles square, with the base on the middle tile. Units can't stand on the outer ring. */
+  mapSize: 17,
+  baseHp: 20,
+  /** A weapon reaches one tile for every this many inches of range. */
+  inchesPerTile: 4,
+  /** Melee weapons reach this far (tiles). */
+  meleeReach: 1.5,
+  /** Seconds between a unit's volleys: shooting, and melee. */
+  shootEvery: 2,
+  meleeEvery: 1.2,
+  /** A unit's volley spreads its shots over this share of the wait before the next one. */
+  volleySpread: 0.5,
+  /** Seconds between an enemy's attacks, and between the shots of one with a gun. */
+  enemyEvery: 1.2,
+  enemyShootEvery: 2.5,
+  /** Enemies stop to fight a unit they come within this many tiles of. */
+  engage: 0.8,
+  /** Blast(X) hits up to X enemies within this many tiles of the target. */
+  blastRadius: 1,
+  /** A Hero's aura gives +1 to hit to every unit within this many tiles of it, itself included. */
+  auraRadius: 2,
+  /** Fortifications have this many times their wounds. */
+  fortificationHp: 2,
+  /** Every unit's Tough counts this many times over, so a swarm that reaches it doesn't wipe it out at once. */
+  toughMul: 3,
+  /** Each enemy fighting a Vehicle/Monster takes this much damage a second, plus a third of its Impact. */
+  crushDps: 1,
+  /** Upgrades: +1 wound, +1 damage a hit, this much faster fire, +1 tile to weapons and aura. */
+  ratePerLevel: 0.7,
+  /** The first upgrade's cost in credits; each one bought after it costs this many times the one before. */
+  upgradeBase: 10,
+  upgradeGrowth: 1.25,
+  /** A wave drops credits enough for about this many upgrades, if every enemy in it dies. */
+  upgradesPerWave: 3,
+  /** Waves scale with the squad's power: its points, with each level adding this share. */
+  levelPower: 0.05,
+  /** Wave 1's enemies cost this much for every 100 power, growing by `budgetGrowth` a wave. */
+  budgetPer100: 5.5,
+  budgetGrowth: 1.16,
+  /** Enemies also get this many times tougher each wave, to keep pace with the upgrades: faster for a smaller squad, which spreads them over fewer units (× squadMax / squad size). */
+  hpGrowth: 1.08,
+  /** The Echo Lord is as tough as this many points of squad would make it (scaled with the squad, within ×0.4–2). */
+  bossPower: 700,
+  /** Past this many cost-points in a wave, enemies get tougher instead of more numerous. */
+  maxBudget: 70,
+  /** Each wave sends this many times the enemies its budget buys, for the same credits. */
+  enemyCount: 1.5,
+  /** An Echo Lord comes every this many waves. */
+  bossEvery: 5,
+  /** Share of a wave that comes from the direction shown before it, within `arc` degrees either side. */
+  favoured: 0.7,
+  arc: 35,
+  /** Scouts and Ambushers come from the opposite side, within this many degrees of it. */
+  flankArc: 40,
+  /** Ambushers appear this far from the base (tiles). */
+  ambushRange: [4.5, 6] as [number, number],
+};
+
+export type TrainingEnemyKind = 'swarm' | 'drone' | 'carapace' | 'spitter' | 'outrider' | 'stalker' | 'brute' | 'lord';
+
+export interface TrainingEnemyDef {
+  name: string;
+  desc: string;
+  hp: number;
+  /** Tiles a second. */
+  speed: number;
+  /** Taken off the damage of every hit (a 6 to hit from a Rending weapon ignores it). */
+  armor: number;
+  attacks: number;
+  quality: number;
+  ap: number;
+  /** Tiles it shoots from; 0 = it fights in melee. */
+  range: number;
+  /** A gun it fires on the move at the nearest unit in reach (tiles), as well as fighting in melee. */
+  gun?: { range: number; attacks: number; ap: number };
+  /** Its share of the wave's budget, and of the credits. */
+  cost: number;
+  /** The first wave it can turn up in. */
+  from: number;
+  /** Scout: comes in from the opposite side as the wave starts. Ambush: appears mid-wave, close in on the opposite side. */
+  spawn: 'main' | 'scout' | 'ambush' | 'boss';
+  color: string;
+  /** Drawn radius, in tiles. */
+  size: number;
+}
+
+export const TRAINING_ENEMIES: Record<TrainingEnemyKind, TrainingEnemyDef> = {
+  swarm: { name: 'Swarmling', desc: 'Fast and frail, in numbers.', hp: 3, speed: 1.6, armor: 0, attacks: 1, quality: 5, ap: 0, range: 0, cost: 1, from: 1, spawn: 'main', color: '#c9b458', size: 0.18 },
+  drone: { name: 'Echo Drone', desc: 'The line infantry of the Echoes. Shoots on the move (4 tiles).', hp: 6, speed: 1.1, armor: 0, attacks: 2, quality: 4, ap: 0, range: 0, gun: { range: 4, attacks: 1, ap: 0 }, cost: 2, from: 1, spawn: 'main', color: '#8fa7c4', size: 0.24 },
+  spitter: { name: 'Spitter', desc: 'Stops 3 tiles out and shoots the nearest unit, or the base.', hp: 5, speed: 0.9, armor: 0, attacks: 2, quality: 4, ap: 0, range: 3, cost: 3, from: 2, spawn: 'main', color: '#7fbf6a', size: 0.22 },
+  outrider: { name: 'Outrider', desc: 'Scout: races in from the opposite side as the wave starts, shooting (3 tiles).', hp: 5, speed: 2, armor: 0, attacks: 2, quality: 4, ap: 0, range: 0, gun: { range: 3, attacks: 1, ap: 0 }, cost: 3, from: 2, spawn: 'scout', color: '#e0a040', size: 0.22 },
+  carapace: { name: 'Carapace', desc: 'Armour 1: each hit does 1 less damage. Bring AP. Shoots on the move (4 tiles).', hp: 10, speed: 0.8, armor: 1, attacks: 2, quality: 4, ap: 1, range: 0, gun: { range: 4, attacks: 2, ap: 0 }, cost: 4, from: 3, spawn: 'main', color: '#6c7a89', size: 0.28 },
+  stalker: { name: 'Stalker', desc: 'Ambush: appears mid-wave, close in on the opposite side.', hp: 7, speed: 1.3, armor: 0, attacks: 3, quality: 4, ap: 1, range: 0, cost: 4, from: 3, spawn: 'ambush', color: '#b05cc8', size: 0.24 },
+  brute: { name: 'Brute', desc: 'Slow, huge, and hits hard. Shoots on the move (3 tiles).', hp: 22, speed: 0.6, armor: 0, attacks: 4, quality: 3, ap: 1, range: 0, gun: { range: 3, attacks: 2, ap: 1 }, cost: 6, from: 4, spawn: 'main', color: '#c0583e', size: 0.34 },
+  lord: { name: 'Echo Lord', desc: `Every ${TRAINING.bossEvery}th wave. Armour 1. Shoots on the move (5 tiles).`, hp: 80, speed: 0.5, armor: 1, attacks: 6, quality: 3, ap: 2, range: 0, gun: { range: 5, attacks: 3, ap: 1 }, cost: 20, from: 1, spawn: 'boss', color: '#e04a6a', size: 0.45 },
+};

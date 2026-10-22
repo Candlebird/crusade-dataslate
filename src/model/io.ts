@@ -85,13 +85,17 @@ export function asCopy(f: Force): Force {
     owner: undefined,
     name: `${f.name} (copy)`,
     units: f.units.map((u) => ({ ...u, id: id(u.id) })),
-    // Battle lists and the units used this round name units by id: point them at the copy's units.
+    // Battle lists and the units used or busy this round name units by id: point them at the copy's units.
     lists: f.lists?.map((l) => ({
       ...l,
       unitIds: l.unitIds.map(id),
       joins: Object.fromEntries(Object.entries(l.joins).map(([hero, to]) => [id(hero), id(to)])),
     })),
-    nexus: f.nexus && used ? { ...f.nexus, usedUnits: { ...used, ids: used.ids.map(id) } } : f.nexus,
+    nexus: f.nexus && {
+      ...f.nexus,
+      usedUnits: used && { ...used, ids: used.ids.map(id) },
+      tasks: f.nexus.tasks && { ...f.nexus.tasks, units: Object.fromEntries(Object.entries(f.nexus.tasks.units).map(([u, t]) => [id(u), t])) },
+    },
   };
 }
 

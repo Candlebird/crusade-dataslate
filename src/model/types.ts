@@ -141,6 +141,35 @@ export interface ForceNexus {
   duelsPaid?: string[];
   /** Crossroads Journals whose Warlord rewards (or costs) this force has taken. */
   journalsPaid?: string[];
+  /** Units on a downtime task this round (rules/tasks.ts): busy, they fight in no battle, the round's main Battle included. */
+  tasks?: { round: number; units: Record<string, UnitTaskKind> };
+  /** Relics forged by a Project, not taken yet: each makes one relic of its tier free in the Requisition shop. */
+  forged?: ('Common' | 'Rare')[];
+  /** Garrisons (`sectorId@round`) whose raid XP this force has taken. */
+  garrisonsPaid?: string[];
+}
+
+/** A unit's downtime task for a round. */
+export type UnitTaskKind = 'project' | 'mentor' | 'recon' | 'garrison';
+
+/** A Project under way on a world (rules/tasks.ts): one at a time, lost if the world changes hands. */
+export interface SectorProject {
+  /** PROJECTS id (downtimeData.ts). */
+  id: string;
+  factionId: string;
+  progress: number;
+  /** Who has worked on it, newest last: `round: unit name (+n)`. */
+  log: string[];
+}
+
+/** Units standing guard on a world through a round, against the Marauders. */
+export interface SectorGarrison {
+  /** The round they stand guard in (raids come at its end). */
+  round: number;
+  factionId: string;
+  units: { forceId: string; unitId: string; name: string; points: number }[];
+  /** A band came: whether the garrison threw it back. Its units can take their XP. */
+  raid?: { band: string; repelled: boolean };
 }
 
 /** A battle list: a printable selection of the force's units for one game. */
@@ -194,6 +223,8 @@ export interface Force {
   nexus?: ForceNexus;
   battleLog?: BattleRecord[];
   lists?: ArmyList[];
+  /** Most waves cleared in one training run (rules/training.ts). */
+  trainingBest?: number;
   /** Version of the trait and relic names it was saved with (see rules/migrate.ts). */
   rulesVersion?: number;
   createdAt: string;
@@ -330,6 +361,10 @@ export interface Sector {
   guardian?: SectorGuardian;
   /** Marauders raided it: it produces nothing in this round. */
   raided?: number;
+  /** A downtime Project under way here (one per world). */
+  project?: SectorProject;
+  /** Units that garrisoned it lately, newest last (a few rounds are kept, so raid XP waits to be taken). */
+  garrisons?: SectorGarrison[];
 }
 
 /** A Marauder band (rules/marauders.ts): raiders belonging to no one, always on the map. */
@@ -377,6 +412,8 @@ export interface CampaignFaction {
   journalSeen?: string[];
   /** A story thread its journals are following (rules/journalData.ts JOURNAL_THREADS). */
   thread?: JournalThreadState;
+  /** Sectors scouted by Recon units: seen in the round they were scouted and the next. */
+  recon?: { round: number; sectorIds: string[] }[];
 }
 
 /** A story thread a faction's journals follow over several rounds: the step it's at, and the rival it names, if any. */

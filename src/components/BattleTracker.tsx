@@ -354,7 +354,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
       // Randomly picked forces fill the sides nothing was loaded into, players first.
       const open = [...b.sides.filter((x) => !x.ai), ...b.sides.filter((x) => x.ai)].filter((x) => !x.forceId);
       const left = forces.filter((f) => !b.sides.some((x) => x.forceId === f.id));
-      open.forEach((side, i) => left[i] && loadForce(side, left[i], undefined, s.settings));
+      open.forEach((side, i) => left[i] && loadForce(side, left[i], undefined, s.settings, s.campaign));
       s.battle = b;
     });
     if (sector || crisis) go(href.tracker());
@@ -658,7 +658,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
   const pickForce = (forceId: string, listId: string) => {
     const f = forces.find((x) => x.id === forceId);
     if (!f) return setSide((s) => Object.assign(s, { forceId: undefined, listId: undefined, units: [], roster: undefined, bp: 0, manipulations: [] }));
-    setSide((s) => loadForce(s, f, f.lists?.find((l) => l.id === listId), state.settings));
+    setSide((s) => loadForce(s, f, f.lists?.find((l) => l.id === listId), state.settings, state.campaign));
   };
 
   return (

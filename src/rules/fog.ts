@@ -1,5 +1,6 @@
 import type { Campaign, Sector } from '../model/types';
 import { hexDistance, isPlaced } from './hexmap';
+import { RECON } from './downtimeData';
 import { FOG, WARLORDS } from './nexusData';
 import { hasPerk } from './warlords';
 
@@ -25,7 +26,16 @@ export function visibleTo(c: Campaign, factionId: string): Set<string> {
     const at = p.factionId === factionId ? c.sectors.find((s) => s.id === p.sectorId) : undefined;
     if (at && isPlaced(at)) for (const s of c.sectors) if (isPlaced(s) && hexDistance(at, s) <= FOG.forceSight + scouts) out.add(s.id);
   }
+  // And what its Recon units scouted lately.
+  for (const id of reconSeen(c, factionId)) out.add(id);
   return out;
+}
+
+/** Sectors the faction's Recon units (rules/tasks.ts) see right now: scouted this round or the one before. */
+export function reconSeen(c: Campaign, factionId: string): string[] {
+  const round = c.round ?? 1;
+  const recon = c.factions.find((x) => x.id === factionId)?.recon ?? [];
+  return recon.filter((r) => r.round > round - RECON.rounds && r.round <= round).flatMap((r) => r.sectorIds);
 }
 
 /** Sectors a faction has seen at some point but can't see now. */

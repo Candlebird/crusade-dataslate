@@ -23,6 +23,11 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
   const units = force.units.filter((u) => u.status !== 'removed');
   const unit = units.find((u) => u.id === unitId);
   const tier = sel ? RELIC_TIER[sel.name] : undefined;
+  // A relic forged by a finished Project is free: it uses up one credit of its tier instead of RP.
+  const forged = force.nexus?.forged ?? [];
+  const credits = (t: string | undefined) => forged.filter((x) => x === t).length;
+  const free = !!tier && credits(tier) > 0;
+  const cost = free ? 0 : sel?.cost ?? 0;
 
   const pick = (r: Requisition) => {
     setSel(r);
@@ -34,7 +39,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
 
   const eligible: Unit[] = !sel ? [] : units.filter((u) => requisitionEligible(sel.name, u));
 
-  const why = requisitionProblem(sel, rp, unit, choice, held);
+  const why = requisitionProblem(sel && { ...sel, cost }, rp, unit, choice, held);
 
   let warning: string | null = null;
   if (unit && sel?.name === 'Heroic Rise' && (unit.category !== 'Infantry' || unit.tough > 1)) warning = 'Heroic Rise is for Tough(1) infantry.';
@@ -100,7 +105,8 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
     }
 
     updateForce(force.id, (d) => {
-      d.ledger.push({ id: uid(), date: today, label, rp: -sel.cost, supply });
+      d.ledger.push({ id: uid(), date: today, label: free ? `${label} (forged: free)` : label, rp: -cost, supply });
+      if (free && d.nexus?.forged) d.nexus.forged.splice(d.nexus.forged.findIndex((x) => x === tier), 1);
       const u = d.units.find((x) => x.id === unitId);
       if (u && mutate) mutate(u);
     });
@@ -111,12 +117,12 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
 
   return (
     <Modal title={`Requisition — ${rp} RP available`} onClose={onClose} wide
-      footer={<><span className="muted small grow">{why ?? warning}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>Buy{sel ? ` (${sel.cost} RP)` : ''}</button></>}>
+      footer={<><span className="muted small grow">{why ?? warning}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>Buy{sel ? (free ? ' (forged: free)' : ` (${sel.cost} RP)`) : ''}</button></>}>
       <div className="cols-2">
         <div>
           {REQUISITIONS.map((r) => (
-            <div key={r.name} className={`shop-item${sel === r ? ' selected' : ''}${r.cost > rp ? ' disabled' : ''}`} onClick={() => pick(r)}>
-              <span className="cost">{r.cost} RP</span>
+            <div key={r.name} className={`shop-item${sel === r ? ' selected' : ''}${r.cost > rp && !credits(RELIC_TIER[r.name]) ? ' disabled' : ''}`} onClick={() => pick(r)}>
+              <span className="cost">{credits(RELIC_TIER[r.name]) ? `${credits(RELIC_TIER[r.name])} forged` : `${r.cost} RP`}</span>
               <div className="grow">
                 <b>{r.name}</b>
                 <div className="muted small">{r.name === 'Increase Supply' ? `+${s.supplyPerRp} Supply Limit.` : r.desc}</div>

@@ -766,3 +766,14 @@ fieldset.fields:disabled { opacity: 0.6; }
 .loading { display: flex; align-items: center; gap: 0.5rem; padding: 1.5rem 0.25rem; }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Training sim */
+.training { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 12px; }
+.training-board canvas { display: block; width: 100%; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 4px; cursor: crosshair; touch-action: manipulation; }
+.training-side { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.training-unit { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 6px; }
+.training-ups { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 4px 0; }
+.training-log { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 4px; }
+@media (max-width: 700px) {
+  .training { grid-template-columns: 1fr; }
+}

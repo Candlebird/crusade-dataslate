@@ -7,6 +7,7 @@ import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
 import { aiStyleFor, type AiStyle } from './aiTrees';
 import { aiDefended, modifierOf } from './difficulty';
 import { isReinforced } from './production';
+import { unitsBusy } from './tasks';
 
 // The battle tracker: one game in progress, scored from the mission it was started with.
 // The mission is copied in, so editing the library mid-game doesn't change a running battle.
@@ -187,9 +188,10 @@ export function trackerUnit(u: Unit): TrackerUnit {
   return { id: u.id, unitId: u.id, name: unitName(u), maxWounds, wounds: maxWounds, shaken: false, activated: false, destroyed: false, xp: 0, points: u.points, aiStyle: aiStyleFor(u) };
 }
 
-/** Fill a side from a force (and one of its lists, or every active unit). */
-export function loadForce(side: TrackerSide, f: Force, list: ArmyList | undefined, s: Settings) {
-  const units = list ? listUnits(f, list) : f.units.filter((u) => u.status === 'active');
+/** Fill a side from a force (and one of its lists, or every active unit). Units busy on a task this round (with the campaign) stay home. */
+export function loadForce(side: TrackerSide, f: Force, list: ArmyList | undefined, s: Settings, c?: Campaign) {
+  const busy = new Set(unitsBusy(f, c));
+  const units = (list ? listUnits(f, list) : f.units.filter((u) => u.status === 'active')).filter((u) => !busy.has(u.id));
   side.name = f.name;
   side.forceId = f.id;
   side.listId = list?.id;
@@ -349,7 +351,7 @@ export function atSector(b: TrackedBattle, c: Campaign, forces: Force[], s: Sett
     const side = membersOf(b, t).find((x) => !x.ai);
     const theirs = forces.filter((f) => factionId && f.nexus?.factionId === factionId);
     const one = theirs.find((f) => f.id === pick) ?? (theirs.length === 1 ? theirs[0] : undefined);
-    if (side && one) loadForce(side, one, undefined, s);
+    if (side && one) loadForce(side, one, undefined, s, c);
   };
   load('A', attacker, forceId);
   if (owner !== attacker) load('B', owner);
@@ -393,7 +395,7 @@ export function atCrisis(b: TrackedBattle, c: Campaign, forces: Force[], s: Sett
   const players = membersOf(b, 'A').filter((x) => !x.ai);
   c.factions.forEach((f, i) => {
     const theirs = forces.filter((x) => x.nexus?.factionId === f.id);
-    if (players[i] && theirs.length === 1) loadForce(players[i], theirs[0], undefined, s);
+    if (players[i] && theirs.length === 1) loadForce(players[i], theirs[0], undefined, s, c);
   });
 }
 

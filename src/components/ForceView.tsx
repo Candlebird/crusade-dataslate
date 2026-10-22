@@ -12,6 +12,8 @@ import UmbraShop from './UmbraShop';
 import RoundIncome from './RoundIncome';
 import ExpeditionModal from './ExpeditionModal';
 import PatrolModal from './PatrolModal';
+import UnitTaskModal from './UnitTaskModal';
+import TrainingModal from './TrainingModal';
 import type { Campaign, Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
 import { SOLO_PATROL } from '../rules/downtimeData';
@@ -22,7 +24,10 @@ import { hireBlock, hireHero, offerEnds, openOffers } from '../rules/heroes';
 import { nowIso } from '../model/factory';
 import { DetachmentsBox } from './Detachments';
 import { claimableRounds } from '../rules/rounds';
-import { RESULT_LABEL } from '../rules/battle';
+import { TASK_NAMES, claimGarrisons, freeUnits, garrisonClaims, tasksOf } from '../rules/tasks';
+import { GARRISON, TRAINING } from '../rules/downtimeData';
+import { canTrain } from '../rules/training';
+import { RESULT_LABEL, unitName } from '../rules/battle';
 import { listTotals, newList } from '../rules/lists';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
@@ -499,6 +504,48 @@ export function ForceImage({ image, onChange }: { image?: string; onChange: (img
   );
 }
 
+/** Unit tasks this round (Mentoring, Projects, Recon, Garrison), and garrison XP to take. */
+function UnitTasksRow({ f, c, onOpen }: { f: Force; c: Campaign; onOpen: () => void }) {
+  const { update } = useStore();
+  const tasks = tasksOf(f, c);
+  const claims = garrisonClaims(c, f);
+  const claim = () => {
+    let summary = '';
+    update((s) => {
+      const d = s.forces.find((x) => x.id === f.id);
+      if (!d || !s.campaign) return;
+      summary = claimGarrisons(s.campaign, d, localDate(), uid);
+      d.updatedAt = nowIso();
+    });
+    if (summary) toast(summary);
+  };
+  return (
+    <>
+      <div className="span-all row">
+        <span className="grow small">
+          <b>Unit tasks:</b> set a unit to Mentoring, a Project, Recon or Garrison. <span className="muted">It is busy all round and fights in no battle, the main Battle included.</span>
+        </span>
+        <button disabled={!freeUnits(f, c).length} onClick={onOpen}>Unit task…</button>
+      </div>
+      {Object.keys(tasks).length > 0 && (
+        <div className="span-all small">
+          <span className="muted">Busy this round: </span>
+          {Object.entries(tasks).map(([id, t]) => {
+            const u = f.units.find((x) => x.id === id);
+            return u ? `${unitName(u)} (${TASK_NAMES[t]})` : null;
+          }).filter(Boolean).join(', ')}
+        </div>
+      )}
+      {claims.length > 0 && (
+        <div className="span-all row">
+          <span className="grow small"><b>Garrison XP:</b> Marauders came against {claims.map((x) => x.sector.name).join(', ')}. +{GARRISON.raidXp} XP to each unit that stood guard.</span>
+          <button className="primary" onClick={claim}>Claim garrison XP</button>
+        </div>
+      )}
+    </>
+  );
+}
+
 function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const { state, updateForce } = useStore();
   const c = state.campaign;
@@ -511,6 +558,8 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const [claiming, setClaiming] = useState(false);
   const [expedition, setExpedition] = useState(false);
   const [patrol, setPatrol] = useState(false);
+  const [tasking, setTasking] = useState(false);
+  const [training, setTraining] = useState(false);
   // As many Expeditions a round as there are free units: each unit takes part once a round.
   const expedited = !!c && !f.units.some((u) => u.status === 'active' && !unitsUsed(f, c).includes(u.id));
   const toClaim = c && n && faction ? claimableRounds(c, n, state.forces) : [];
@@ -526,6 +575,15 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
       {patrol && <PatrolModal force={f} onClose={() => setPatrol(false)} />}
     </div>
   );
+  const trainingRow = (
+    <div className="span-all row">
+      <span className="grow small">
+        <b>Training sim:</b> hold a base against endless waves with up to {TRAINING.squadMax} units for up to {TRAINING.xpCap} XP each. <span className="muted">Any time, as often as you like; no unit becomes busy.{f.trainingBest ? ` Best: ${f.trainingBest} waves.` : ''}</span>
+      </span>
+      <button disabled={!f.units.some(canTrain)} onClick={() => setTraining(true)}>Train…</button>
+      {training && <TrainingModal force={f} onClose={() => setTraining(false)} />}
+    </div>
+  );
 
   return (
     <Panel id="force.nexus" title="Nexus Wars" h={3} className="nexus-box" extra={<button className="primary" onClick={onShop}>Spend Umbra Shards</button>}>
@@ -533,6 +591,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
         <>
           <p className="muted small">No campaign loaded. <a href={href.campaign()}>Import or start one</a> to link this force to a faction.</p>
           {patrolRow}
+          {trainingRow}
         </>
       ) : (
         <div className="fields">
@@ -557,6 +616,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
           </label>
           {n && !faction && <p className="span-all small" style={{ color: 'var(--warn)', margin: 0 }}>This faction is not in the loaded campaign.</p>}
           {!(n && faction) && patrolRow}
+          {!(n && faction) && trainingRow}
           {n && faction && (
             <>
               <div className="span-all row">
@@ -577,7 +637,10 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
                 <button disabled={expedited} onClick={() => setExpedition(true)}>Expedition…</button>
               </div>
               {expedition && <ExpeditionModal force={f} c={c} onClose={() => setExpedition(false)} />}
+              <UnitTasksRow f={f} c={c} onOpen={() => setTasking(true)} />
+              {tasking && <UnitTaskModal force={f} c={c} onClose={() => setTasking(false)} />}
               {patrolRow}
+              {trainingRow}
               <DetachmentsBox f={f} c={c} />
               <div className="span-all small">
                 <div className="muted">Controlled sectors</div>

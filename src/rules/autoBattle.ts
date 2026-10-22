@@ -31,9 +31,11 @@ export const AUTO_BATTLE = {
 };
 
 /** A weapon reduced to what the auto-battle needs. */
-interface Gun {
+export interface Gun {
   name: string;
   melee: boolean;
+  /** Inches; 0 = melee. */
+  range: number;
   /** Total attacks: models × attacks per model. */
   attacks: number;
   ap: number;
@@ -153,6 +155,7 @@ function gun(w: Weapon): Gun {
   return {
     name: w.name,
     melee: w.range === 0,
+    range: w.range,
     attacks: Math.max(1, w.count) * (avgAttacks(w.attacks) + plusA),
     ap: (ruleRating(rules, 'AP') ?? 0) + plusAp,
     hitMod: (hasRule(rules, 'Well Balanced') ? 1 : 0) + (hasRule(rules, 'Surge') || hasRule(rules, 'Brutal') ? 0.17 : 0),

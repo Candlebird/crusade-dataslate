@@ -1,6 +1,7 @@
-import type { Campaign, CampaignEvent, Force, Marauder, Sector } from '../model/types';
+import type { Campaign, CampaignEvent, Force, Marauder, Sector, SectorGarrison } from '../model/types';
 import type { RelicTier } from './data';
 import { difficultyLevel } from './difficulty';
+import { GARRISON } from './downtimeData';
 import { colOf, hexKey, isPlaced, neighbors, type Hex, type Rand } from './hexmap';
 import { positionOf } from './movement';
 import { rollGuardianLoot } from './nexus';
@@ -27,6 +28,8 @@ export interface Raid {
   /** Materials carried off (0 when thrown back). */
   stolen: number;
   repelled: boolean;
+  /** Units on Garrison duty stood there (rules/tasks.ts): whether they were strong enough to throw it back. */
+  garrison?: 'held' | 'weak';
 }
 
 export const bandsAt = (c: Campaign, sectorId: string) => (c.marauders ?? []).filter((m) => m.sectorId === sectorId);
@@ -47,6 +50,11 @@ export const lootTier = (c: Campaign, m: Marauder, factionId: string): RelicTier
 function garrisoned(c: Campaign, s: Sector, forces?: Force[]) {
   if (forces) return forces.some((f) => f.nexus?.factionId === s.owner && positionOf(c, f)?.id === s.id);
   return Object.values(c.positions ?? {}).some((p) => p.sectorId === s.id && p.factionId === s.owner);
+}
+
+/** Units garrisoning the sector through the round that just ended (raids come after the round has moved on). */
+function standing(c: Campaign, s: Sector): SectorGarrison | undefined {
+  return s.garrisons?.find((g) => g.round === (c.round ?? 1) - 1 && g.factionId === s.owner && g.units.length);
 }
 
 /** Walls, Reinforce or a garrison throw a raid back. */
@@ -102,13 +110,20 @@ function advance(c: Campaign, m: Marauder, rand: Rand, forces?: Force[]): Raid |
     return undefined;
   }
   const raid: Raid = { band: m.name, sectorId: target.id, sector: target.name, owner: target.owner!, stolen: 0, repelled: repels(c, target, forces) };
+  // Garrison units hold if they're worth enough of the band's Supply; weaker, they still save part of the bank.
+  const g = standing(c, target);
+  if (g) {
+    raid.garrison = g.units.reduce((n, u) => n + u.points, 0) >= m.strength * GARRISON.holdShare ? 'held' : 'weak';
+    if (raid.garrison === 'held') raid.repelled = true;
+    g.raid = { band: m.name, repelled: raid.repelled };
+  }
   if (raid.repelled) {
     // Thrown back: it stops a hex short, and bloodied.
     m.sectorId = (route[steps - 2] ?? from).id;
     m.strength = Math.max(MARAUDERS.min, m.strength - MARAUDERS.repelLoss);
     return raid;
   }
-  raid.stolen = Math.floor((target.bank ?? 0) * MARAUDERS.steal);
+  raid.stolen = Math.floor((target.bank ?? 0) * MARAUDERS.steal * (g ? GARRISON.weakTheft : 1));
   target.bank = (target.bank ?? 0) - raid.stolen;
   if (!target.bank) delete target.bank;
   target.raided = c.round ?? 1;
