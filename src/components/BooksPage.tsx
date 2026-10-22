@@ -158,7 +158,7 @@ export default function BooksPage() {
         ))}
       </Panel>
 
-      {openId && <BookBrowser uid={openId} />}
+      {openId && <BookBrowser key={openId} uid={openId} />}
     </>
   );
 }
@@ -260,6 +260,7 @@ function BookBrowser({ uid }: { uid: string }) {
           </table>
         </div>
       )}
+      {tab === 'units' && !units.length && <p className="muted">{book.units.length ? 'No datasheets match.' : 'No datasheets.'}</p>}
       {tab === 'rules' && (
         <div>
           {rules.map((r) => (
