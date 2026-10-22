@@ -84,7 +84,9 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
   const cg = crisisGame(b, state.campaign, state.forces);
   const finish = () => {
     update((s) => {
-      s.battleHistory = [finishBattle(b, nowIso()), ...(s.battleHistory ?? [])];
+      // Already finished (a second click, or on another device): don't put it in the history twice.
+      if (s.battle?.id !== b.id) return;
+      s.battleHistory = [finishBattle(s.battle, nowIso()), ...(s.battleHistory ?? [])];
       delete s.battle;
       // The Nexus map follows the result; a battle is only ever logged once.
       if (game && 'event' in game && s.campaign && !s.campaign.log.some((e) => e.battleId === b.id)) {
@@ -582,6 +584,7 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
         {b.sides.map((s) => {
           if (!s.forceId) return <span key={s.id} className="muted small">{s.name}: no force loaded.</span>;
           if (b.recorded.includes(s.id)) return <span key={s.id} className="tag green">{s.name} recorded ✓</span>;
+          if (!state.forces.some((f) => f.id === s.forceId)) return <span key={s.id} className="muted small">{s.name}: its force was deleted.</span>;
           return <a key={s.id} className="btn primary" href={href.battle(s.forceId)}>⚔ Record battle for {s.name}</a>;
         })}
       </div>
