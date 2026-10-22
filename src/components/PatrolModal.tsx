@@ -13,6 +13,7 @@ import { ECHOES } from '../rules/nexusData';
 import { SOLO_PATROL } from '../rules/downtimeData';
 import { declinePatrol, rollPatrolEnemy } from '../rules/downtime';
 import { Modal, confirmAction, toast } from './ui';
+import { localDate } from '../model/date';
 
 /** What the patrol ran into: fight it on the battle tracker, or turn back for a little XP. */
 interface Sighting {
@@ -52,7 +53,7 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
     if (!found) return;
     let summary = '';
     updateForce(force.id, (d) => {
-      summary = declinePatrol(d, picked, found.points, new Date().toISOString().slice(0, 10), uid);
+      summary = declinePatrol(d, picked, found.points, localDate(), uid);
       if (linked) markUnitsUsed(d, c!, picked);
     });
     toast(summary);

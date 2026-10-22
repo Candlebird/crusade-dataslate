@@ -18,6 +18,7 @@ import DuelsPanel from './Duels';
 import JournalPanel from './Journal';
 import { useImporter } from './importer';
 import { Dropzone, Panel, TextField, confirmAction, toast } from './ui';
+import { localDate } from '../model/date';
 
 const COLORS = ['#c0392b', '#2e86c1', '#27ae60', '#d4ac0d', '#8e44ad', '#d35400', '#17a589', '#7f8c8d'];
 
@@ -352,7 +353,7 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
 }
 
 function RecordPanel({ c, setC, preset }: { c: Campaign; setC: SetC; preset: { sectorId: string; n: number } }) {
-  const blank = () => ({ date: new Date().toISOString().slice(0, 10), sectorId: '', attacker: '', defender: 'ai', winner: '', notes: '' });
+  const blank = () => ({ date: localDate(), sectorId: '', attacker: '', defender: 'ai', winner: '', notes: '' });
   const [ev, setEv] = useState(blank);
   useEffect(() => {
     if (preset.n) setEv((e) => ({ ...e, sectorId: preset.sectorId, defender: c.sectors.find((s) => s.id === preset.sectorId)?.owner ?? 'ai', winner: '' }));

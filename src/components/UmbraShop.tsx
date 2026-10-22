@@ -8,6 +8,7 @@ import { unitName } from '../rules/battle';
 import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_ROUNDS, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
 import { isReinforced } from '../rules/production';
 import { Modal, RelicOption, toast } from './ui';
+import { localDate } from '../model/date';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
 const NEEDS_UNIT = new Set<UmbraBuy>(['knowledge', 'relic', 'evolution']);
@@ -57,7 +58,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
 
   const buy = () => {
     if (!item || why) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDate();
     let label = `Umbra: ${item.name}`;
     let rpDelta = 0;
     let outcome = `${item.name} purchased.`;

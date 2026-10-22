@@ -6,6 +6,7 @@ import { RELICS, REQUISITIONS, SCAR_TABLE, type RelicTier, type Requisition } fr
 import { applyScar, forceTotals, hasRule, relicHolders, relicSlots, relicTaken, relicTierAllowed, rollDice, rollDie } from '../rules/engine';
 import { unitName } from '../rules/battle';
 import { Modal, RelicOption, toast } from './ui';
+import { localDate } from '../model/date';
 
 const RELIC_TIER: Record<string, RelicTier> = { 'Common Relic': 'Common', 'Rare Relic': 'Rare', 'Legendary Relic': 'Legendary' };
 /** Requisitions whose effect the shop applies itself; the rest are recorded in the ledger only. */
@@ -58,7 +59,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
 
   const buy = () => {
     if (!sel || why) return;
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDate();
     let label = sel.name + (unit ? ` — ${unitName(unit)}` : '') + (note ? ` (${note})` : '');
     let supply = 0;
     let outcome = `${sel.name} purchased.`;

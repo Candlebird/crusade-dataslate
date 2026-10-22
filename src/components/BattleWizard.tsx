@@ -29,6 +29,7 @@ import { go, href } from '../route';
 import NexusBox, { UnitSelect } from './NexusBox';
 import { Stepper, confirmAction, toast } from './ui';
 import { SOLO_PATROL } from '../rules/downtimeData';
+import { localDate } from '../model/date';
 
 const STEPS = ['Setup', 'Units', 'Deaths', 'Rewards', 'Summary'] as const;
 const OUTCOME_LABEL: Record<DeathOutcome, string> = { scar: 'Battle scar', xp: '+1 XP', none: 'Nothing' };
@@ -37,7 +38,7 @@ function initialInput(f: Force, bp: number): BattleInput {
   const units: Record<string, UnitBattle> = {};
   for (const u of f.units) if (u.status !== 'removed') units[u.id] = emptyUnitBattle(u);
   return {
-    date: new Date().toISOString().slice(0, 10),
+    date: localDate(),
     opponent: '', result: 'win', vsAi: false, agendas: [], myBp: bp, oppBp: bp, notes: '',
     table: '', agendaRp: 0, units, rewards: {},
   };

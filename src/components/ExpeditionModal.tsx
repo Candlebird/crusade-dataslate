@@ -10,6 +10,7 @@ import {
   type Expedition,
 } from '../rules/downtime';
 import { Modal, toast } from './ui';
+import { localDate } from '../model/date';
 
 /** Send up to three units on a short dice-story into the Nexus. Any number a round, but each unit goes once. */
 export default function ExpeditionModal({ force, c, onClose }: { force: Force; c: Campaign; onClose: () => void }) {
@@ -31,7 +32,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
   const apply = (x: Expedition) => {
     let summary = '';
     updateForce(force.id, (d) => {
-      summary = applyExpedition(d, x, new Date().toISOString().slice(0, 10), uid);
+      summary = applyExpedition(d, x, localDate(), uid);
       markUnitsUsed(d, c, x.squad);
     });
     setDone(summary);

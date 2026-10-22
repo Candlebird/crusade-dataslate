@@ -2,6 +2,7 @@ import { uid } from '../model/factory';
 import type { Campaign, CampaignEvent, Sector } from '../model/types';
 import { frontier, isPlaced, type Rand } from './hexmap';
 import { ECHOES, ECHOES_SKIP, changeHands, currentRound, isStronghold } from './nexus';
+import { localDate } from '../model/date';
 
 // The Void Echoes spread from their territory when a round ends (how far depends on their threat: rounds.ts).
 
@@ -24,7 +25,7 @@ export function pickSpread(c: Campaign, rand: Rand = Math.random, weight: (s: Se
 }
 
 /** The Void Echoes take the sector; the log entry remembers the old owner so deleting it puts the sector back. */
-export function spreadInto(c: Campaign, sectorId: string, date = new Date().toISOString().slice(0, 10)): CampaignEvent | null {
+export function spreadInto(c: Campaign, sectorId: string, date = localDate()): CampaignEvent | null {
   const s = c.sectors.find((x) => x.id === sectorId);
   if (!s || s.owner === ECHOES.id || isStronghold(s)) return null;
   const e: CampaignEvent = {

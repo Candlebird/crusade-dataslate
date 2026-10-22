@@ -43,6 +43,7 @@ import TablePicker, { type PickEntry, type PickGroup, type Picked } from './Tabl
 import { traitMark } from './marks';
 import { Issues, Panel, Stepper, TextArea, TextField, XpBar, toast } from './ui';
 import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
+import { localDate } from '../model/date';
 
 type Picker =
   | { kind: 'trait' }
@@ -176,7 +177,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       const cost = p.free ? 0 : relicCost(tier);
       updateForce(f.id, (fd) => {
         fd.units.find((x) => x.id === u.id)?.relics.push({ id: uid(), name: p.name, tier, profile: def?.profile, note: def?.note });
-        if (cost) fd.ledger.push({ id: uid(), date: new Date().toISOString().slice(0, 10), label: `${tier} Relic — ${unitName(u)}: ${p.name}`, rp: -cost, supply: 0 });
+        if (cost) fd.ledger.push({ id: uid(), date: localDate(), label: `${tier} Relic — ${unitName(u)}: ${p.name}`, rp: -cost, supply: 0 });
       });
       if (cost) toast(`${unitName(u)} gains ${p.name} for ${cost} RP.`);
     }

@@ -10,6 +10,7 @@ import {
 } from '../rules/detachments';
 import { href } from '../route';
 import { Modal, Stepper, confirmAction, toast } from './ui';
+import { localDate } from '../model/date';
 
 const COST = NEXUS_DETACHMENTS.reorganiseCost;
 const shards = (n: number) => `${n} Umbra Shard${n === 1 ? '' : 's'}`;
@@ -68,7 +69,7 @@ function ReorganiseModal({ forces, payer, c, onClose }: { forces: Force[]; payer
   const apply = () => {
     if (over.length && !confirmAction(`${over.map((f) => f.name).join(', ')} would field more points than their Supply Limit. Reorganise anyway?`)) return;
     const ids = new Set(forces.map((f) => f.id));
-    const date = new Date().toISOString().slice(0, 10);
+    const date = localDate();
     let failed: string[] = [];
     update((d) => {
       failed = reorganise(d.forces.filter((f) => ids.has(f.id)), plan, currentRound(c), date, uid);

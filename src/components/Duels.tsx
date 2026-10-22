@@ -10,9 +10,10 @@ import {
 import { factionName } from '../rules/nexus';
 import { href } from '../route';
 import { Modal, Panel, Stepper, confirmAction, toast } from './ui';
+import { localDate } from '../model/date';
 
 type SetC = (fn: (c: Campaign) => void) => void;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDate();
 const ROLES: DuelRole[] = ['challenger', 'challenged'];
 
 /**

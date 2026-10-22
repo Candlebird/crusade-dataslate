@@ -5,6 +5,7 @@ import type { CatalogBook } from './types';
 import { uid } from './factory';
 import { migrateForce } from '../rules/migrate';
 import { migrateBattle } from '../rules/tracker';
+import { localDate } from './date';
 
 const FORCE_KIND = 'opr-crusade-force';
 const BACKUP_KIND = 'opr-crusade-backup';
@@ -26,7 +27,7 @@ export function exportForce(f: Force) {
 }
 
 export function exportBackup(s: AppState) {
-  downloadJson(`crusade-backup-${new Date().toISOString().slice(0, 10)}.json`, { kind: BACKUP_KIND, ...s });
+  downloadJson(`crusade-backup-${localDate()}.json`, { kind: BACKUP_KIND, ...s });
 }
 
 export function exportCampaign(c: Campaign) {

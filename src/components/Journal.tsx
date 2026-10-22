@@ -13,9 +13,10 @@ import { journalEndings } from '../rules/journalAi';
 import { JOURNAL, JOURNAL_CATALYSTS, JOURNAL_COMPLICATIONS, JOURNAL_CONTEXTS, type JournalSkillId } from '../rules/journalData';
 import { currentRound, factionName } from '../rules/nexus';
 import { Panel, TextArea, confirmAction, toast } from './ui';
+import { localDate } from '../model/date';
 
 type SetC = (fn: (c: Campaign) => void) => void;
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => localDate();
 const LETTERS = ['A', 'B', 'C', 'D'];
 
 /**

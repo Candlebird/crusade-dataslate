@@ -19,6 +19,7 @@ import { accrueProduction, buildingsHeld, finishConstruction, warded } from './p
 import { accrueResearch } from './tech';
 import { buildReport } from './report';
 import { hasPerk, syncWarlords } from './warlords';
+import { localDate } from '../model/date';
 
 // Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
 // a Strategic Asset, and one against the Echoes is a patrol). The round closes with the Battle: the sealed-order attacks.
@@ -169,7 +170,7 @@ export interface RoundEnd {
  * campaign's forces, sector difficulty is rescaled to their Supply too.
  */
 export function endRound(
-  c: Campaign, rand: Rand = Math.random, date = new Date().toISOString().slice(0, 10), forces?: Force[], books?: CatalogBook[],
+  c: Campaign, rand: Rand = Math.random, date = localDate(), forces?: Force[], books?: CatalogBook[],
 ): RoundEnd {
   const round = currentRound(c);
   // Warlords' levels are brought up to date, and fallen ones lost, before their perks count.

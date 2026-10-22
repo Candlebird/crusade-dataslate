@@ -28,6 +28,7 @@ import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
 import { Panel, Stepper, TextArea, TextField, XpBar, confirmAction, toast } from './ui';
 import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
+import { localDate } from '../model/date';
 
 /** Hands the force to another player on the campaign, e.g. when you've been looking after their army. */
 function TransferForce({ f }: { f: Force }) {
@@ -86,7 +87,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const levelling = f.units.filter((u) => pendingLevels(u) > 0);
 
   const addLedger = (label: string, rp: number, supply: number) =>
-    set((d) => void d.ledger.push({ id: uid(), date: new Date().toISOString().slice(0, 10), label, rp, supply }));
+    set((d) => void d.ledger.push({ id: uid(), date: localDate(), label, rp, supply }));
 
   return (
     <>
