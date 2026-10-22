@@ -43,7 +43,7 @@ export default function DuelsPanel({ c, setC, me, gm }: { c: Campaign; setC: Set
 
   const canChallenge = gm || !!me;
   return (
-    <Panel id="campaign.duels" title="Nexus Duels" collapsed={!open.length} lead={open.length > 0 && (
+    <Panel id="campaign.duels" title="Nexus Duels" lead={open.length > 0 && (
       <span className="muted small">{open.length} duel{open.length === 1 ? '' : 's'} being arranged.</span>
     )}>
       <p className="muted small">

@@ -55,7 +55,7 @@ export default function JournalPanel({ c, setC, me, gm }: { c: Campaign; setC: S
   };
 
   return (
-    <Panel id="campaign.journal" title="Crossroads Journal" collapsed={!waiting.length && !dealable.length} lead={(waiting.length > 0 || dealable.length > 0) && (
+    <Panel id="campaign.journal" title="Crossroads Journal" lead={(waiting.length > 0 || dealable.length > 0) && (
       <span className="muted small">
         {waiting.length > 0 ? `${waiting.length} journal${waiting.length === 1 ? '' : 's'} in progress.` : 'A new journal is ready to deal.'}
       </span>

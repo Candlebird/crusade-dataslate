@@ -20,9 +20,9 @@ export default function WarlordsPanel({ c, setC, faction, gm }: { c: Campaign; s
     if (stale) setC((d) => void syncWarlords(d, state.forces));
   }, [stale]); // eslint-disable-line react-hooks/exhaustive-deps
   const shown = c.factions.filter((f) => !faction || f.id === faction);
-  if (!shown.length) return null;
+  if (!shown.length) return <div className="panel"><p className="muted">No factions yet. Add them on the Map tab, and each one can name a Warlord here.</p></div>;
   return (
-    <Panel id="campaign.warlords" title="Warlords" collapsed lead={
+    <Panel id="campaign.warlords" title="Warlords" lead={
       <div className="tech-head">
         {shown.map((f) => {
           const path = pathById(f.path);
