@@ -60,7 +60,7 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
   const pickGroup = (key: string) => { setGroupKey(key); setSelected(null); setRolls([]); };
 
   const roll = () => {
-    if (!group) return;
+    if (!group?.entries.length) return;
     const r = rollUntilNew(group.entries.length, (face) => isOwned(group.entries[face - 1]));
     setRolls(r);
     setSelected(r[r.length - 1] - 1);
@@ -115,7 +115,7 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
       {group && (
         <>
           {group.restricted && <p className="small" style={{ color: 'var(--warn)' }}>⚠ {group.restricted}</p>}
-          {group.rollable && (
+          {group.rollable && group.entries.length > 0 && (
             <div className="row" style={{ marginBottom: '0.6rem' }}>
               <button onClick={roll}>🎲 Roll D{group.entries.length}</button>
               {rolls.slice(0, -1).map((r, i) => (
