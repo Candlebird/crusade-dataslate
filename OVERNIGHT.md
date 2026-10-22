@@ -78,7 +78,6 @@ At the end, fill in the sections below and give a short chat summary.
 - **Firestore rules.** Players can write GM-only parts of the campaign document. Tightening needs a rules deploy, which was off-limits tonight.
 - **Order marks last two rounds.** An order mark (e.g. +1 hex) is live from the round it was earned through the next, so it could cover two orders. For now the player or GM presses "Used" to strike it off. It could instead be used up automatically when an order is given. Want that?
 - **Quirks and battle marks are text only.** Quirks (max 3 per Warlord) and next-battle marks are shown on the Journal panel, but nothing applies them in the battle tracker yet. They could be wired into the tracker later.
-
 - **"Start blank instead" clears the sector.** A sector battle restarted blank becomes a skirmish. Keep the sector instead?
 - **Claims for a deleted force.** In past battles, a side whose force was deleted shows "waiting for its player" forever. It could be dropped from the list, or the GM could dismiss it.
 
