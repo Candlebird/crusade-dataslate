@@ -145,8 +145,12 @@ export function settleDuel(c: Campaign, id: string, winner: string, date: string
   d.settledOn = date;
   const loser = loserOf(d);
   if (loser) moveFactionStakes(c, loser.factionId, winner, loser.wager);
+  // Keep the newest settled duels. One whose forces may still have shards or relics to pay or collect is kept longer.
   const settled = c.duels!.filter((x) => x.status === 'settled');
-  const drop = new Set(settled.slice(0, Math.max(0, settled.length - NEXUS_DUELS.keep)).map((x) => x.id));
+  const owed = (x: NexusDuel) => { const l = loserOf(x); return !!l && forceStake(l.wager); };
+  const newest = new Set(settled.slice(-NEXUS_DUELS.keep));
+  const owedKept = new Set(settled.filter(owed).slice(-NEXUS_DUELS.keepOwed));
+  const drop = new Set(settled.filter((x) => !newest.has(x) && !owedKept.has(x)).map((x) => x.id));
   c.duels = c.duels!.filter((x) => !drop.has(x.id));
   return true;
 }
@@ -190,7 +194,7 @@ export function payDuel(d: NexusDuel, f: Force, date: string, newId: () => strin
     line = `${label}: ${[w.shards ? `+${w.shards} Umbra Shards` : '', relics].filter(Boolean).join(', ')}.`;
     if (w.shards) f.ledger.push({ id: newId(), date, label, rp: 0, supply: 0, us: w.shards });
   } else {
-    const n = Math.min(w.shards ?? 0, f.umbraShards);
+    const n = Math.min(w.shards ?? 0, Math.max(0, f.umbraShards));
     f.umbraShards -= n;
     const ids = new Set((w.relics ?? []).map((r) => r.id));
     for (const u of f.units) u.relics = u.relics.filter((r) => !ids.has(r.id));

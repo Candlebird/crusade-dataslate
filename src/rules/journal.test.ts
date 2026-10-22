@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
 import type { Campaign, Force } from '../model/types';
 import {
-  canReroll, checkTarget, chooseComplication, dealJournal, eligibleRewards, journalBlock, journalStatus, journalsOwed, localOffer, makeOffer,
+  canReroll, checkTarget, chooseComplication, dealJournal, eligibleRewards, journalBlock, journalOf, journalStatus, journalsOwed, localOffer, makeOffer,
   payJournal, pickOption, reframeJournal, rerollCheck, rewardById, rollApproach, rollClimax, successes, tierCap, validOffer,
 } from './journal';
 import { JOURNAL_REWARDS } from './journalData';
@@ -174,6 +174,60 @@ describe('crossroads journal', () => {
     fs[0].umbraShards = 1;
     expect(payJournal(k, fs[0], '2026-10-22', ids())).toMatch(/−1 Umbra Shards/);
     expect(fs[0].umbraShards).toBe(0);
+  });
+
+  it("keeps an unfinished journal from an earlier round in play, and no new one is dealt until it's done", () => {
+    const c = campaign();
+    const fs = forces();
+    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    c.round = 3;
+    expect(journalOf(c, 'A')).toBe(j);
+    expect(journalBlock(c, 'A')).toMatch(/finish/);
+    j.options = [{ rewardId: 'renown', title: 'R', text: '' }];
+    pickOption(c, 'j1', 0, fs, '2026-10-22');
+    expect(journalOf(c, 'A')).toBeUndefined();
+    expect(journalBlock(c, 'A')).toBeUndefined();
+  });
+
+  it("won't re-roll the complication once the climax it made harder is rolled", () => {
+    const c = campaign();
+    const fs = forces();
+    const u = fs[0].units[0];
+    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    reframeJournal(j, { catalyst: 'derelictSignal', complication: 'clock' });
+    rollApproach(j, 'board', u, 1, () => face(5));
+    chooseComplication(j, 'push', u, 1, () => face(1));
+    expect(canReroll(j, 'choice')).toBe(true);
+    rollClimax(j, 'might', u, 1, () => face(1));
+    expect(canReroll(j, 'choice')).toBe(false);
+    expect(canReroll(j, 'climax')).toBe(true);
+  });
+
+  it('never gives shards back to a force that is somehow below zero', () => {
+    const c = campaign();
+    const fs = forces();
+    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    j.options = [{ rewardId: 'shardDrain', title: 'Drained', text: '' }];
+    pickOption(c, 'j1', 0, fs, '2026-10-22');
+    fs[0].umbraShards = -2;
+    payJournal(j, fs[0], '2026-10-22', ids());
+    expect(fs[0].umbraShards).toBe(-2);
+  });
+
+  it('keeps finished journals the force may still have to collect for longer', () => {
+    const c = campaign();
+    const fs = forces();
+    c.journals = [];
+    for (let i = 0; i < 30; i++) {
+      c.journals.push({ id: `o${i}`, factionId: 'A', round: 1, date: '', forceId: 'fA', unitId: 'w', warlord: 'Vex', context: 'x', catalyst: 'x', complication: 'x', options: [{ rewardId: 'voidBargain', title: '', text: '' }], picked: 0 });
+      c.journals.push({ id: `n${i}`, factionId: 'A', round: 1, date: '', forceId: 'fA', unitId: 'w', warlord: 'Vex', context: 'x', catalyst: 'x', complication: 'x', options: [{ rewardId: 'spyNetwork', title: '', text: '' }], picked: 0 });
+    }
+    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    j.options = [{ rewardId: 'renown', title: 'R', text: '' }];
+    pickOption(c, 'j1', 0, fs, '2026-10-22');
+    expect(c.journals.filter((x) => x.id.startsWith('o')).length).toBe(30); // owed: all kept (under keepOwed)
+    expect(c.journals.filter((x) => !x.id.startsWith('o')).length).toBe(13); // the newest 24: j1 and 12 of the others
+    expect(c.journals.some((x) => x.id === 'j1')).toBe(true);
   });
 
   it('has reward ids that are unique', () => {

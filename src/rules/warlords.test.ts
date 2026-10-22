@@ -93,6 +93,15 @@ describe('naming a Warlord', () => {
     expect(faction(c).warlord).toBeUndefined();
     expect(warlordBlock(c, 'A')).toBeUndefined();
   });
+
+  it("GM revive: keeps the record when the Warlord's force isn't loaded here", () => {
+    const { c, f } = withWarlord('architect');
+    loseWarlord(c, 'A');
+    expect(reviveWarlord(c, 'A', [])).toBeUndefined();
+    expect(faction(c).warlordLost).toBeUndefined();
+    expect(faction(c).fallenWarlord).toBeTruthy();
+    expect(reviveWarlord(c, 'A', [f])).toBe('Lord');
+  });
 });
 
 describe('keeping Warlords in step with their forces', () => {

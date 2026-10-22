@@ -34,16 +34,19 @@ export type JournalStatus = 'play' | 'offer' | 'done';
 
 export const journalStatus = (j: CrossroadsJournal): JournalStatus => (j.picked != null ? 'done' : j.options ? 'offer' : 'play');
 
-/** The faction's journal for a round (this one by default). */
-export const journalOf = (c: Campaign, factionId: string, round = currentRound(c)) =>
-  (c.journals ?? []).find((j) => j.factionId === factionId && j.round === round);
+/** The faction's journal for a round (this one by default), or one from an earlier round it hasn't finished yet. */
+export const journalOf = (c: Campaign, factionId: string, round = currentRound(c)) => {
+  const own = (c.journals ?? []).filter((j) => j.factionId === factionId);
+  return own.find((j) => j.round === round) ?? own.filter((j) => j.round < round && j.picked == null).pop();
+};
 
 /** Why a journal can't be dealt to the faction now, if it can't. */
 export function journalBlock(c: Campaign, factionId: string): string | undefined {
   const f = c.factions.find((x) => x.id === factionId);
   if (!f) return 'Unknown faction';
   if (!f.warlord) return 'It has no Warlord';
-  if (journalOf(c, factionId)) return 'Its Warlord already has a journal this round';
+  const j = journalOf(c, factionId);
+  if (j) return j.round === currentRound(c) ? 'Its Warlord already has a journal this round' : 'Its Warlord has a journal to finish first';
   return undefined;
 }
 
@@ -142,7 +145,8 @@ const rollOf = (j: CrossroadsJournal, which: JournalCheck) => (which === 'approa
 /** Can this check be re-rolled (once, before the endings are offered)? */
 export function canReroll(j: CrossroadsJournal, which: JournalCheck): boolean {
   const r = rollOf(j, which);
-  return !!r && r.rolls.length === 1 && !j.options;
+  // The climax target already counts a failed risky choice, so the choice can't be re-rolled once the climax is.
+  return !!r && r.rolls.length === 1 && !j.options && !(which === 'choice' && j.climax);
 }
 
 /** Re-roll a check; the new roll stands. (The caller takes JOURNAL.rerollCost Umbra Shards from the Warlord's force.) */
@@ -298,12 +302,14 @@ export function pickOption(c: Campaign, id: string, index: number, forces: Force
   }
   j.picked = index;
   j.pickedOn = date;
-  // Keep the newest finished journals (and every one still in play).
+  // Keep the newest finished journals (and every one still in play). One whose force may not have taken its reward yet
+  // is kept longer, up to JOURNAL.keepOwed.
   const done = c.journals!.filter((x) => x.picked != null);
-  if (done.length > JOURNAL.keep) {
-    const drop = new Set(done.slice(0, done.length - JOURNAL.keep));
-    c.journals = c.journals!.filter((x) => !drop.has(x));
-  }
+  const owed = (x: CrossroadsJournal) => touchesForce(rewardById(x.options?.[x.picked!]?.rewardId));
+  const newest = new Set(done.slice(-JOURNAL.keep));
+  const owedKept = new Set(done.filter(owed).slice(-JOURNAL.keepOwed));
+  const drop = new Set(done.filter((x) => !newest.has(x) && !owedKept.has(x)));
+  if (drop.size) c.journals = c.journals!.filter((x) => !drop.has(x));
   return `${o.title}${bits.length ? `: ${bits.join(', ')}` : ''}.`;
 }
 
@@ -331,7 +337,7 @@ export function payJournal(j: CrossroadsJournal, f: Force, date: string, newId: 
   const bits: string[] = [];
   for (const e of r.effects) {
     if (e.kind === 'shards') {
-      const n = e.n > 0 ? e.n : -Math.min(-e.n, f.umbraShards);
+      const n = e.n > 0 ? e.n : -Math.min(-e.n, Math.max(0, f.umbraShards));
       if (!n) continue;
       f.umbraShards += n;
       f.ledger.push({ id: newId(), date, label, rp: 0, supply: 0, us: n });

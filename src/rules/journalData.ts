@@ -18,7 +18,7 @@ export const JOURNAL = {
   /** The best reward tier a scenario can earn with no successes (the tier cap is the successes, but at least this). */
   minTier: 1,
   /** How many finished journals the campaign keeps. */
-  keep: 24,
+  keep: 24, keepOwed: 48,
 } as const;
 
 export type JournalSkillId = 'might' | 'resolve' | 'guile' | 'endurance' | 'speed' | 'lore' | 'command';

@@ -80,6 +80,8 @@ export const NEXUS_ROUNDS = {
 export const NEXUS_DUELS = {
   /** Settled duels the campaign keeps to look back on. */
   keep: 10,
+  /** …and how many it keeps whose forces may not have paid or collected their shards and relics yet. */
+  keepOwed: 30,
 };
 
 /** Detachments: further forces linked to a faction that already has one. Each declares its own attack in the Battle. */

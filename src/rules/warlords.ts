@@ -87,6 +87,8 @@ export function reviveWarlord(c: Campaign, factionId: string, forces: Force[]): 
   const force = w && forces.find((x) => x.id === w.forceId);
   const unit = force?.units.find((u) => u.id === w!.unitId);
   delete f.warlordLost;
+  // Its force isn't loaded here: lift the wait but keep the record, so it can be revived once it is.
+  if (w && !force) return undefined;
   delete f.fallenWarlord;
   if (!w || !unit || unit.status === 'removed' || force!.nexus?.factionId !== f.id) return undefined;
   f.warlord = { ...w, name: unit.name, level: levelForXp(unit.xp) };
