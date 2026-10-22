@@ -358,6 +358,41 @@ export interface CampaignFaction {
   warlordLost?: number;
   /** The Warlord it lost, so the GM can bring it back (a mistaken step-down). */
   fallenWarlord?: Warlord;
+  /** Lasting marks its Crossroads Journals left: battle omens, sector effects, order changes, Warlord quirks. */
+  marks?: JournalMark[];
+  /** The journal pieces it has drawn lately (`ctx:`, `cat:`, `comp:`, `rew:`, `thr:` ids), newest last, so they don't come round again soon. */
+  journalSeen?: string[];
+  /** A story thread its journals are following (rules/journalData.ts JOURNAL_THREADS). */
+  thread?: JournalThreadState;
+}
+
+/** A story thread a faction's journals follow over several rounds: the step it's at, and the rival it names, if any. */
+export interface JournalThreadState {
+  id: string;
+  step: number;
+  since: number;
+  factionId?: string;
+}
+
+/**
+ * What a Crossroads Journal ending left behind. `battle`: an omen for the Warlord's next battle; `sector`: an effect on a
+ * sector; `order`: a change to the Warlord's detachment's move; `quirk`: a habit or trait of the Warlord's own. Each holds
+ * from round `from` to round `until` (a quirk with no `until` lasts as long as its Warlord).
+ */
+export interface JournalMark {
+  id: string;
+  journalId: string;
+  kind: 'battle' | 'sector' | 'order' | 'quirk';
+  name: string;
+  text: string;
+  good: boolean;
+  from: number;
+  until?: number;
+  sectorId?: string;
+  forceId?: string;
+  unitId?: string;
+  /** An order mark: hexes added to (or taken from) the detachment's move. */
+  move?: number;
 }
 
 export interface Warlord {
@@ -494,8 +529,16 @@ export interface CrossroadsJournal {
   context: string;
   catalyst: string;
   complication: string;
+  /** The sector the Warlord stood in when it was dealt. */
+  sectorId?: string;
   /** The GM's framing: a line of their own to set the scene. */
   note?: string;
+  /** A hidden fourth beat (JOURNAL_TWISTS), revealed once the climax is rolled. */
+  twist?: { id: string; roll?: JournalRoll };
+  /** A rival Warlord who walks through the scene (flavour only). */
+  rival?: { factionId: string; name: string };
+  /** The faction's story thread, at the step this journal plays (`last`: this one ends it). */
+  thread?: { id: string; step: number; last: boolean; factionId?: string };
   approach?: { id: string; roll: JournalRoll };
   /** The complication's choice; a risky one is rolled. */
   choice?: { id: string; roll?: JournalRoll };
