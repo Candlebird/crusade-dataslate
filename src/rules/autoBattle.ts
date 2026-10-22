@@ -549,6 +549,8 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
 
 /** Write the outcome onto the tracked battle: wounds, losses and kill XP, and who won. It's then recorded like any other battle. */
 export function applyAutoBattle(b: TrackedBattle, r: AutoResult) {
+  // Already applied (a second click before the dialog closed): its kill XP would count twice.
+  if (b.ended) return;
   for (const f of r.fighters) {
     const u = b.sides.find((s) => s.id === f.sideId)?.units.find((x) => x.id === f.unitId);
     if (!u) continue;

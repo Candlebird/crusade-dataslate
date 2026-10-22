@@ -77,6 +77,10 @@ describe('auto-battle', () => {
     expect(enemy.destroyed).toBe(enemy.wounds === 0);
     expect(b.sides[0].units[0].xp).toBe(r.fighters.find((f) => f.team === 'A')!.xp);
     expect(autoBattleBlock(b)).toMatch(/over/);
+    // Applying the same run again changes nothing.
+    const xp = b.sides[0].units[0].xp;
+    applyAutoBattle(b, r);
+    expect(b.sides[0].units[0].xp).toBe(xp);
   });
 
   it('decides the winner over the VP score', () => {
