@@ -74,13 +74,15 @@ const forcesOf = (forces: Force[], factionId: string) => forces.filter((f) => f.
 function Challenge({ c, setC, me, gm, own }: { c: Campaign; setC: SetC; me?: string; gm?: boolean; own: Force[] }) {
   const { state } = useStore();
   const [from, setFrom] = useState(me ?? '');
-  const [to, setTo] = useState('');
+  const [picked, setTo] = useState('');
   const [fromForce, setFromForce] = useState('');
   const [toForce, setToForce] = useState('');
   const fromFaction = me ?? from;
+  // Switching which faction you're viewing as can make the old pick your own.
+  const to = picked === fromFaction ? '' : picked;
   // A player fights with their own forces; the GM, acting for a faction, with any of its forces.
-  const mineToPick = forcesOf(me ? own : state.forces, fromFaction);
-  const theirsToPick = forcesOf(state.forces, to).filter((f) => !own.includes(f) || !me);
+  const mineToPick = forcesOf(gm ? state.forces : own, fromFaction);
+  const theirsToPick = forcesOf(state.forces, to);
   const a = mineToPick.find((f) => f.id === fromForce) ?? mineToPick[0];
   const b = theirsToPick.find((f) => f.id === toForce) ?? theirsToPick[0];
   const opponents = c.factions.filter((f) => f.id !== fromFaction);
