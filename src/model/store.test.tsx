@@ -137,11 +137,12 @@ describe('loading saved data', () => {
     expect(render().state.settings).toEqual(DEFAULT_SETTINGS);
   });
 
-  it.todo(
-    'keeps unreadable saved data instead of replacing it with the seed (judgment call: today any error while loading — ' +
-      'e.g. a save with no forces array, or a force migrateForce chokes on — silently falls back to the seed, and the ' +
-      'save effect then overwrites the stored data with it)',
-  );
+  it('keeps a save it cannot read under its own key before the seed replaces it', () => {
+    const broken = JSON.stringify({ version: 1, books: [] });
+    storage.set(KEY, broken);
+    expect(render().state.books.length).toBe(1);
+    expect(storage.get('opr-crusade-tracker:unreadable')).toBe(broken);
+  });
 });
 
 describe('update', () => {

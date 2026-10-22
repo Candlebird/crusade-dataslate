@@ -7,10 +7,13 @@ import { nowIso } from './factory';
 import { toast } from '../components/ui';
 
 const STORAGE_KEY = 'opr-crusade-tracker:v1';
+/** Where a save that failed to load is kept, so starting fresh never destroys it. */
+export const UNREADABLE_KEY = 'opr-crusade-tracker:unreadable';
 
 function load(): AppState {
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as AppState;
       return {
@@ -20,8 +23,16 @@ function load(): AppState {
         settings: { ...DEFAULT_SETTINGS, ...parsed.settings, bp: { ...DEFAULT_SETTINGS.bp, ...parsed.settings?.bp } },
       };
     }
-  } catch {
-    // fall through to seed
+  } catch (e) {
+    // The starter data replaces it on the next save, so keep the unreadable save under its own key first.
+    console.error('Could not read saved data; starting fresh', e);
+    if (raw) {
+      try {
+        localStorage.setItem(UNREADABLE_KEY, raw);
+      } catch {
+        // Nowhere to keep it.
+      }
+    }
   }
   return buildSeedState();
 }
