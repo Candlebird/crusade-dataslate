@@ -205,4 +205,16 @@ describe('sector games', () => {
     removeSectorGame(c, 'e1');
     expect(c.sectors[3]).toMatchObject({ owner: 'B', reinforced: true });
   });
+
+  it('gives an unclaimed sector its guardian back when the game that slew it is deleted', () => {
+    const c = campaign();
+    const guardian = { name: 'Vex the Hollow', tier: 'Common' as const, unit: newUnit() };
+    c.sectors[5].guardian = guardian;
+    recordSectorGame(c, { ...ev('v', 'A', 'ai', 'A'), id: 'g1' }, () => 0);
+    expect(c.sectors[5]).toMatchObject({ owner: 'A' });
+    expect(c.sectors[5].guardian).toBeUndefined();
+    removeSectorGame(c, 'g1');
+    expect(c.sectors[5].owner).toBeUndefined();
+    expect(c.sectors[5].guardian).toEqual(guardian);
+  });
 });

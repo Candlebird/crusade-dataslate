@@ -200,10 +200,10 @@ export function removeSectorGame(c: Campaign, id: string) {
     winner.archives = Math.max(0, (winner.archives ?? 0) - 1);
     if (!winner.archives) delete winner.archives;
   }
-  if (e.undo.reinforced && s.owner === e.undo.owner) s.reinforced = true;
-  if (e.undo.bank && s.owner === e.undo.owner) s.bank = e.undo.bank;
-  if (e.undo.construction && s.owner === e.undo.owner) s.construction = e.undo.construction;
-  if (e.undo.guardian && s.owner === e.undo.owner) s.guardian = e.undo.guardian;
+  if (e.undo.reinforced && (s.owner ?? '') === e.undo.owner) s.reinforced = true;
+  if (e.undo.bank && (s.owner ?? '') === e.undo.owner) s.bank = e.undo.bank;
+  if (e.undo.construction && (s.owner ?? '') === e.undo.owner) s.construction = e.undo.construction;
+  if (e.undo.guardian && (s.owner ?? '') === e.undo.owner) s.guardian = e.undo.guardian;
   if (e.loot) returnGuardianLoot(c, e.loot);
   if (e.undo.positions) unsettleGame(c, e.undo.positions);
 }
