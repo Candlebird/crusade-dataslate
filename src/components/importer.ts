@@ -81,7 +81,10 @@ export function useImporter() {
             toast(`Campaign "${got.campaign.name}" loaded (${got.campaign.sectors.length} sectors).`);
           } else {
             if (!window.confirm('Restore this backup? It replaces ALL forces, books and settings in this browser.')) continue;
-            replaceState({ ...got.state, settings: { ...DEFAULT_SETTINGS, ...got.state.settings } });
+            replaceState({
+              ...got.state,
+              settings: { ...DEFAULT_SETTINGS, ...got.state.settings, bp: { ...DEFAULT_SETTINGS.bp, ...got.state.settings?.bp } },
+            });
             toast('Backup restored.');
           }
         } catch (e) {
