@@ -47,6 +47,12 @@ At the end, fill in the sections below and give a short chat summary.
   - `a969f76`: the Journal panel shows twists (roll and reroll), the rival's name, the thread beat, and each faction's active marks with a "Used" button.
   - `7f6cad1`: the Claude request gets the twist step, rival, thread beat, sector, the Warlord's rules, which endings were recent, and the thread payoff that must be offered. The Worker prompt and request cleaning are updated. **Not deployed: redeploy the Worker to use it.**
 
+- **Browser checks (area 1)**: dealt, rolled, re-rolled and ended a journal, picked an ending with a sector mark, and opened a duel, all in Chrome on local data.
+  - `c63325a`: an ending whose title matched its reward showed the same text twice, and so did the toast for a mark named like its ending.
+  - `2d4ab13`: every date the app writes (battles, ledger, duels, journals, log) used the UTC day, so anything recorded in the evening in the Americas was dated tomorrow. Dates now use the local day.
+  - `d7862ab`: a panel now folds from its title as well as the small arrow, a bigger target on phones.
+  - "LEVEL 0" on a new Warlord is right: the level comes from XP.
+
 ## Open questions
 - **Duel stakes when the loser can't pay.** The winner collects the full stake even if the loser has fewer shards/materials than staked (the loser is clamped at 0). Fair fix: the loser pays first and the winner gets what was actually paid, which needs a "paid" record on the duel. Want that?
 - **Deleting a Warlord's force.** The Warlord stays on the faction, because a deleted force looks the same as one that just isn't loaded in this browser. Options: clear the Warlord when the owner deletes the force on their own device, or give the GM a "clear Warlord" button.
