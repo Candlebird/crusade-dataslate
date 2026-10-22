@@ -66,6 +66,11 @@ At the end, fill in the sections below and give a short chat summary.
   - `79002ed`: 41 tests for fog of war, turn reports, guardians and the Claude journal request (what each faction sees, who reads each report line, which sectors get guardians and relics, and that a journal request never leaks another faction's Warlord, forces or sectors).
   - `a0ecd5d`: they found that a Claude reply with a `null` ending threw, which left the journal stuck on "busy". It now falls back to the tables.
 
+- **Battle flow bug hunt (area 2)**:
+  - `0f27a23`: "Start blank instead" on the battle report dropped the patrol flag (a solo patrol then got full rewards) and re-ticked units that had already fought this round, so they could earn XP twice.
+  - `50a76f5`: finishing a battle twice quickly put it in the history twice. A side whose force was deleted now says so instead of linking to "Force not found".
+  - `e4011bb`: pressing Apply twice on an auto-battle doubled every fighter's kill XP.
+
 ## Open questions
 - **Duel stakes when the loser can't pay.** The winner collects the full stake even if the loser has fewer shards/materials than staked (the loser is clamped at 0). Fair fix: the loser pays first and the winner gets what was actually paid, which needs a "paid" record on the duel. Want that?
 - **Deleting a Warlord's force.** The Warlord stays on the faction, because a deleted force looks the same as one that just isn't loaded in this browser. Options: clear the Warlord when the owner deletes the force on their own device, or give the GM a "clear Warlord" button.
@@ -73,6 +78,9 @@ At the end, fill in the sections below and give a short chat summary.
 - **Firestore rules.** Players can write GM-only parts of the campaign document. Tightening needs a rules deploy, which was off-limits tonight.
 - **Order marks last two rounds.** An order mark (e.g. +1 hex) is live from the round it was earned through the next, so it could cover two orders. For now the player or GM presses "Used" to strike it off. It could instead be used up automatically when an order is given. Want that?
 - **Quirks and battle marks are text only.** Quirks (max 3 per Warlord) and next-battle marks are shown on the Journal panel, but nothing applies them in the battle tracker yet. They could be wired into the tracker later.
+
+- **"Start blank instead" clears the sector.** A sector battle restarted blank becomes a skirmish. Keep the sector instead?
+- **Claims for a deleted force.** In past battles, a side whose force was deleted shows "waiting for its player" forever. It could be dropped from the list, or the GM could dismiss it.
 
 ## Test by hand
 - **Campaign tabs:** switch tabs on the player and GM pages, reload, and the tab should stay. On the GM map, "Record a game here" should open the Log tab at the record form. (My local data had no map, so this jump wasn't clicked.)
