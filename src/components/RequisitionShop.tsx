@@ -2,15 +2,12 @@ import { useState } from 'react';
 import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { Force, Unit } from '../model/types';
-import { RELICS, REQUISITIONS, SCAR_TABLE, type RelicTier, type Requisition } from '../rules/data';
+import { RELICS, REQUISITIONS, SCAR_TABLE, type Requisition } from '../rules/data';
 import { applyScar, forceTotals, hasRule, relicHolders, relicSlots, relicTaken, relicTierAllowed, rollDice, rollDie } from '../rules/engine';
+import { NEEDS_UNIT, RELIC_TIER, requisitionEligible, requisitionProblem } from '../rules/requisition';
 import { unitName } from '../rules/battle';
 import { Modal, RelicOption, toast } from './ui';
 import { localDate } from '../model/date';
-
-const RELIC_TIER: Record<string, RelicTier> = { 'Common Relic': 'Common', 'Rare Relic': 'Rare', 'Legendary Relic': 'Legendary' };
-/** Requisitions whose effect the shop applies itself; the rest are recorded in the ledger only. */
-const NEEDS_UNIT = new Set(['Remove a Scar', 'Off Duty Training', 'Elite Reinforcements', 'Heroic Rise', ...Object.keys(RELIC_TIER)]);
 
 export default function RequisitionShop({ force, onClose }: { force: Force; onClose: () => void }) {
   const { state, updateForce } = useStore();
@@ -35,20 +32,9 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
     setResult(null);
   };
 
-  const eligible: Unit[] = !sel ? [] : units.filter((u) => {
-    if (sel.name === 'Remove a Scar') return u.scars.length > 0;
-    if (sel.name === 'Heroic Rise') return u.category !== 'Hero' && !u.heroicRise;
-    return true;
-  });
+  const eligible: Unit[] = !sel ? [] : units.filter((u) => requisitionEligible(sel.name, u));
 
-  const problem = (): string | null => {
-    if (!sel) return 'Choose a requisition.';
-    if (sel.cost > rp) return `Needs ${sel.cost} RP (you have ${rp}).`;
-    if (NEEDS_UNIT.has(sel.name) && !unit) return 'Choose a unit.';
-    if ((sel.name === 'Remove a Scar' || tier) && !choice) return sel.name === 'Remove a Scar' ? 'Choose a scar.' : 'Choose a relic.';
-    return null;
-  };
-  const why = problem();
+  const why = requisitionProblem(sel, rp, unit, choice, held);
 
   let warning: string | null = null;
   if (unit && sel?.name === 'Heroic Rise' && (unit.category !== 'Infantry' || unit.tough > 1)) warning = 'Heroic Rise is for Tough(1) infantry.';
@@ -119,6 +105,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
       if (u && mutate) mutate(u);
     });
     setResult(outcome);
+    setChoice('');
     toast(outcome);
   };
 
