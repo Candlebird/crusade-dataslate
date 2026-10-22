@@ -34,7 +34,14 @@ Priority when short on time: bugs > journal content > UX > performance. After al
 At the end, fill in the sections below and give a short chat summary.
 
 ## Log
+- **Bug hunt (area 2)**: two agents swept the rules and the UI/sync layer.
+  - `730df06`: a journal left open over a round end now carries over and blocks a new one (it used to vanish from view); no choice re-roll after the climax; a negative Umbra balance can't pay shards out; old journals and duels that still owe a force are kept longer (48 / 30) so auto-pay never misses them; reviving a Warlord whose force isn't loaded keeps the fallen record.
+  - `9bdd04d`: the store applies changes at once. Before, ending a round worked on the page's copy of the campaign and could undo anything changed in between, and handlers that read a result back out of a queued update could get nothing. Faction and sector edits now find their row by id, not index.
 
 ## Open questions
+- **Duel stakes when the loser can't pay.** The winner collects the full stake even if the loser has fewer shards/materials than staked (the loser is clamped at 0). Fair fix: the loser pays first and the winner gets what was actually paid, which needs a "paid" record on the duel. Want that?
+- **Deleting a Warlord's force.** The Warlord stays on the faction, because a deleted force looks the same as one that just isn't loaded in this browser. Options: clear the Warlord when the owner deletes the force on their own device, or give the GM a "clear Warlord" button.
+- **Lost updates in Firestore.** Every save writes the whole campaign document with a client-clock `updatedAt`, so two people saving within a second or two can overwrite each other (seen in theory with the Warlord sync, orders and journals). The fix is per-field merges or transactions with `serverTimestamp()`. I didn't touch it because it can't be tested without real Firestore. Worth doing together.
+- **Firestore rules.** Players can write GM-only parts of the campaign document. Tightening needs a rules deploy, which was off-limits tonight.
 
 ## Test by hand
