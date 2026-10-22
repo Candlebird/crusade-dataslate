@@ -1,14 +1,19 @@
 import type { Campaign, CampaignFaction, Force, Unit } from '../model/types';
+import { LEVEL_THRESHOLDS } from './data';
 import { hasRule, levelForXp } from './engine';
 import { currentRound } from './nexus';
 import { WARLORDS, type WarlordPathId, type WarlordPerkId } from './nexusData';
 
-// Warlords (Nexus Wars): each faction names one Hero from its forces its Warlord and picks a Path for it, for good.
-// The Path's three perks unlock at Warlord levels 1, 3 and 5 (WARLORDS.levels). The Warlord's level is kept on the
+// Warlords (Nexus Wars): each faction names one Hero from its forces its Warlord and picks a Path for it. The Path
+// can be changed, but the Warlord starts back at level 1 (`changePath`). The Path's three perks unlock at Warlord
+// levels 1, 3 and 5 (WARLORDS.levels). The Warlord's level is kept on the
 // faction, so campaign-only rules (sight, research, slots) can read it without the forces. Lose the Warlord (removed
 // for good, or its force leaves the faction) and the perks go; a new Warlord can be named WARLORDS.replaceAfter rounds on.
 
 export const pathById = (id: string | undefined) => WARLORDS.paths.find((p) => p.id === id);
+
+/** A Warlord's level: from its unit's XP, less what it had when the faction last changed Path (`xpBase`). */
+export const warlordLevel = (unit: Unit, xpBase = 0) => levelForXp(Math.max(0, unit.xp - xpBase));
 
 const factionOf = (c: Campaign | undefined, factionId: string | undefined) =>
   factionId ? c?.factions.find((f) => f.id === factionId) : undefined;
@@ -57,9 +62,29 @@ export function chooseWarlord(c: Campaign, factionId: string, force: Force, unit
     if (!pathById(path)) return false;
     f.path = path;
   }
-  f.warlord = { forceId: force.id, unitId: unit.id, name: unit.name, level: levelForXp(unit.xp), since: currentRound(c) };
+  // The same Hero named again keeps its reset from a Path change.
+  const xpBase = f.fallenWarlord?.unitId === unit.id ? f.fallenWarlord.xpBase : undefined;
+  f.warlord = { forceId: force.id, unitId: unit.id, name: unit.name, level: warlordLevel(unit, xpBase), since: currentRound(c) };
+  if (xpBase !== undefined) f.warlord.xpBase = xpBase;
   delete f.warlordLost;
   delete f.fallenWarlord;
+  return true;
+}
+
+/**
+ * Change a faction's Path. It takes a Warlord whose force is loaded here, and the Warlord starts back at level 1 (just
+ * the first perk), levelling up again with the XP its unit gains from now on. The unit's own XP and level are untouched.
+ */
+export function changePath(c: Campaign, factionId: string, path: WarlordPathId, forces: Force[]): boolean {
+  const f = factionOf(c, factionId);
+  const w = f?.warlord;
+  if (!f || !w || !pathById(path) || path === f.path) return false;
+  const unit = forces.find((x) => x.id === w.forceId)?.units.find((u) => u.id === w.unitId);
+  if (!unit) return false;
+  f.path = path;
+  // Count it as having just reached level 1 (a Warlord still below level 1 stays where it is).
+  const xpBase = Math.max(0, unit.xp - LEVEL_THRESHOLDS[0]);
+  f.warlord = { ...w, xpBase, level: warlordLevel(unit, xpBase) };
   return true;
 }
 
@@ -91,7 +116,7 @@ export function reviveWarlord(c: Campaign, factionId: string, forces: Force[]): 
   if (w && !force) return undefined;
   delete f.fallenWarlord;
   if (!w || !unit || unit.status === 'removed' || force!.nexus?.factionId !== f.id) return undefined;
-  f.warlord = { ...w, name: unit.name, level: levelForXp(unit.xp) };
+  f.warlord = { ...w, name: unit.name, level: warlordLevel(unit, w.xpBase) };
   return unit.name;
 }
 
@@ -113,7 +138,7 @@ export function syncWarlords(c: Campaign, forces: Force[]) {
       loseWarlord(c, f.id);
       continue;
     }
-    const level = levelForXp(unit.xp);
+    const level = warlordLevel(unit, w.xpBase);
     if (level !== w.level || unit.name !== w.name) {
       if (level !== w.level) levelled.push({ factionId: f.id, name: unit.name, level });
       f.warlord = { ...w, level, name: unit.name };

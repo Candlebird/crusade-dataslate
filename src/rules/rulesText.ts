@@ -167,7 +167,7 @@ export const NEXUS_TEXT = {
     `Fight a band in the sector it stands in: the GM fields an AI army at its Supply. Beat it and the band is broken, and you roll on the Guardian loot table: Common below ${MARAUDERS.rareAt} Supply, Rare from ${MARAUDERS.rareAt}, Legendary from ${MARAUDERS.legendaryAt}. Fighting a band never changes who holds the sector, and it isn't the faction's attack for the round.`,
   ],
   warlords: [
-    `Each faction names one Hero from its forces its Warlord, on the Warlords panel of the campaign page, and picks a Path for it: ${WARLORDS.paths.map((p) => p.name).join(', ')}. The Path is for the rest of the campaign: a later Warlord follows the same one.`,
+    `Each faction names one Hero from its forces its Warlord, on the Warlords panel of the campaign page, and picks a Path for it: ${WARLORDS.paths.map((p) => p.name).join(', ')}. A later Warlord follows the same Path. The faction can change its Path while it has a Warlord, but the Warlord starts back at level 1 and levels up again with the XP it gains from then on (the unit's own XP and level are untouched).`,
     `Each Path has three perks, unlocked as the Warlord reaches levels ${WARLORDS.levels.join(', ')} (its level comes from its XP, as for any unit). Perks that name the Warlord's force only work for the detachment the Warlord is in; the others help the whole faction.`,
     `If the Warlord is removed for good, or its force leaves the faction, the perks go. A new Warlord can be named ${WARLORDS.replaceAfter} round${WARLORDS.replaceAfter === 1 ? '' : 's'} later. A Warlord can also step down, with the same wait.`,
   ],

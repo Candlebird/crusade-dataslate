@@ -12,7 +12,7 @@ import { build, buildCost, buildingSlots, produce } from './production';
 import { assetsOf } from './rounds';
 import { researchRate } from './tech';
 import { loadUnits, newBattle } from './tracker';
-import { chooseWarlord, hasPerk, leadsWith, loseWarlord, perksOf, reviveWarlord, syncWarlords, warlordBlock, warlordCandidates, warlordsStale } from './warlords';
+import { changePath, chooseWarlord, hasPerk, leadsWith, loseWarlord, perksOf, reviveWarlord, syncWarlords, warlordBlock, warlordCandidates, warlordsStale } from './warlords';
 
 // A row of hexes: A's home, then empty space out to B's home.
 function campaign(): Campaign {
@@ -101,6 +101,40 @@ describe('naming a Warlord', () => {
     expect(faction(c).warlordLost).toBeUndefined();
     expect(faction(c).fallenWarlord).toBeTruthy();
     expect(reviveWarlord(c, 'A', [f])).toBe('Lord');
+  });
+});
+
+describe('changing Path', () => {
+  it('switches the Path and puts the Warlord back to level 1, then it levels up again', () => {
+    const { c, f, lord } = withWarlord('architect');
+    expect(changePath(c, 'A', 'architect', [f])).toBe(false);
+    expect(changePath(c, 'A', 'reaver', [])).toBe(false);
+    expect(changePath(c, 'A', 'reaver', [f])).toBe(true);
+    expect(faction(c).path).toBe('reaver');
+    expect(faction(c).warlord?.level).toBe(1);
+    expect(perksOf(faction(c))).toHaveLength(1);
+    expect(lord.xp).toBe(90);
+    syncWarlords(c, [f]);
+    expect(faction(c).warlord?.level).toBe(1);
+    lord.xp += 30;
+    syncWarlords(c, [f]);
+    expect(faction(c).warlord?.level).toBe(3);
+  });
+
+  it('needs a Warlord, and the same Hero named again keeps its reset', () => {
+    const { c, f, lord } = withWarlord('architect');
+    changePath(c, 'A', 'reaver', [f]);
+    loseWarlord(c, 'A');
+    expect(changePath(c, 'A', 'shadow', [f])).toBe(false);
+    c.round = 2;
+    expect(chooseWarlord(c, 'A', f, lord)).toBe(true);
+    expect(faction(c).warlord?.level).toBe(1);
+  });
+
+  it('leaves a Warlord still below level 1 where it is', () => {
+    const { c, f } = withWarlord('architect', 5);
+    expect(changePath(c, 'A', 'reaver', [f])).toBe(true);
+    expect(faction(c).warlord?.level).toBe(0);
   });
 });
 

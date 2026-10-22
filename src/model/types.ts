@@ -414,7 +414,8 @@ export interface Warlord {
   name: string;
   level: number;
   /** The round it was named. */
-  since: number;
+  since: number;  /** The unit's XP when the faction last changed Path: the Warlord's level counts only XP gained since. */
+  xpBase?: number;
 }
 
 export interface CampaignEvent {
