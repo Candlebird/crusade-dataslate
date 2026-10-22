@@ -31,7 +31,7 @@ Priority when short on time: bugs > journal content > UX > performance. After al
    - Update the Worker prompt and request with threads, army traits and the sector (the user redeploys tomorrow).
 
 ## Later (noted, not for tonight)
-- **Force emblems.** An emblem creator on the force page: stack three shapes (e.g. shield, circle, star, chevron, skull…), pick each one's shape and colour. The emblem stands for the force on the Nexus Map instead of the plain marker. Stored on the force, so it should sync to the campaign with the detachment's position.
+- **Force emblems.** An emblem creator on the force page: stack three shapes (e.g. shield, circle, star, chevron, skull…), pick each one's shape and colour. The emblem stands for the force on the Nexus Map instead of the plain marker. Stored on the force, so it should sync to the campaign with the detachment's position. **Done (after the overnight run):** an Emblem panel on the force page (15 shapes, 10 swatches plus any colour, Random), shown in the force heading, on its card and on the map, ringed in the faction colour.
 
 ## Report
 At the end, fill in the sections below and give a short chat summary.

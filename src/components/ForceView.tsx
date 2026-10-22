@@ -29,6 +29,7 @@ import { TagFilter, UnitTags } from './Tags';
 import { Panel, Stepper, TextArea, TextField, XpBar, confirmAction, toast } from './ui';
 import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
 import { localDate } from '../model/date';
+import { EmblemBadge, EmblemEditor } from './Emblem';
 
 /** Hands the force to another player on the campaign, e.g. when you've been looking after their army. */
 function TransferForce({ f }: { f: Force }) {
@@ -94,7 +95,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
       <div className="page-head">
         <div>
           <div className="crumbs"><a href={href.forces()}>Forces</a> / Order of Battle</div>
-          <h1>{f.name}</h1>
+          <h1 className="with-emblem"><EmblemBadge emblem={f.emblem} size={40} />{f.name}</h1>
         </div>
         <div className="row">
           {armyUrl && <a className="btn" href={armyUrl} target="_blank" rel="noreferrer">Army Forge ↗</a>}
@@ -348,6 +349,9 @@ export default function ForceView({ forceId }: { forceId: string }) {
               )}
               <label className="field span-all">Description / lore<TextArea rows={5} value={f.description} onCommit={(v) => set((d) => void (d.description = v))} /></label>
             </div>
+          </Panel>
+          <Panel id="force.emblem" title="Emblem" h={3} collapsed lead={<EmblemBadge emblem={f.emblem} size={48} />}>
+            <EmblemEditor emblem={f.emblem} readOnly={theirs} onChange={(e) => set((d) => void (d.emblem = e))} />
           </Panel>
           <NexusPanel f={f} onShop={() => setUmbra(true)} />
           {theirs ? null : <div className="panel">

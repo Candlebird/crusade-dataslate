@@ -160,6 +160,17 @@ export interface ArmyList {
   compact: boolean;
 }
 
+export type EmblemShape =
+  | 'circle' | 'ring' | 'square' | 'diamond' | 'shield' | 'hexagon' | 'triangle' | 'star'
+  | 'burst' | 'cross' | 'chevron' | 'crescent' | 'bolt' | 'wings' | 'skull';
+
+/** One layer of a force emblem; 'none' leaves the layer empty. */
+export interface EmblemLayer {
+  shape: EmblemShape | 'none';
+  /** '#rrggbb' */
+  color: string;
+}
+
 export interface Force {
   id: string;
   name: string;
@@ -169,6 +180,8 @@ export interface Force {
   owner?: string;
   description: string;
   image?: string;
+  /** Three stacked shapes, background first, that stand for the force on the Nexus Map (model/emblem.ts). */
+  emblem?: EmblemLayer[];
   /** Army Forge link for the force's army (falls back to its units' book). */
   armyLink?: string;
   startingSupply: number;

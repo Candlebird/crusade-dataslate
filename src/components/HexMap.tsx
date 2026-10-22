@@ -20,6 +20,8 @@ import { knows } from '../rules/tech';
 import { sightMap, type Sight } from '../rules/fog';
 import { positionOf, reach, setPosition } from '../rules/movement';
 import { detachmentName } from '../rules/detachments';
+import { emblemLayers } from '../model/emblem';
+import { EmblemBadge, EmblemShapes } from './Emblem';
 import { MARAUDER_ID, bandsAt, isRaided, marauderTier, recordMarauderGame } from '../rules/marauders';
 import { BUILDINGS, PRODUCTION } from '../rules/nexusData';
 import { href } from '../route';
@@ -349,8 +351,23 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
                       return here.length > 0 && (
                         <g className="hex-force" transform={`translate(${p.x - 19}, ${p.y + 9})`}>
                           <title>{here.map((x) => detachmentName(c, forces, x)).join(', ')}</title>
-                          <circle r={6.5} fill={color(here[0].nexus?.factionId) ?? '#888'} stroke="#07080b" strokeWidth={1.5} />
-                          <text y={3} className="hex-force-n">{here.length > 1 ? here.length : '⚑'}</text>
+                          {(() => {
+                            // The first detachment's emblem if it has one, ringed in its faction's colour; else the plain marker.
+                            const layers = emblemLayers(here[0].emblem);
+                            const col = color(here[0].nexus?.factionId) ?? '#888';
+                            if (!layers) return <>
+                              <circle r={6.5} fill={col} stroke="#07080b" strokeWidth={1.5} />
+                              <text y={3} className="hex-force-n">{here.length > 1 ? here.length : '⚑'}</text>
+                            </>;
+                            return <>
+                              <circle r={9} fill="#07080b" stroke={col} strokeWidth={1.6} />
+                              <g transform="translate(-7 -7) scale(0.14)"><EmblemShapes layers={layers} /></g>
+                              {here.length > 1 && <>
+                                <circle cx={7} cy={-7} r={4.2} fill={col} stroke="#07080b" strokeWidth={1} />
+                                <text x={7} y={-5} className="hex-force-n" style={{ fontSize: 6 }}>{here.length}</text>
+                              </>}
+                            </>;
+                          })()}
                         </g>
                       );
                     })()}
@@ -556,7 +573,7 @@ function DetachmentsHere({ c, s, forces, gm, setC }: { c: Campaign; s: Sector; f
           <b>Detachments here:</b>{' '}
           {here.map((f) => (
             <span key={f.id} className="tag" style={{ borderColor: factionColor(c, f.nexus?.factionId) }}>
-              ⚑ {detachmentName(c, forces, f)}
+              {emblemLayers(f.emblem) ? <EmblemBadge emblem={f.emblem} size={14} /> : '⚑'} {detachmentName(c, forces, f)}
             </span>
           ))}
         </p>

@@ -428,6 +428,21 @@ table.compact .stepper input { width: 2.6rem; }
 .sector-art.thumb { width: 48px; height: 48px; margin: 0; }
 .lore { font-style: italic; color: var(--muted); border-left: 2px solid var(--gold-dim); padding-left: 0.5rem; white-space: pre-wrap; }
 .map-legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.5rem; }
+.emblem { flex: none; vertical-align: middle; }
+.with-emblem { display: flex; align-items: center; gap: 0.5rem; }
+.tag .emblem { margin-right: 0.15rem; vertical-align: -2px; }
+.emblem-editor { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
+.emblem-preview { display: flex; align-items: flex-end; gap: 1rem; padding: 0.75rem; background: #07080b; border: 1px solid var(--line); border-radius: var(--radius); }
+.emblem-map-size { padding: 4px; border: 1px dashed var(--line); border-radius: 50%; line-height: 0; }
+.emblem-layer { border: 1px solid var(--line); border-radius: var(--radius); padding: 0.5rem 0.6rem 0.6rem; margin: 0; min-width: 0; }
+.emblem-layer legend { padding: 0 0.3rem; color: var(--muted); font-size: 0.85em; }
+.emblem-shapes, .emblem-colors { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.emblem-colors { margin-top: 0.5rem; align-items: center; }
+.emblem-shapes button { width: 36px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; color: var(--muted); }
+.emblem-shapes button.on { color: var(--gold); border-color: var(--gold); }
+.emblem-swatch { width: 26px; height: 26px; min-height: 0; padding: 0; border: 2px solid var(--line); border-radius: 50%; }
+.emblem-swatch.on { border-color: var(--gold); box-shadow: 0 0 0 2px #07080b inset; }
+.emblem-colors input[type='color'] { width: 36px; height: 30px; padding: 0 2px; border: 1px solid var(--line); background: transparent; cursor: pointer; }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; }
 .report { list-style: none; padding: 0; margin: 0.5rem 0 0; display: flex; flex-direction: column; gap: 0.35rem; }
 .report li { display: flex; gap: 0.5rem; align-items: baseline; line-height: 1.4; }
