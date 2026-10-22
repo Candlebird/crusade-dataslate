@@ -100,7 +100,7 @@ export async function journalEndings(
   proxy: string, c: Campaign, j: CrossroadsJournal, u: Unit, forces: Force[], rand: Rand, signal?: AbortSignal,
 ): Promise<{ picks: JournalPick[]; source: 'claude' | 'tables' }> {
   const picks = await fetchOffer(proxy, journalRequest(c, j, u, forces), signal);
-  if (picks && validOffer(j, u, forces, picks.map((p) => p.rewardId))) {
+  if (picks && picks.every((p) => typeof p?.rewardId === 'string') && validOffer(j, u, forces, picks.map((p) => p.rewardId))) {
     const clip = (s: unknown, n: number) => (typeof s === 'string' ? s.slice(0, n) : undefined);
     return { picks: picks.map((p) => ({ rewardId: p.rewardId, title: clip(p.title, 80), text: clip(p.text, 600) })), source: 'claude' };
   }
