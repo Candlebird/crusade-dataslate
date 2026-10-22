@@ -52,6 +52,8 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
     if (NEEDS_UNIT.has(item.key) && !unit) return 'Choose a unit.';
     if ((item.key === 'manipulation' || item.key === 'relic' || item.key === 'evolution') && !choice) return 'Make a choice.';
     if ((item.key === 'reinforce' || item.key === 'expansion') && !choice) return c && fid ? 'Choose a sector.' : 'Link this force to a campaign faction first.';
+    // The sector may have been taken, reinforced or deleted since it was picked.
+    if ((item.key === 'reinforce' || item.key === 'expansion') && !sectorChoices.some((s) => s.id === choice)) return 'That sector is no longer available. Choose another.';
     return null;
   };
   const why = problem();
@@ -87,12 +89,18 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
         break;
       case 'reinforce':
         label += `: ${sector?.name}`;
-        sectorFn = (d) => void (d.sectors.find((s) => s.id === choice)!.reinforced = true);
+        sectorFn = (d) => {
+          const s = d.sectors.find((x) => x.id === choice);
+          if (s) s.reinforced = true;
+        };
         outcome = `${sector?.name} is reinforced. Tell the GM so the campaign file is updated.`;
         break;
       case 'expansion':
         label += `: ${sector?.name}`;
-        sectorFn = (d) => void (d.sectors.find((s) => s.id === choice)!.owner = fid);
+        sectorFn = (d) => {
+          const s = d.sectors.find((x) => x.id === choice);
+          if (s) s.owner = fid;
+        };
         outcome = `You take ${sector?.name}. Tell the GM so the campaign file is updated.`;
         break;
       case 'relic': {
