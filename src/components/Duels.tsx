@@ -51,7 +51,7 @@ export default function DuelsPanel({ c, setC, me, gm }: { c: Campaign; setC: Set
         battle as usual (<a href={href.tracker()}>Battle</a>, then record it for XP and rewards), and record the duel's result here:
         the loser's stakes go to the winner. A draw moves nothing.
       </p>
-      {canChallenge && <Challenge c={c} setC={setC} me={me} gm={gm} />}
+      {canChallenge && <Challenge c={c} setC={setC} me={me} gm={gm} own={own} />}
       {open.map((d) => <DuelCard key={d.id} c={c} setC={setC} d={d} me={me} gm={gm} />)}
       {settled.length > 0 && (
         <>
@@ -67,49 +67,57 @@ export default function DuelsPanel({ c, setC, me, gm }: { c: Campaign; setC: Set
 
 const forcesOf = (forces: Force[], factionId: string) => forces.filter((f) => f.nexus?.factionId === factionId);
 
-function Challenge({ c, setC, me, gm }: { c: Campaign; setC: SetC; me?: string; gm?: boolean }) {
+/**
+ * Challenge another faction. Any faction but your own can be challenged, whether or not its forces are in this
+ * browser; you pick your own force, and the other side picks theirs when it sets its wager, if it isn't known here.
+ */
+function Challenge({ c, setC, me, gm, own }: { c: Campaign; setC: SetC; me?: string; gm?: boolean; own: Force[] }) {
   const { state } = useStore();
   const [from, setFrom] = useState(me ?? '');
   const [to, setTo] = useState('');
-  const fromFaction = me ?? from;
-  const withForces = c.factions.filter((f) => forcesOf(state.forces, f.id).length);
   const [fromForce, setFromForce] = useState('');
   const [toForce, setToForce] = useState('');
-  const pickForce = (factionId: string, picked: string) => forcesOf(state.forces, factionId).find((f) => f.id === picked) ?? forcesOf(state.forces, factionId)[0];
-  const a = pickForce(fromFaction, fromForce);
-  const b = pickForce(to, toForce);
+  const fromFaction = me ?? from;
+  // A player fights with their own forces; the GM, acting for a faction, with any of its forces.
+  const mineToPick = forcesOf(me ? own : state.forces, fromFaction);
+  const theirsToPick = forcesOf(state.forces, to).filter((f) => !own.includes(f) || !me);
+  const a = mineToPick.find((f) => f.id === fromForce) ?? mineToPick[0];
+  const b = theirsToPick.find((f) => f.id === toForce) ?? theirsToPick[0];
+  const opponents = c.factions.filter((f) => f.id !== fromFaction);
 
   const send = () => {
-    if (!a || !b) return;
-    setC((d) => void newDuel(d, { factionId: fromFaction, forceId: a.id }, { factionId: to, forceId: b.id }, uid(), today()));
+    if (!a || !to) return;
+    setC((d) => void newDuel(d, { factionId: fromFaction, forceId: a.id }, { factionId: to, forceId: b?.id ?? '' }, uid(), today()));
     toast(`Challenge sent to ${factionName(c, to)}. Set the wagers next.`);
     setTo('');
+    setToForce('');
   };
 
-  if (withForces.length < 2) return <p className="muted small">Duels need two factions with a linked force.</p>;
+  if (c.factions.length < 2) return <p className="muted small">Duels need at least two factions.</p>;
   return (
     <div className="row">
       {gm && !me && (
-        <select value={from} onChange={(e) => { setFrom(e.target.value); setFromForce(''); }} aria-label="Challenger">
+        <select value={from} onChange={(e) => { setFrom(e.target.value); setFromForce(''); setTo(''); }} aria-label="Challenger">
           <option value="">Challenger…</option>
-          {withForces.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
       )}
-      {forcesOf(state.forces, fromFaction).length > 1 && (
+      {fromFaction && !mineToPick.length && <span className="muted small">Link a force to {factionName(c, fromFaction)} to fight a duel.</span>}
+      {mineToPick.length > 1 && (
         <select value={a?.id ?? ''} onChange={(e) => setFromForce(e.target.value)} aria-label="Your force">
-          {forcesOf(state.forces, fromFaction).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          {mineToPick.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
       )}
-      <select value={to} onChange={(e) => { setTo(e.target.value); setToForce(''); }} aria-label="Opponent">
+      <select value={to} onChange={(e) => { setTo(e.target.value); setToForce(''); }} aria-label="Opponent" disabled={!fromFaction}>
         <option value="">Challenge…</option>
-        {withForces.filter((f) => f.id !== fromFaction).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+        {opponents.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
       </select>
-      {to && forcesOf(state.forces, to).length > 1 && (
+      {to && theirsToPick.length > 1 && (
         <select value={b?.id ?? ''} onChange={(e) => setToForce(e.target.value)} aria-label="Their force">
-          {forcesOf(state.forces, to).map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+          {theirsToPick.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
       )}
-      <button className="primary" disabled={!fromFaction || !to || !a || !b} onClick={send}>⚔ Request a duel</button>
+      <button className="primary" disabled={!fromFaction || !to || !a} onClick={send}>⚔ Request a duel</button>
     </div>
   );
 }
@@ -120,7 +128,7 @@ function DuelCard({ c, setC, d, me, gm }: { c: Campaign; setC: SetC; d: NexusDue
   const mine = roleOf(d, me);
   const involved = gm || !!mine;
   const ready = duelReady(d);
-  const forceName = (s: DuelSide) => state.forces.find((f) => f.id === s.forceId)?.name ?? 'a missing force';
+  const forceName = (s: DuelSide) => !s.forceId ? 'force not picked yet' : state.forces.find((f) => f.id === s.forceId)?.name ?? 'a missing force';
   const sideName = (s: DuelSide) => factionName(c, s.factionId);
 
   const agree = (s: DuelSide, yes: boolean) => setC((x) => void agreeDuel(x.duels!.find((y) => y.id === d.id)!, s.factionId, yes));
@@ -152,7 +160,7 @@ function DuelCard({ c, setC, d, me, gm }: { c: Campaign; setC: SetC; d: NexusDue
               <div>Puts up: {wagerText(s.wager)}</div>
               {(mine === r || (gm && !mine)) && (s.agreed
                 ? <button className="small" onClick={() => agree(s, false)}>Take back agreement</button>
-                : <button className="primary small" onClick={() => agree(s, true)}>{mine ? 'Agree' : `Agree for ${sideName(s)}`}</button>)}
+                : <button className="primary small" disabled={!s.forceId} title={s.forceId ? undefined : 'Pick a force first: Change wagers'} onClick={() => agree(s, true)}>{mine ? 'Agree' : `Agree for ${sideName(s)}`}</button>)}
               {issues.length > 0 && <ul className="issues">{issues.map((i) => <li key={i} className="warn">{i} If it loses, it pays what it has.</li>)}</ul>}
             </div>
           );
@@ -211,9 +219,10 @@ function WagerModal({ c, setC, d, me, onClose }: { c: Campaign; setC: SetC; d: N
           return (
             <div key={r}>
               <h3>{factionName(c, s.factionId)} puts up</h3>
-              {forces.length > 1 && (
+              {(forces.length > 1 || (forces.length > 0 && !force)) && (
                 <label className="row small">Force
                   <select value={draft[r].forceId} onChange={(e) => set(r, { forceId: e.target.value, wager: { ...w, relics: [] } })}>
+                    {!force && <option value={draft[r].forceId}>Pick a force…</option>}
                     {forces.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                   </select>
                 </label>

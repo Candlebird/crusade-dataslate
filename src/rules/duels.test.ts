@@ -63,6 +63,19 @@ describe('Nexus Duels', () => {
     expect(c.duels).toBeUndefined();
   });
 
+  it('the challenged side can pick its force later, and must before agreeing', () => {
+    const c = campaign();
+    const d = newDuel(c, { factionId: 'A', forceId: 'fA' }, { factionId: 'B', forceId: '' }, 'd', '');
+    expect(wagerIssues(c, forces(), d.challenged)).toEqual(['No force picked yet.']);
+    expect(agreeDuel(d, 'B')).toBe(false);
+    setWagers(d, { challenger: { forceId: 'fA', wager: {} }, challenged: { forceId: '', wager: {} } }, 'B');
+    expect(d.challenged.agreed).toBe(false);
+    setWagers(d, { challenger: { forceId: 'fA', wager: {} }, challenged: { forceId: 'fB', wager: {} } }, 'B');
+    expect(d.challenged.agreed).toBe(true);
+    agreeDuel(d, 'A');
+    expect(duelReady(d)).toBe(true);
+  });
+
   it("flags stakes a side couldn't pay", () => {
     const c = campaign();
     const d = agreed(c);

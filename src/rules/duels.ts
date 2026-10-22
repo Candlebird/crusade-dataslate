@@ -60,7 +60,8 @@ export function wagerText(w: DuelWager): string {
   return parts.join(', ') || 'nothing';
 }
 
-/** Ask another faction for a duel. Both wagers start empty; neither side has agreed yet. */
+/** Ask another faction for a duel. Both wagers start empty; neither side has agreed yet. The challenged force can be left
+ * blank ('') for its player to pick. */
 export function newDuel(c: Campaign, from: Pick<DuelSide, 'factionId' | 'forceId'>, to: Pick<DuelSide, 'factionId' | 'forceId'>, id: string, date: string): NexusDuel {
   const d: NexusDuel = {
     id, date, round: currentRound(c), status: 'open',
@@ -83,15 +84,15 @@ export function setWagers(d: NexusDuel, next: Record<DuelRole, Pick<DuelSide, 'f
     if (next[role].forceId !== side.forceId) delete wager.relics;
     side.forceId = next[role].forceId;
     side.wager = wager;
-    side.agreed = roleOf(d, by) === role;
+    side.agreed = roleOf(d, by) === role && !!side.forceId;
   }
   return true;
 }
 
-/** A side agrees (or takes back its agreement) to the wagers as they stand. */
+/** A side agrees (or takes back its agreement) to the wagers as they stand. It must have picked its force first. */
 export function agreeDuel(d: NexusDuel, factionId: string, agreed = true): boolean {
   const role = roleOf(d, factionId);
-  if (d.status !== 'open' || !role) return false;
+  if (d.status !== 'open' || !role || (agreed && !d[role].forceId)) return false;
   d[role].agreed = agreed;
   return true;
 }
@@ -111,7 +112,8 @@ export function wagerIssues(c: Campaign, forces: Force[], side: DuelSide): strin
   const out: string[] = [];
   const f = forces.find((x) => x.id === side.forceId);
   const fa = c.factions.find((x) => x.id === side.factionId);
-  if (!f) out.push('Its force is missing.');
+  if (!side.forceId) out.push('No force picked yet.');
+  else if (!f) out.push('Its force is missing.');
   if (f && (w.shards ?? 0) > f.umbraShards) out.push(`${f.name} has only ${f.umbraShards} Umbra Shards.`);
   if ((w.materials ?? 0) > banked(c, side.factionId)) out.push(`Only ${banked(c, side.factionId)} Materials are banked.`);
   for (const s of FACTION_STAKES) if ((w[s.key] ?? 0) > (fa?.[s.key] ?? 0)) out.push(`Only ${fa?.[s.key] ?? 0} ${s.name} to give.`);
