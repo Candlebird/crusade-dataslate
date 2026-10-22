@@ -99,6 +99,10 @@ At the end, fill in the sections below and give a short chat summary.
   - `4bb3820`: switching tabs on the GM page threw away a half-filled game record. The Log tab now stays loaded once opened (checked in Chrome).
   - Everything else checked out: the store's immediate updates, lazy pages, the tabs and the jump to Record a game, the Worker request, and every bug fix above.
 
+- **Empty states and phone polish (area 4)**:
+  - `f14652c`: lists that showed nothing when empty now say what goes there: no books, a datasheet/rule/spell search with no match, no duels, a unit with no special rules, no factions on the map.
+  - `5901ee3`: on phones, Journal and Duels choices wrap under their button, the small "Used" and ✕ buttons are full-size, and a settled duel's relic dropdown and "Collect winnings" stay on screen. Checked at 390 px: no sideways scroll on any campaign tab.
+
 ## Open questions
 - **Duel stakes when the loser can't pay.** The winner collects the full stake even if the loser has fewer shards/materials than staked (the loser is clamped at 0). Fair fix: the loser pays first and the winner gets what was actually paid, which needs a "paid" record on the duel. Want that?
 - **Deleting a Warlord's force.** The Warlord stays on the faction, because a deleted force looks the same as one that just isn't loaded in this browser. Options: clear the Warlord when the owner deletes the force on their own device, or give the GM a "clear Warlord" button.
