@@ -94,6 +94,11 @@ At the end, fill in the sections below and give a short chat summary.
   - `2a685d0`: saved data that failed to load was silently replaced by the starter data on the next save. It is now kept under `opr-crusade-tracker:unreadable` first.
   - `447fdaf`: restoring a backup with only some point values lost the defaults for the rest.
 
+- **Review of tonight's own changes**: one agent read the whole overnight diff for regressions.
+  - `2de78b9`: a journal on a story thread's last beat, with every check and the twist failed, could never be finished (the tables offered 5 endings instead of 4). Since unfinished journals now carry over, it also blocked that faction's later journals.
+  - `4bb3820`: switching tabs on the GM page threw away a half-filled game record. The Log tab now stays loaded once opened (checked in Chrome).
+  - Everything else checked out: the store's immediate updates, lazy pages, the tabs and the jump to Record a game, the Worker request, and every bug fix above.
+
 ## Open questions
 - **Duel stakes when the loser can't pay.** The winner collects the full stake even if the loser has fewer shards/materials than staked (the loser is clamped at 0). Fair fix: the loser pays first and the winner gets what was actually paid, which needs a "paid" record on the duel. Want that?
 - **Deleting a Warlord's force.** The Warlord stays on the faction, because a deleted force looks the same as one that just isn't loaded in this browser. Options: clear the Warlord when the owner deletes the force on their own device, or give the GM a "clear Warlord" button.
@@ -111,6 +116,9 @@ At the end, fill in the sections below and give a short chat summary.
 - **A save that fails to load** is now kept under `opr-crusade-tracker:unreadable`, but nothing tells the player. Show a notice with a download button?
 - **A force imported as a copy** keeps its campaign faction, its battle records' links to tracked battles, and its created date. Should a copy drop these?
 - **Campaign import** only checks that `sectors` is a list, with no migration of older campaign files. Worth hardening?
+- **Thread payoff on an all-failed journal** (`2de78b9`): the payoff now takes the place of the top-tier ending, giving payoff plus 3 bad endings. The other option is one fewer bad ending. Which do you prefer?
+- **Requisition shop and held relics.** It now refuses a relic another force already holds (matching the dropdown, which greys them out). Before, it only checked that one was chosen. OK?
+- **Rival Warlord in the Claude request.** The journal request sends the rival's name and faction, the only other-faction detail it sends. Intended for flavour; fine?
 
 ## Test by hand
 - **Campaign tabs:** switch tabs on the player and GM pages, reload, and the tab should stay. On the GM map, "Record a game here" should open the Log tab at the record form. (My local data had no map, so this jump wasn't clicked.)
