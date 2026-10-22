@@ -77,6 +77,10 @@ At the end, fill in the sections below and give a short chat summary.
   - `71e4b52`: a random Void Echoes force from a book with no units threw.
   - `81476f0`: dropping several files at once: the same force twice made two forces with one id, and a book dropped with a list wasn't used for it.
 
+- **Turn loop bug hunt (area 2)**: round end, production, orders, detachments, events and the GM map tools checked.
+  - `e4bb8b7`: deleting a game won at an unclaimed sector took the guardian's loot back but never restored the guardian (or Reinforce, bank, construction).
+  - `78aef3e`: revealed orders compared the orders counter with the campaign round, so after a second set of orders in one round an attack never showed as fought.
+
 ## Open questions
 - **Duel stakes when the loser can't pay.** The winner collects the full stake even if the loser has fewer shards/materials than staked (the loser is clamped at 0). Fair fix: the loser pays first and the winner gets what was actually paid, which needs a "paid" record on the duel. Want that?
 - **Deleting a Warlord's force.** The Warlord stays on the faction, because a deleted force looks the same as one that just isn't loaded in this browser. Options: clear the Warlord when the owner deletes the force on their own device, or give the GM a "clear Warlord" button.
@@ -89,6 +93,8 @@ At the end, fill in the sections below and give a short chat summary.
 - **Deleting a force or unit leaves references behind.** Warlord, marks, duel sides, payments and list joins keep the old id. Mostly harmless (they show as missing), but a cleanup on delete would be tidier. It touches the Warlord and duel code, so I left it for a decision together with "Deleting a Warlord's force" above.
 - **Closing an expedition without choosing** still records an empty expedition and marks its units used. Intended?
 - **Changing a force's faction** keeps its old Nexus state (claimed round, used units, patrol round). Reset it?
+- **Unclaimed income rounds expire.** Only the last few rounds are kept, so a faction that doesn't claim income for longer loses the older ones. Keep unclaimed rounds until claimed?
+- **Painting a Voidspawn back** to another sector type leaves the Echoes as its owner. Echoes can hold ordinary sectors, so I left it; clear the owner instead?
 
 ## Test by hand
 - **Campaign tabs:** switch tabs on the player and GM pages, reload, and the tab should stay. On the GM map, "Record a game here" should open the Log tab at the record form. (My local data had no map, so this jump wasn't clicked.)
