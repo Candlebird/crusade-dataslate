@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
 import type { Campaign, Force } from '../model/types';
 import {
-  activeMarks, checksDone, dealJournal, dropMark, eligibleRewards, localOffer, makeOffer, minNothing, pickOption, requiredReward,
+  activeMarks, checksDone, dealJournal, dropMark, eligibleRewards, journalText, localOffer, makeOffer, minNothing, pickOption, reframeJournal,
+  requiredReward,
   rollTwist, successes, tierCap, validOffer,
 } from './journal';
 import {
@@ -144,6 +145,18 @@ describe('journal variety', () => {
       }
     }
     expect(found).toBe(true);
+  });
+
+  it('the GM can only frame a rival beat when there is a rival', () => {
+    const c = campaign();
+    const j = dealJournal(c, 'A', forces(), calm(), 'j1', '2026-10-21')!;
+    delete j.rival;
+    const rival = JOURNAL_COMPLICATIONS.find((x) => x.rival)!;
+    expect(reframeJournal(j, { complication: rival.id })).toBe(false);
+    expect(journalText(j, '{rival} waits')).toBe('a rival Warlord waits');
+    j.rival = { factionId: 'B', name: 'Kor' };
+    expect(reframeJournal(j, { complication: rival.id })).toBe(true);
+    expect(journalText(j, '{rival} waits')).toBe('Kor waits');
   });
 
   it('a story thread comes back, and its last beat always offers the payoff', () => {

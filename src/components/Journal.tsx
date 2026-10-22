@@ -5,13 +5,13 @@ import type { Campaign, CrossroadsJournal, Force, JournalRoll } from '../model/t
 import { useCloud } from '../cloud/CloudSync';
 import { proxyOf } from '../armyforge/book';
 import {
-  canReroll, catalystById, checkTarget, chooseComplication, climaxPenalty, complicationById, contextById, dealJournal, journalBlock,
-  journalOf, journalStatus, journalUnit, journalsOwed, localOffer, makeOffer, payJournal, pickOption, recentRewards, reframeJournal, rerollCheck,
-  rewardById, rollApproach, rollClimax, skillById, successes, tierCap, type JournalCheck,
+  activeMarks, canReroll, catalystById, checksDone, checkTarget, chooseComplication, climaxPenalty, complicationById, contextById, dealJournal, dropMark, journalBlock,
+  journalOf, journalStatus, journalText, journalUnit, journalsOwed, localOffer, makeOffer, payJournal, pickOption, recentRewards, reframeJournal, rerollCheck,
+  rewardById, rollApproach, rollClimax, rollTwist, skillById, successes, threadBeat, tierCap, twistById, type JournalCheck,
 } from '../rules/journal';
 import { journalEndings } from '../rules/journalAi';
 import { JOURNAL, JOURNAL_CATALYSTS, JOURNAL_COMPLICATIONS, JOURNAL_CONTEXTS, type JournalSkillId } from '../rules/journalData';
-import { factionName } from '../rules/nexus';
+import { currentRound, factionName } from '../rules/nexus';
 import { Panel, TextArea, confirmAction, toast } from './ui';
 
 type SetC = (fn: (c: Campaign) => void) => void;
@@ -61,9 +61,11 @@ export default function JournalPanel({ c, setC, me, gm }: { c: Campaign; setC: S
     )}>
       <p className="muted small">
         Once a round your Warlord comes to a crossroads, away from the battlefield. Pick how they take it on, answer the
-        twist, and roll the checks: each is a D6 against the Warlord's Quality (Defense for Endurance), and special rules
+        complication, and roll the checks: each is a D6 against the Warlord's Quality (Defense for Endurance), and special rules
         that suit the skill make it easier. A failed check can be re-rolled once for {JOURNAL.rerollCost} Umbra Shard.
         The more checks pass, the better the endings on offer, but at least one ending always gives nothing, or costs you.
+        Now and then the scene takes a twist (one more check), a rival Warlord crosses your path, or a story thread
+        picks up where an earlier journal left it.
       </p>
       {dealable.map((f) => (
         <div key={f.id} className="row">
@@ -72,6 +74,7 @@ export default function JournalPanel({ c, setC, me, gm }: { c: Campaign; setC: S
         </div>
       ))}
       {current.map((j) => <JournalCard key={j.id} c={c} setC={setC} j={j} gm={gm} own={own} />)}
+      {factions.map((f) => <Marks key={f.id} c={c} setC={setC} factionId={f.id} canDrop={gm || me === f.id} />)}
       {!factions.length && <p className="muted small">Link a force to a faction to play its Warlord's journal.</p>}
       {factions.length > 0 && !current.length && !dealable.length && (
         <p className="muted small">{factions.map((f) => `${f.name}: ${journalBlock(c, f.id)}`).join('. ')}.</p>
@@ -116,6 +119,9 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
   const comp = complicationById(j.complication);
   const approach = cat?.approaches.find((a) => a.id === j.approach?.id);
   const choice = comp?.choices.find((x) => x.id === j.choice?.id);
+  const twist = twistById(j.twist?.id);
+  const beat = threadBeat(j);
+  const say = (text: string | undefined) => (text ? journalText(j, text) : text);
 
   const edit = (fn: (x: CrossroadsJournal) => void) => setC((d) => {
     const x = d.journals?.find((y) => y.id === j.id);
@@ -176,6 +182,7 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
       {j.note && <p><i>{j.note}</i></p>}
       <p><b>{ctx?.name}.</b> {ctx?.text}</p>
       <p><b>{cat?.name}.</b> {cat?.text}</p>
+      {beat && <p className="thread"><b>{beat.name}</b> <span className="muted small">({beat.step + 1} of {beat.of})</span> <i>{beat.text}</i></p>}
 
       {gm && !j.approach && (framing
         ? <Framing j={j} edit={edit} onDone={() => setFraming(false)} />
@@ -202,22 +209,22 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
       {/* The complication. */}
       {j.approach && comp && (
         <>
-          <p><b>{comp.name}.</b> {comp.text}</p>
+          <p><b>{say(comp.name)}.</b> {say(comp.text)}</p>
           {!j.choice ? (
             canPlay && (
               <div className="option-section">
                 <h4>What do you do?</h4>
                 {comp.choices.map((ch) => (
                   <div key={ch.id} className="option">
-                    <button onClick={() => edit((x) => void chooseComplication(x, ch.id, u!, level, Math.random))}>{ch.label}</button>
-                    <span className="small">{ch.text}</span>
+                    <button onClick={() => edit((x) => void chooseComplication(x, ch.id, u!, level, Math.random))}>{say(ch.label)}</button>
+                    <span className="small">{say(ch.text)}</span>
                     <span className="cost">{ch.skill ? `${skillById(ch.skill)?.name} ${target(ch.skill)}+ (fail: climax harder)` : 'Safe: no roll'}</span>
                   </div>
                 ))}
               </div>
             )
           ) : (
-            <p><b>{choice?.label}.</b> <span className="small">{choice?.text}</span>{j.choice.roll && <><RollLine r={j.choice.roll} /> <Reroll which="choice" r={j.choice.roll} /></>}</p>
+            <p><b>{say(choice?.label)}.</b> <span className="small">{say(choice?.text)}</span>{j.choice.roll && <><RollLine r={j.choice.roll} /> <Reroll which="choice" r={j.choice.roll} /></>}</p>
           )}
         </>
       )}
@@ -243,10 +250,29 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
         </>
       )}
 
+      {/* The twist: one more check, now and then. */}
+      {j.climax && j.twist && twist && (
+        <>
+          <p><b>A twist: {twist.name}.</b> {say(twist.text)}</p>
+          {!j.twist.roll ? (
+            canPlay && (
+              <div className="row">
+                {twist.skills.map((s) => (
+                  <button key={s} onClick={() => edit((x) => void rollTwist(x, s, u!, level, Math.random))}>{skillById(s)?.name} {target(s)}+</button>
+                ))}
+                <span className="muted small">Fail and one more ending gives nothing.</span>
+              </div>
+            )
+          ) : (
+            <p><RollLine r={j.twist.roll} /> <Reroll which="twist" r={j.twist.roll} /></p>
+          )}
+        </>
+      )}
+
       {/* The tally. */}
-      {status === 'play' && j.climax && (
+      {status === 'play' && checksDone(j) && (
         <div className="row">
-          <span className="small">{successes(j)} of 3 checks passed: endings up to tier {tierCap(j)}.</span>
+          <span className="small">{successes(j)} of {j.twist ? 4 : 3} checks passed: endings up to tier {tierCap(j)}.</span>
           {canPlay && <button className="primary" disabled={busy} onClick={tally}>{busy ? 'The story turns…' : 'See how it ends'}</button>}
         </div>
       )}
@@ -294,7 +320,7 @@ function Framing({ j, edit, onDone }: { j: CrossroadsJournal; edit: (fn: (x: Cro
           {JOURNAL_CATALYSTS.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
         </select>
         <select value={j.complication} onChange={(e) => set({ complication: e.target.value })} aria-label="Complication">
-          {JOURNAL_COMPLICATIONS.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+          {JOURNAL_COMPLICATIONS.filter((x) => !x.rival || j.rival || x.id === j.complication).map((x) => <option key={x.id} value={x.id}>{journalText(j, x.name)}</option>)}
         </select>
       </div>
       <TextArea value={j.note ?? ''} rows={2} placeholder="A line of your own to set the scene (the twist stays hidden until the first roll)" onCommit={(note) => set({ note })} />
@@ -303,3 +329,24 @@ function Framing({ j, edit, onDone }: { j: CrossroadsJournal; edit: (fn: (x: Cro
   );
 }
 
+/** The marks Crossroads Journal endings left on a faction's Warlord, with a button to strike one off once it's used. */
+function Marks({ c, setC, factionId, canDrop }: { c: Campaign; setC: SetC; factionId: string; canDrop?: boolean }) {
+  const marks = activeMarks(c, factionId, currentRound(c));
+  if (!marks.length) return null;
+  const where = (m: (typeof marks)[number]) =>
+    m.kind === 'quirk' ? 'for good' : m.kind === 'sector' ? `${c.sectors.find((x) => x.id === m.sectorId)?.name ?? 'a sector'}, until round ${m.until}` : `next ${m.kind}, until round ${m.until}`;
+  return (
+    <div className="option-section">
+      <h4>Marks on {factionName(c, factionId)}'s Warlord</h4>
+      {marks.map((m) => (
+        <div key={m.id} className="option">
+          <span className={`tag ${m.good ? 'green' : 'red'}`}>{m.kind}</span>
+          <span className="small"><b>{m.name}.</b> {m.text} <span className="muted">({where(m)})</span></span>
+          {canDrop && m.kind !== 'quirk' && (
+            <button className="ghost small" title="Strike it off once it's used" onClick={() => setC((d) => void dropMark(d, factionId, m.id))}>Used</button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}

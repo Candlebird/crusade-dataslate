@@ -176,7 +176,7 @@ export function reframeJournal(j: CrossroadsJournal, next: Partial<Pick<Crossroa
   if (j.approach) return false;
   if (next.context !== undefined && !contextById(next.context)) return false;
   if (next.catalyst !== undefined && !catalystById(next.catalyst)) return false;
-  if (next.complication !== undefined && !complicationById(next.complication)) return false;
+  if (next.complication !== undefined && (!complicationById(next.complication) || (complicationById(next.complication)!.rival && !j.rival))) return false;
   Object.assign(j, next);
   if (j.note !== undefined && !j.note.trim()) delete j.note;
   return true;
