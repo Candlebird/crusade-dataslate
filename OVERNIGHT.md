@@ -71,6 +71,12 @@ At the end, fill in the sections below and give a short chat summary.
   - `50a76f5`: finishing a battle twice quickly put it in the history twice. A side whose force was deleted now says so instead of linking to "Force not found".
   - `e4011bb`: pressing Apply twice on an auto-battle doubled every fighter's kill XP.
 
+- **Force pages bug hunt (area 2)**:
+  - `3501b12`: pressing buy again in the Requisition shop charged RP twice for the same relic, a scar already removed, or a second Heroic Rise.
+  - `abd3afb`: the Umbra shop could sell a sector someone took (or the GM deleted) after you picked it, and crashed on a deleted one.
+  - `71e4b52`: a random Void Echoes force from a book with no units threw.
+  - `81476f0`: dropping several files at once: the same force twice made two forces with one id, and a book dropped with a list wasn't used for it.
+
 ## Open questions
 - **Duel stakes when the loser can't pay.** The winner collects the full stake even if the loser has fewer shards/materials than staked (the loser is clamped at 0). Fair fix: the loser pays first and the winner gets what was actually paid, which needs a "paid" record on the duel. Want that?
 - **Deleting a Warlord's force.** The Warlord stays on the faction, because a deleted force looks the same as one that just isn't loaded in this browser. Options: clear the Warlord when the owner deletes the force on their own device, or give the GM a "clear Warlord" button.
@@ -80,6 +86,9 @@ At the end, fill in the sections below and give a short chat summary.
 - **Quirks and battle marks are text only.** Quirks (max 3 per Warlord) and next-battle marks are shown on the Journal panel, but nothing applies them in the battle tracker yet. They could be wired into the tracker later.
 - **"Start blank instead" clears the sector.** A sector battle restarted blank becomes a skirmish. Keep the sector instead?
 - **Claims for a deleted force.** In past battles, a side whose force was deleted shows "waiting for its player" forever. It could be dropped from the list, or the GM could dismiss it.
+- **Deleting a force or unit leaves references behind.** Warlord, marks, duel sides, payments and list joins keep the old id. Mostly harmless (they show as missing), but a cleanup on delete would be tidier. It touches the Warlord and duel code, so I left it for a decision together with "Deleting a Warlord's force" above.
+- **Closing an expedition without choosing** still records an empty expedition and marks its units used. Intended?
+- **Changing a force's faction** keeps its old Nexus state (claimed round, used units, patrol round). Reset it?
 
 ## Test by hand
 - **Campaign tabs:** switch tabs on the player and GM pages, reload, and the tab should stay. On the GM map, "Record a game here" should open the Log tab at the record form. (My local data had no map, so this jump wasn't clicked.)
