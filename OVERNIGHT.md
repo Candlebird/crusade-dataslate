@@ -52,6 +52,12 @@ At the end, fill in the sections below and give a short chat summary.
   - `2d4ab13`: every date the app writes (battles, ledger, duels, journals, log) used the UTC day, so anything recorded in the evening in the Americas was dated tomorrow. Dates now use the local day.
   - `d7862ab`: a panel now folds from its title as well as the small arrow, a bigger target on phones.
   - "LEVEL 0" on a new Warlord is right: the level comes from XP.
+  - `aaa06a2`: the dates shown (updated, started, fetched) use the local day too. `05caa74`: a little room above Recent duels.
+  - Full duel flow checked: wagers, agree on both sides, record the result, payout. The phone player view (390 px) has no sideways scroll.
+
+- **UX and performance (areas 4 and 5)**:
+  - `8f907ee`: the campaign page has tabs: Map, Warlord, Duels & Journal, Log. The round stays above them, and each device remembers its open tab. On the GM page, Factions and Sectors are under Map and Record a game is under Log ("Record a game here" on the map switches to it). Panel ids are unchanged, so folded panels stay folded.
+  - `28ee383`: every page except the force pages, plus the hex map, loads on first use with a small spinner. The main bundle went from 982 kB to 614 kB (Firebase is its own 674 kB chunk, as before).
 
 ## Open questions
 - **Duel stakes when the loser can't pay.** The winner collects the full stake even if the loser has fewer shards/materials than staked (the loser is clamped at 0). Fair fix: the loser pays first and the winner gets what was actually paid, which needs a "paid" record on the duel. Want that?
@@ -62,6 +68,7 @@ At the end, fill in the sections below and give a short chat summary.
 - **Quirks and battle marks are text only.** Quirks (max 3 per Warlord) and next-battle marks are shown on the Journal panel, but nothing applies them in the battle tracker yet. They could be wired into the tracker later.
 
 ## Test by hand
+- **Campaign tabs:** switch tabs on the player and GM pages, reload, and the tab should stay. On the GM map, "Record a game here" should open the Log tab at the record form. (My local data had no map, so this jump wasn't clicked.)
 - **Journal variety:** deal a few journals for one faction over several rounds. Contexts, catalysts and endings shouldn't repeat soon, and the context should suit the Warlord's sector.
 - **Twist:** after the climax, a twist section may appear (about 1 in 7). Roll it; the tally reads "of 4", and a failed twist adds a bad ending.
 - **Marks:** pick an ending with a mark (e.g. a free move). It appears under the faction's cards; "Used" removes it. Only the GM and that faction's player see the button.
