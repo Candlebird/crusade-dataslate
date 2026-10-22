@@ -225,7 +225,8 @@ export function CloudProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   const signIn = useCallback(() => {
-    fb?.signIn().catch((err) => {
+    if (!fb) return toast('Still connecting to the campaign. Try again in a moment.', 'error');
+    fb.signIn().catch((err) => {
       if (!/popup-closed|cancelled-popup/.test(errorText(err))) toast(`Sign-in failed: ${errorText(err)}`, 'error');
     });
   }, [fb]);

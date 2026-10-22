@@ -14,10 +14,10 @@ const STATUS_TEXT = {
 /** Sign-in / account link for the top bar. */
 export default function AccountButton() {
   const { status, email, name, isGm, signIn, signOut, requests } = useCloud();
-  if (status === 'loading' && !email) return null;
+  // Shown while the cloud is still connecting too: on a slow phone that can take a while, or never finish.
   if (!email) {
     return (
-      <a href="#" title="Sign in with Google to share forces with the other players" onClick={(e) => { e.preventDefault(); signIn(); }}>
+      <a href="#" title={status === 'loading' ? 'Connecting… Sign in with Google to share forces with the other players' : 'Sign in with Google to share forces with the other players'} onClick={(e) => { e.preventDefault(); signIn(); }}>
         Sign in
       </a>
     );
