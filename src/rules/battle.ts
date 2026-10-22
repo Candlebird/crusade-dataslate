@@ -87,6 +87,18 @@ export function emptyUnitBattle(u: Unit): UnitBattle {
   return { in: u.status === 'active', destroyed: false, marked: false, holding: false, kills: 0, killXp: 0, bonusXp: 0, death: null, scar: '' };
 }
 
+/**
+ * "Start blank instead" on a report filled in from the tracker: a fresh report that still remembers which battle it
+ * came from and whether it was a solo patrol, with the units that already fought this round left out (`used`, empty for
+ * a Crisis battle).
+ */
+export function restartInput(blank: BattleInput, prev: BattleInput, used: string[]): BattleInput {
+  const next: BattleInput = { ...blank, units: { ...blank.units }, from: prev.from };
+  if (prev.patrol) Object.assign(next, { patrol: true, vsAi: prev.vsAi });
+  for (const id of used) if (next.units[id]) next.units[id] = { ...next.units[id], in: false };
+  return next;
+}
+
 export const unitName = (u: Unit) => u.name || u.unitType || 'Unnamed unit';
 
 export function mainTable(input: BattleInput): RewardTableKey {

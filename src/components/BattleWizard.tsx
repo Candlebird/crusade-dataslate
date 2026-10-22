@@ -15,6 +15,7 @@ import {
   mainTable,
   participationXp,
   resolveBattle,
+  restartInput,
   rewardRows,
   sufferingCount,
   unitName,
@@ -170,7 +171,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
         <p className="panel notice small">
           Filled in from {source.past ? 'past battle' : 'the battle tracker'} <a href={href.tracker()}>{source.battle.mission.name}</a>
           {source.past && ` (${localDate(source.past)}, as ${source.battle.sides.find((x) => x.id === source.side)?.name})`}. Check the details, then add XP and rewards.
-          {' '}<button className="ghost small" onClick={() => setInput({ ...initialInput(f, forceTotals(f, state.settings).bp), from: input.from })}>Start blank instead</button>
+          {' '}<button className="ghost small" onClick={() => setInput(restartInput(initialInput(f, forceTotals(f, state.settings).bp), input, source.battle.crisis ? [] : used))}>Start blank instead</button>
         </p>
       )}
       {source && claimedBy && (

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
-import { emptyUnitBattle, participationXp, resolveBattle, rewardRows, type BattleInput } from './battle';
+import { emptyUnitBattle, participationXp, resolveBattle, restartInput, rewardRows, type BattleInput } from './battle';
 
 function setup() {
   const f = newForce('Test');
@@ -74,5 +74,27 @@ describe('battle resolution', () => {
     const out = resolveBattle(f, input, id);
     expect(out.warnings).toContain('Winners table: not rolled yet.');
     expect(out.warnings).toContain('Alpha: death roll not made.');
+  });
+});
+
+describe('starting a filled-in report blank', () => {
+  it('keeps the source battle and the patrol flag, and leaves out units that already fought this round', () => {
+    const { input } = setup();
+    const prev: BattleInput = { ...input, from: { battleId: 'b1', sideId: 's1' }, patrol: true, vsAi: true, units: { ...input.units, a: { ...input.units.a, killXp: 3 } } };
+    const next = restartInput(input, prev, ['a']);
+    expect(next.from).toEqual(prev.from);
+    expect(next.patrol).toBe(true);
+    expect(next.vsAi).toBe(true);
+    expect(next.units.a.in).toBe(false);
+    expect(next.units.a.killXp).toBe(0);
+    expect(next.units.b.in).toBe(true);
+    expect(input.units.a.in).toBe(true);
+  });
+
+  it('is a plain report when the source was not a patrol', () => {
+    const { input } = setup();
+    const next = restartInput(input, { ...input, vsAi: true }, []);
+    expect(next.patrol).toBeUndefined();
+    expect(next.vsAi).toBe(false);
   });
 });
