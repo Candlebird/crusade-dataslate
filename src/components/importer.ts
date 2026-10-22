@@ -29,34 +29,46 @@ export function useImporter() {
 
   return useCallback(
     async (files: File[]) => {
+      // What this drop has added so far: `state` is the render-time copy, so a book or force from an earlier file in the
+      // same drop isn't in it yet.
+      let books = state.books;
+      let forces = state.forces;
       for (const file of files) {
         try {
           const got = await readJsonFile(file);
           if (got.kind === 'book') {
-            const old = state.books.find((b) => b.uid === got.book.uid);
+            const old = books.find((b) => b.uid === got.book.uid);
             if (old?.edited && !confirmAction(`"${old.name}" has datasheets edited in the app. Importing it again replaces them with the file's. Continue?`)) continue;
             addBook(got.book);
+            books = [...books.filter((b) => b.uid !== got.book.uid), got.book];
             toast(`Army book "${got.book.name}" imported (${got.book.units.length} datasheets).`);
           } else if (got.kind === 'armyList') {
-            const fetched = await missingBooks(got.raw, state.books, proxyOf(state.settings));
-            const force = listToForce(got.raw, [...state.books, ...fetched]);
+            const fetched = await missingBooks(got.raw, books, proxyOf(state.settings));
+            const force = listToForce(got.raw, [...books, ...fetched]);
             fetched.forEach(addBook);
+            books = [...books, ...fetched];
             update((d) => void d.forces.push(force));
+            forces = [...forces, force];
             toast(`Force "${force.name}" created from the Army Forge list (${force.units.length} units, ${force.units.reduce((n, u) => n + u.points, 0)} pts).`);
           } else if (got.kind === 'coreRules') {
             update((d) => void (d.coreRules = got.rules));
             toast(`Core rules imported (${got.rules.length} rules). List glossaries will now include them.`);
           } else if (got.kind === 'force') {
-            const existing = state.forces.find((f) => f.id === got.force.id);
+            const existing = forces.find((f) => f.id === got.force.id);
             if (existing) {
               const replace = window.confirm(
                 `"${existing.name}" already exists. OK = replace it with the file's version, Cancel = keep both.`,
               );
+              const copy = asCopy(got.force);
               update((d) => {
                 if (replace) d.forces = d.forces.map((f) => (f.id === got.force.id ? got.force : f));
-                else d.forces.push(asCopy(got.force));
+                else d.forces.push(copy);
               });
-            } else update((d) => void d.forces.push(got.force));
+              forces = replace ? forces.map((f) => (f.id === got.force.id ? got.force : f)) : [...forces, copy];
+            } else {
+              update((d) => void d.forces.push(got.force));
+              forces = [...forces, got.force];
+            }
             toast(`Force "${got.force.name}" imported.`);
           } else if (got.kind === 'campaign') {
             const cur = state.campaign;
