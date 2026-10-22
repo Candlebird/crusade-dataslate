@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import raw from '../data/spears-of-dothea.raw.json';
 import { newForce, newUnit } from '../model/factory';
-import { applySelection, bookPageUrl, forceArmyUrl, normalizeBook, parseBookUid, parseTextList, parseWeaponText } from './book';
+import { applySelection, bookPageUrl, matchesTarget, forceArmyUrl, normalizeBook, parseBookUid, parseTextList, parseWeaponText } from './book';
 
 describe('Army Forge book import', () => {
   const book = normalizeBook(raw);
@@ -41,6 +41,24 @@ describe('Army Forge book import', () => {
     expect(out.cost).toBe(u.cost + opt.cost);
     const gained = opt.gains.find((g) => g.kind === 'weapon');
     if (gained && gained.kind === 'weapon') expect(out.weapons.some((w) => w.name === gained.weapon.name)).toBe(true);
+  });
+
+  it('matches plural and counted upgrade targets to the weapon', () => {
+    expect(matchesTarget('Rifle', 'Rifles')).toBe(true);
+    expect(matchesTarget('Power Mace', 'Power Maces')).toBe(true);
+    expect(matchesTarget('Druidic Talisman', 'Druidic Talismen')).toBe(true);
+    expect(matchesTarget('Hail Missile Array', '2x Hail Missile Arrays')).toBe(true);
+    expect(matchesTarget('Falcon Missile Pods', '2x Falcon Missile Pods')).toBe(true);
+    expect(matchesTarget('Heavy Machinegun', 'Heavy Machineguns')).toBe(true);
+    expect(matchesTarget('Heavy Rifle', 'Rifles')).toBe(false);
+  });
+
+  it('replacing all Rifles removes the Rifles', () => {
+    const u = book.units.find((x) => x.name === 'Recruit Squad')!;
+    const sec = u.sections.find((s) => s.label === 'Replace all Rifles')!;
+    const out = applySelection(u, { [`${sec.id}:${sec.options[0].id}`]: 1 });
+    expect(out.weapons.find((w) => w.name === 'Rifle')).toBeUndefined();
+    expect(out.weapons.find((w) => w.name === 'Light Sniper Rifle')?.count).toBe(5);
   });
 });
 

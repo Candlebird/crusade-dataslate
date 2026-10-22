@@ -162,8 +162,20 @@ export async function fetchCoreRules(proxy: string): Promise<unknown> {
 /** Selected option quantities, keyed by `${sectionId}:${optionId}`. */
 export type Selection = Record<string, number>;
 
-const singular = (s: string) => s.toLowerCase().replace(/e?s$/, '');
-const matches = (weaponName: string, target: string) => singular(weaponName) === singular(target);
+/**
+ * The forms a weapon name may take in an upgrade target: Army Forge writes targets in the plural and sometimes with a
+ * count ("Rifles", "2x Hail Missile Arrays", "Druidic Talismen") while the weapon itself is "Rifle".
+ */
+const nameForms = (s: string) => {
+  const n = s.toLowerCase().trim().replace(/^\d+\s*x\s*/, '');
+  return [n, n.replace(/s$/, ''), n.replace(/es$/, ''), n.replace(/men$/, 'man')];
+};
+/** Whether an upgrade target names this weapon. */
+export const matchesTarget = (weaponName: string, target: string) => {
+  const t = nameForms(target);
+  return nameForms(weaponName).some((x) => t.includes(x));
+};
+const matches = matchesTarget;
 
 export interface Loadout {
   cost: number;
