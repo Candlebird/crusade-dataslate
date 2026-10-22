@@ -128,7 +128,7 @@ export default function BooksPage() {
       </Panel>
 
       <Panel id="books.imported" title="Imported books">
-        {state.books.length === 0 && <p className="muted">None yet.</p>}
+        {state.books.length === 0 && <p className="muted small">No army books yet. Paste an Army Forge link above, or import a book file.</p>}
         {state.books.map((b) => (
           <div key={b.uid} className="list-item">
             <div className="grow">
@@ -222,7 +222,7 @@ function BookBrowser({ uid }: { uid: string }) {
         />
       )}
       {tab === 'units' && <TagFilter tags={tagsIn(Object.values(book.unitTags ?? {}))} value={tagFilter} onChange={setTagFilter} />}
-      {tab === 'units' && (
+      {tab === 'units' && units.length > 0 && (
         <div className="table-wrap">
           <table className="stack">
             <thead>
@@ -260,7 +260,7 @@ function BookBrowser({ uid }: { uid: string }) {
           </table>
         </div>
       )}
-      {tab === 'units' && !units.length && <p className="muted">{book.units.length ? 'No datasheets match.' : 'No datasheets.'}</p>}
+      {tab === 'units' && !units.length && <p className="muted small">{book.units.length ? 'No datasheets match the search or tags.' : 'No datasheets. Use Edit units to add one.'}</p>}
       {tab === 'rules' && (
         <div>
           {rules.map((r) => (
@@ -269,7 +269,7 @@ function BookBrowser({ uid }: { uid: string }) {
               <div className="small muted">{r.desc}</div>
             </div>
           ))}
-          {!rules.length && <p className="muted">No special rules.</p>}
+          {!rules.length && <p className="muted small">{book.rules.length ? 'No rules match the search.' : 'No special rules in this book.'}</p>}
         </div>
       )}
       {tab === 'spells' && (
@@ -280,7 +280,7 @@ function BookBrowser({ uid }: { uid: string }) {
               <div className="small muted">{sp.effect}</div>
             </div>
           ))}
-          {!book.spells.length && <p className="muted">No spells.</p>}
+          {!book.spells.some((sp) => sp.name.toLowerCase().includes(q)) && <p className="muted small">{book.spells.length ? 'No spells match the search.' : 'No spells in this book.'}</p>}
         </div>
       )}
     </Panel>

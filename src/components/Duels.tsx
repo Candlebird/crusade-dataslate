@@ -53,6 +53,9 @@ export default function DuelsPanel({ c, setC, me, gm }: { c: Campaign; setC: Set
         the loser's stakes go to the winner. A draw moves nothing.
       </p>
       {canChallenge && <Challenge c={c} setC={setC} me={me} gm={gm} own={own} />}
+      {!duels.length && c.factions.length >= 2 && (
+        <p className="muted small">No duels yet.{canChallenge ? ' Pick a faction to challenge above, then set the wagers.' : ''}</p>
+      )}
       {open.map((d) => <DuelCard key={d.id} c={c} setC={setC} d={d} me={me} gm={gm} />)}
       {settled.length > 0 && (
         <>

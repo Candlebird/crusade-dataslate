@@ -304,6 +304,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             </div>
             <div style={{ marginTop: '0.75rem' }}>
               <div className="cat" style={{ marginBottom: 4 }}>Special rules</div>
+              {!u.rules.length && !edit && <span className="muted small">None.</span>}
               {u.rules.map((r, i) => (
                 <span key={r + i} className="tag">
                   {r}

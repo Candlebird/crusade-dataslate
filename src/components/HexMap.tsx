@@ -412,6 +412,7 @@ function SideIntro({ c, unplaced }: { c: Campaign; unplaced: Sector[] }) {
     <>
       <h3>{c.name}</h3>
       <p className="muted small">Click a hex to see its sector. Drag to pan; scroll or use the buttons to zoom.</p>
+      {!c.factions.length && <p className="muted small">No factions on the map yet.</p>}
       {sidesOf(c).map((f) => {
         const n = c.sectors.filter((s) => s.owner === f.id).length;
         if (f.id === ECHOES.id && !n) return null;
