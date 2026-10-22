@@ -10,6 +10,7 @@ import { DatasheetEditor } from './BookEditor';
 import { blankDatasheet, removeDatasheet, saveDatasheet } from '../model/bookEdit';
 import type { CatalogBook, CatalogUnit } from '../model/types';
 import { useImporter } from './importer';
+import { localDate } from '../model/date';
 
 export default function BooksPage() {
   const { state, update, addBook } = useStore();
@@ -133,7 +134,7 @@ export default function BooksPage() {
             <div className="grow">
               <b>{b.name}</b>
               <div className="muted small">
-                {b.faction && `${b.faction} · `}v{b.version}{b.edited ? ' (edited)' : ''} · {b.units.length} datasheets · {b.rules.length} rules · {b.spells.length} spells · fetched {b.importedAt.slice(0, 10)}
+                {b.faction && `${b.faction} · `}v{b.version}{b.edited ? ' (edited)' : ''} · {b.units.length} datasheets · {b.rules.length} rules · {b.spells.length} spells · fetched {localDate(b.importedAt)}
               </div>
             </div>
             <a className="btn" href={bookPageUrl(b.uid, b.name)} target="_blank" rel="noreferrer">Army Forge ↗</a>

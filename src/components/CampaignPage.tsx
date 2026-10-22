@@ -121,7 +121,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
       <>
         <div className="page-head">
           <div>
-            <div className="crumbs">Nexus Wars · updated {c.updatedAt.slice(0, 10)}</div>
+            <div className="crumbs">Nexus Wars · updated {localDate(c.updatedAt)}</div>
             <h1>{c.name}</h1>
           </div>
           <div className="row">
@@ -170,7 +170,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
     <>
       <div className="page-head">
         <div>
-          <div className="crumbs">Nexus Wars · GM · updated {c.updatedAt.slice(0, 10)}</div>
+          <div className="crumbs">Nexus Wars · GM · updated {localDate(c.updatedAt)}</div>
           <h1><TextField value={c.name} onCommit={(v) => setC((d) => void (d.name = v || 'Nexus Wars'))} /></h1>
         </div>
         <div className="row">

@@ -14,6 +14,7 @@ import {
 import { difficultyLevel, difficultyRange, rateSectors } from '../rules/difficulty';
 import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY } from '../rules/nexusData';
 import { Panel, confirmAction, toast } from './ui';
+import { localDate } from '../model/date';
 
 /** End the current round on a copy of the campaign (the spread is random, so it's rolled once, here) and store the result. */
 export function useEndRound() {
@@ -221,7 +222,7 @@ function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
               <select value="" aria-label={`Spend a Strategic Asset for ${f.name}`}
                 onChange={(e) => {
                   const [key, forceId] = e.target.value.split(':');
-                  if (key) change((d) => void spendAsset(d, f.id, key, uid(), nowIso().slice(0, 10), forceId));
+                  if (key) change((d) => void spendAsset(d, f.id, key, uid(), localDate(), forceId));
                 }}>
                 <option value="">Spend one…</option>
                 {STRATEGIC_ASSETS.map((x) => x.key === 'forcedMarch' ? (

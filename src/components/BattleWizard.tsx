@@ -169,7 +169,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       {source && (
         <p className="panel notice small">
           Filled in from {source.past ? 'past battle' : 'the battle tracker'} <a href={href.tracker()}>{source.battle.mission.name}</a>
-          {source.past && ` (${source.past.slice(0, 10)}, as ${source.battle.sides.find((x) => x.id === source.side)?.name})`}. Check the details, then add XP and rewards.
+          {source.past && ` (${localDate(source.past)}, as ${source.battle.sides.find((x) => x.id === source.side)?.name})`}. Check the details, then add XP and rewards.
           {' '}<button className="ghost small" onClick={() => setInput({ ...initialInput(f, forceTotals(f, state.settings).bp), from: input.from })}>Start blank instead</button>
         </p>
       )}

@@ -6,6 +6,7 @@ import { fetchBook, normalizeBook, proxyOf } from '../armyforge/book';
 import { listBookUids, listToForce } from '../armyforge/list';
 import rawDothea from '../data/spears-of-dothea.raw.json';
 import { confirmAction, toast } from './ui';
+import { localDate } from '../model/date';
 
 const BUNDLED_UID = 'ykNPXx5YgsdGWqJi';
 
@@ -61,7 +62,7 @@ export function useImporter() {
             const cur = state.campaign;
             if (cur && !window.confirm(
               cur.id === got.campaign.id
-                ? `Replace your copy of "${cur.name}" with this file (updated ${got.campaign.updatedAt.slice(0, 10)})?`
+                ? `Replace your copy of "${cur.name}" with this file (updated ${localDate(got.campaign.updatedAt)})?`
                 : `Replace the campaign "${cur.name}" with "${got.campaign.name}"? Forces linked to the old campaign's factions will need re-linking.`,
             )) continue;
             update((d) => void (d.campaign = got.campaign));

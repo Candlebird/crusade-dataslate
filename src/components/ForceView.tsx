@@ -457,7 +457,7 @@ function HeroOffers({ f, c }: { f: Force; c: Campaign }) {
               let hired = false;
               update((d) => {
                 const force = d.forces.find((y) => y.id === f.id);
-                if (d.campaign && force && hireHero(d.campaign, o.id, force, nowIso().slice(0, 10), uid)) {
+                if (d.campaign && force && hireHero(d.campaign, o.id, force, localDate(), uid)) {
                   d.campaign.updatedAt = nowIso();
                   hired = true;
                 }

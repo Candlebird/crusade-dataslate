@@ -61,6 +61,7 @@ import AiActivation from './AiActivation';
 import PatrolModal from './PatrolModal';
 import AutoBattleModal from './AutoBattleModal';
 import { Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
+import { localDate } from '../model/date';
 
 /** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
 export default function BattleTracker({ sectorId, attacker, forceId, crisis }: { sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean }) {
@@ -87,13 +88,13 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
       delete s.battle;
       // The Nexus map follows the result; a battle is only ever logged once.
       if (game && 'event' in game && s.campaign && !s.campaign.log.some((e) => e.battleId === b.id)) {
-        recordSectorGame(s.campaign, { id: uid(), date: nowIso().slice(0, 10), ...game.event });
+        recordSectorGame(s.campaign, { id: uid(), date: localDate(), ...game.event });
         s.campaign.updatedAt = nowIso();
       }
       // The Crisis isn't fought over a sector: it only settles whether the Lord was stopped, and who was MVP. Only the first battle counts.
       if (cg && s.campaign && activeCrisis(s.campaign) && !s.campaign.crisis!.battleId) {
         Object.assign(s.campaign.crisis!, { result: cg.result, mvp: cg.mvp, battleId: b.id });
-        s.campaign.log.push({ id: uid(), date: nowIso().slice(0, 10), ...cg.event });
+        s.campaign.log.push({ id: uid(), date: localDate(), ...cg.event });
         s.campaign.updatedAt = nowIso();
       }
     });
@@ -111,7 +112,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
     <div>
       <div className="page-head">
         <div>
-          <div className="crumbs">{b.patrol ? 'Solo patrol' : 'Battle'} · {b.mission.source} · started {b.startedAt.slice(0, 10)}</div>
+          <div className="crumbs">{b.patrol ? 'Solo patrol' : 'Battle'} · {b.mission.source} · started {localDate(b.startedAt)}</div>
           <h1>{b.mission.name} {b.patrol && <span className="tag cyan">Solo patrol</span>}</h1>
         </div>
         <div className="row">
@@ -493,7 +494,7 @@ function PastBattles() {
   });
   const past = onlyMine ? waiting : all;
   const remove = (x: FinishedBattle) =>
-    confirmAction(`Delete ${x.mission.name} from ${x.finishedAt.slice(0, 10)} for the whole group? Rewards already claimed stay in each force's log.`) &&
+    confirmAction(`Delete ${x.mission.name} from ${localDate(x.finishedAt)} for the whole group? Rewards already claimed stay in each force's log.`) &&
     update((s) => void (s.battleHistory = s.battleHistory?.filter((y) => y.id !== x.id)));
   return (
     <Panel
@@ -522,7 +523,7 @@ function PastBattles() {
               <div>
                 <b>{x.mission.name}</b>{' '}
                 <span className="muted small">
-                  · {x.finishedAt.slice(0, 10)} · {x.round} round{x.round === 1 ? '' : 's'}
+                  · {localDate(x.finishedAt)} · {x.round} round{x.round === 1 ? '' : 's'}
                   {x.sectorId ? ` · ${state.campaign?.sectors.find((s) => s.id === x.sectorId)?.name ?? 'Nexus sector'}` : ''}
                 </span>
               </div>

@@ -25,6 +25,7 @@ import { BUILDINGS, PRODUCTION } from '../rules/nexusData';
 import { href } from '../route';
 import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 import SectorDanger from './SectorDanger';
+import { localDate } from '../model/date';
 
 type SetC = (fn: (c: Campaign) => void) => void;
 type Tool = 'select' | 'type' | 'owner' | 'move' | 'unplace';
@@ -501,7 +502,7 @@ function MarauderBox({ c, s, gm, setC }: { c: Campaign; s: Sector; gm: boolean; 
   if (!bands.length) return null;
   const who = by || s.owner && c.factions.some((f) => f.id === s.owner) && s.owner || c.factions[0]?.id || '';
   const fight = (bandId: string, won: boolean) => setC((d) => {
-    const e: CampaignEvent = { id: uid(), date: nowIso().slice(0, 10), sectorId: s.id, attacker: who, defender: MARAUDER_ID, winner: won ? who : MARAUDER_ID, notes: '' };
+    const e: CampaignEvent = { id: uid(), date: localDate(), sectorId: s.id, attacker: who, defender: MARAUDER_ID, winner: won ? who : MARAUDER_ID, notes: '' };
     recordMarauderGame(d, e, bandId);
     toast(won ? `${factionName(d, who)} broke the band${e.loot ? ` and found ${e.loot.name}` : ''}.` : 'The Marauders held.');
   });
@@ -589,7 +590,7 @@ function ProductionBox({ s }: { s: Sector }) {
   const going = k ? buildingById(k.id) : undefined;
   const built = s.buildings ?? [];
   const free = freeSlots(s, c ?? undefined);
-  const today = nowIso().slice(0, 10);
+  const today = localDate();
   const edit = (fn: (x: Sector, c: Campaign, forces: Force[]) => void) => update((d) => {
     const x = d.campaign?.sectors.find((y) => y.id === s.id);
     if (!x || !d.campaign) return;
