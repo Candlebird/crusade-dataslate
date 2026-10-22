@@ -47,6 +47,30 @@ export const warded = (c: Campaign, s: Sector) =>
 /** The sectors a faction can produce units at. */
 export const productionSites = (c: Campaign, factionId: string) => c.sectors.filter((s) => s.owner === factionId && produces(s));
 
+/** Take up to `n` banked Materials from the faction, largest banks first. Returns how many it had to give. */
+export function withdrawBanked(c: Campaign, factionId: string, n: number): number {
+  let left = n;
+  for (const s of c.sectors.filter((x) => x.owner === factionId && x.bank).sort((a, b) => (b.bank ?? 0) - (a.bank ?? 0))) {
+    const k = Math.min(left, s.bank ?? 0);
+    s.bank = (s.bank ?? 0) - k;
+    if (!s.bank) delete s.bank;
+    left -= k;
+  }
+  return n - left;
+}
+
+/** Bank up to `n` Materials at the faction's producing sectors with room, home first. Returns how many fit. */
+export function depositBanked(c: Campaign, factionId: string, n: number): number {
+  let left = n;
+  const sites = productionSites(c, factionId).sort((a, b) => Number(b.type === 'home') - Number(a.type === 'home'));
+  for (const s of sites) {
+    const k = Math.min(left, Math.max(0, bankCap(s, c) - (s.bank ?? 0)));
+    if (k) s.bank = (s.bank ?? 0) + k;
+    left -= k;
+  }
+  return n - left;
+}
+
 /** Round end: every held producing sector banks its production. Returns what each sector gained. */
 export function accrueProduction(c: Campaign): { sector: Sector; gained: number }[] {
   const out: { sector: Sector; gained: number }[] = [];

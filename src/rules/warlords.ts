@@ -59,6 +59,7 @@ export function chooseWarlord(c: Campaign, factionId: string, force: Force, unit
   }
   f.warlord = { forceId: force.id, unitId: unit.id, name: unit.name, level: levelForXp(unit.xp), since: currentRound(c) };
   delete f.warlordLost;
+  delete f.fallenWarlord;
   return true;
 }
 
@@ -66,8 +67,30 @@ export function chooseWarlord(c: Campaign, factionId: string, force: Force, unit
 export function loseWarlord(c: Campaign, factionId: string) {
   const f = factionOf(c, factionId);
   if (!f?.warlord) return;
+  f.fallenWarlord = f.warlord;
   delete f.warlord;
   f.warlordLost = currentRound(c);
+}
+
+/** Can the GM undo the loss of a faction's Warlord (or the wait for a new one)? */
+export const canRevive = (f: CampaignFaction) => !f.warlord && (!!f.fallenWarlord || f.warlordLost !== undefined);
+
+/**
+ * GM: undo the loss of a faction's Warlord. When its Hero is still alive in a force of the faction, it's the Warlord
+ * again, as if it never left (same `since`); otherwise the wait is lifted so a new one can be named now. Returns the
+ * revived Warlord's name, or undefined when only the wait was lifted.
+ */
+export function reviveWarlord(c: Campaign, factionId: string, forces: Force[]): string | undefined {
+  const f = factionOf(c, factionId);
+  if (!f || !canRevive(f)) return undefined;
+  const w = f.fallenWarlord;
+  const force = w && forces.find((x) => x.id === w.forceId);
+  const unit = force?.units.find((u) => u.id === w!.unitId);
+  delete f.warlordLost;
+  delete f.fallenWarlord;
+  if (!w || !unit || unit.status === 'removed' || force!.nexus?.factionId !== f.id) return undefined;
+  f.warlord = { ...w, name: unit.name, level: levelForXp(unit.xp) };
+  return unit.name;
 }
 
 /**

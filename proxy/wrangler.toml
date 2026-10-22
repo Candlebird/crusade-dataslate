@@ -1,3 +1,8 @@
 name = "crusade-dataslate-proxy"
 main = "worker.js"
 compatibility_date = "2026-10-01"
+
+# Origins allowed to ask for Crossroads Journal endings (POST /journal). The API key is a secret:
+#   wrangler secret put ANTHROPIC_API_KEY
+[vars]
+ALLOWED_ORIGINS = "https://candlebird.github.io,http://localhost:5173"

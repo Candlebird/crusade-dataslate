@@ -1,7 +1,7 @@
 import type { Campaign, DuelSide, DuelWager, Force, NexusDuel, Unit } from '../model/types';
 import { currentRound } from './nexus';
 import { NEXUS_DUELS } from './nexusData';
-import { bankCap, produces } from './production';
+import { depositBanked, withdrawBanked } from './production';
 
 // Nexus Duels: two players agree to fight with their own armies, away from the map, for a wager. Either player can
 // change either wager while the duel is open; any change clears both agreements, and the result can only be recorded
@@ -133,20 +133,7 @@ function moveFactionStakes(c: Campaign, from: string, to: string, w: DuelWager) 
     if (!F[key]) delete F[key];
     T[key] = (T[key] ?? 0) + n;
   }
-  let left = Math.min(w.materials ?? 0, banked(c, from));
-  let gain = left;
-  for (const s of c.sectors.filter((x) => x.owner === from && x.bank).sort((a, b) => (b.bank ?? 0) - (a.bank ?? 0))) {
-    const n = Math.min(left, s.bank ?? 0);
-    s.bank = (s.bank ?? 0) - n;
-    if (!s.bank) delete s.bank;
-    left -= n;
-  }
-  const sites = c.sectors.filter((x) => x.owner === to && produces(x)).sort((a, b) => Number(b.type === 'home') - Number(a.type === 'home'));
-  for (const s of sites) {
-    const n = Math.min(gain, Math.max(0, bankCap(s, c) - (s.bank ?? 0)));
-    if (n) s.bank = (s.bank ?? 0) + n;
-    gain -= n;
-  }
+  depositBanked(c, to, withdrawBanked(c, from, w.materials ?? 0));
 }
 
 /** Record the result of an agreed duel: the winning faction, or '' for a draw. The loser's faction stakes move now. */

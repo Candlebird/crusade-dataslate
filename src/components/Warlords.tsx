@@ -3,16 +3,17 @@ import { useStore } from '../model/store';
 import type { Campaign, CampaignFaction } from '../model/types';
 import { levelForXp } from '../rules/engine';
 import { WARLORDS, type WarlordPathId } from '../rules/nexusData';
-import { chooseWarlord, loseWarlord, pathById, perksOf, syncWarlords, warlordBlock, warlordCandidates, warlordsStale } from '../rules/warlords';
+import { canRevive, chooseWarlord, loseWarlord, pathById, reviveWarlord, perksOf, syncWarlords, warlordBlock, warlordCandidates, warlordsStale } from '../rules/warlords';
 import { Panel, confirmAction, toast } from './ui';
 
 type SetC = (fn: (c: Campaign) => void) => void;
 
 /**
  * Warlords (Nexus Wars): each faction's chosen Hero, its Path and the perks it has unlocked. `faction` limits it to one
- * faction (a player's view); with none, the GM sees them all. Keeps each Warlord's level in step with its force.
+ * faction (a player's view); with none, the GM sees them all. Keeps each Warlord's level in step with its force. `gm`
+ * shows the GM's Revive control.
  */
-export default function WarlordsPanel({ c, setC, faction }: { c: Campaign; setC: SetC; faction?: string }) {
+export default function WarlordsPanel({ c, setC, faction, gm }: { c: Campaign; setC: SetC; faction?: string; gm?: boolean }) {
   const { state } = useStore();
   const stale = warlordsStale(c, state.forces);
   useEffect(() => {
@@ -39,12 +40,12 @@ export default function WarlordsPanel({ c, setC, faction }: { c: Campaign; setC:
         perks unlock as the Warlord reaches levels {WARLORDS.levels.join(', ')}. If the Warlord falls for good or its force leaves the
         faction, the perks go, and a new Warlord can be named {WARLORDS.replaceAfter} round{WARLORDS.replaceAfter === 1 ? '' : 's'} later (on the same Path).
       </p>
-      {shown.map((f) => <FactionWarlord key={f.id} c={c} setC={setC} f={f} />)}
+      {shown.map((f) => <FactionWarlord key={f.id} c={c} setC={setC} f={f} gm={gm} />)}
     </Panel>
   );
 }
 
-function FactionWarlord({ c, setC, f }: { c: Campaign; setC: SetC; f: CampaignFaction }) {
+function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: CampaignFaction; gm?: boolean }) {
   const { state } = useStore();
   const [pick, setPick] = useState('');
   const [pathPick, setPathPick] = useState<WarlordPathId | ''>('');
@@ -73,6 +74,14 @@ function FactionWarlord({ c, setC, f }: { c: Campaign; setC: SetC; f: CampaignFa
   const stepDown = () => {
     if (!f.warlord || !confirmAction(`${f.warlord.name} stops being ${f.name}'s Warlord? Its perks go, and a new Warlord can be named ${WARLORDS.replaceAfter} round${WARLORDS.replaceAfter === 1 ? '' : 's'} from now.`)) return;
     setC((d) => loseWarlord(d, f.id));
+  };
+
+  const revive = () => {
+    const who = f.fallenWarlord?.name;
+    if (!confirmAction(who ? `Bring back ${who} as ${f.name}'s Warlord? (If it can't come back, the wait for a new one is lifted.)` : `Lift the wait so ${f.name} can name a Warlord now?`)) return;
+    let name: string | undefined;
+    setC((d) => void (name = reviveWarlord(d, f.id, state.forces)));
+    toast(name ? `${name} is ${f.name}'s Warlord again.` : `${f.name} can name a Warlord now.`);
   };
 
   return (
@@ -106,6 +115,11 @@ function FactionWarlord({ c, setC, f }: { c: Campaign; setC: SetC; f: CampaignFa
               )}
               <button className="primary" disabled={!chosen || (!f.path && !pathPick)} onClick={name}>Name Warlord</button>
             </>
+          )}
+          {gm && canRevive(f) && (
+            <button className="small" onClick={revive} title="GM: undo the loss of this faction's Warlord">
+              Revive{f.fallenWarlord ? ` ${f.fallenWarlord.name}` : ''}
+            </button>
           )}
         </div>
       )}

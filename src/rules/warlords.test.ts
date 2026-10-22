@@ -12,7 +12,7 @@ import { build, buildCost, buildingSlots, produce } from './production';
 import { assetsOf } from './rounds';
 import { researchRate } from './tech';
 import { loadUnits, newBattle } from './tracker';
-import { chooseWarlord, hasPerk, leadsWith, loseWarlord, perksOf, syncWarlords, warlordBlock, warlordCandidates, warlordsStale } from './warlords';
+import { chooseWarlord, hasPerk, leadsWith, loseWarlord, perksOf, reviveWarlord, syncWarlords, warlordBlock, warlordCandidates, warlordsStale } from './warlords';
 
 // A row of hexes: A's home, then empty space out to B's home.
 function campaign(): Campaign {
@@ -77,6 +77,21 @@ describe('naming a Warlord', () => {
     expect(chooseWarlord(c, 'A', f, next, 'reaver')).toBe(true);
     expect(faction(c).path).toBe('architect');
     expect(perksOf(faction(c))).toEqual(['cheapBuild']);
+  });
+
+  it('GM revive: brings a stepped-down Warlord back, or just lifts the wait', () => {
+    const { c, f, lord } = withWarlord('architect');
+    loseWarlord(c, 'A');
+    c.round = 3;
+    expect(reviveWarlord(c, 'A', [f])).toBe('Lord');
+    expect(faction(c).warlord).toMatchObject({ unitId: lord.id, since: 1 });
+    expect(faction(c).warlordLost).toBeUndefined();
+    expect(reviveWarlord(c, 'A', [f])).toBeUndefined();
+    loseWarlord(c, 'A');
+    lord.status = 'removed';
+    expect(reviveWarlord(c, 'A', [f])).toBeUndefined();
+    expect(faction(c).warlord).toBeUndefined();
+    expect(warlordBlock(c, 'A')).toBeUndefined();
   });
 });
 

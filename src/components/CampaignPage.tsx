@@ -15,6 +15,7 @@ import RoundPanel from './RoundPanel';
 import TechTreePanel from './TechTree';
 import WarlordsPanel from './Warlords';
 import DuelsPanel from './Duels';
+import JournalPanel from './Journal';
 import { useImporter } from './importer';
 import { Dropzone, Panel, TextField, confirmAction, toast } from './ui';
 
@@ -146,8 +147,9 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
         <ReportPanel c={c} viewer={fog} />
         <HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} />
         {viewAs !== '-' && <TechTreePanel c={c} setC={setC} faction={viewAs || undefined} />}
-        {viewAs !== '-' && <WarlordsPanel c={c} setC={setC} faction={viewAs || undefined} />}
+        {viewAs !== '-' && <WarlordsPanel c={c} setC={setC} faction={viewAs || undefined} gm={canGm} />}
         <DuelsPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />
+        <JournalPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />
         <OrdersPanel c={c} />
         <LogPanel c={c} setC={setC} viewer={fog} />
         {footer}
@@ -192,8 +194,9 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
       }} />
       <OrdersPanel c={c} />
       <TechTreePanel c={c} setC={setC} />
-      <WarlordsPanel c={c} setC={setC} />
+      <WarlordsPanel c={c} setC={setC} gm />
       <DuelsPanel c={c} setC={setC} gm />
+      <JournalPanel c={c} setC={setC} gm />
       <SectorsPanel c={c} setC={setC} />
       <div className="cols-2">
         <RecordPanel c={c} setC={setC} preset={recordAt} />

@@ -139,6 +139,8 @@ export interface ForceNexus {
   usedUnits?: { round: number; ids: string[] };
   /** Settled Nexus Duels whose Umbra Shards and relics this force has paid or collected. */
   duelsPaid?: string[];
+  /** Crossroads Journals whose Warlord rewards (or costs) this force has taken. */
+  journalsPaid?: string[];
 }
 
 /** A battle list: a printable selection of the force's units for one game. */
@@ -354,6 +356,8 @@ export interface CampaignFaction {
   path?: string;
   /** The round its Warlord was lost: a new one can be named a round later. */
   warlordLost?: number;
+  /** The Warlord it lost, so the GM can bring it back (a mistaken step-down). */
+  fallenWarlord?: Warlord;
 }
 
 export interface Warlord {
@@ -457,6 +461,52 @@ export interface Campaign {
   movedOrders?: number;
   /** Nexus Duels: battles two players agreed to fight for a wager (rules/duels.ts). */
   duels?: NexusDuel[];
+  /** Crossroads Journals: a short vignette for each faction's Warlord, once a round (rules/journal.ts). */
+  journals?: CrossroadsJournal[];
+}
+
+/** A check rolled in a Crossroads Journal: a D6 at or over `target`. `rolls` holds the first roll and any re-roll (the last one stands). */
+export interface JournalRoll {
+  skill: string;
+  target: number;
+  rolls: number[];
+  pass: boolean;
+}
+
+/** One of the four endings offered (A–D). What it gives is fixed by its reward; a relic or scar it carries is drawn when it's offered. */
+export interface JournalOption {
+  rewardId: string;
+  title: string;
+  text: string;
+  relic?: Relic;
+  scar?: Scar;
+}
+
+/** A faction's Warlord's vignette for a round: a Context, a Catalyst and a Complication from the tables (journalData.ts). */
+export interface CrossroadsJournal {
+  id: string;
+  factionId: string;
+  round: number;
+  date: string;
+  forceId: string;
+  unitId: string;
+  warlord: string;
+  context: string;
+  catalyst: string;
+  complication: string;
+  /** The GM's framing: a line of their own to set the scene. */
+  note?: string;
+  approach?: { id: string; roll: JournalRoll };
+  /** The complication's choice; a risky one is rolled. */
+  choice?: { id: string; roll?: JournalRoll };
+  climax?: JournalRoll;
+  /** The endings offered, once the checks are done. */
+  options?: JournalOption[];
+  /** Who wrote them: Claude, or the tables when it couldn't be reached. */
+  source?: 'claude' | 'tables';
+  /** The ending picked (an index into `options`). */
+  picked?: number;
+  pickedOn?: string;
 }
 
 /** What one side of a Nexus Duel puts up. Each count is taken from the side's faction (or force, for Umbra Shards). */
