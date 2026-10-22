@@ -228,6 +228,22 @@ describe('journal variety', () => {
     expect(moveOf(c, fs[0]).move).toBe(base);
   });
 
+  it("a mark named like its ending says what it does, not its name twice", () => {
+    const c = campaign();
+    const fs = forces();
+    const u = fs[0].units[0];
+    const j = dealJournal(c, 'A', fs, calm(), 'j1', '2026-10-21')!;
+    delete j.twist; delete j.thread; delete j.rival;
+    j.approach = { id: 'a', roll: pass };
+    j.choice = { id: 'b', roll: pass };
+    j.climax = pass;
+    expect(makeOffer(j, ['deepCurrent', 'cursedGround', 'livingLegend', 'paranoia'].map((rewardId) => ({ rewardId })), 'tables', u, fs, () => 0, ids())).toBe(true);
+    const line = pickOption(c, 'j1', 1, fs, '2026-10-21')!;
+    const title = j.options![1].title;
+    expect(line.startsWith(`${title}: `)).toBe(true);
+    expect(line).not.toContain(`${title}: ${title}`);
+  });
+
   it('a Warlord carries three quirks at most', () => {
     const c = campaign();
     const fs = forces();

@@ -412,7 +412,7 @@ export function pickOption(c: Campaign, id: string, index: number, forces: Force
         if (quirks.length >= JOURNAL.maxQuirks) marks = marks.filter((x) => x !== quirks[0]);
       }
       f.marks = [...marks, m];
-      bits.push(`${e.name}`);
+      bits.push(e.name === o.title ? e.text : e.name);
     }
   }
   // The story thread moves on a beat, or ends on its last.

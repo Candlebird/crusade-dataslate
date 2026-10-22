@@ -292,7 +292,7 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
                 <div>
                   <b>{o.title}.</b> <span className="small">{o.text}</span>
                   <div className="muted small">
-                    {r?.desc}
+                    {r?.desc !== o.text && r?.desc}
                     {o.relic && <> Relic: <b>{o.relic.name}</b> ({o.relic.tier}).</>}
                     {o.scar && <> Scar: <b>{o.scar.name}</b>.</>}
                   </div>
@@ -337,7 +337,7 @@ function Marks({ c, setC, factionId, canDrop }: { c: Campaign; setC: SetC; facti
     m.kind === 'quirk' ? 'for good' : m.kind === 'sector' ? `${c.sectors.find((x) => x.id === m.sectorId)?.name ?? 'a sector'}, until round ${m.until}` : `next ${m.kind}, until round ${m.until}`;
   return (
     <div className="option-section">
-      <h4>Marks on {factionName(c, factionId)}'s Warlord</h4>
+      <h4>{factionName(c, factionId)}'s marks</h4>
       {marks.map((m) => (
         <div key={m.id} className="option">
           <span className={`tag ${m.good ? 'green' : 'red'}`}>{m.kind}</span>
