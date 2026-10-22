@@ -191,7 +191,7 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
         </div>
       )}
       {attacks.map((a) => {
-        const fought = foughtFor(c, a, round);
+        const fought = foughtFor(c, a, currentRound(c)); // games are logged by campaign round, not by orders #
         return (
           <div key={a.forceId ?? a.factionId} className="list-item small">
             <span className="grow">
