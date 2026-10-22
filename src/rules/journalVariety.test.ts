@@ -183,6 +183,23 @@ describe('journal variety', () => {
     expect(c.factions[0].journalSeen).toContain('rew:threadMap');
   });
 
+  it("a thread's last beat with every check failed, twist too, still gets its endings", () => {
+    const c = campaign();
+    const fs = forces();
+    const u = fs[0].units[0];
+    c.factions[0].thread = { id: 'map', step: 1, since: 1 };
+    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    j.approach = { id: 'a', roll: fail };
+    j.climax = fail;
+    j.twist = { id: JOURNAL_TWISTS[0].id, roll: fail };
+    expect(minNothing(j)).toBe(3);
+    const offer = localOffer(j, u, fs, () => 0.5);
+    expect(offer).toHaveLength(4);
+    expect(offer).toContain('threadMap');
+    expect(validOffer(j, u, fs, offer)).toBe(true);
+    expect(makeOffer(j, offer.map((rewardId) => ({ rewardId })), 'tables', u, fs, () => 0, ids())).toBe(true);
+  });
+
   it('tells Claude about the twist, rival, thread, sector and recent endings', () => {
     const c = campaign();
     const fs = forces();

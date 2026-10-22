@@ -288,7 +288,9 @@ export function validOffer(j: CrossroadsJournal, u: Unit, forces: Force[], ids: 
   if (ids.length !== 4 || new Set(ids).size !== 4 || rs.some((r) => !r)) return false;
   const payoff = requiredReward(j);
   if (payoff && ok.has(payoff) && !ids.includes(payoff)) return false;
-  return rs.filter((r) => r!.tier <= 0).length >= minNothing(j) && rs.some((r) => r!.tier === tierCap(j));
+  // With the payoff and three bad endings due there's no room for one more at the cap: the payoff (above it) stands in.
+  const top = rs.some((r) => r!.tier === tierCap(j)) || (!!payoff && ids.includes(payoff) && minNothing(j) >= 3 && ok.get(payoff)!.tier >= tierCap(j));
+  return rs.filter((r) => r!.tier <= 0).length >= minNothing(j) && top;
 }
 
 /** Endings the faction has had lately (`journalSeen`), to offer less often. */
@@ -313,7 +315,7 @@ export function localOffer(j: CrossroadsJournal, u: Unit, forces: Force[], rand:
   const take = (r: JournalReward | undefined) => r && !out.includes(r) && out.push(r);
   take(scored.find((x) => x.r.id === requiredReward(j))?.r);
   scored.filter((x) => x.r.tier <= 0).slice(0, minNothing(j)).forEach((x) => take(x.r));
-  take(scored.find((x) => x.r.tier === tierCap(j))?.r);
+  if (out.length < 4) take(scored.find((x) => x.r.tier === tierCap(j))?.r);
   while (out.length < 4) {
     const used = new Set(out.map((r) => r.table));
     const next = scored.filter((x) => !out.includes(x.r)).map((x) => ({ ...x, score: x.score - (used.has(x.r.table) ? 1.5 : 0) })).sort((a, b) => b.score - a.score)[0];
