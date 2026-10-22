@@ -41,6 +41,8 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
   const [recordAt, setRecordAt] = useState<{ sectorId: string; n: number }>({ sectorId: '', n: 0 });
   const [pickedView, setViewAs] = useState<string>();
   const [tab, setTab] = useCampaignTab();
+  const [logSeen, setLogSeen] = useState(tab === 'log');
+  if (tab === 'log' && !logSeen) setLogSeen(true);
   // Signed out, this browser is the GM's own copy.
   const canGm = cloud.isGm || !cloud.email;
   const mine = state.forces.find((f) => f.nexus?.factionId && (!f.owner || f.owner === cloud.email))?.nexus?.factionId;
@@ -223,8 +225,9 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
           <JournalPanel c={c} setC={setC} gm />
         </>
       )}
-      {tab === 'log' && (
-        <div className="cols-2">
+      {/* Kept mounted once opened, so a half-filled record survives a look at another tab. */}
+      {logSeen && (
+        <div className="cols-2" style={tab === 'log' ? undefined : { display: 'none' }}>
           <RecordPanel c={c} setC={setC} preset={recordAt} />
           <LogPanel c={c} setC={setC} />
         </div>
