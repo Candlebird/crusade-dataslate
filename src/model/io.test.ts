@@ -150,4 +150,31 @@ describe('asCopy', () => {
     // The original is untouched.
     expect(f.owner).toBe('me@x');
   });
+
+  it("keeps the copy's battle lists pointing at its own units", () => {
+    const hero = newUnit({ name: 'Hero' });
+    const squad = newUnit({ name: 'Squad' });
+    const f = {
+      ...newForce('Wolves'),
+      units: [hero, squad],
+      lists: [{ id: 'l', name: 'L', pointsLimit: 1000, unitIds: [squad.id, hero.id], joins: { [hero.id]: squad.id }, notes: '', glossary: false, compact: false }],
+    };
+    const c = asCopy(f);
+    const [cHero, cSquad] = c.units;
+    expect(c.lists![0].unitIds).toEqual([cSquad.id, cHero.id]);
+    expect(c.lists![0].joins).toEqual({ [cHero.id]: cSquad.id });
+    expect(f.lists[0].unitIds).toEqual([squad.id, hero.id]);
+  });
+
+  it("keeps the units that already fought this round marked on the copy", () => {
+    const u = newUnit();
+    const f = {
+      ...newForce('Wolves'),
+      units: [u],
+      nexus: { factionId: 'f', permanentTables: [], tempTables: [], traitTokens: 0, pending: [], usedUnits: { round: 2, ids: [u.id] } },
+    };
+    const c = asCopy(f);
+    expect(c.nexus!.usedUnits).toEqual({ round: 2, ids: [c.units[0].id] });
+    expect(f.nexus.usedUnits.ids).toEqual([u.id]);
+  });
 });

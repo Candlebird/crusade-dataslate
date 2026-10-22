@@ -76,7 +76,23 @@ export async function readJsonFile(file: File): Promise<Imported> {
 
 /** Give an imported force fresh ids if one with the same id already exists (keeps both copies). */
 export function asCopy(f: Force): Force {
-  return { ...f, id: uid(), owner: undefined, name: `${f.name} (copy)`, units: f.units.map((u) => ({ ...u, id: uid() })) };
+  const ids = new Map(f.units.map((u) => [u.id, uid()]));
+  const id = (old: string) => ids.get(old) ?? old;
+  const used = f.nexus?.usedUnits;
+  return {
+    ...f,
+    id: uid(),
+    owner: undefined,
+    name: `${f.name} (copy)`,
+    units: f.units.map((u) => ({ ...u, id: id(u.id) })),
+    // Battle lists and the units used this round name units by id: point them at the copy's units.
+    lists: f.lists?.map((l) => ({
+      ...l,
+      unitIds: l.unitIds.map(id),
+      joins: Object.fromEntries(Object.entries(l.joins).map(([hero, to]) => [id(hero), id(to)])),
+    })),
+    nexus: f.nexus && used ? { ...f.nexus, usedUnits: { ...used, ids: used.ids.map(id) } } : f.nexus,
+  };
 }
 
 export function readImageAsDataUrl(file: File, maxSize = 512): Promise<string> {
