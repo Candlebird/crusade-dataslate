@@ -56,7 +56,7 @@ export default function DuelsPanel({ c, setC, me, gm }: { c: Campaign; setC: Set
       {open.map((d) => <DuelCard key={d.id} c={c} setC={setC} d={d} me={me} gm={gm} />)}
       {settled.length > 0 && (
         <>
-          <h3>Recent duels</h3>
+          <h3 style={{ marginTop: '0.9rem' }}>Recent duels</h3>
           <ul className="small">
             {settled.map((d) => <Settled key={d.id} c={c} d={d} own={own} />)}
           </ul>
