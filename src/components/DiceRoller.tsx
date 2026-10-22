@@ -70,7 +70,7 @@ function DiceModal({ onClose }: { onClose: () => void }) {
           Type
           <div className="row">
             {SIDES.map((n) => (
-              <button key={n} className={sides === n ? 'primary' : ''} onClick={() => setSides(n)}>D{n}</button>
+              <button key={n} className={sides === n ? 'primary' : ''} onClick={() => { setSides(n); if (target > n) setTarget(0); }}>D{n}</button>
             ))}
           </div>
         </label>
