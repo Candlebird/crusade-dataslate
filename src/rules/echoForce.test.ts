@@ -7,6 +7,10 @@ import { BIG_UNIT, randomEchoes } from './echoForce';
 const book = normalizeBook(JSON.parse(readFileSync('armies/void-echoes.gf.json', 'utf8')));
 
 describe('random Void Echoes force', () => {
+  it('gives an empty force for a book with no units instead of throwing', () => {
+    expect(randomEchoes({ ...book, units: [] }, 1000)).toEqual([]);
+  });
+
   it('stays within the target and the list limits', () => {
     for (const target of [500, 1000, 2000, 4000]) {
       for (let i = 0; i < 20; i++) {

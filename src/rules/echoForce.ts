@@ -26,6 +26,7 @@ export function randomSelection(cu: CatalogUnit, rand: Rand): Selection {
 export const randomLoadout = (cu: CatalogUnit, rand: Rand) => applySelection(cu, randomSelection(cu, rand));
 
 export function randomEchoes(book: CatalogBook, target: number, rand: Rand = Math.random): Unit[] {
+  if (!book.units.length) return [];
   const maxCost = Math.floor(target * 0.35);
   const maxHeroes = Math.max(1, Math.floor(target / 375));
   const maxCopies = 1 + Math.floor(target / 750);
