@@ -65,6 +65,13 @@ export function moveOf(c: Campaign, force: Force): { move: number; why: string[]
     move += WARLORDS.blitz;
     why.push(`+${WARLORDS.blitz} Warlord (Blitzkrieg)`);
   }
+  // Crossroads Journal marks on the detachment's next order (struck off once used).
+  const round = currentRound(c);
+  for (const m of c.factions.find((f) => f.id === fid)?.marks ?? []) {
+    if (m.kind !== 'order' || !m.move || m.forceId !== force.id || m.from > round || (m.until != null && m.until < round)) continue;
+    move += m.move;
+    why.push(`${m.move > 0 ? '+' : ''}${m.move} ${m.name}`);
+  }
   const event = activeEvent(c);
   if (event?.move) {
     move += event.move;

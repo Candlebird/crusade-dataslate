@@ -1,6 +1,6 @@
 import type { Campaign, CrossroadsJournal, Force, Unit } from '../model/types';
 import {
-  catalystById, complicationById, contextById, eligibleRewards, localOffer, minNothing, skillById, tierCap, validOffer,
+  catalystById, complicationById, contextById, eligibleRewards, localOffer, minNothing, recentRewards, skillById, tierCap, validOffer,
 } from './journal';
 import type { Rand } from './hexmap';
 
@@ -84,5 +84,5 @@ export async function journalEndings(
     const clip = (s: unknown, n: number) => (typeof s === 'string' ? s.slice(0, n) : undefined);
     return { picks: picks.map((p) => ({ rewardId: p.rewardId, title: clip(p.title, 80), text: clip(p.text, 600) })), source: 'claude' };
   }
-  return { picks: localOffer(j, u, forces, rand).map((rewardId) => ({ rewardId })), source: 'tables' };
+  return { picks: localOffer(j, u, forces, rand, recentRewards(c, j.factionId)).map((rewardId) => ({ rewardId })), source: 'tables' };
 }

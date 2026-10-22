@@ -4,6 +4,7 @@ import { CONTEXTS_TABLE } from './journalTables/contexts';
 import { CATALYSTS_TABLE } from './journalTables/catalysts';
 import { COMPLICATIONS_TABLE } from './journalTables/complications';
 import { REWARDS_TABLE } from './journalTables/rewards';
+import { TWISTS_TABLE } from './journalTables/twists';
 
 // Crossroads Journal (Nexus Wars): a short vignette for a faction's Warlord, dealt once a round. Its pieces are drawn
 // from the tables below: a Context (where it happens, picked to suit the sector the Warlord's detachment stands in), a
@@ -23,6 +24,20 @@ export const JOURNAL = {
   minTier: 1,
   /** How many finished journals the campaign keeps. */
   keep: 24, keepOwed: 48,
+  /** Chance a journal gets a twist (one more check after the climax). */
+  twistChance: 0.15,
+  /** Chance a rival Warlord (another faction's) walks through the scene, when there is one. */
+  rivalChance: 0.12,
+  /** Chance a faction with no story thread starts one; and that an open thread comes back in a journal. */
+  threadStart: 0.08, threadResume: 0.5,
+  /** How many of the faction's last contexts, catalysts, complications and endings it won't see again soon. */
+  avoid: { ctx: 8, cat: 12, comp: 8, rew: 10 },
+  /** How many pieces the faction's journal memory keeps. */
+  seenKeep: 60,
+  /** Most quirks a Warlord carries; a new one pushes out the oldest. */
+  maxQuirks: 3,
+  /** How many rounds a sector mark lasts unless the reward says. */
+  sectorRounds: 2,
 } as const;
 
 export type JournalSkillId = 'might' | 'resolve' | 'guile' | 'endurance' | 'speed' | 'lore' | 'command';
@@ -104,6 +119,55 @@ export interface JournalComplication {
 
 export const JOURNAL_COMPLICATIONS: JournalComplication[] = COMPLICATIONS_TABLE;
 
+/** A twist: after the climax the scene turns once more, and the player picks one of `skills` for one more check. */
+export interface JournalTwist {
+  id: string;
+  name: string;
+  text: string;
+  skills: JournalSkillId[];
+}
+
+export const JOURNAL_TWISTS: JournalTwist[] = TWISTS_TABLE;
+
+/** A story thread: a few beats that come back over a faction's journals, and the reward the last one always offers. */
+export interface JournalThread {
+  id: string;
+  name: string;
+  /** The beat each journal on the thread plays, in order (`{rival}`: the rival Warlord's name). */
+  steps: string[];
+  /** The reward (JOURNAL_REWARDS, with `thread` set) the last beat offers. */
+  payoff: string;
+  /** Needs a rival Warlord. */
+  rival?: boolean;
+}
+
+export const JOURNAL_THREADS: JournalThread[] = [
+  {
+    id: 'rival', name: 'A grudge', rival: true, payoff: 'threadRival',
+    steps: [
+      '{rival} has heard of you, and sent a gift: the helmet of one of your sergeants.',
+      'Your scouts find {rival}’s mark burned into every waystation you pass.',
+      'At last word comes of where {rival} will be. This ends now, one way or another.',
+    ],
+  },
+  {
+    id: 'debt', name: 'A debt', payoff: 'threadDebt',
+    steps: [
+      'A shuttle broker offers passage, supplies, anything — all on credit. You signed.',
+      'The broker’s agents have started asking, politely, about the interest.',
+      'The broker comes in person. The debt can be settled today, in coin or in kind.',
+    ],
+  },
+  {
+    id: 'map', name: 'The star-chart', payoff: 'threadMap',
+    steps: [
+      'Among the loot, a fragment of an ancient star-chart, marked with routes nobody uses.',
+      'A second fragment, from a dead navigator’s hand. The routes begin to make sense.',
+      'The last fragment. Laid together, the chart shows the hidden lanes of the whole sector.',
+    ],
+  },
+];
+
 export type JournalTableId = 'salvage' | 'knowledge' | 'void' | 'glory' | 'relics' | 'peril';
 
 export const JOURNAL_TABLES: { id: JournalTableId; name: string }[] = [
@@ -150,3 +214,33 @@ export interface JournalReward {
 }
 
 export const JOURNAL_REWARDS: JournalReward[] = REWARDS_TABLE;
+
+/** What an effect is worth, in Umbra Shards: the yardstick that keeps every reward inside its tier's band. */
+export function effectValue(e: JournalEffect): number {
+  switch (e.kind) {
+    case 'materials': return e.n / 25;
+    case 'research': return e.n / 2;
+    case 'blueprints': return e.n * 3;
+    case 'cores': return e.n * 5;
+    case 'archives': return e.n * 5;
+    case 'threat': return -1.5 * e.n;
+    case 'reveal': return e.n / 3;
+    case 'shards': return e.n;
+    case 'xp': return e.n / 2;
+    case 'relic': return { Common: 2.5, Rare: 4, Legendary: 7 }[e.tier] ?? 0;
+    case 'scar': return -2.5;
+    case 'traitToken': return e.n * 3;
+    case 'mark': {
+      const v = e.mark === 'battle' ? 1.5 : e.mark === 'order' ? Math.abs(e.move ?? 1) * 1.5 : e.mark === 'sector' ? 0.75 * (e.rounds ?? JOURNAL.sectorRounds) : 2;
+      return e.good ? v : -v;
+    }
+  }
+}
+
+export const rewardValue = (r: JournalReward) => r.effects.reduce((n, e) => n + effectValue(e), 0);
+
+/** The value band each tier's rewards must fall in (tier −1 and lower share the first). */
+export function tierBand(tier: number): [number, number] {
+  if (tier <= -1) return [-3, -1];
+  return ([[-2, 0.5], [0.5, 2], [1.5, 4], [3.5, 6]] as [number, number][])[Math.min(tier, 3)];
+}

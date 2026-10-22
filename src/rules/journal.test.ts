@@ -31,6 +31,13 @@ function forces(): Force[] {
   return [a];
 }
 
+/** A plain journal: no twist, rival or story thread (with rand() 0 they'd always come). */
+const deal = (...a: Parameters<typeof dealJournal>) => {
+  const j = dealJournal(...a);
+  if (j) { delete j.twist; delete j.thread; delete j.rival; }
+  return j;
+};
+
 const ids = () => { let n = 0; return () => `id${n++}`; };
 const seq = (...xs: number[]) => { let i = 0; return () => xs[i++ % xs.length]; };
 /** A rand() that rolls this face on a D6. */
@@ -41,10 +48,10 @@ describe('crossroads journal', () => {
     const c = campaign();
     const fs = forces();
     expect(journalBlock(c, 'B')).toMatch(/no Warlord/);
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     expect(j).toMatchObject({ factionId: 'A', round: 2, forceId: 'fA', unitId: 'w', warlord: 'Vex' });
     expect(journalStatus(j)).toBe('play');
-    expect(dealJournal(c, 'A', fs, () => 0, 'j2', '2026-10-21')).toBeUndefined();
+    expect(deal(c, 'A', fs, () => 0, 'j2', '2026-10-21')).toBeUndefined();
   });
 
   it('checks a skill against the stat, with special rules helping', () => {
@@ -60,7 +67,7 @@ describe('crossroads journal', () => {
   it('lets the GM reframe it only before the first roll', () => {
     const c = campaign();
     const fs = forces();
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     expect(reframeJournal(j, { catalyst: 'derelictSignal', note: 'The beacon calls your name.' })).toBe(true);
     expect(reframeJournal(j, { catalyst: 'nope' })).toBe(false);
     rollApproach(j, 'decode', fs[0].units[0], 1, () => face(6));
@@ -72,7 +79,7 @@ describe('crossroads journal', () => {
     const c = campaign();
     const fs = forces();
     const u = fs[0].units[0];
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     reframeJournal(j, { catalyst: 'derelictSignal', complication: 'clock' });
     expect(rollClimax(j, 'might', u, 1, () => face(6))).toBe(false);
     expect(rollApproach(j, 'board', u, 1, () => face(5))).toBe(true);
@@ -94,7 +101,7 @@ describe('crossroads journal', () => {
     const c = campaign();
     const fs = forces();
     const u = fs[0].units[0];
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     reframeJournal(j, { catalyst: 'derelictSignal', complication: 'clock' });
     rollApproach(j, 'board', u, 1, () => face(1));
     chooseComplication(j, 'cut', u, 1, () => face(1));
@@ -114,7 +121,7 @@ describe('crossroads journal', () => {
     const u = fs[0].units[0];
     u.scars = [{ id: 's1', name: 'a' }, { id: 's2', name: 'b' }, { id: 's3', name: 'c' }];
     const c = campaign();
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     j.approach = { id: 'board', roll: { skill: 'might', target: 3, rolls: [6], pass: true } };
     j.climax = { skill: 'might', target: 3, rolls: [6], pass: true };
     expect(eligibleRewards(j, u, fs).some((r) => r.effects.some((e) => e.kind === 'scar'))).toBe(false);
@@ -124,7 +131,7 @@ describe('crossroads journal', () => {
     const c = campaign();
     const fs = forces();
     const u = fs[0].units[0];
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     j.approach = { id: 'board', roll: { skill: 'might', target: 3, rolls: [6], pass: true } };
     j.choice = { id: 'push', roll: { skill: 'speed', target: 4, rolls: [6], pass: true } };
     j.climax = { skill: 'might', target: 3, rolls: [6], pass: true };
@@ -164,7 +171,7 @@ describe('crossroads journal', () => {
   it('takes lost Materials and Umbra Shards only as far as there are any', () => {
     const c = campaign();
     const fs = forces();
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     j.options = [{ rewardId: 'raided', title: 'Raided', text: '' }, { rewardId: 'shardDrain', title: 'Drained', text: '' }];
     expect(pickOption(c, 'j1', 0, fs, '2026-10-22')).toMatch(/−10 Materials/);
     expect(c.sectors[0].bank).toBeUndefined();
@@ -179,7 +186,7 @@ describe('crossroads journal', () => {
   it("keeps an unfinished journal from an earlier round in play, and no new one is dealt until it's done", () => {
     const c = campaign();
     const fs = forces();
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     c.round = 3;
     expect(journalOf(c, 'A')).toBe(j);
     expect(journalBlock(c, 'A')).toMatch(/finish/);
@@ -193,7 +200,7 @@ describe('crossroads journal', () => {
     const c = campaign();
     const fs = forces();
     const u = fs[0].units[0];
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     reframeJournal(j, { catalyst: 'derelictSignal', complication: 'clock' });
     rollApproach(j, 'board', u, 1, () => face(5));
     chooseComplication(j, 'push', u, 1, () => face(1));
@@ -206,7 +213,7 @@ describe('crossroads journal', () => {
   it('never gives shards back to a force that is somehow below zero', () => {
     const c = campaign();
     const fs = forces();
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     j.options = [{ rewardId: 'shardDrain', title: 'Drained', text: '' }];
     pickOption(c, 'j1', 0, fs, '2026-10-22');
     fs[0].umbraShards = -2;
@@ -222,7 +229,7 @@ describe('crossroads journal', () => {
       c.journals.push({ id: `o${i}`, factionId: 'A', round: 1, date: '', forceId: 'fA', unitId: 'w', warlord: 'Vex', context: 'x', catalyst: 'x', complication: 'x', options: [{ rewardId: 'voidBargain', title: '', text: '' }], picked: 0 });
       c.journals.push({ id: `n${i}`, factionId: 'A', round: 1, date: '', forceId: 'fA', unitId: 'w', warlord: 'Vex', context: 'x', catalyst: 'x', complication: 'x', options: [{ rewardId: 'spyNetwork', title: '', text: '' }], picked: 0 });
     }
-    const j = dealJournal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
     j.options = [{ rewardId: 'renown', title: 'R', text: '' }];
     pickOption(c, 'j1', 0, fs, '2026-10-22');
     expect(c.journals.filter((x) => x.id.startsWith('o')).length).toBe(30); // owed: all kept (under keepOwed)

@@ -6,7 +6,7 @@ import { useCloud } from '../cloud/CloudSync';
 import { proxyOf } from '../armyforge/book';
 import {
   canReroll, catalystById, checkTarget, chooseComplication, climaxPenalty, complicationById, contextById, dealJournal, journalBlock,
-  journalOf, journalStatus, journalUnit, journalsOwed, localOffer, makeOffer, payJournal, pickOption, reframeJournal, rerollCheck,
+  journalOf, journalStatus, journalUnit, journalsOwed, localOffer, makeOffer, payJournal, pickOption, recentRewards, reframeJournal, rerollCheck,
   rewardById, rollApproach, rollClimax, skillById, successes, tierCap, type JournalCheck,
 } from '../rules/journal';
 import { journalEndings } from '../rules/journalAi';
@@ -146,7 +146,7 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
     edit((x) => {
       if (makeOffer(x, picks, source, u, state.forces, Math.random, uid)) got = source;
       // Things changed while Claude was writing: the tables pick instead.
-      else if (makeOffer(x, localOffer(x, u, state.forces, Math.random).map((rewardId) => ({ rewardId })), 'tables', u, state.forces, Math.random, uid)) got = 'tables';
+      else if (makeOffer(x, localOffer(x, u, state.forces, Math.random, recentRewards(c, x.factionId)).map((rewardId) => ({ rewardId })), 'tables', u, state.forces, Math.random, uid)) got = 'tables';
     });
     setBusy(false);
     if (!got) toast('The endings could not be drawn.', 'error');
