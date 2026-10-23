@@ -168,7 +168,7 @@ export const NEXUS_TEXT = {
   ],
   guardians: [
     `Guardians: every ${GUARDIANS.types.join(', ')} sector held by the ${ECHOES.name} is watched over by one of their Heroes, with ${GUARDIANS.toughFactor}× its Tough and a relic. The deeper in the map, the stronger: a Common guardian near the homes, Rare further in, Legendary in the far reaches. The relic is of the guardian's tier.`,
-    "The guardian leads the sector's garrison and counts toward its Supply difficulty. Beat the garrison and take the sector, and the guardian's relic is yours. New guardians appear when a round ends.",
+    `The guardian leads the sector's garrison and counts toward its Supply difficulty. Its relic follows the Stealing Relics rule: if one of your Heroes (or a unit with Heroic Rise) kills the guardian, roll a D6, and on a ${GUARDIANS.stealRoll}+ that unit takes the relic. Otherwise it's lost with the guardian. Record who took it with the match. New guardians appear when a round ends.`,
     `Guardian loot: a slain guardian also drops loot, rolled for you when the game is recorded: D6, +${GUARDIAN_LOOT.bonus.Rare} for a Rare guardian, +${GUARDIAN_LOOT.bonus.Legendary} for a Legendary one (${GUARDIAN_LOOT.table.length} at most). Materials go to the bank of the sector it guarded, or your home's if that sector doesn't produce. A Building Expansion is installed on one of your planets from its panel on the map: one more building slot, for good, one per planet.`,
   ],
   marauders: [

@@ -12,7 +12,7 @@ import { randomRelic } from './relicPick';
 // Guardian sites (Nexus Wars). AI-held planets, research stations, anomalies and void sectors are watched over by a
 // guardian: a Void Echoes Hero with a relic and doubled Tough. Its tier (Common/Rare/Legendary) follows how deep in the
 // map the sector sits, and is also the tier of the relic it carries. The guardian leads the sector's garrison, so it
-// counts toward the sector's Supply difficulty. Beat it and take the sector, and its relic is yours.
+// counts toward the sector's Supply difficulty. A Hero that slays it takes its relic on a 3+ (GUARDIANS.stealRoll).
 
 /** The guardian's tier from the sector's threat (0–1). */
 export const guardianTier = (threat: number): RelicTier =>

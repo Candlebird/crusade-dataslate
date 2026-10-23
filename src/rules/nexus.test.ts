@@ -3,7 +3,7 @@ import { newForce, newUnit } from '../model/factory';
 import type { Campaign } from '../model/types';
 import { emptyUnitBattle, resolveBattle, rewardRows, type BattleInput } from './battle';
 import { REWARD_TABLES } from './data';
-import { ECHOES, emptyNexus, homeChallengeBlock, nexusAccess, nexusGeneration, recordSectorGame, removeSectorGame } from './nexus';
+import { ECHOES, RELIC_TAKEN, emptyNexus, homeChallengeBlock, nexusAccess, nexusGeneration, recordSectorGame, removeSectorGame } from './nexus';
 
 function campaign(): Campaign {
   return {
@@ -146,6 +146,29 @@ describe('nexus resolution', () => {
     input.nexusPicks.void = { roll: 3, choice: '', target: '', alloc: {} };
     resolveBattle(f, input, id);
     expect(f.nexus!.traitTokens).toBe(1);
+  });
+
+  it('gives a slain guardian\'s relic only to the Hero that took it', () => {
+    const c = campaign();
+    c.sectors[5] = { ...c.sectors[5], owner: ECHOES.id, guardian: { name: 'Vex the Hollow', tier: 'Common', unit: { ...newUnit(), relics: [{ id: 'r', name: 'Umbra Claw', tier: 'Common' }] } } };
+    const { f, input, id } = setup();
+    const hero = newUnit({ id: 'h', name: 'Captain', category: 'Hero' });
+    f.units.push(hero);
+    input.units.h = emptyUnitBattle(hero);
+    input.nexus = nexusGeneration(c, 'A', 'v', 'win', true);
+    expect(kinds(input.nexus)).toContain('guardian:relicSteal');
+
+    // Not taken: no relic, no warning.
+    expect(resolveBattle(structuredClone(f), input, id).warnings).not.toContainEqual(expect.stringContaining('Vex'));
+    expect(f.units.flatMap((u) => u.relics)).toEqual([]);
+    // Taken by a unit that can't carry relics: a warning.
+    input.nexusPicks = { guardian: { roll: null, choice: RELIC_TAKEN, target: 'a', alloc: {} } };
+    expect(resolveBattle(structuredClone(f), input, id).warnings).toContainEqual(expect.stringContaining('Hero'));
+    // Taken by the Hero.
+    input.nexusPicks.guardian.target = 'h';
+    resolveBattle(f, input, id);
+    expect(hero.relics.map((r) => r.name)).toEqual(['Umbra Claw']);
+    expect(f.units[0].relics).toEqual([]);
   });
 
   it('gates Nexus traits by unlocked table or token', () => {

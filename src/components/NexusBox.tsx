@@ -1,7 +1,8 @@
 import type { Unit } from '../model/types';
 import { CATEGORIES, RELICS } from '../rules/data';
-import { ANOMALY_TABLE, COMBAT_MANIPULATIONS, NEXUS_CRISIS, NEXUS_ROUNDS, ROLL_SIDES, VOID_TABLE, nexusEntry, type NexusItem, type NexusPick } from '../rules/nexus';
-import { relicHolders, relicTaken, rollDie } from '../rules/engine';
+import { ANOMALY_TABLE, COMBAT_MANIPULATIONS, NEXUS_CRISIS, NEXUS_ROUNDS, RELIC_TAKEN, ROLL_SIDES, VOID_TABLE, nexusEntry, type NexusItem, type NexusPick } from '../rules/nexus';
+import { GUARDIANS } from '../rules/nexusData';
+import { relicBearer, relicHolders, relicTaken, rollDie } from '../rules/engine';
 import { useStore } from '../model/store';
 import { unitName } from '../rules/battle';
 import { RelicOption, Stepper } from './ui';
@@ -123,6 +124,17 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
           )}
           <UnitSelect label={e?.free ? `${e.free} for` : 'for'} units={units} value={pick.target} onChange={(target) => setPick({ target })} empty="No units" />
         </div>
+      )}
+      {item.kind === 'relicSteal' && (
+        <>
+          <label className="row small" style={{ marginTop: '0.5rem' }}>
+            <input type="checkbox" checked={pick.choice === RELIC_TAKEN} onChange={(ev) => setPick({ choice: ev.target.checked ? RELIC_TAKEN : '', target: '' })} />
+            A Hero (or Heroic Rise unit) slew the guardian and rolled {GUARDIANS.stealRoll}+ to take {item.relic}
+          </label>
+          {pick.choice === RELIC_TAKEN && (
+            <UnitSelect label="Taken by" units={units.filter(relicBearer)} value={pick.target} onChange={(target) => setPick({ target })} empty="No Heroes" />
+          )}
+        </>
       )}
       {e?.nexusRelic && <p className="muted small" style={{ margin: '0.35rem 0 0' }}>Common Nexus relic — take a Rare one only if no Common one is available.</p>}
     </div>

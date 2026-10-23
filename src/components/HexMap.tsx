@@ -23,7 +23,7 @@ import { detachmentName } from '../rules/detachments';
 import { emblemLayers } from '../model/emblem';
 import { EmblemBadge, EmblemShapes } from './Emblem';
 import { MARAUDER_ID, bandsAt, isRaided, marauderTier, recordMarauderGame } from '../rules/marauders';
-import { BUILDINGS, PRODUCTION } from '../rules/nexusData';
+import { BUILDINGS, GUARDIANS, PRODUCTION } from '../rules/nexusData';
 import { href } from '../route';
 import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 import SectorDanger from './SectorDanger';
@@ -505,7 +505,7 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
         <p className="small" title={g.unit.notes}>
           <span className={`tag${g.tier === 'Legendary' ? ' gold' : g.tier === 'Rare' ? ' red' : ''}`}>♛ {g.tier} guardian</span>{' '}
           <b>{g.name}</b>, a {g.unit.unitType} ({g.unit.points} pts) with doubled Tough{g.unit.relics[0] ? <>, carrying <b>{g.unit.relics[0].name}</b></> : ''}.
-          {' '}It leads the garrison{s.difficulty !== undefined ? <>: <b>{s.difficulty} Supply</b> in all</> : ''}. Take the sector and its relic is yours.
+          {' '}It leads the garrison{s.difficulty !== undefined ? <>: <b>{s.difficulty} Supply</b> in all</> : ''}. Slay it with a Hero and roll {GUARDIANS.stealRoll}+ to take its relic.
         </p>
       )}
       {manage && <ProductionBox s={s} />}
