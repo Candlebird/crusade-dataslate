@@ -8,13 +8,14 @@ import { crisisForfeits, rollEvent, setEvent } from '../rules/events';
 import { detachmentName } from '../rules/detachments';
 import { href } from '../route';
 import {
-  assetName, assetsOf, echoWins, endRound, inGrace, leaders, nextThreat, refundAsset, roundEndText, sectorCounts, spendAsset, spreadsAt, threatOf,
-  underdogBonus, type RoundEnd,
+  assetName, assetsOf, echoWins, endRound, inGrace, leaders, nextThreat, placeEchoMarks, refundAsset, roundEndText, sectorCounts, spendAsset, spreadsAt,
+  threatOf, underdogBonus, type RoundEnd,
 } from '../rules/rounds';
 import { difficultyLevel, difficultyRange, rateSectors } from '../rules/difficulty';
 import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY } from '../rules/nexusData';
 import { Panel, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
+import { breaksLeft, echoMarks, holders } from '../rules/voidspawn';
 
 /** End the current round on a copy of the campaign (the spread is random, so it's rolled once, here) and store the result. */
 export function useEndRound() {
@@ -54,10 +55,33 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
   const event = activeEvent(c);
   const crisis = activeCrisis(c);
   const spreads = Math.max(0, spreadsAt(coming) + (event?.spread ?? 0));
+  // Where the Echoes are massing, and whether the line holds there so far.
+  const marked = c.echoMarks?.round === round;
+  const marks = echoMarks(c).flatMap((m) => {
+    const s = c.sectors.find((x) => x.id === m.sectorId);
+    if (!s || s.owner === ECHOES.id) return [];
+    const by = m.brokenBy ? [m.brokenBy] : holders(c, s, state.forces);
+    return [{ s, by, status: m.brokenBy ? 'broken' : by.length ? 'held' : 'open' }];
+  });
+  const open = marks.filter((m) => m.status === 'open').map((m) => m.s.name);
+  const breakers = c.factions.filter((f) => breaksLeft(c, f.id) > 0);
+  const markNow = () => {
+    let text = '';
+    update((d) => {
+      if (!d.campaign) return;
+      const placed = placeEchoMarks(d.campaign);
+      text = placed.map((m) => d.campaign!.sectors.find((s) => s.id === m.sectorId)?.name).join(', ');
+      d.campaign.updatedAt = nowIso();
+    });
+    toast(text ? `The ${ECHOES.name} are massing at ${text}.` : `The ${ECHOES.name} have nowhere to mass.`);
+  };
 
   const endNow = () => {
     if (!confirmAction(`End round ${round}? Every faction's sector income for the round is fixed now (players claim it on their force page), `
-      + `the ${ECHOES.name}' threat goes to ${coming} and they spread ${spreads} sector${spreads === 1 ? '' : 's'}${grace ? ' (into unclaimed space only)' : ''}.`
+      + (marked
+        ? `the ${ECHOES.name} take ${open.length ? open.join(', ') : 'nothing (the line held everywhere)'}, and their threat goes to ${coming}.`
+        : `the ${ECHOES.name}' threat goes to ${coming} and they spread ${spreads} sector${spreads === 1 ? '' : 's'}${grace ? ' (into unclaimed space only)' : ''}.`)
+      + (breakers.length ? ` ${breakers.map((f) => f.name).join(', ')} still ha${breakers.length === 1 ? 's' : 've'} a mark to break: it goes to their own marked sector.` : '')
       + (crisis && crisis.result !== 'won' ? ` The Nexus Crisis wasn't won: the ${ECHOES.name} take each faction's sector nearest ${lordById(crisis.lord)?.name ?? 'the Lord'}.` : '')
       + (unspent ? ` ${unspent} unspent Strategic Asset${unspent === 1 ? ' is' : 's are'} lost.` : '')
       + ' Claimed space hulks drift off and new points of interest appear on the map, and a Galactic Event is rolled for the next round.'
@@ -95,8 +119,31 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
         <span className="tag red" title={`Up ${NEXUS_ROUNDS.threatPerRound} each round, down ${NEXUS_ROUNDS.threatPerWin} per Battle won against them (${NEXUS_ROUNDS.threatPerVoidspawnWin} at a Voidspawn) and ${NEXUS_ROUNDS.threatPerPatrolWin} per patrol (a skirmish won against them)`}>
           ☣ {ECHOES.name} threat {threat}/{NEXUS_ROUNDS.threatMax}
         </span>
-        <span className="muted">If the round ended now: threat {coming}, spreading {spreads} sector{spreads === 1 ? '' : 's'}{ahead.size ? ', most likely into the leader\'s space' : ''}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>
+        {marked
+          ? <span className="muted">If the round ended now: threat {coming}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>
+          : <span className="muted">If the round ended now: threat {coming}, spreading {spreads} sector{spreads === 1 ? '' : 's'}{ahead.size ? ', most likely into the leader\'s space' : ''}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>}
+        {gm && !marked && (
+          <button className="small" onClick={markNow} title={`Show where the ${ECHOES.name} will spread when this round ends, so the players can hold the line`}>⚠ Mark their targets</button>
+        )}
       </div>
+      {marked && (
+        <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}
+          title={`Each falls when the round ends, unless a detachment of its own faction (anyone's, if it's unclaimed) stands there, or a faction that won a Battle against the ${ECHOES.name} this round breaks the mark`}>
+          <span className="muted">⚠ The {ECHOES.name} are massing:</span>
+          {!marks.length && <span className="muted">nowhere this round.</span>}
+          {marks.map(({ s, by, status }) => (
+            <span key={s.id} className={`tag ${status === 'open' ? 'red' : 'green'}`}>
+              {s.name}{s.owner ? ` (${factionName(c, s.owner)})` : ''}
+              {status === 'held' ? ` · held by ${by.map((id) => factionName(c, id)).join(', ')}` : status === 'broken' ? ` · broken by ${factionName(c, by[0])}` : ' · falls'}
+            </span>
+          ))}
+          {breakers.map((f) => (
+            <span key={f.id} className="tag gold" title={`Won a Battle against the ${ECHOES.name}: break a mark from the sector's panel on the map`}>
+              {f.name} can break {breaksLeft(c, f.id)}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
         <span className="tag" title={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}, × ${difficultyLevel(c).scale} for ${difficultyLevel(c).name} difficulty; rescaled when the round ends`}>
           Sector difficulty {range.min}–{range.max} Supply

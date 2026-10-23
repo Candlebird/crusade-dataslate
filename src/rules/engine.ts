@@ -59,6 +59,9 @@ export function relicTierAllowed(tier: RelicTier, xp: number): boolean {
   return xp >= RELIC_TIER_MIN_XP[tier];
 }
 
+/** Can this unit carry relics: a Hero, or a unit with Heroic Rise. */
+export const relicBearer = (u: Unit | undefined) => !!u && (u.category === 'Hero' || !!u.heroicRise);
+
 export interface RelicHolder {
   forceId: string;
   unitId: string;

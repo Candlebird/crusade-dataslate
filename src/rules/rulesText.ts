@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { BOUNTY, ECHOES, DIFFICULTY_LEVELS, FOG, GAME_NIGHT, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_DUELS, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP, WARLORDS } from './nexusData';
+import { BOUNTY, ECHOES, ECHO_MARKS, DIFFICULTY_LEVELS, FOG, GAME_NIGHT, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_DUELS, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP, WARLORDS } from './nexusData';
 import { FEATS, rewardText } from './feats';
 import { EXPEDITION, GARRISON, MENTORING, PROJECT_DIE, PROJECTS, RECON, SOLO_PATROL, SORTIE, SORTIE_QUIRKS, SORTIE_TRINKETS, TRAINING, type ExpeditionCheck } from './downtimeData';
 
@@ -111,8 +111,10 @@ export const NEXUS_TEXT = {
   ],
   echoes: [
     `The ${ECHOES.name} are the AI's faction. They hold the Voidspawn sectors, which can be attacked but never taken, and spread out from their territory into neighbouring sectors when a round ends.`,
-    `Their threat starts at ${R.threatStart} and runs from 0 to ${R.threatMax}. When a round ends it rises by ${R.threatPerRound}, then falls by ${R.threatPerWin} for every Battle won against the Echoes that round (${R.threatPerVoidspawnWin} for a win at a Voidspawn) and ${R.threatPerPatrolWin} for every patrol. The new threat sets how many sectors they spread into.`,
-    `They go after whoever is ahead: sectors held by the faction with the most sectors are ${R.leaderWeight} times as likely to be hit. In the opening rounds (rounds 1–${R.graceRounds}) they only spread into unclaimed sectors.`,
+    `They show their hand first: when a round begins, the sectors they'll take at its end are marked ⚠ on the map (and listed in the turn report). A marked sector falls when the round ends unless the line is held there.`,
+    `Hold the line: a detachment of the sector's own faction standing in it when the round ends keeps the ${ECHOES.name} out (in an unclaimed sector, anyone's detachment will do). Or win a Battle against the ${ECHOES.name}: each win breaks ${ECHO_MARKS.breaksPerWin === 1 ? 'one mark' : `${ECHO_MARKS.breaksPerWin} marks`} anywhere on the map, yours or a neighbour's. A break you haven't spent by the round's end goes to your own marked sector. A mark the ${ECHOES.name} no longer border, or one an Echo Ward covers, fades.`,
+    `Their threat starts at ${R.threatStart} and runs from 0 to ${R.threatMax}. When a round ends it rises by ${R.threatPerRound}, then falls by ${R.threatPerWin} for every Battle won against the Echoes that round (${R.threatPerVoidspawnWin} for a win at a Voidspawn) and ${R.threatPerPatrolWin} for every patrol. The new threat sets how many sectors they mark for the next round.`,
+    `They go after whoever is ahead: sectors held by the faction with the most sectors are ${R.leaderWeight} times as likely to be marked. In the opening rounds (rounds 1–${R.graceRounds}) they only mark unclaimed sectors.`,
     `Bounty: retaking a sector from the ${ECHOES.name} earns a free roll on the AI special table, on top of the match rewards.`,
   ],
   events: [

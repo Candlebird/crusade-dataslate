@@ -32,7 +32,7 @@ function campaign(): Campaign {
 function roundEnd(over: Partial<Omit<RoundEnd, 'report'>> = {}): Omit<RoundEnd, 'report'> {
   return {
     round: 2, threatBefore: 3, threat: 3, wins: 0, voidspawnWins: 0, patrols: 0,
-    spread: [], cleared: [], fresh: [], production: [], research: [], built: [], guardians: [],
+    spread: [], marks: [], marked: [], cleared: [], fresh: [], production: [], research: [], built: [], guardians: [],
     marauders: { raids: [], spawned: [] },
     ...over,
   };

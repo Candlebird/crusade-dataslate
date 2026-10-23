@@ -78,6 +78,16 @@ export const NEXUS_ROUNDS = {
   keepRounds: 8,
 };
 
+/**
+ * Echo marks (rules/voidspawn.ts): when a round begins, the sectors the Echoes will spread into at its end are marked on
+ * the map (how many: NEXUS_ROUNDS.spreadsByThreat). A mark falls unless a detachment of the sector's faction stands there
+ * when the round ends, or a faction that won a Battle against the Echoes this round breaks it.
+ */
+export const ECHO_MARKS = {
+  /** Marks a faction may break for every Battle it won against the Echoes this round. */
+  breaksPerWin: 1,
+};
+
 /** Nexus Duels: player-against-player battles for a wager (rules/duels.ts). */
 export const NEXUS_DUELS = {
   /** Settled duels the campaign keeps to look back on. */
@@ -467,7 +477,7 @@ export interface GuardianLoot {
 }
 
 /**
- * Guardian loot: on top of its relic, a slain guardian drops one roll on this table, D6 plus its tier's bonus (6 at
+ * Guardian loot: on top of the chance at its relic, a slain guardian drops one roll on this table, D6 plus its tier's bonus (6 at
  * most). Materials go to the bank of the sector it guarded, if that produces, or else to the faction's home. The
  * Building Expansion is the only way to give a planet a third building slot.
  */
@@ -536,7 +546,8 @@ export const HERO_OFFERS = {
 /**
  * Guardians: every AI-held planet, research station, anomaly, void sector and Lost Archive is guarded by a Void Echoes hero with a
  * relic and twice its Tough. Its tier follows the sector's threat (sectorThreat, 0–1): under `rare` Common, under
- * `legendary` Rare, Legendary above. Beat the garrison and the guardian's relic is yours, with a roll on GUARDIAN_LOOT.
+ * `legendary` Rare, Legendary above. Beat the garrison for a roll on GUARDIAN_LOOT; the guardian's relic is only taken
+ * by a Hero (or Heroic Rise unit) that slays it and rolls `stealRoll`+ (players roll it; the app just records it).
  */
 export const GUARDIANS = {
   types: ['planet', 'research', 'anomaly', 'void', 'archive'] as SectorType[],
@@ -546,6 +557,8 @@ export const GUARDIANS = {
   toughFactor: 2,
   /** XP the guardian has, so its relic tier is legal. */
   xp: { Common: 20, Rare: 60, Legendary: 90 },
+  /** D6 a Hero (or a unit with Heroic Rise) that slays the guardian needs to take its relic: the Stealing Relics rule. */
+  stealRoll: 3,
   titles: ['the Hollow', 'the Unbound', 'of the Last Light', 'the Shard-Eater', 'the Whispering', 'the Starless', 'of the Ninth Echo', 'the Undying', 'the Pale', 'Who Was Once'],
   names: ['Vaelrith', 'Orsk', 'Myrrhena', 'Calvaxis', 'Thul', 'Ezhrael', 'Nocturn', 'Isk-Arreth', 'Seraphon', 'Ghaul'],
 };

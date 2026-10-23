@@ -9,6 +9,7 @@ import { moveOf, moveTargets, positionOf } from '../rules/movement';
 import { HOLD, applyMoves, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
 import { nowIso } from '../model/factory';
 import { spreadsAt, nextThreat } from '../rules/rounds';
+import { echoMarks, holders } from '../rules/voidspawn';
 import { href } from '../route';
 import { useEndRound } from './RoundPanel';
 import { Panel, confirmAction, toast } from './ui';
@@ -100,7 +101,13 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
   const openNext = () => {
     if (!confirmAction('Open orders for the next game? These orders will be hidden again.')) return;
     const spreads = spreadsAt(nextThreat(c));
-    if (confirmAction(`Also end round ${currentRound(c)}? Sector income is fixed for the round and the ${ECHOES.name} spread ${spreads} sector${spreads === 1 ? '' : 's'}. Cancel to keep playing this round.`)) endRound();
+    const exposed = echoMarks(c).filter((m) => {
+      const s = c.sectors.find((x) => x.id === m.sectorId);
+      return s && !m.brokenBy && !holders(c, s).length;
+    }).length;
+    const take = c.echoMarks?.round === currentRound(c)
+      ? `the ${ECHOES.name} take ${exposed} marked sector${exposed === 1 ? '' : 's'} nobody holds` : `the ${ECHOES.name} spread ${spreads} sector${spreads === 1 ? '' : 's'}`;
+    if (confirmAction(`Also end round ${currentRound(c)}? Sector income is fixed for the round and ${take}. Cancel to keep playing this round.`)) endRound();
     open();
   };
   const reveal = () => {

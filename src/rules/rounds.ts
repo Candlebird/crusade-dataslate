@@ -1,5 +1,5 @@
 import { uid } from '../model/factory';
-import type { AssetUse, Campaign, CatalogBook, Force, ForceNexus, HeroOffer, Marauder, RoundSnapshot, Sector, TurnReport } from '../model/types';
+import type { AssetUse, Campaign, CatalogBook, EchoMark, Force, ForceNexus, HeroOffer, Marauder, RoundSnapshot, Sector, TurnReport } from '../model/types';
 import { CATEGORIES } from './data';
 import { refreshSectors, type Rand } from './hexmap';
 import {
@@ -7,7 +7,7 @@ import {
   WARLORDS, factionName, incomeItems, lordById, type NexusItem, type NexusPick,
 } from './nexus';
 import { crisisRound, placeCrisis, rollEvent, settleCrisis, type CrisisEnd } from './events';
-import { pickSpread, spreadInto } from './voidspawn';
+import { pickSpread, resolveMarks, type MarkEnd } from './voidspawn';
 import { factionClaimedRound } from './detachments';
 import { rateSectors } from './difficulty';
 import { explore } from './fog';
@@ -28,7 +28,8 @@ import type { FinishedBattle } from './tracker';
 // a Strategic Asset, and one against the Echoes is a patrol). The round closes with the Battle: the sealed-order attacks.
 // The GM then ends the round:
 //  - every faction's holdings are noted, and each force claims that round's sector income whenever its player is ready,
-//  - the Void Echoes' threat moves (up each round, down for every win against them), and they spread that many sectors,
+//  - the Void Echoes take the sectors marked when the round began, unless the line was held (voidspawn.ts), and their
+//    threat moves (up each round, down for every win against them),
 //  - unspent Strategic Assets are lost,
 //  - claimed space hulks and Lost Archives fade and new points of interest turn up (refreshSectors, hexmap.ts),
 //  - every sector's difficulty is rescaled to the factions' current Supply, and AI garrisons roll new modifiers,
@@ -36,6 +37,7 @@ import type { FinishedBattle } from './tracker';
 //    time (events.ts),
 //  - planets bank their Materials (production.ts), factions earn Research (tech.ts), every faction's map is explored (fog.ts), wandering heroes come and
 //    go (heroes.ts) and AI-held sites get guardians (guardians.ts), given the forces and army books,
+//  - the Echoes mark the next round's targets, as many as their new threat says (placeEchoMarks),
 //  - and the round's turn report is written (report.ts).
 // Values live in NEXUS_ROUNDS (nexusData.ts).
 
@@ -130,6 +132,26 @@ export function refundAsset(c: Campaign, id: string) {
   c.assetsSpent = (c.assetsSpent ?? []).filter((a) => a.id !== id);
 }
 
+/**
+ * Mark where the Echoes will spread when the current round ends: as many sectors as the threat (and the Galactic Event)
+ * says, picked from their frontier. They go for whoever is ahead and are drawn to an Umbral Spire; an Echo Ward keeps
+ * them out, and while the campaign is young they only mark unclaimed space.
+ */
+export function placeEchoMarks(c: Campaign, rand: Rand = Math.random, threat = threatOf(c)): EchoMark[] {
+  const ahead = new Set(leaders(c));
+  const weight = (s: Sector) =>
+    (s.owner && ahead.has(s.owner) ? NEXUS_ROUNDS.leaderWeight : 1) * (s.owner && buildingsHeld(c, s.owner, 'spire') ? PRODUCTION.spire.weight : 1);
+  const marks: EchoMark[] = [];
+  const only = (s: Sector) => (!inGrace(c) || !s.owner) && !warded(c, s) && !marks.some((m) => m.sectorId === s.id);
+  for (let i = 0; i < Math.max(0, spreadsAt(threat) + (activeEvent(c)?.spread ?? 0)); i++) {
+    const target = pickSpread(c, rand, weight, only);
+    if (!target) break;
+    marks.push({ sectorId: target.id });
+  }
+  c.echoMarks = { round: currentRound(c), marks };
+  return marks;
+}
+
 export interface RoundEnd {
   round: number;
   threatBefore: number;
@@ -137,7 +159,12 @@ export interface RoundEnd {
   wins: number;
   voidspawnWins: number;
   patrols: number;
+  /** The sectors the Echoes took. */
   spread: Sector[];
+  /** How each of the round's marks ended. */
+  marks: MarkEnd[];
+  /** The sectors marked for the next round. */
+  marked: Sector[];
   /** The new range of sector ratings, when the forces were given to rescale them. */
   difficulty?: { min: number; max: number };
   /** Claimed space hulks and Lost Archives that faded, as they were. */
@@ -199,18 +226,11 @@ export function endRound(
   // The Crisis, unless it was won, takes a sector from everyone.
   const crisis = settleCrisis(c, date);
 
-  // The Echoes go for whoever is ahead; while the campaign is young, they only take unclaimed space.
-  const ahead = new Set(leaders(c));
-  // An Umbral Spire draws them to its owner; an Echo Ward keeps them out.
-  const weight = (s: Sector) =>
-    (s.owner && ahead.has(s.owner) ? NEXUS_ROUNDS.leaderWeight : 1) * (s.owner && buildingsHeld(c, s.owner, 'spire') ? PRODUCTION.spire.weight : 1);
-  const only = (s: Sector) => (!inGrace(c) || !s.owner) && !warded(c, s);
-  const spread: Sector[] = [];
-  for (let i = 0; i < Math.max(0, spreadsAt(threat) + (event?.spread ?? 0)); i++) {
-    const target = pickSpread(c, rand, weight, only);
-    if (!target || !spreadInto(c, target.id, date)) break;
-    spread.push(target);
-  }
+  // The Echoes take the round's marked sectors, unless the line was held. A campaign from before marks rolls them now.
+  const marked = c.echoMarks?.round === round ? c.echoMarks.marks : placeEchoMarks(c, rand, threat);
+  const marks = resolveMarks(c, marked, date, forces);
+  const spread = marks.filter((m) => m.result === 'fell').map((m) => m.sector);
+  delete c.echoMarks;
 
   c.rounds = [...(c.rounds ?? []), snapshot].slice(-NEXUS_ROUNDS.keepRounds);
   c.threat = threat;
@@ -228,6 +248,8 @@ export function endRound(
   let newCrisis: RoundEnd['newCrisis'];
   if (crisisRound(c.round) && placeCrisis(c, rand))
     newCrisis = { lord: lordById(c.crisis!.lord)?.name ?? '', sectorName: c.sectors.find((s) => s.id === c.crisis!.sectorId)?.name ?? '' };
+  // …and where the Echoes mass for it.
+  const next = placeEchoMarks(c, rand, threat).map((m) => c.sectors.find((s) => s.id === m.sectorId)!);
   // Detachments in sectors that drifted off or changed hands fall back.
   regroup(c);
   explore(c);
@@ -237,7 +259,7 @@ export function endRound(
   // Claimed bounties (and ones whose target is gone) make way for new ones.
   const posted = BOUNTY.enabled ? refreshBounties(c, rand, uid) : [];
   const end: Omit<RoundEnd, 'report'> = {
-    round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, difficulty, cleared, fresh,
+    round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, marks, marked: next, difficulty, cleared, fresh,
     event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, research, built, offers, guardians, marauders, warlords,
   };
   const report = buildReport(c, end, { production, research, built, offers, guardians }, date, rand);
@@ -253,6 +275,11 @@ export function roundEndText(c: Campaign, r: RoundEnd) {
     return g.length ? ` ${what}${g.length === 1 ? '' : 's'} ${did}: ${g.map((s) => s.name).join(', ')}.` : '';
   };
   const where = r.spread.length ? `spread to ${r.spread.map((s) => s.name).join(', ')}` : 'did not spread';
+  const names = (ms: MarkEnd[]) => ms.map((m) => m.sector.name).join(', ');
+  const stood = (r.marks ?? []).filter((m) => m.result === 'held' || m.result === 'broken');
+  const faded = (r.marks ?? []).filter((m) => m.result === 'cutOff' || m.result === 'warded');
+  const lines = `${stood.length ? ` The line held at ${names(stood)}.` : ''}${faded.length ? ` Their push on ${names(faded)} came to nothing.` : ''}`;
+  const massing = r.marked?.length ? ` The ${ECHOES.name} are massing at ${r.marked.map((s) => s.name).join(', ')}.` : '';
   const crisis = !r.crisis ? ''
     : r.crisis.result === 'won' ? ` The Nexus Crisis was won: ${r.crisis.lord} is beaten.`
     : ` The Nexus Crisis was lost: ${r.crisis.lord} took ${r.crisis.lost.map((s) => s.name).join(', ') || 'nothing'}.`;
@@ -263,7 +290,7 @@ export function roundEndText(c: Campaign, r: RoundEnd) {
     : ` ${x.band} raided ${x.sector} (−${x.stolen} Materials${x.garrison ? ', halved by its garrison' : ''}).`).join('');
   const bands = r.marauders.spawned.map((m) => ` Marauders! ${m.name} (${m.strength} Supply) turned up at ${sector(m.sectorId)}.`).join('');
   const lords = (r.warlords?.lost ?? []).map((w) => ` ${factionName(c, w.factionId)} lost its Warlord, ${w.name}.`).join('');
-  return `Round ${r.round} ended.${crisis} ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${gone('void', 'Space hulk', 'drifted off')}${gone('archive', 'Lost Archive', 'faded')}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''}${raids}${bands}${lords} Round ${currentRound(c)} begins.${next}`;
+  return `Round ${r.round} ended.${crisis} ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${lines}${gone('void', 'Space hulk', 'drifted off')}${gone('archive', 'Lost Archive', 'faded')}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''}${raids}${bands}${lords} Round ${currentRound(c)} begins.${next}${massing}`;
 }
 
 /**

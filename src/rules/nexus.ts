@@ -1,7 +1,7 @@
 import type { BattleResult, Campaign, CampaignEvent, Force, ForceNexus, Sector, SectorGuardian } from '../model/types';
 import { CATEGORIES, type Category } from './data';
 import {
-  ANOMALY_TABLE, BENEFITS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, GUARDIAN_LOOT, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRONGHOLDS, VOID_TABLE, WARLORDS,
+  ANOMALY_TABLE, BENEFITS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, GUARDIANS, GUARDIAN_LOOT, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRONGHOLDS, VOID_TABLE, WARLORDS,
   type GalacticEvent, type NexusTableEntry,
 } from './nexusData';
 import { explore } from './fog';
@@ -210,7 +210,7 @@ export function removeSectorGame(c: Campaign, id: string) {
 
 // ---- income and after-match generation ----
 
-export type NexusItemKind = 'us' | 'supply' | 'shardRoll' | 'relicRoll' | 'research' | 'manipulation' | 'anomaly' | 'void' | 'matchBonus' | 'relic' | 'medicae';
+export type NexusItemKind = 'us' | 'supply' | 'shardRoll' | 'relicRoll' | 'research' | 'manipulation' | 'anomaly' | 'void' | 'matchBonus' | 'relic' | 'relicSteal' | 'medicae';
 
 export interface NexusItem {
   key: string;
@@ -218,9 +218,12 @@ export interface NexusItem {
   source: string;
   us?: number;
   supply?: number;
-  /** kind 'relic': this relic and no other (a slain guardian's). */
+  /** kind 'relic': this relic and no other. kind 'relicSteal': the slain guardian's relic, if a Hero took it. */
   relic?: string;
 }
+
+/** A 'relicSteal' pick's `choice` when the relic was taken (a Hero slew the guardian and made the roll). */
+export const RELIC_TAKEN = 'taken';
 
 export interface NexusPick {
   roll: number | null;
@@ -371,8 +374,10 @@ export function nexusGeneration(
   const guardian = fought && won && vsAi ? slainGuardian(c, factionId, fought) : undefined;
   if (guardian) {
     const relic = guardian.unit.relics[0];
-    if (relic) items.push({ key: 'guardian', kind: 'relic', source: `${guardian.name}, guardian of ${fought!.name}: ${relic.name}`, relic: relic.name });
-    notes.push(`Slew ${guardian.name}, the ${guardian.tier} guardian of ${fought!.name}${relic ? `: ${relic.name} is yours to give a unit` : ''}.`);
+    if (relic) items.push({ key: 'guardian', kind: 'relicSteal', source: `${guardian.name}, guardian of ${fought!.name}: ${relic.name}`, relic: relic.name });
+    notes.push(`Slew ${guardian.name}, the ${guardian.tier} guardian of ${fought!.name}${relic
+      ? `. If one of your Heroes (or a Heroic Rise unit) dealt the killing blow and rolled ${GUARDIANS.stealRoll}+, it took ${relic.name}`
+      : ''}.`);
   }
   if (fought && won && vsAi && retookFromEchoes(c, factionId, fought)) {
     ctx.bounty = true;

@@ -10,7 +10,7 @@ import {
 import {
   BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, activeCrisis, activeEvent, benefitOf, factionColor, factionName, homeChallengeBlock, isStronghold, lordById, sidesOf, stormed,
 } from '../rules/nexus';
-import { pickSpread, spreadInto, spreadTargets } from '../rules/voidspawn';
+import { breakMark, breaksLeft, holders, markOn, pickSpread, restoreMark, spreadInto, spreadTargets } from '../rules/voidspawn';
 import { aiDefended, rateSectors } from '../rules/difficulty';
 import {
   bankCap, build, buildBlock, buildCost, buildingById, buildingSlots, cancelBuilding, coreBlock, demolish, exchange, exchangeBlock, freeSlots, hasBuilding, installCore,
@@ -355,6 +355,9 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                     {stormed(c, s.id) && <text x={p.x} y={p.y - 17} className="hex-mark"><title>{activeEvent(c)?.name}: can't be attacked this round</title>🌀</text>}
                     {activeCrisis(c)?.sectorId === s.id && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name}</title>☠</text>}
                     {s.guardian && <text x={p.x + 15} y={p.y - 17} className="hex-mark"><title>Guardian: {s.guardian.name} ({s.guardian.tier})</title>♛</text>}
+                    {markOn(c, s.id) && !markOn(c, s.id)!.brokenBy && (
+                      <text x={p.x + 19} y={p.y + 13} className="hex-mark hex-echo"><title>{MARK_TIP}</title>⚠</text>
+                    )}
                     {s.difficulty !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff"><title>AI garrison: {s.difficulty} Supply</title>{s.difficulty}</text>}
                     {/* Detachments: your own always, anyone else's only while you can see the sector. */}
                     {(() => {
@@ -494,6 +497,7 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
         {stormed(c, s.id) && <span className="tag red">🌀 {activeEvent(c)?.name}: can't be attacked this round</span>}
         {activeCrisis(c)?.sectorId === s.id && <span className="tag red">☠ Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name} rises here</span>}
         {isRaided(c, s) && <span className="tag red">🏴 Raided: produces nothing this round</span>}
+        <EchoMarkTag c={c} s={s} gm={gm} viewer={viewer} setC={setC} />
       </div>
       <p className="small">{benefit ? <><b>{benefit.name}:</b> {benefit.desc}</> : SECTOR_TYPES[s.type].desc}</p>
       <SectorDanger s={s} />
@@ -919,8 +923,42 @@ const MAP_EXPORT_CSS = `
   .hex-empty .hex-glyph { fill: #666; }
   .hex-name { fill: #d9d4c7; font: 600 7.5px 'Segoe UI', sans-serif; text-anchor: middle; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }
   .hex-mark { fill: #d9d4c7; font: 11px sans-serif; text-anchor: middle; }
+  .hex-echo { fill: #e05a4a; font-size: 13px; }
   .hex-force-n { fill: #07080b; font: 700 8px sans-serif; text-anchor: middle; }
 `;
+
+const MARK_TIP = `The ${ECHOES.name} are massing here. It falls when the round ends unless a detachment of yours stands here `
+  + `or someone wins a Battle against the ${ECHOES.name} and breaks the mark.`;
+
+/** A sector the Echoes have marked: who's holding the line, and a way to break the mark with a Battle won against them. */
+function EchoMarkTag({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: boolean; viewer: string; setC: SetC }) {
+  const forces = useStore().state.forces;
+  const m = markOn(c, s.id);
+  if (!m || s.owner === ECHOES.id) return null;
+  const held = holders(c, s, forces);
+  // The GM breaks for whoever has a break to spend; a player only for their own faction.
+  const can = c.factions.filter((f) => (gm || f.id === viewer) && breaksLeft(c, f.id) > 0);
+  const breakIt = (factionId: string) => {
+    setC((d) => void breakMark(d, s.id, factionId));
+    toast(`${factionName(c, factionId)} broke the ${ECHOES.name}' mark on ${s.name}.`);
+  };
+  if (m.brokenBy)
+    return <>
+      <span className="tag green">🛡 Mark broken by {factionName(c, m.brokenBy)}: the {ECHOES.name} won't take it this round</span>
+      {gm && <button className="small" onClick={() => setC((d) => restoreMark(d, s.id))} title="Undo the break">Restore mark</button>}
+    </>;
+  return <>
+    <span className={`tag ${held.length ? 'green' : 'red'}`} title={MARK_TIP}>
+      ⚠ The {ECHOES.name} are massing here{held.length ? `: ${held.map((id) => factionName(c, id)).join(', ')} hold${held.length === 1 ? 's' : ''} the line` : ': it falls when the round ends'}
+    </span>
+    {!held.length && can.map((f) => (
+      <button key={f.id} className="small" onClick={() => breakIt(f.id)}
+        title={`${f.name} won a Battle against the ${ECHOES.name} this round: spend it to keep them out of ${s.name}`}>
+        Break this mark{gm && can.length > 1 ? ` (${f.name})` : ''}
+      </button>
+    ))}
+  </>;
+}
 
 /** Let the Void Echoes spread one sector by hand (the Echoes also spread when the GM ends a round). */
 function SpreadButton({ c, setC }: { c: Campaign; setC: SetC }) {

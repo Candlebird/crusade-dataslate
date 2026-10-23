@@ -11,8 +11,8 @@ import {
   type RewardEntry,
   type RewardTableKey,
 } from './data';
-import { applyScar, levelForXp, previousBracketXp, sufferingRolls, type DeathOutcome, type ScarResult } from './engine';
-import { MANIPULATION_PREFIX, NEXUS_ROUNDS, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
+import { applyScar, levelForXp, previousBracketXp, relicBearer, sufferingRolls, type DeathOutcome, type ScarResult } from './engine';
+import { MANIPULATION_PREFIX, NEXUS_ROUNDS, RELIC_TAKEN, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
 
 // Post-battle resolution ("Gaining Experience", "Gaining RP", "Deaths").
 // resolveBattle() mutates a force draft, so the wizard can preview on a clone and apply the same code for real.
@@ -296,6 +296,11 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
           break;
         case 'relic':
           relic(src, pick, item.relic);
+          break;
+        case 'relicSteal':
+          if (pick.choice !== RELIC_TAKEN) nexusLines.push(`${src}: not taken.`);
+          else if (!relicBearer(byId.get(pick.target))) warnings.push(`${src}: choose the Hero (or Heroic Rise unit) that took it.`);
+          else relicGains.push({ unitId: pick.target, name: item.relic! });
           break;
         case 'relicRoll':
           if (!pick.roll) warnings.push(`${src}: not rolled yet.`);

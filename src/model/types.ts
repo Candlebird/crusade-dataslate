@@ -571,6 +571,13 @@ export interface CampaignEvent {
   marauder?: Marauder;
 }
 
+/** A sector the Void Echoes are massing against: it falls when the round ends unless the line is held. */
+export interface EchoMark {
+  sectorId: string;
+  /** The faction that broke it with a Battle won against the Echoes. */
+  brokenBy?: string;
+}
+
 /** What each faction held when a round ended: round income is paid from this. */
 export interface RoundSnapshot {
   round: number;
@@ -608,6 +615,8 @@ export interface Campaign {
   rounds?: RoundSnapshot[];
   /** Strategic Assets spent this round (cleared when the round ends, with any left unspent). */
   assetsSpent?: AssetUse[];
+  /** Where the Void Echoes are massing: the sectors they take when `round` ends (rules/voidspawn.ts). */
+  echoMarks?: { round: number; marks: EchoMark[] };
   /** The Galactic Event for a round (GALACTIC_EVENTS, nexusData.ts); it only counts while `round` is the current round. */
   event?: GalacticEventState;
   /** The Nexus Crisis: an Echo Lord every faction must fight together before the round ends. */

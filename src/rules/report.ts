@@ -50,6 +50,17 @@ const TEXT = {
     'The {echoes} swallowed {sector}{from}.',
     'Darkness rolled over {sector}{from}. The {echoes} hold it now.',
   ],
+  spreadYours: ['You let {sector} fall: the {echoes} hold it now.', 'Nobody stood at {sector} when the {echoes} came. It is theirs now.'],
+  heldYours: ['Your detachment held {sector} against the {echoes}.', 'The {echoes} came for {sector}, and your detachment was waiting.'],
+  heldTheirs: ['{holder} held the line at {sector}: the {echoes} were turned back.'],
+  heldOpen: ['Your detachment kept the {echoes} out of {sector}.'],
+  brokenYours: ["You broke the {echoes}' mark on {sector}: they will not take it this round."],
+  brokenAuto: ['Your victory over the {echoes} kept them out of {sector}.'],
+  brokenTheirs: ["{holder} broke the {echoes}' mark on {sector}."],
+  cutOff: ['The {echoes} massing at {sector} were cut off and scattered.'],
+  warded: ['An Echo Ward turned the {echoes} away from {sector}.'],
+  massingYours: ['The {echoes} are massing at {sector}. Stand a detachment there, or win a Battle against them and break the mark, or it falls.'],
+  massing: ['The {echoes} are massing at {sector}.'],
   threatUp: ['The {echoes} grow bolder: threat rose to {threat}.'],
   threatDown: ['The {echoes} falter: threat fell to {threat}.'],
   threatSame: ['The {echoes} watch and wait: threat holds at {threat}.'],
@@ -150,10 +161,27 @@ export function buildReport(c: Campaign, r: Omit<RoundEnd, 'report'>, x: ReportE
   // The Echoes.
   const threat = r.threat > r.threatBefore ? TEXT.threatUp : r.threat < r.threatBefore ? TEXT.threatDown : TEXT.threatSame;
   lines.push({ icon: '☠', text: say(rand, threat, { echoes: ECHOES.name, threat: r.threat }) });
-  for (const s of r.spread) {
-    const lost = c.log.find((e) => e.spread && e.sectorId === s.id && (e.round ?? 1) === r.round)?.undo?.owner;
-    const from = lost && lost !== ECHOES.id ? ` from ${factionName(c, lost)}` : '';
-    at(s.id, [lost], { icon: '☠', text: say(rand, TEXT.spread, { echoes: ECHOES.name, sector: s.name, from }) });
+  // A line for the factions it happened to, and another for everyone else who saw it.
+  const told = (sectorId: string, to: string[], mine: TurnReportLine, theirs?: TurnReportLine) => {
+    for (const id of to) lines.push({ ...mine, sectorId, factions: [id] });
+    if (!theirs) return;
+    const rest = (watchers(c, sectorId, [], sight) ?? c.factions.map((f) => f.id)).filter((id) => !to.includes(id));
+    if (rest.length) lines.push({ ...theirs, sectorId, ...(rest.length < c.factions.length ? { factions: rest } : {}) });
+  };
+  const real = (id: string | undefined): id is string => !!id && c.factions.some((f) => f.id === id);
+  for (const m of r.marks ?? []) {
+    const s = m.sector;
+    const vars = { echoes: ECHOES.name, sector: s.name, holder: m.by.map((id) => factionName(c, id)).join(' and ') };
+    const owner = real(m.owner) ? [m.owner] : [];
+    if (m.result === 'fell') {
+      const from = owner.length ? ` from ${factionName(c, m.owner)}` : '';
+      told(s.id, owner, { icon: '☠', text: say(rand, TEXT.spreadYours, vars) }, { icon: '☠', text: say(rand, TEXT.spread, { ...vars, from }) });
+    } else if (m.result === 'held') {
+      if (owner.length) told(s.id, owner, { icon: '🛡', text: say(rand, TEXT.heldYours, vars) }, { icon: '🛡', text: say(rand, TEXT.heldTheirs, vars) });
+      else told(s.id, m.by.filter(real), { icon: '🛡', text: say(rand, TEXT.heldOpen, vars) }, { icon: '🛡', text: say(rand, TEXT.heldTheirs, vars) });
+    } else if (m.result === 'broken') {
+      told(s.id, m.by.filter(real), { icon: '🛡', text: say(rand, m.auto ? TEXT.brokenAuto : TEXT.brokenYours, vars) }, { icon: '🛡', text: say(rand, TEXT.brokenTheirs, vars) });
+    } else at(s.id, owner, { icon: '✧', text: say(rand, m.result === 'cutOff' ? TEXT.cutOff : TEXT.warded, vars) });
   }
   for (const s of x.guardians ?? [])
     at(s.id, [], { icon: '♛', text: say(rand, TEXT.guardian, { guardian: s.guardian!.name, tier: s.guardian!.tier, sector: s.name }) });
@@ -198,6 +226,10 @@ export function buildReport(c: Campaign, r: Omit<RoundEnd, 'report'>, x: ReportE
   // What's coming.
   if (r.nextEvent) lines.push({ icon: '✺', text: `Galactic event: ${eventById(r.nextEvent)?.name ?? r.nextEvent}.` });
   if (r.newCrisis) lines.push({ icon: '☄', text: `Nexus Crisis! ${r.newCrisis.lord} rises at ${r.newCrisis.sectorName}.` });
+  for (const s of r.marked ?? []) {
+    const vars = { echoes: ECHOES.name, sector: s.name };
+    told(s.id, real(s.owner) ? [s.owner] : [], { icon: '⚠', text: say(rand, TEXT.massingYours, vars) }, { icon: '⚠', text: say(rand, TEXT.massing, vars) });
+  }
 
   const report: TurnReport = { round: r.round, date, lines };
   c.reports = [...(c.reports ?? []), report].slice(-NEXUS_ROUNDS.keepRounds);
