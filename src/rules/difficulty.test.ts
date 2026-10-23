@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newForce } from '../model/factory';
 import type { Campaign, Sector } from '../model/types';
-import { difficultyRange, factionSupply, rateSectors, sectorThreat } from './difficulty';
+import { difficultyRange, factionSupply, rateSectors, ratingFor, sectorThreat } from './difficulty';
 import { cells, colOf, defaultCounts, defaultMap, generateMap, hexDistance, isConnected, isPlaced, refreshSectors, rng, type Hex } from './hexmap';
 import { ECHOES, emptyNexus } from './nexus';
 import { NEXUS_DIFFICULTY, NEXUS_MAP, SECTOR_MODIFIERS } from './nexusData';
@@ -111,6 +111,19 @@ describe('sector difficulty', () => {
     const close = planets.reduce((a, b) => (hexDistance(home, a as Hex) < hexDistance(home, b as Hex) ? a : b));
     expect(sectorThreat(c, close)).toBeLessThan(sectorThreat(c, c.sectors.find((s) => s.type === 'voidspawn')!));
     expect(Math.min(...rated.map((s) => s.difficulty!))).toBeLessThan(800);
+  });
+
+  it("rates each sector on each faction's own scale, so the leader's growth doesn't price out the rest", () => {
+    const c = generate(campaign(), 'a1');
+    rateSectors(c, [force('A', 4000), force('B', 1000)], rng('x'));
+    const rated = c.sectors.filter((s) => s.type !== 'home' && s.type !== 'voidspawn');
+    expect(rated.every((s) => ratingFor(s, 'A')! >= ratingFor(s, 'B')!)).toBe(true);
+    expect(Math.max(...rated.map((s) => ratingFor(s, 'B')!))).toBeLessThanOrEqual(difficultyRange(c, [force('B', 1000)]).max);
+    expect(Math.max(...rated.map((s) => ratingFor(s, 'A')!))).toBeGreaterThan(1500);
+    // Without a faction (the GM's view), it's the biggest faction's scale; the Voidspawn is everyone's top.
+    expect(rated.every((s) => ratingFor(s) === s.ratings!.A)).toBe(true);
+    const vs = c.sectors.find((s) => s.type === 'voidspawn')!;
+    expect(ratingFor(vs, 'B')).toBe(vs.difficulty);
   });
 
   it('rolls one modifier, two on hard sectors, all different', () => {

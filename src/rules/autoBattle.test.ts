@@ -64,6 +64,13 @@ describe('auto-battle', () => {
     expect(wins.filter((w) => w === 'A').length).toBeGreaterThanOrEqual(8);
   });
 
+  it('judges by the share of each army lost, so a bigger army is not punished for offering more to kill', () => {
+    const big = Array.from({ length: 12 }, () => squad());
+    const wins = Array.from({ length: 20 }, (_, i) => autoBattle(fightersOf(battle(big, big.slice(0, 6).map(() => squad())), []), seeded(i + 1)));
+    expect(wins.filter((r) => r.winner === 'A').length).toBeGreaterThanOrEqual(16);
+    for (const r of wins.filter((x) => x.winner === 'A')) expect(r.lost.B! - r.lost.A!).toBeGreaterThan(AUTO_BATTLE.drawMargin);
+  });
+
   it('applies losses, kill XP and the winner to the battle', () => {
     const elite = squad({ quality: 2, defense: 2, weapons: [{ ...rifle, attacks: 4, rules: ['AP(3)'] }] });
     const b = battle([elite], [squad()]);

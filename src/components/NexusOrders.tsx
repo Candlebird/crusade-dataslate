@@ -3,7 +3,7 @@ import { useCloud } from '../cloud/CloudSync';
 import { useStore } from '../model/store';
 import type { Campaign, Force } from '../model/types';
 import { detachmentName } from '../rules/detachments';
-import { aiDefended } from '../rules/difficulty';
+import { aiDefended, ratingFor } from '../rules/difficulty';
 import { ECHOES, currentRound, factionName } from '../rules/nexus';
 import { moveOf, moveTargets, positionOf } from '../rules/movement';
 import { HOLD, applyMoves, digsIn, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
@@ -15,7 +15,8 @@ import { callMeeting, meetingBattle, meetingState, meetings, settleMeeting, unse
 import type { AutoResult } from '../rules/autoBattle';
 import type { TrackedBattle } from '../rules/tracker';
 import AutoBattleModal from './AutoBattleModal';
-import { href } from '../route';
+import { go, href } from '../route';
+import { attackBattle, overrunBlock } from '../rules/overrun';
 import { useEndRound } from './RoundPanel';
 import { Panel, confirmAction, toast } from './ui';
 
@@ -149,7 +150,10 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
                   )}
                   {attacks.length > 0 && (
                     <optgroup label="Attack">
-                      {attacks.map((s) => <option key={s.id} value={s.id}>{s.name} ({factionName(c, s.owner)}){s.difficulty !== undefined && aiDefended(s) ? ` — ${s.difficulty} Supply` : ''}</option>)}
+                      {attacks.map((s) => {
+                        const rating = aiDefended(s) ? ratingFor(s, f.nexus!.factionId) : undefined;
+                        return <option key={s.id} value={s.id}>{s.name} ({factionName(c, s.owner)}){rating !== undefined ? ` — ${rating} Supply` : ''}{overrunBlock(s, f) ? '' : ' · ⚡ can overrun'}</option>;
+                      })}
                     </optgroup>
                   )}
                 </select>
@@ -181,6 +185,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
 
 function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerOrders[]; round: number; gm: boolean }) {
   const { state, update } = useStore();
+  const cloud = useCloud();
   const { attacks, moves, holds } = revealOrders(c, orders, round, state.forces);
   const moved = c.movedOrders === round;
   const met = moved ? [] : meetings(c, { moves }, state.forces);
@@ -204,6 +209,13 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
     return !!f && digsIn(c, f);
   };
   const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
+  // Off the table: set the attack up on the tracker for its auto-battle; finishing it there logs it like any battle.
+  const autoBattle = (a: (typeof attacks)[number]) => {
+    if (state.battle) return toast('A battle is already running on the tracker: finish or discard it first.');
+    update((s) => void (s.battle = attackBattle(c, a, s.forces, s.books, s.settings)));
+    go(href.tracker());
+    toast('Set up on the tracker: press ⚡ Auto-battle, then finish the battle to log the result.');
+  };
   if (!attacks.length && !moves.length && !holds.length) return <p className="muted small">Nobody declared this round.</p>;
   return (
     <>
@@ -228,6 +240,10 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
       )}
       {attacks.map((a) => {
         const fought = foughtFor(c, a, currentRound(c)); // games are logged by campaign round, not by orders #
+        const sector = c.sectors.find((s) => s.id === a.sectorId);
+        const force = state.forces.find((f) => f.id === a.forceId);
+        const block = sector ? overrunBlock(sector, force) : 'the sector is gone';
+        const mine = gm || (!!cloud.email && force?.owner === cloud.email);
         return (
           <div key={a.forceId ?? a.factionId} className="list-item small">
             <span className="grow">
@@ -237,7 +253,14 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
             {fought ? (
               <span className="tag green" title={fought.notes || undefined}>✓ Fought: {fought.winner ? `${factionName(c, fought.winner)} won` : 'a draw'}</span>
             ) : (
-              <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}>⚔ Start battle</a>
+              <span className="row" style={{ gap: 4 }}>
+                <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}>⚔ Start battle</a>
+                {!block && mine ? (
+                  <button className="small" onClick={() => autoBattle(a)} title="The garrison is small enough to settle on the auto-battle instead of at the table. It can still go wrong.">⚡ Overrun</button>
+                ) : gm && sector ? (
+                  <button className="small" onClick={() => autoBattle(a)} title={`GM fallback, for an attack nobody can play at the table (no overrun: ${block})`}>🎲 Auto-battle</button>
+                ) : null}
+              </span>
             )}
           </div>
         );

@@ -5,7 +5,7 @@ import { emptyUnitBattle, unitName, type BattleInput } from './battle';
 import { NEXUS_CRISIS, activeEvent, benefitOf, ECHOES, factionName, lordById, ORGANIZED_STRIKE, ownedSectors } from './nexus';
 import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
 import { aiStyleFor, type AiStyle } from './aiTrees';
-import { aiDefended, modifierOf } from './difficulty';
+import { aiDefended, modifierOf, ratingFor } from './difficulty';
 import { isReinforced } from './production';
 import { unitsBusy } from './tasks';
 
@@ -306,7 +306,8 @@ export function nexusNotes(b: TrackedBattle, c: Campaign | undefined, forces: Fo
     const defenders = b.sides.filter((x) => x.team !== b.attacker);
     if (isReinforced(sector) && defenders.length)
       notes.push(`${defenders.map((x) => x.name).join(' & ')} ${defenders.length > 1 ? 'defend' : 'defends'} a Reinforced sector: +200 Supply Limit.`);
-    if (sector.difficulty !== undefined && aiDefended(sector)) notes.push(`${sector.name}'s AI garrison: ${sector.difficulty} Supply.`);
+    const rating = c && ratingFor(sector, teamFaction(b, b.attacker, c, forces));
+    if (rating !== undefined && aiDefended(sector)) notes.push(`${sector.name}'s AI garrison: ${rating} Supply.`);
     for (const m of (sector.modifiers ?? []).map(modifierOf)) if (m) notes.push(`Sector modifier, ${m.name}: ${m.desc}`);
     for (const x of membersOf(b, b.attacker))
       if (x.manipulations.some((m) => m.text.startsWith(ORGANIZED_STRIKE))) notes.push(`${x.name} attacks with an Organized Strike: +200 Supply Limit.`);
@@ -379,7 +380,9 @@ export function sectorGame(b: TrackedBattle, c: Campaign | undefined, forces: Fo
   if (w !== 'draw' && !won) return { problem: `${teamName(b, w)} won but isn't playing for a Nexus faction, so the map can't tell who takes ${sector.name}.` };
   if (standIn && won === ECHOES.id) won = standIn;
   const sc = score(b);
-  const notes = `${b.mission.name}: ${teamsOf(b).map((t) => `${teamName(b, t)} ${sc[t]!.total}`).join(', ')} VP.`
+  const notes = (b.auto
+    ? `Auto-battle: ${teamsOf(b).map((t) => `${teamName(b, t)} dealt ${b.auto!.dealt[t] ?? 0}`).join(', ')} pts.`
+    : `${b.mission.name}: ${teamsOf(b).map((t) => `${teamName(b, t)} ${sc[t]!.total}`).join(', ')} VP.`)
     + (standIn ? ` The ${ECHOES.name} stood in for ${factionName(c, standIn)}.` : '');
   const forceId = membersOf(b, b.attacker).map((x) => forces.find((f) => f.id === x.forceId)).find((f) => f?.nexus?.factionId === attacker)?.id;
   return { event: { sectorId: sector.id, attacker, defender, winner: won, notes, battleId: b.id, ...(forceId ? { forceId } : {}) } };

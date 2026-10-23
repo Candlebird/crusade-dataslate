@@ -17,8 +17,8 @@ export const AUTO_BATTLE = {
   luck: 0.5,
   /** A melee target that survives strikes back with this share of its own melee. */
   strikeBack: 0.5,
-  /** Within this share of the larger side's points destroyed, it's a draw. */
-  drawMargin: 0.1,
+  /** The side that lost the smaller share of its own points wins; within this many percentage points of each other, it's a draw. */
+  drawMargin: 0.05,
   /** Each crusade level adds this much to Attack and Defense. */
   perLevel: 0.03,
   hero: 0.05,
@@ -140,6 +140,8 @@ export interface AutoResult {
   moves: Move[];
   /** Points of enemy destroyed per team, counting partly-killed units by the wounds they lost. */
   dealt: Partial<Record<TeamKey, number>>;
+  /** The share (0–1) of its own points each team lost. */
+  lost: Partial<Record<TeamKey, number>>;
   winner: TeamKey | 'draw';
 }
 
@@ -705,15 +707,20 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
     }
     first = (first + 1) % teams.length;
   }
+  const dealtTo = (xs: Fighter[]) => xs.reduce((n, f) => n + (f.points * (start.find((s) => s.key === f.key)!.hp - f.hp)) / f.maxHp, 0);
   const dealt: Partial<Record<TeamKey, number>> = {};
+  for (const t of teams) dealt[t] = Math.round(dealtTo(fighters.filter((f) => f.team !== t)));
+  // Judged by the share of its own army each team lost, not points destroyed: a bigger army offers more to kill,
+  // and would otherwise lose fights it plainly won.
+  const lost: Partial<Record<TeamKey, number>> = {};
   for (const t of teams) {
-    dealt[t] = Math.round(fighters.filter((f) => f.team !== t).reduce((n, f) => n + (f.points * (start.find((s) => s.key === f.key)!.hp - f.hp)) / f.maxHp, 0));
+    const mine = fighters.filter((f) => f.team === t);
+    const total = mine.reduce((n, f) => n + f.points, 0);
+    lost[t] = total ? (dealtTo(mine) / total) : 1;
   }
-  // In a free-for-all, every team's losses are shared among its enemies; the most points destroyed wins.
-  const order = [...teams].sort((a, b) => dealt[b]! - dealt[a]!);
-  const top = dealt[order[0]]!;
-  const draw = order.length > 1 && top - dealt[order[1]]! <= Math.max(1, top * AUTO_BATTLE.drawMargin);
-  return { fighters, moves, dealt, winner: draw ? 'draw' : order[0] };
+  const order = [...teams].sort((a, b) => lost[a]! - lost[b]!);
+  const draw = order.length > 1 && lost[order[1]]! - lost[order[0]]! <= AUTO_BATTLE.drawMargin;
+  return { fighters, moves, dealt, lost, winner: draw ? 'draw' : order[0] };
 }
 
 /** Write the outcome onto the tracked battle: wounds, losses and kill XP, and who won. It's then recorded like any other battle. */

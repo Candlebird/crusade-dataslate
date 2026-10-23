@@ -11,7 +11,7 @@ import {
   BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, activeCrisis, activeEvent, benefitOf, factionColor, factionName, homeChallengeBlock, isStronghold, lordById, sidesOf, stormed,
 } from '../rules/nexus';
 import { breakMark, breaksLeft, holders, markOn, pickSpread, restoreMark, spreadInto, spreadTargets } from '../rules/voidspawn';
-import { aiDefended, rateSectors } from '../rules/difficulty';
+import { aiDefended, rateSectors, ratingFor } from '../rules/difficulty';
 import {
   bankCap, build, buildBlock, buildCost, buildingById, buildingSlots, cancelBuilding, coreBlock, demolish, exchange, exchangeBlock, freeSlots, hasBuilding, installCore,
   isReinforced, produces, productionRate, tradeBonus, type ExchangeTrade,
@@ -362,7 +362,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                     {markOn(c, s.id) && !markOn(c, s.id)!.brokenBy && (
                       <text x={p.x + 19} y={p.y + 13} className="hex-mark hex-echo"><title>{MARK_TIP}</title>⚠</text>
                     )}
-                    {s.difficulty !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff"><title>AI garrison: {s.difficulty} Supply</title>{s.difficulty}</text>}
+                    {ratingFor(s, viewAs) !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff"><title>AI garrison{viewAs ? ` for ${factionName(c, viewAs)}` : " (the biggest faction's scale)"}: {ratingFor(s, viewAs)} Supply</title>{ratingFor(s, viewAs)}</text>}
                     {/* Detachments: your own always, anyone else's only while you can see the sector. */}
                     {(() => {
                       const here = (posted.get(s.id) ?? []).filter((f) => !viewAs || known === 'visible' || f.nexus?.factionId === viewAs);
@@ -521,12 +521,12 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
         <EchoMarkTag c={c} s={s} gm={gm} viewer={viewer} setC={setC} />
       </div>
       <p className="small">{benefit ? <><b>{benefit.name}:</b> {benefit.desc}</> : SECTOR_TYPES[s.type].desc}</p>
-      <SectorDanger s={s} />
+      <SectorDanger s={s} factionId={viewer} />
       {g && (
         <p className="small" title={g.unit.notes}>
           <span className={`tag${g.tier === 'Legendary' ? ' gold' : g.tier === 'Rare' ? ' red' : ''}`}>♛ {g.tier} guardian</span>{' '}
           <b>{g.name}</b>, a {g.unit.unitType} ({g.unit.points} pts) with doubled Tough{g.unit.relics[0] ? <>, carrying <b>{g.unit.relics[0].name}</b></> : ''}.
-          {' '}It leads the garrison{s.difficulty !== undefined ? <>: <b>{s.difficulty} Supply</b> in all</> : ''}. Slay it with a Hero and roll {GUARDIANS.stealRoll}+ to take its relic.
+          {' '}It leads the garrison{ratingFor(s, viewer) !== undefined ? <>: <b>{ratingFor(s, viewer)} Supply</b> in all</> : ''}. Slay it with a Hero and roll {GUARDIANS.stealRoll}+ to take its relic.
         </p>
       )}
       {manage && <ProductionBox s={s} />}

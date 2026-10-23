@@ -417,8 +417,11 @@ export interface Sector {
   reinforced?: boolean;
   /** Void one-off reward already taken. */
   rewardClaimed?: boolean;
-  /** Nexus Wars difficulty: the Supply of the AI garrison holding it, recalculated each round (rules/difficulty). */
+  /** Nexus Wars difficulty: the Supply of the AI garrison holding it, recalculated each round (rules/difficulty). On the
+   *  biggest faction's scale; each faction faces its own rating (`ratings`). */
   difficulty?: number;
+  /** The rating each faction faces here, scaled to its own total Supply (rules/difficulty ratingFor). */
+  ratings?: Record<string, number>;
   /** Sector modifier ids (SECTOR_MODIFIERS) that favour its defender. */
   modifiers?: string[];
   /** Axial hex coordinates on the campaign map; unset = not placed. */

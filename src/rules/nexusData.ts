@@ -676,3 +676,10 @@ export const BOUNTY_KINDS: { id: BountyKind; name: string; desc: string; difficu
   { id: 'noHero', name: 'No heroes', desc: 'Win a game tracked in the battle tracker with no Hero in your army.', difficulty: 2 },
   { id: 'void', name: 'Into the Void', desc: 'Beat the Void Echoes at their Voidspawn, {sector}.', difficulty: 3 },
 ];
+
+/**
+ * Overrun (rules/overrun.ts): a detachment may settle an attack on a weak AI garrison by auto-battle instead of at
+ * the table. It reaches garrisons up to `share` of its Supply Limit, and `upper` of what it has past `knee`, so
+ * 1000 → 700, 2000 → 1400, 4000 → 3000. Rounded down to `step`.
+ */
+export const OVERRUN = { share: 0.7, upper: 0.8, knee: 2000, step: 100 };

@@ -107,8 +107,8 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
           <p className="auto-result">
             <b>{result.winner === 'draw' ? 'A draw.' : `${teamName(b, result.winner)} wins.`}</b>{' '}
             <span className="muted">
-              Points destroyed: {teams.map((t) => `${teamName(b, t)} ${result.dealt[t] ?? 0}`).join(', ')}.
-              Within {AUTO_BATTLE.drawMargin * 100}% of each other is a draw.
+              Army lost: {teams.map((t) => `${teamName(b, t)} ${Math.round((result.lost[t] ?? 0) * 100)}%`).join(', ')}.
+              The side that lost the smaller share wins; within {AUTO_BATTLE.drawMargin * 100} points of each other is a draw.
             </span>
           </p>
         )}

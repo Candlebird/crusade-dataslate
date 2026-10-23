@@ -444,6 +444,7 @@ export function refreshSectors(c: Campaign, rand: Rand = Math.random, hulks = 0)
     delete s.rewardClaimed;
     delete s.modifiers;
     delete s.difficulty;
+    delete s.ratings;
   }
 
   const map = c.map;
@@ -493,6 +494,7 @@ export function refreshSectors(c: Campaign, rand: Rand = Math.random, hulks = 0)
     delete s.rewardClaimed;
     delete s.modifiers;
     delete s.difficulty;
+    delete s.ratings;
     fresh.push(s);
   };
   homes.forEach((h, i) => {

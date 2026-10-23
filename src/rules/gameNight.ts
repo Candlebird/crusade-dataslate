@@ -1,6 +1,6 @@
 import type { Campaign, Force } from '../model/types';
 import { factionForces, supplyLimit } from './detachments';
-import { aiDefended } from './difficulty';
+import { aiDefended, ratingFor } from './difficulty';
 import { hexDistance, isPlaced, type Rand } from './hexmap';
 import { ATTACK_DEFEND_MISSIONS, rollAdvancedMission, type MissionDef } from './missions';
 import { ECHOES, currentRound, factionName } from './nexus';
@@ -65,7 +65,7 @@ export function planNight(c: Campaign, forces: Force[], attacks: Attack[], comin
     const base = { forceId: a.forceId, sectorId: s.id, mission: attackMission(), notes };
     seated.add(a.factionId);
     if (aiDefended(s)) {
-      tables.push({ ...base, kind: s.guardian ? 'guardian' : 'ai', factions: [a.factionId], points: s.difficulty ?? points,
+      tables.push({ ...base, kind: s.guardian ? 'guardian' : 'ai', factions: [a.factionId], points: ratingFor(s, a.factionId) ?? points,
         foe: s.guardian ? `${s.guardian.name} (guardian)` : s.owner ? ECHOES.name : 'The sector\'s defenders' });
       continue;
     }
