@@ -131,7 +131,7 @@ describe('sortie', () => {
     expect(gunReach(run, front, gunOf(front, 'CCW'))).toBe(1);
     expect(gunReach(run, front, gunOf(front, 'Rifles'))).toBe(2);
     expect(gunReach(run, mid, gunOf(mid, 'Sword'))).toBe(0);
-    expect(gunReach(run, mid, gunOf(mid, 'Pistol'))).toBe(0);
+    expect(gunReach(run, mid, gunOf(mid, 'Pistol'))).toBe(1);
     expect(gunReach(run, back, gunOf(back, 'Sniper Rifle'))).toBe(1);
     mid.slot = 0;
     expect(gunReach(run, mid, gunOf(mid, 'Pistol'))).toBe(1);

@@ -1169,7 +1169,8 @@ export function gunReach(run: SortieRun, s: SortieSquad, g: Gun): number {
   if (!s.echo && c && c.outflank[s.key] === c.round) return SORTIE.ranks;
   const band = SORTIE.ranges.find(([r]) => g.range <= r)?.[1] ?? SORTIE.ranks;
   if (s.echo) return band;
-  return clamp(band + (has(run, 'cells') ? 1 : 0) + (has(run, 'spotter') && slotOf(s) === 2 ? 1 : 0) - slotOf(s), 0, SORTIE.ranks);
+  // Any gun reaches Close from the Middle, so a 12" one isn't dead weight there.
+  return clamp(Math.max(slotOf(s) === 1 ? 1 : 0, band + (has(run, 'cells') ? 1 : 0) + (has(run, 'spotter') && slotOf(s) === 2 ? 1 : 0) - slotOf(s)), 0, SORTIE.ranks);
 }
 export const chargeReach = (run: SortieRun, s: SortieSquad) => SORTIE.chargeReach + (!s.echo && has(run, 'packs') ? 1 : 0);
 
