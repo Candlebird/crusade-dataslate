@@ -389,6 +389,7 @@ export function resolveRoundIncome(
           } else out.warnings.push(`${src}: choose a scar to remove.`);
         }
         if (e.unlockAll) n.tempTables = 'all';
+        if (e.traitToken) n.traitTokens += 1;
         if (!e.us && !e.supply && !e.removeScar) out.lines.push(label);
         break;
       }

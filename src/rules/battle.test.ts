@@ -59,7 +59,7 @@ describe('battle resolution', () => {
 
   it('adds sub-table, suffering and risky gamble rows', () => {
     const { input } = setup();
-    input.rewards.main = { roll: 6, alloc: {}, target: '' };
+    input.rewards.main = { roll: 10, alloc: {}, target: '' };
     input.agendas = ['Risky Gamble'];
     expect(rewardRows(input).map((r) => r.key)).toEqual(['main', 'main/sub', 'gamble']);
     input.result = 'loss';

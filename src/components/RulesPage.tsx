@@ -198,7 +198,7 @@ function CrusadeRules() {
       </Section>
 
       <Section id="r-rewards" title="Reward tables">
-        <p className="muted small" style={{ marginTop: 0 }}>Roll a D6.</p>
+        <p className="muted small" style={{ marginTop: 0 }}>Roll a D10. Umbra Shards, trait tokens and Combat Manipulations are Nexus Wars rewards; a force outside Nexus Wars re-rolls trait tokens and Combat Manipulations.</p>
         {rewardKeys.map((k) => <Rolls key={k} title={REWARD_TABLES[k].label} entries={REWARD_TABLES[k].entries} />)}
       </Section>
 
@@ -394,7 +394,7 @@ function NexusRules() {
 
       <Section id="n-crisis" title="The Nexus Crisis">
         <Prose lines={NEXUS_TEXT.crisis} />
-        <Entries title="Echo Lords (D6)" roll entries={ECHO_LORDS} />
+        <Entries title={`Echo Lords (D${ECHO_LORDS.length})`} roll entries={ECHO_LORDS} />
       </Section>
 
       <Section id="n-downtime" title="Downtime: Expeditions & Solo patrols">
@@ -442,7 +442,7 @@ function NexusRules() {
       <Section id="n-heroes" title="Wandering heroes & guardians">
         <Prose lines={NEXUS_TEXT.heroes} />
         <Prose lines={NEXUS_TEXT.guardians} />
-        <Entries title="Guardian loot (D6 + tier bonus)" roll entries={GUARDIAN_LOOT.table.map((l) => ({ name: l.name, desc: l.desc }))} />
+        <Entries title="Guardian loot (D10 + tier bonus)" roll entries={GUARDIAN_LOOT.table.map((l) => ({ name: l.name, desc: l.desc }))} />
       </Section>
 
       <Section id="n-marauders" title="Marauders">
@@ -465,8 +465,8 @@ function NexusRules() {
       </Section>
 
       <Section id="n-tables" title="Anomaly & Void tables">
-        <Rolls title="Anomaly table (each round)" entries={ANOMALY_TABLE} />
-        <Rolls title="Void / Space hulk table (once, for beating the AI there)" entries={VOID_TABLE} />
+        <Rolls title="Anomaly table (D10, each round)" entries={ANOMALY_TABLE} />
+        <Rolls title="Void / Space hulk table (D10, once, for beating the AI there)" entries={VOID_TABLE} />
       </Section>
 
       <Section id="n-shop" title="Umbra Shard shop">

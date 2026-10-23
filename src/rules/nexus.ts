@@ -106,7 +106,7 @@ export function rollGuardianLoot(c: Campaign, s: Sector, g: Pick<SectorGuardian,
   const f = c.factions.find((x) => x.id === factionId);
   if (!f) return undefined;
   const T = GUARDIAN_LOOT.table;
-  const roll = Math.min(T.length, 1 + Math.floor(rand() * 6) + (GUARDIAN_LOOT.bonus[g.tier as keyof typeof GUARDIAN_LOOT.bonus] ?? 0));
+  const roll = Math.min(T.length, 1 + Math.floor(rand() * 10) + (GUARDIAN_LOOT.bonus[g.tier as keyof typeof GUARDIAN_LOOT.bonus] ?? 0));
   const l = T[roll - 1];
   const loot: NonNullable<CampaignEvent['loot']> = { roll, id: l.id, name: l.name, factionId };
   if (l.id === 'materials') {
@@ -399,7 +399,7 @@ function crisisGeneration(c: Campaign, won: boolean, forceId: string | undefined
   return { items, notes, round: crisis.round };
 }
 
-export const ROLL_SIDES: Partial<Record<NexusItemKind, number>> = { shardRoll: 6, relicRoll: 6, anomaly: 6, void: 6 };
+export const ROLL_SIDES: Partial<Record<NexusItemKind, number>> = { shardRoll: 6, relicRoll: 6, anomaly: ANOMALY_TABLE.length, void: VOID_TABLE.length };
 
 /** A Medicae Ward's round income: no roll. */
 export const MEDICAE_ENTRY: NexusTableEntry = { text: 'Remove 1 battle scar from a unit', removeScar: true };

@@ -8,8 +8,8 @@ export const SECTOR_TYPES: Record<SectorType, { label: string; desc: string }> =
   home: { label: 'Home sector', desc: 'Each faction has one. It can be attacked but never controlled.' },
   planet: { label: 'Planet', desc: 'Gives one benefit to whoever controls it.' },
   research: { label: 'Research station', desc: 'Each round, unlock one Nexus Traits table until your next round income.' },
-  void: { label: 'Void / Space hulk', desc: 'Defeat an AI opponent here for a one-off D6 reward. Salvage: +25 Supply each round while you hold it.' },
-  anomaly: { label: 'Anomaly', desc: 'Roll a D6 on the Anomaly table each round.' },
+  void: { label: 'Void / Space hulk', desc: 'Defeat an AI opponent here for a one-off D10 reward. Salvage: +25 Supply each round while you hold it.' },
+  anomaly: { label: 'Anomaly', desc: 'Roll a D10 on the Anomaly table each round.' },
   empty: { label: 'Empty space', desc: 'No benefit.' },
   archive: { label: 'Lost Archive', desc: "A guarded vault of forgotten designs; there's never more than one. Beat its garrison to take it and an Archive unlock: research any one building, even one whose requirements you don't know. Plundered, it fades from the map when the round ends." },
   voidspawn: { label: 'Voidspawn', desc: "The Void Echoes' home sector. It can be attacked but never controlled. When a round ends the Echoes spread from their territory; beating them here lowers their threat the most." },
@@ -116,6 +116,7 @@ export interface NexusTableEntry {
   nexusRelic?: boolean;
 }
 
+/** D10 (the die is the table's length; ROLL_SIDES in nexus.ts). */
 export const ANOMALY_TABLE: NexusTableEntry[] = [
   { text: '+3 Umbra Shards', us: 3 },
   { text: '+6 Umbra Shards', us: 6 },
@@ -123,6 +124,10 @@ export const ANOMALY_TABLE: NexusTableEntry[] = [
   { text: '+100 Supply', supply: 100 },
   { text: 'Remove 1 battle scar from a unit', removeScar: true },
   { text: 'All Nexus tables unlocked until your next round income', unlockAll: true },
+  { text: '+3 Umbra Shards and +50 Supply', us: 3, supply: 50 },
+  { text: 'A Nexus trait token (any Nexus trait when a unit levels up)', traitToken: true },
+  { text: '+9 Umbra Shards', us: 9 },
+  { text: '+100 Supply and +3 Umbra Shards', supply: 100, us: 3 },
 ];
 
 export const VOID_TABLE: NexusTableEntry[] = [
@@ -132,6 +137,10 @@ export const VOID_TABLE: NexusTableEntry[] = [
   { text: '+6 Umbra Shards', us: 6 },
   { text: 'One free weapon upgrade', free: 'Free weapon upgrade' },
   { text: 'A Common Nexus Relic (Rare if none is available)', nexusRelic: true },
+  { text: '+100 Supply and +3 Umbra Shards', supply: 100, us: 3 },
+  { text: 'One free upgrade', free: 'Free upgrade' },
+  { text: '9 XP to distribute', xp: 9 },
+  { text: 'Remove 1 battle scar from a unit and +3 Umbra Shards', removeScar: true, us: 3 },
 ];
 
 export const COMBAT_MANIPULATIONS = [
@@ -311,7 +320,7 @@ export const NEXUS_CRISIS = {
   lordVp: 3,
 };
 
-/** The Echo Lords (D6). The Lord is the Echoes' most expensive unit in the Crisis battle, with these rules on top. (Ids are saved; rename names only.) */
+/** The Echo Lords (D10). The Lord is the Echoes' most expensive unit in the Crisis battle, with these rules on top. (Ids are saved; rename names only.) */
 export const ECHO_LORDS: { id: string; name: string; desc: string }[] = [
   { id: 'devourer', name: 'The Devourer', desc: 'Regeneration. Whenever it destroys a unit in melee, it heals D3 wounds.' },
   { id: 'hollowKing', name: 'The Hollow King', desc: 'Fear(2). Enemy units within 12″ get −1 to Morale tests.' },
@@ -319,6 +328,10 @@ export const ECHO_LORDS: { id: string; name: string; desc: string }[] = [
   { id: 'broodmother', name: 'The Broodmother', desc: 'At the end of each round, place a new unit of 5 of the Echoes’ cheapest infantry within 6″ of it.' },
   { id: 'umbralTitan', name: 'The Umbral Titan', desc: '+6 Tough, and Defense 2+ against shooting from over 12″ away.' },
   { id: 'whisperer', name: 'The Whisperer', desc: 'Ambush. Once per round, an enemy unit within 12″ that fails a Quality test is Shaken.' },
+  { id: 'shardEater', name: 'The Shard Eater', desc: 'Gets +1 to hit for each enemy unit it has destroyed. Whoever destroys it gains +6 Umbra Shards (add them by hand).' },
+  { id: 'nexusWarden', name: 'The Nexus Warden', desc: 'Shielded: Defense 2+ in the first round. Friendly Echoes within 6″ get +1 to Defense rolls while it lives.' },
+  { id: 'mirrorWraith', name: 'The Mirror Wraith', desc: 'Stealth. Once per round, when an enemy unit shoots it, that unit takes one hit with AP(1) for each of its misses.' },
+  { id: 'rift', name: 'The Living Rift', desc: 'Immobile. At the start of each round, one Echoes unit that was destroyed returns at half strength within 6″ of it.' },
 ];
 
 /**
@@ -477,7 +490,7 @@ export interface GuardianLoot {
 }
 
 /**
- * Guardian loot: on top of the chance at its relic, a slain guardian drops one roll on this table, D6 plus its tier's bonus (6 at
+ * Guardian loot: on top of the chance at its relic, a slain guardian drops one roll on this table, D10 plus its tier's bonus (10 at
  * most). Materials go to the bank of the sector it guarded, if that produces, or else to the faction's home. The
  * Building Expansion is the only way to give a planet a third building slot.
  */
@@ -517,13 +530,17 @@ export const MARAUDERS = {
 };
 
 export const GUARDIAN_LOOT = {
-  bonus: { Common: 0, Rare: 1, Legendary: 2 } as Record<'Common' | 'Rare' | 'Legendary', number>,
+  bonus: { Common: 0, Rare: 2, Legendary: 3 } as Record<'Common' | 'Rare' | 'Legendary', number>,
   table: [
     { id: 'materials', name: 'Salvaged Materials', amount: 100, desc: '+100 Materials to a bank.' },
     { id: 'materials', name: 'Cached Materials', amount: 150, desc: '+150 Materials to a bank.' },
     { id: 'research', name: 'Echo Archive', amount: 2, desc: '+2 Research.' },
     { id: 'research', name: 'Lost Schematics', amount: 3, desc: '+3 Research.' },
+    { id: 'materials', name: 'Void Salvage', amount: 200, desc: '+200 Materials to a bank.' },
+    { id: 'research', name: 'Echo Codex', amount: 4, desc: '+4 Research.' },
     { id: 'blueprint', name: 'Blueprint', desc: 'Research any one building whose requirements you have, for free.' },
+    { id: 'materials', name: 'Echo Hoard', amount: 250, desc: '+250 Materials to a bank.' },
+    { id: 'research', name: 'Nexus Archive', amount: 6, desc: '+6 Research.' },
     { id: 'core', name: 'Building Expansion', desc: `Install it on one of your planets: +${PRODUCTION.coreSlots} building slot there, for good. One per planet.` },
   ] as GuardianLoot[],
 };

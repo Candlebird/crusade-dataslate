@@ -3,7 +3,7 @@ import { newForce, newUnit } from '../model/factory';
 import type { Campaign } from '../model/types';
 import { emptyUnitBattle, resolveBattle, rewardRows, type BattleInput } from './battle';
 import { REWARD_TABLES } from './data';
-import { ECHOES, RELIC_TAKEN, emptyNexus, homeChallengeBlock, nexusAccess, nexusGeneration, recordSectorGame, removeSectorGame } from './nexus';
+import { ECHOES, MANIPULATION_PREFIX, RELIC_TAKEN, emptyNexus, homeChallengeBlock, nexusAccess, nexusGeneration, recordSectorGame, removeSectorGame } from './nexus';
 
 function campaign(): Campaign {
   return {
@@ -136,6 +136,19 @@ describe('nexus resolution', () => {
     input.nexus = { ...input.nexus!, bounty: true };
     input.rewards.bounty = { roll: 3, alloc: {}, target: '' };
     expect(rewardRows(input).find((r) => r.key === 'bounty')).toMatchObject({ table: 'aiSpecial', source: 'Echo bounty', entry: REWARD_TABLES.aiSpecial.entries[2] });
+  });
+
+  it('pays Nexus rewards from the reward tables', () => {
+    const { f, input, id } = setup();
+    input.rewards.main = { roll: 6, alloc: {}, target: '' }; // AI 6: 3 Umbra Shards
+    expect(resolveBattle(f, input, id).us).toBe(6); // + the match bonus
+    input.nexus = { ...input.nexus!, round: 2 };
+    input.rewards.main = { roll: 9, alloc: {}, target: '' }; // AI 9: a free Combat Manipulation
+    resolveBattle(f, input, id);
+    expect(f.nexus!.pending).toContain(`${MANIPULATION_PREFIX}: any (free)`);
+    const plain = newForce('Plain');
+    plain.units.push(newUnit({ id: 'a', name: 'Alpha' }));
+    expect(resolveBattle(plain, { ...input, nexus: undefined }, id).warnings).toContain("AI table: this force isn't in Nexus Wars — re-roll.");
   });
 
   it('grants trait tokens and relics', () => {

@@ -450,6 +450,8 @@ export interface RewardEntry {
   text: string;
   rp?: number;
   supply?: number;
+  /** Umbra Shards. */
+  us?: number;
   xp?: number;
   /** 'any' is a pool to distribute; the others go to a single unit. */
   xpTarget?: XpTarget;
@@ -457,12 +459,17 @@ export interface RewardEntry {
   removeScar?: 'battle' | 'any';
   /** Free upgrade / relic applied on the unit sheet. */
   free?: string;
+  /** Nexus trait tokens (Nexus Wars forces only). */
+  traitTokens?: number;
+  /** A free Combat Manipulation for the next match (Nexus Wars forces only). */
+  manipulation?: boolean;
   /** Roll on this sub-table too. */
   subtable?: RewardTableKey;
 }
 
 export type RewardTableKey = 'winner' | 'winnerSpecial' | 'loser' | 'suffering' | 'ai' | 'aiSpecial';
 
+/** D10 tables: the die is the table's length. */
 export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: RewardEntry[] }> = {
   winner: {
     label: 'Winners table',
@@ -472,6 +479,10 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
       { text: '+150 Supply Limit', supply: 150 },
       { text: '1 extra RP', rp: 1 },
       { text: '+1 RP and +50 Supply Limit', rp: 1, supply: 50 },
+      { text: '6 Umbra Shards', us: 6 },
+      { text: '3 Umbra Shards and 4 XP to distribute', us: 3, xp: 4, xpTarget: 'any' },
+      { text: 'A Nexus trait token', traitTokens: 1 },
+      { text: '+1 RP and 3 Umbra Shards', rp: 1, us: 3 },
       { text: 'Roll on the special table', subtable: 'winnerSpecial' },
     ],
   },
@@ -482,7 +493,11 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
       { text: '+1 RP and remove 1 scar', rp: 1, removeScar: 'any' },
       { text: 'Free upgrade', free: 'Free upgrade' },
       { text: 'Free weapon upgrade', free: 'Free weapon upgrade' },
+      { text: '9 Umbra Shards', us: 9 },
+      { text: 'A free Combat Manipulation next match and 3 Umbra Shards', manipulation: true, us: 3 },
+      { text: 'Two Nexus trait tokens', traitTokens: 2 },
       { text: 'Gain a Common relic', free: 'Common relic' },
+      { text: 'Gain a Common Nexus relic', free: 'Common Nexus relic' },
       { text: 'Gain a Rare relic', free: 'Rare relic' },
     ],
   },
@@ -495,6 +510,10 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
       { text: '10 XP to a unit that died this battle', xp: 10, xpTarget: 'dead' },
       { text: '+150 Supply Limit', supply: 150 },
       { text: '1 extra RP', rp: 1 },
+      { text: '4 Umbra Shards', us: 4 },
+      { text: '3 Umbra Shards and 3 XP to distribute', us: 3, xp: 3, xpTarget: 'any' },
+      { text: 'A Nexus trait token', traitTokens: 1 },
+      { text: 'A free Combat Manipulation next match', manipulation: true },
     ],
   },
   suffering: {
@@ -502,10 +521,14 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
     entries: [
       { text: '2 XP to distribute', xp: 2, xpTarget: 'any' },
       { text: '2 XP to distribute', xp: 2, xpTarget: 'any' },
+      { text: '3 XP to distribute', xp: 3, xpTarget: 'any' },
       { text: '4 XP to distribute', xp: 4, xpTarget: 'any' },
       { text: '4 XP to distribute', xp: 4, xpTarget: 'any' },
+      { text: '5 XP to distribute', xp: 5, xpTarget: 'any' },
       { text: '6 XP to distribute', xp: 6, xpTarget: 'any' },
+      { text: '3 XP to distribute and 3 Umbra Shards', xp: 3, xpTarget: 'any', us: 3 },
       { text: '8 XP to distribute', xp: 8, xpTarget: 'any' },
+      { text: '6 XP to distribute and a Nexus trait token', xp: 6, xpTarget: 'any', traitTokens: 1 },
     ],
   },
   ai: {
@@ -516,6 +539,10 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
       { text: '6 XP to distribute', xp: 6, xpTarget: 'any' },
       { text: '6 XP to a unit holding a point at the end', xp: 6, xpTarget: 'holder' },
       { text: '+50 Supply Limit', supply: 50 },
+      { text: '3 Umbra Shards', us: 3 },
+      { text: '+100 Supply Limit', supply: 100 },
+      { text: '3 Umbra Shards and 3 XP to distribute', us: 3, xp: 3, xpTarget: 'any' },
+      { text: 'A free Combat Manipulation next match', manipulation: true },
       { text: 'Roll on the special table', subtable: 'aiSpecial' },
     ],
   },
@@ -528,6 +555,10 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
       { text: '+100 Supply Limit', supply: 100 },
       { text: '8 XP to distribute', xp: 8, xpTarget: 'any' },
       { text: '+1 RP and +50 Supply Limit', rp: 1, supply: 50 },
+      { text: '6 Umbra Shards', us: 6 },
+      { text: 'A Nexus trait token', traitTokens: 1 },
+      { text: 'A free Combat Manipulation next match and 3 Umbra Shards', manipulation: true, us: 3 },
+      { text: 'Gain a Common Nexus relic', free: 'Common Nexus relic' },
     ],
   },
 };

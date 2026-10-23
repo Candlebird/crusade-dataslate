@@ -162,7 +162,7 @@ describe('Building Expansions', () => {
 describe('Guardian loot', () => {
   const guardian = (tier: 'Common' | 'Rare' | 'Legendary') => ({ name: 'Warden', tier, unit: unit(100) });
 
-  it('rolls D6 plus the tier bonus, up to the table', () => {
+  it('rolls D10 plus the tier bonus, up to the table', () => {
     const c = campaign();
     const s = sector(c, 'near');
     expect(rollGuardianLoot(c, s, guardian('Common'), 'A', () => 0)?.roll).toBe(1);
@@ -184,8 +184,8 @@ describe('Guardian loot', () => {
     const s = sector(c, 'mid');
     s.guardian = guardian('Common');
     const e: CampaignEvent = { id: 'g', date: '', round: 1, sectorId: 'mid', attacker: 'A', defender: ECHOES.id, winner: 'A', notes: '' };
-    recordSectorGame(c, e, () => 0.5); // 4: Lost Schematics
-    expect([e.loot?.id, faction(c, 'A').research]).toEqual(['research', GUARDIAN_LOOT.table[3].amount]);
+    recordSectorGame(c, e, () => 0.5); // 6: Echo Codex
+    expect([e.loot?.id, faction(c, 'A').research]).toEqual(['research', GUARDIAN_LOOT.table[5].amount]);
     removeSectorGame(c, 'g');
     expect(faction(c, 'A').research).toBeUndefined();
   });

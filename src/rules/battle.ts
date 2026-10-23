@@ -203,6 +203,9 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
   const removeScars: Record<string, string[]> = {};
   const free: Record<string, string[]> = {};
   const byId = new Map(units.map((u) => [u.id, u]));
+  let us = 0;
+  /** Nexus rewards from the reward tables, applied once last match's Nexus items expire. */
+  const nexusRewards: { source: string; tokens: number; manipulation: boolean }[] = [];
 
   const ledger: BattleOutcome['ledger'] = [{
     label: `${input.patrol ? 'Solo patrol' : 'Battle'} vs ${input.opponent || 'unknown'} — ${RESULT_LABEL[input.result]}${input.vsAi ? ' (AI)' : ''}`,
@@ -220,7 +223,14 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
       warnings.push(`${row.source}: not rolled yet.`);
       continue;
     }
-    if (e.rp || e.supply) ledger.push({ label: `${row.source}: ${e.text}`, rp: e.rp ?? 0, supply: e.supply ?? 0 });
+    if (e.rp || e.supply || e.us) {
+      ledger.push({ label: `${row.source}: ${e.text}`, rp: e.rp ?? 0, supply: e.supply ?? 0, ...(e.us ? { us: e.us } : {}) });
+      us += e.us ?? 0;
+    }
+    if (e.traitTokens || e.manipulation) {
+      if (force.nexus) nexusRewards.push({ source: row.source, tokens: e.traitTokens ?? 0, manipulation: !!e.manipulation });
+      else warnings.push(`${row.source}: this force isn't in Nexus Wars — re-roll.`);
+    }
     if (e.xp) {
       if (e.xpTarget === 'any') {
         let given = 0;
@@ -258,10 +268,19 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
   // ---- Nexus Wars ----
   const nexusLines: string[] = [];
   const relicGains: { unitId: string; name: string }[] = [];
-  let us = 0;
   if (force.nexus) {
     const n = force.nexus;
     expireNexus(n);
+    for (const r of nexusRewards) {
+      if (r.tokens) {
+        n.traitTokens += r.tokens;
+        nexusLines.push(`${r.source}: +${r.tokens} Nexus trait token${r.tokens > 1 ? 's' : ''}.`);
+      }
+      if (r.manipulation) {
+        n.pending.push(`${MANIPULATION_PREFIX}: any (free)`);
+        nexusLines.push(`${r.source}: a free Combat Manipulation for the next match.`);
+      }
+    }
     nexusLines.push(...(input.nexus?.notes ?? []));
     const addUs = (source: string, k: number) => {
       us += k;
@@ -356,8 +375,8 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
         }
       }
     }
-    force.umbraShards += us;
   }
+  force.umbraShards += us;
 
   const part = participationXp(input);
   const outcomes: UnitOutcome[] = [];
