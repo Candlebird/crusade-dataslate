@@ -90,6 +90,16 @@ function fight(units: Unit[], seed: number): SortieRun {
 }
 
 describe('sortie', () => {
+  it('gives every model a real weapon and loses a lone special weapon last', () => {
+    const servants = newUnit({ id: 'serv', name: 'Servants', category: 'Infantry', size: 3, quality: 4, defense: 4, points: 100, weapons: [gun('Hammer', 0, 2, 2, ['AP(2)']), gun('Fusion Rifle', 12, 1, 1, ['AP(4)'])] });
+    const s = squadOf(servants, 'me');
+    const names = (m: (typeof s.models)[number]) => m.guns.map((g) => g.name);
+    expect(s.models.map(names)).toEqual([['Hammer'], ['Hammer'], ['Fusion Rifle', 'Fists']]);
+    s.models[0].hp = 0;
+    s.models[1].hp = 0;
+    expect(active(s).flatMap(names)).toContain('Fusion Rifle');
+  });
+
   it('splits weapons between models and multiplies wounds', () => {
     const s = squadOf(UNITS.troopers(), 'me');
     expect(s.models).toHaveLength(10);

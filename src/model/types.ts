@@ -641,6 +641,8 @@ export interface Campaign {
   marauders?: Marauder[];
   /** The last round whose revealed moves the GM has applied. */
   movedOrders?: number;
+  /** Meeting engagements for one orders round (rules/meetings.ts): each side's call and each fight's winner ('' a draw), by meeting key. */
+  meetings?: { round: number; calls: Record<string, Record<string, MeetingCall>>; results: Record<string, string> };
   /** Nexus Duels: battles two players agreed to fight for a wager (rules/duels.ts). */
   duels?: NexusDuel[];
   /** Crossroads Journals: a short vignette for each faction's Warlord, once a round (rules/journal.ts). */
@@ -863,3 +865,6 @@ export interface AppState {
   /** Finished battles, shared with the group, so players can look back and claim their rewards. */
   battleHistory?: FinishedBattle[];
 }
+
+/** A side's pick when its detachment runs into another faction's on the map. */
+export type MeetingCall = 'fight' | 'pass';

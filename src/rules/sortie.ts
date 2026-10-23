@@ -317,25 +317,20 @@ const maxOf = (s: SortieSquad) => s.models.reduce((n, m) => n + m.max, 0);
 const FISTS: Gun = { name: 'Fists', melee: true, range: 0, attacks: 1, ap: 0, hitMod: 0, blast: 1, deadly: 1, rending: false, reliable: false, bane: false };
 const countOf = (names: string[], n: string) => names.filter((x) => x === n).length;
 
-/** Each model's share of the weapons, in the order fighter() made the guns: one carried by every model goes to all, the rest round-robin. */
+/** Each model's share of the weapons, in the order fighter() made the guns: one carried by every model goes to all, each copy of the rest to the model with the fewest so far, so every model holds a real weapon before any holds two. */
 function modelsOf(u: Unit, f: Fighter, n: number, tough: number): SortieModel[] {
-  const models: SortieModel[] = Array.from({ length: n }, () => ({ hp: tough, max: tough, guns: [] }));
+  const models: SortieModel[] = Array.from({ length: f.size }, () => ({ hp: tough, max: tough, guns: [] }));
   const relics = (u.relics ?? []).filter((r) => r.profile).length;
   const counts = [...u.weapons.map((w) => Math.max(1, w.count)), ...Array<number>(relics).fill(1)];
-  const next = { melee: 0, ranged: 0 };
   f.guns.forEach((g, i) => {
     const c = counts[i] ?? f.size;
     const per = { ...g, attacks: g.attacks / c };
     if (i >= u.weapons.length && relics) return models[0].guns.push(per);
     if (c >= f.size) return models.forEach((m) => m.guns.push({ ...per }));
-    const kind = g.melee ? 'melee' : 'ranged';
-    for (let k = 0; k < c; k++) {
-      const m = models[next[kind]++ % f.size];
-      if (m) m.guns.push({ ...per });
-    }
+    for (let k = 0; k < c; k++) models.reduce((a, b) => (b.guns.length < a.guns.length ? b : a)).guns.push({ ...per });
   });
   for (const m of models) if (!m.guns.some((g) => g.melee)) m.guns.push({ ...FISTS });
-  return models;
+  return models.slice(0, n);
 }
 
 /** A unit in the fight: its own fighter numbers, every model on its own with its Tough times the run's multiplier in wounds. */
@@ -1500,8 +1495,12 @@ function wound(run: SortieRun, s: SortieSquad, n: number, why: string) {
   if (lost) lastStand(run, s, alive0, hp0);
 }
 
-/** The model hits go onto: the most hurt one still fighting. */
-const pickHurt = (s: SortieSquad) => [...active(s)].sort((a, b) => a.hp - b.hp)[0];
+/** The model hits go onto: the most hurt one still fighting, and of those, one whose weapons the others also carry, so a lone special weapon falls last. */
+function pickHurt(s: SortieSquad) {
+  const up = active(s);
+  const lone = (m: SortieModel) => m.guns.filter((g) => g.name !== FISTS.name && !up.some((o) => o !== m && o.guns.some((x) => x.name === g.name))).length;
+  return [...up].sort((a, b) => a.hp - b.hp || lone(a) - lone(b))[0];
+}
 
 /** A model just fell: count it (the party unit that felled it may leech), and if it was the last, a revive or a death blast. */
 function fell(run: SortieRun, s: SortieSquad, front: boolean, by?: SortieSquad) {

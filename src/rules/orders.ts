@@ -2,13 +2,17 @@ import type { Campaign, CampaignEvent, Force } from '../model/types';
 import { frontier, hexDistance, isPlaced } from './hexmap';
 import { PRODUCTION, homeChallengeBlock, stormed } from './nexus';
 import { hasBuilding } from './production';
-import { isOpen, reach, setPosition } from './movement';
+import { isOpen, positionOf, reach, setPosition } from './movement';
+import { fallBack, meetingOutcomes, meetings } from './meetings';
 
 // Nexus Wars sealed orders: each player picks where their detachments move or what they attack next game (or holds),
 // nobody sees anyone else's picks until the GM reveals them. Each force linked to a faction is a
 // detachment and declares its own order, within its reach on the map (movement.ts).
 
 export const HOLD = 'hold';
+
+/** A detachment holding on its own faction's sector digs in: if the sector is attacked that round, it defends it. */
+export const digsIn = (c: Campaign, force: Force) => !!force.nexus && positionOf(c, force)?.owner === force.nexus.factionId;
 
 /** The GM's round: open for orders until revealed, then locked. */
 export interface OrderRound {
@@ -63,6 +67,8 @@ export interface Attack {
   defender: string;
   /** Why this attack needs the GM's attention. */
   flags: string[];
+  /** The defender's detachment dug in there: it fights the battle and picks the deployment. */
+  dugIn?: string;
 }
 
 /** A detachment moving through its own or empty space: no game, the GM moves it on the map. */
@@ -116,6 +122,13 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
   }
   const name = (id: string) => c.factions.find((f) => f.id === id)?.name ?? id;
   for (const a of attacks) {
+    const dug = a.defender && a.defender !== a.factionId
+      ? holds.map((h) => forces.find((f) => f.id === h.forceId)).find((f) => f && f.nexus?.factionId === a.defender && positionOf(c, f)?.id === a.sectorId)
+      : undefined;
+    if (dug) {
+      a.dugIn = dug.id;
+      a.flags.push(`Dug in: ${dug.name} defends it and picks the deployment`);
+    }
     const rivals = attacks.filter((x) => x !== a && x.sectorId === a.sectorId);
     const others = [...new Set(rivals.filter((x) => x.factionId !== a.factionId).map((x) => x.factionId))];
     if (others.length) a.flags.push(`Also attacked by ${others.map(name).join(', ')}`);
@@ -127,10 +140,19 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
   return { attacks, moves, holds };
 }
 
-/** Make the revealed moves on the map: those still in reach. Returns how many detachments moved. */
-export function applyMoves(c: Campaign, moves: Move[], forces: Force[]): number {
+/**
+ * Make the revealed moves on the map: those still in reach, after the meeting engagements (meetings.ts) — a detachment
+ * that lost one falls back to its faction's nearest sector, one that drew stays where it was. Returns how many moved.
+ */
+export function applyMoves(c: Campaign, moves: Move[], forces: Force[], round?: number): number {
   let n = 0;
+  const outcomes = round === undefined ? new Map() : meetingOutcomes(c, meetings(c, { moves }, forces), round);
+  for (const [id, o] of outcomes) {
+    const force = forces.find((f) => f.id === id);
+    if (force && o.to === 'back' && fallBack(c, force, o.from)) n++;
+  }
   for (const m of moves) {
+    if (outcomes.has(m.forceId)) continue;
     const force = forces.find((f) => f.id === m.forceId);
     const s = c.sectors.find((x) => x.id === m.sectorId);
     if (!force || !s || force.nexus?.factionId !== m.factionId || reach(c, force).get(s.id)?.kind !== 'move') continue;

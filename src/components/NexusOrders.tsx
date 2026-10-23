@@ -6,11 +6,15 @@ import { detachmentName } from '../rules/detachments';
 import { aiDefended } from '../rules/difficulty';
 import { ECHOES, currentRound, factionName } from '../rules/nexus';
 import { moveOf, moveTargets, positionOf } from '../rules/movement';
-import { HOLD, applyMoves, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
+import { HOLD, applyMoves, digsIn, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
 import { nowIso } from '../model/factory';
 import { spreadsAt, nextThreat } from '../rules/rounds';
 import { echoMarks, holders } from '../rules/voidspawn';
 import { standingEffects } from '../rules/standing';
+import { callMeeting, meetingBattle, meetingState, meetings, settleMeeting, unsettleMeeting, type Meeting } from '../rules/meetings';
+import type { AutoResult } from '../rules/autoBattle';
+import type { TrackedBattle } from '../rules/tracker';
+import AutoBattleModal from './AutoBattleModal';
 import { href } from '../route';
 import { useEndRound } from './RoundPanel';
 import { Panel, confirmAction, toast } from './ui';
@@ -137,7 +141,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
                 <span>{label(f)} <span className="muted small" title={why.join(', ')}>at {at?.name ?? '—'}, moves {move}</span></span>
                 <select value={own?.picks[f.id] ?? own?.picks[f.nexus!.factionId] ?? ''} onChange={(e) => pick(f.id, e.target.value)}>
                   <option value="">— Not declared —</option>
-                  <option value={HOLD}>Hold: stay put, no attack{fx(at?.id)}</option>
+                  <option value={HOLD}>Hold: stay put, no attack{digsIn(c, f) ? ' · ⛊ digs in if attacked' : ''}{fx(at?.id)}</option>
                   {moves.length > 0 && (
                     <optgroup label="Move">
                       {moves.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.owner ? factionName(c, s.owner) : 'empty space'}){fx(s.id)}</option>)}
@@ -179,11 +183,13 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
   const { state, update } = useStore();
   const { attacks, moves, holds } = revealOrders(c, orders, round, state.forces);
   const moved = c.movedOrders === round;
+  const met = moved ? [] : meetings(c, { moves }, state.forces);
+  const unsettled = met.filter((m) => ['open', 'fight'].includes(meetingState(c, m, round))).length;
   const makeMoves = () => {
     let n = 0;
     update((s) => {
       if (!s.campaign) return;
-      n = applyMoves(s.campaign, moves, s.forces);
+      n = applyMoves(s.campaign, moves, s.forces, round);
       s.campaign.movedOrders = round;
       s.campaign.updatedAt = nowIso();
     });
@@ -192,6 +198,10 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
   const who = (factionId: string, forceId?: string) => {
     const f = forceId && state.forces.find((x) => x.id === forceId);
     return f ? detachmentName(c, state.forces, f) : factionName(c, factionId);
+  };
+  const dug = (forceId?: string) => {
+    const f = forceId && state.forces.find((x) => x.id === forceId);
+    return !!f && digsIn(c, f);
   };
   const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
   if (!attacks.length && !moves.length && !holds.length) return <p className="muted small">Nobody declared this round.</p>;
@@ -206,9 +216,14 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
           {moved && <span className="tag green">✓ Moved</span>}
         </div>
       ))}
+      {met.map((m) => <MeetingRow key={m.key} c={c} m={m} round={round} gm={gm} who={(id) => who('', id)} sectorName={sectorName} />)}
       {moves.length > 0 && gm && !moved && (
         <div className="row" style={{ margin: '4px 0 8px' }}>
-          <button className="primary" title="Move every detachment whose move is still in reach; attackers move when they win their battle" onClick={makeMoves}>Move detachments</button>
+          <button className="primary" disabled={unsettled > 0} onClick={makeMoves}
+            title={unsettled ? 'Settle the meeting engagements first' : 'Move every detachment whose move is still in reach; attackers move when they win their battle'}>
+            Move detachments
+          </button>
+          {unsettled > 0 && <span className="muted small">{unsettled} meeting engagement{unsettled === 1 ? '' : 's'} to settle first</span>}
         </div>
       )}
       {attacks.map((a) => {
@@ -228,8 +243,76 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
         );
       })}
       {holds.map((h) => (
-        <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds</span></div>
+        <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds{dug(h.forceId) && <span className="tag" style={{ marginLeft: 6 }} title="If its sector is attacked this round, it fights the battle and picks the deployment">⛊ Dug in</span>}</span></div>
       ))}
     </>
+  );
+}
+
+const HOW: Record<Meeting['how'], string> = { same: 'both move into', swap: 'pass each other on the way to', onto: 'runs into the other at' };
+
+/**
+ * Two factions' detachments run into each other on open ground: each side's player (or the GM) picks Fight or Pass.
+ * Both pass and they pass by; either fights and they play it at the table or on the auto-battle, the winner takes the hex.
+ */
+function MeetingRow({ c, m, round, gm, who, sectorName }: {
+  c: Campaign; m: Meeting; round: number; gm: boolean; who: (forceId: string) => string; sectorName: (id: string) => string;
+}) {
+  const { state, update } = useStore();
+  const cloud = useCloud();
+  const [auto, setAuto] = useState<TrackedBattle | null>(null);
+  const status = meetingState(c, m, round);
+  const calls = c.meetings?.round === round ? c.meetings.calls[m.key] ?? {} : {};
+  const result = c.meetings?.round === round ? c.meetings.results[m.key] : undefined;
+  const force = (id: string) => state.forces.find((f) => f.id === id);
+  const mine = (id: string) => gm || (!!cloud.email && force(id)?.owner === cloud.email);
+  const either = m.sides.some(mine);
+  const edit = (fn: (c: Campaign) => void) => update((s) => {
+    if (!s.campaign) return;
+    fn(s.campaign);
+    s.campaign.updatedAt = nowIso();
+  });
+  const settle = (winner: string, how: string) => {
+    edit((x) => settleMeeting(x, round, m.key, winner));
+    toast(`${how}: ${winner ? `${who(winner)} wins and takes ${sectorName(m.sectorId)}` : 'a draw, both stay where they were'}.`);
+  };
+  const applyAuto = (r: AutoResult) => settle(r.winner === 'A' ? m.sides[0] : r.winner === 'B' ? m.sides[1] : '', 'Auto-battle');
+  const [a, b] = m.sides;
+  return (
+    <div className="list-item small" style={{ flexWrap: 'wrap' }}>
+      <span className="grow">
+        ⚔ <b>{who(a)}</b> and <b>{who(b)}</b> {HOW[m.how]} <b>{sectorName(m.sectorId)}</b>
+        {status !== 'settled' && m.sides.map((id) => (
+          <span key={id} className="tag" style={{ marginLeft: 6 }}>{who(id)}: {calls[id] === 'fight' ? '⚔ Fight' : calls[id] === 'pass' ? '↷ Pass' : '…'}</span>
+        ))}
+      </span>
+      {status === 'settled' ? (
+        <>
+          <span className="tag green">✓ {result ? `${who(result)} won: ${who(result === a ? b : a)} falls back` : 'A draw: both stay put'}</span>
+          {gm && <button className="small" onClick={() => edit((x) => unsettleMeeting(x, round, m.key))}>Undo</button>}
+        </>
+      ) : status === 'passed' ? (
+        <span className="tag">↷ They pass by</span>
+      ) : null}
+      {status !== 'settled' && m.sides.filter(mine).map((id) => (
+        <span key={id} className="row" style={{ gap: 4 }}>
+          {m.sides.filter(mine).length > 1 && <span className="muted">{who(id)}:</span>}
+          <button className={calls[id] === 'fight' ? 'primary small' : 'small'} onClick={() => edit((x) => callMeeting(x, round, m.key, id, 'fight'))}>Fight</button>
+          <button className={calls[id] === 'pass' ? 'primary small' : 'small'} onClick={() => edit((x) => callMeeting(x, round, m.key, id, 'pass'))}>Pass</button>
+        </span>
+      ))}
+      {status === 'fight' && either && (
+        <span className="row" style={{ gap: 4 }}>
+          <button className="small" onClick={() => setAuto(meetingBattle(c, m, state.forces, state.settings))}>⚡ Auto-battle</button>
+          {m.sides.map((id) => <button key={id} className="small" title="Played at the table" onClick={() => settle(id, 'At the table')}>{who(id)} won</button>)}
+          <button className="small" title="Played at the table" onClick={() => settle('', 'At the table')}>Draw</button>
+        </span>
+      )}
+      {auto && (
+        <AutoBattleModal b={auto} onClose={() => setAuto(null)} onApply={applyAuto}
+          set={(fn) => setAuto((x) => { if (!x) return x; const y = structuredClone(x); fn(y); return y; })}
+          applyNote="The winner takes the hex, the loser falls back to its nearest sector. Losses don't carry over to the forces." />
+      )}
+    </div>
   );
 }
