@@ -7,7 +7,7 @@ import {
   type RelicDef, type RelicTier, type RewardTableKey, type TableEntry,
 } from '../rules/data';
 import {
-  ANOMALY_TABLE, BENEFITS, BUILDINGS, GUARDIAN_LOOT, NEXUS_TECH, TECH_BRANCHES, COMBAT_MANIPULATIONS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE, WARLORDS,
+  ANOMALY_TABLE, BENEFITS, BOUNTY, BOUNTY_KINDS, BUILDINGS, GUARDIAN_LOOT, NEXUS_TECH, TECH_BRANCHES, COMBAT_MANIPULATIONS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE, WARLORDS,
 } from '../rules/nexusData';
 import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
 import { EXPEDITION_SITES } from '../rules/downtimeData';
@@ -329,7 +329,7 @@ function NexusRules() {
         </p>
         <Toc items={[
           ['n-map', 'Sectors'], ['n-danger', 'Difficulty & modifiers'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'],
-          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-downtime', 'Downtime'], ['n-fog', 'Fog of war'], ['n-production', 'Production'], ['n-tech', 'Tech tree'], ['n-heroes', 'Heroes & guardians'], ['n-marauders', 'Marauders'], ['n-warlords', 'Warlords'], ['n-duels', 'Nexus Duels'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
+          ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-downtime', 'Downtime'], ['n-fog', 'Fog of war & Chronicle'], ['n-night', 'Game night'], ...(BOUNTY.enabled ? [['n-bounties', 'Bounty Board'] as [string, string]] : []), ['n-warroom', 'War Room'], ['n-production', 'Production'], ['n-tech', 'Tech tree'], ['n-heroes', 'Heroes & guardians'], ['n-marauders', 'Marauders'], ['n-warlords', 'Warlords'], ['n-duels', 'Nexus Duels'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
           ['n-shop', 'Umbra Shard shop'],
         ]} />
         <p className="small">
@@ -401,9 +401,22 @@ function NexusRules() {
         <Entries title="Expedition sites" entries={EXPEDITION_SITES.map((x) => ({ name: x.name, desc: `${x.desc} Make it all the way: ${rewardText(x.finish.reward)}.` }))} />
       </Section>
 
-      <Section id="n-fog" title="Fog of war & turn reports">
+      <Section id="n-fog" title="Fog of war & turn reports & the Chronicle">
         <Prose lines={NEXUS_TEXT.fog} />
         <Prose lines={NEXUS_TEXT.reports} />
+      </Section>
+
+      <Section id="n-night" title="Game night">
+        <Prose lines={NEXUS_TEXT.gameNight} />
+      </Section>
+
+      {BOUNTY.enabled && <Section id="n-bounties" title="Bounty Board">
+        <Prose lines={NEXUS_TEXT.bounties} />
+        <Entries title="Bounties" entries={BOUNTY_KINDS.map((k) => ({ name: k.name, desc: k.desc.replace(/\{(\w+)\}/g, (_, w: string) => (w === 'rounds' ? 'some rounds' : `a ${w}`)) }))} />
+      </Section>}
+
+      <Section id="n-warroom" title="War Room">
+        <Prose lines={NEXUS_TEXT.warRoom} />
       </Section>
 
       <Section id="n-production" title="Production & buildings">

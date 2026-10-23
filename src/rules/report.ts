@@ -136,8 +136,8 @@ export function buildReport(c: Campaign, r: Omit<RoundEnd, 'report'>, x: ReportE
   for (const e of c.log) {
     if ((e.round ?? 1) !== r.round || e.spread || e.skirmish || e.crisis) continue;
     // Marauders are news everywhere.
-    if (e.marauder) lines.push({ sectorId: e.sectorId, ...battleLine(c, e, name, rand) });
-    else at(e.sectorId, [e.attacker, e.defender], battleLine(c, e, name, rand));
+    if (e.marauder) lines.push({ sectorId: e.sectorId, eventId: e.id, ...battleLine(c, e, name, rand) });
+    else at(e.sectorId, [e.attacker, e.defender], { ...battleLine(c, e, name, rand), eventId: e.id });
   }
   if (r.crisis)
     lines.push({

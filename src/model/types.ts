@@ -149,6 +149,8 @@ export interface ForceNexus {
   duelsPaid?: string[];
   /** Crossroads Journals whose Warlord rewards (or costs) this force has taken. */
   journalsPaid?: string[];
+  /** Claimed bounties whose Umbra Shards, relic or trait tokens this force has taken. */
+  bountiesPaid?: string[];
   /** Units on a downtime task this round (rules/tasks.ts): busy, they fight in no battle, the round's main Battle included. */
   tasks?: { round: number; units: Record<string, UnitTaskKind> };
   /** Relics forged by a Project, not taken yet: each makes one relic of its tier free in the Requisition shop. */
@@ -630,6 +632,45 @@ export interface Campaign {
   journals?: CrossroadsJournal[];
   /** The weekly Sortie challenge: each force's best run of the last few weeks (rules/downtime.ts postWeekly). */
   sortieBoard?: SortieBoardEntry[];
+  /** Who's coming to the next game night (rules/gameNight.ts). */
+  gameNight?: GameNight;
+  /** The GM's Bounty Board: BOUNTY.slots bounties any faction can claim (rules/bounties.ts). */
+  bounties?: Bounty[];
+  /** Claimed bounties taken off the board, kept until their forces have been paid (the last BOUNTY.keepClaimed). */
+  claimedBounties?: Bounty[];
+}
+
+export type BountyKind = 'band' | 'hold' | 'take' | 'topple' | 'guardian' | 'noHero' | 'void';
+
+/** What a bounty pays. Materials to Blueprints go to the faction; Umbra Shards, relics and trait tokens to a force. */
+export type BountyReward =
+  | { kind: 'materials' | 'research' | 'blueprints' | 'cores' | 'archives' | 'shards' | 'traitToken'; n: number }
+  | { kind: 'relic'; tier: RelicTier };
+
+export interface Bounty {
+  id: string;
+  kind: BountyKind;
+  /** 1–3: sets what it pays. */
+  difficulty: number;
+  /** The target, by kind: a sector, a Marauder band (named, so the board can still say who it was) or a faction. */
+  sectorId?: string;
+  bandId?: string;
+  bandName?: string;
+  factionId?: string;
+  /** hold: the round ends to hold the sector through, and who holds it now and through how many. */
+  rounds?: number;
+  holder?: { factionId: string; ends: number };
+  rewards: BountyReward[];
+  /** The round it was posted in; games logged before it was posted (`skip`) don't count. */
+  round: number;
+  skip?: string[];
+  claimed?: { factionId: string; forceId?: string; round: number; date: string; eventId?: string };
+}
+
+/** The evening's roll call: the factions whose players said they're coming, for a campaign round. */
+export interface GameNight {
+  round: number;
+  coming: string[];
 }
 
 /** A check rolled in a Crossroads Journal: a D6 at or over `target`. `rolls` holds the first roll and any re-roll (the last one stands). */
@@ -744,6 +785,8 @@ export interface TurnReportLine {
   factions?: string[];
   /** Where it happened: players only read it when they can see the sector. */
   sectorId?: string;
+  /** The logged game it tells of (a battle line). */
+  eventId?: string;
 }
 
 export interface TurnReport {

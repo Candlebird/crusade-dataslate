@@ -17,10 +17,8 @@ type Firebase = typeof import('../cloud/firebase');
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err));
 
-/** Sealed orders: every player picks a move, an attack or a hold per detachment; the GM reveals them all at once. */
-export default function OrdersPanel({ c }: { c: Campaign }) {
-  const { state } = useStore();
-  const endRound = useEndRound();
+/** The sealed-orders round in the cloud, as it stands: the round, its declarations and the orders you may read (yours, or everyone's once revealed). */
+export function useSealedOrders(c: Campaign) {
   const cloud = useCloud();
   const online = cloud.status === 'synced' || cloud.status === 'syncing';
   const [fb, setFb] = useState<Firebase | null>(null);
@@ -51,13 +49,23 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     return fb.watchOrders(revealed ? null : cloud.email, setOrders, console.error);
   }, [fb, online, cloud.email, revealed]);
 
+  const current = round && round.campaignId === c.id ? round : null;
+  return { fb, online, round, current, revealed, orders, declared };
+}
+
+/** Sealed orders: every player picks a move, an attack or a hold per detachment; the GM reveals them all at once. */
+export default function OrdersPanel({ c }: { c: Campaign }) {
+  const { state } = useStore();
+  const endRound = useEndRound();
+  const cloud = useCloud();
+  const { fb, online, round, current, revealed, orders, declared } = useSealedOrders(c);
+
   const status = round && round.campaignId === c.id && <span className="muted small">Round {currentRound(c)} · orders #{round.round}{revealed ? ' · revealed' : ' · open'}</span>;
   // Every state renders in the same collapsible panel.
   const panel = (body: ReactNode) => <Panel id="campaign.orders" title="Sealed orders" extra={status}>{body}</Panel>;
   if (!online || !cloud.email) return panel(<p className="muted small">Sign in to the campaign to declare sealed attack orders.</p>);
   if (round === undefined || !fb) return panel(<p className="muted small">Loading orders…</p>);
 
-  const current = round && round.campaignId === c.id ? round : null;
   const fail = (what: string) => (err: unknown) => toast(`Couldn't ${what}: ${errorText(err)}`, 'error');
   const nextRound = () => (round ? round.round + 1 : 1);
   const open = () => fb.setRound({ campaignId: c.id, round: nextRound(), revealed: false }).then(() => toast('Orders are open. Players can now declare.'), fail('open the round'));

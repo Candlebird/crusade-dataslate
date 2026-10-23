@@ -24,7 +24,7 @@ export function useEndRound() {
     let out: { r: RoundEnd; c: Campaign } | undefined;
     update((d) => {
       if (!d.campaign) return;
-      const r = endRound(d.campaign, Math.random, undefined, d.forces, d.books);
+      const r = endRound(d.campaign, Math.random, undefined, d.forces, d.books, d.battleHistory);
       d.campaign.updatedAt = nowIso();
       out = { r, c: d.campaign };
     });

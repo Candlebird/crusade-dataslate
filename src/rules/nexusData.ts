@@ -1,4 +1,4 @@
-import type { SectorType } from '../model/types';
+import type { BountyKind, SectorType } from '../model/types';
 
 // Nexus Wars homebrew values: sector types, benefits, the Anomaly / Void tables, Combat Manipulations
 // and the Umbra Shard shop. Tweak them here; the logic in nexus.ts reads everything from this file.
@@ -613,3 +613,48 @@ export const WARLORDS = {
     ] },
   ] as { id: WarlordPathId; name: string; icon: string; desc: string; perks: { id: WarlordPerkId; name: string; desc: string }[] }[],
 };
+
+/** Game Night Planner (rules/gameNight.ts): how the evening's tables are set. */
+export const GAME_NIGHT = {
+  /** Points for a table with nothing to go by (a player with no detachment linked). */
+  fallbackPoints: 1000,
+  /** Table points round down to this. */
+  step: 50,
+};
+
+/**
+ * The GM's Bounty Board (rules/bounties.ts). Bounties are dealt from BOUNTY_KINDS; what one pays is worth `budget` (by
+ * difficulty, in Umbra Shards, the Crossroads Journal yardstick journalData effectValue), in up to `maxRewards` rewards.
+ */
+export const BOUNTY = {
+  /** Off for now: the tab, its rules and round-end bounties are hidden until the board is reworked. */
+  enabled: false,
+  slots: 5,
+  budget: [0, 3, 6, 10],
+  maxRewards: 2,
+  /** What a bounty can pay, and the step amounts come in. */
+  rewards: [
+    { kind: 'materials', step: 25 },
+    { kind: 'research', step: 1 },
+    { kind: 'blueprints', step: 1 },
+    { kind: 'cores', step: 1 },
+    { kind: 'archives', step: 1 },
+    { kind: 'shards', step: 1 },
+    { kind: 'traitToken', step: 1 },
+    { kind: 'relic', step: 1 },
+  ] as const,
+  /** hold: the round ends to hold through, by difficulty. */
+  holdRounds: [0, 1, 2, 3],
+  /** Claimed bounties kept off the board, so a force not yet paid still is. */
+  keepClaimed: 30,
+};
+
+export const BOUNTY_KINDS: { id: BountyKind; name: string; desc: string; difficulty?: number }[] = [
+  { id: 'band', name: 'Break the band', desc: 'Beat {band} in a Marauder game.' },
+  { id: 'hold', name: 'Take and hold', desc: 'Hold {sector} through {rounds}.' },
+  { id: 'take', name: 'Seize the sector', desc: 'Win an attack on {sector}.' },
+  { id: 'topple', name: 'Topple the leader', desc: 'Beat {faction} in any game.', difficulty: 2 },
+  { id: 'guardian', name: 'Slay the guardian', desc: 'Beat {guardian}, the guardian of {sector}.' },
+  { id: 'noHero', name: 'No heroes', desc: 'Win a game tracked in the battle tracker with no Hero in your army.', difficulty: 2 },
+  { id: 'void', name: 'Into the Void', desc: 'Beat the Void Echoes at their Voidspawn, {sector}.', difficulty: 3 },
+];

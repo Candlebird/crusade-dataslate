@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle[/sector/:sectorId[/:attacker[/:forceId]]] , #/battle/crisis , #/battle/sheet/:sideId , #/missions , #/campaign[/gm] , #/books , #/settings , #/rules[/nexus|traits|relics] , #/guide */
+/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle[/sector/:sectorId[/:attacker[/:forceId]]] , #/battle/crisis , #/battle/sheet/:sideId , #/missions , #/campaign[/gm] , #/campaign/:tab[/:at] , #/books , #/settings , #/rules[/nexus|traits|relics] , #/guide */
 export type Route =
   | { page: 'forces' }
   | { page: 'force'; forceId: string }
@@ -10,7 +10,7 @@ export type Route =
   | { page: 'tracker'; sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean }
   | { page: 'sideSheet'; sideId: string }
   | { page: 'missions' }
-  | { page: 'campaign'; gm?: boolean }
+  | { page: 'campaign'; gm?: boolean; tab?: string; at?: string }
   | { page: 'books' }
   | { page: 'settings' }
   | { page: 'rules'; sub?: RulesSub }
@@ -32,7 +32,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'battle' && parts[1] === 'crisis') return { page: 'tracker', crisis: true };
   if (parts[0] === 'battle') return parts[1] === 'sector' ? { page: 'tracker', sectorId: parts[2], attacker: parts[3], forceId: parts[4] } : { page: 'tracker' };
   if (parts[0] === 'missions') return { page: 'missions' };
-  if (parts[0] === 'campaign') return parts[1] === 'gm' ? { page: 'campaign', gm: true } : { page: 'campaign' };
+  if (parts[0] === 'campaign') return parts[1] === 'gm' ? { page: 'campaign', gm: true } : { page: 'campaign', tab: parts[1], at: parts[2] };
   if (parts[0] === 'books') return { page: 'books' };
   if (parts[0] === 'settings') return { page: 'settings' };
   if (parts[0] === 'rules') return { page: 'rules', sub: RULES_SUBS.find((x) => x === parts[1]) };
@@ -55,7 +55,8 @@ export const href = {
   /** The printable army sheet of a generated side in the current battle. */
   sideSheet: (sideId: string) => `#/battle/sheet/${sideId}`,
   missions: () => '#/missions',
-  campaign: () => '#/campaign',
+  /** The player's campaign page; with a tab open (and a game, on the log, or a sector, on the map, to show). */
+  campaign: (tab?: string, at?: string) => (tab ? `#/campaign/${tab}${at ? `/${at}` : ''}` : '#/campaign'),
   /** The GM's side of the campaign: the whole map, the editors and the round controls. */
   campaignGm: () => '#/campaign/gm',
   books: () => '#/books',

@@ -6,7 +6,7 @@ import type { Campaign, Sector, SectorType } from '../model/types';
 import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionColor, factionName, ownedSectors, recordSectorGame, removeSectorGame, sectorEffect, sidesOf } from '../rules/nexus';
 import { href } from '../route';
 import { useCloud } from '../cloud/CloudSync';
-import { rememberedBy, visibleTo } from '../rules/fog';
+import { logFor, type ChronicleEntry } from '../rules/chronicle';
 import { placeGuardians } from '../rules/guardians';
 import { reportFor } from '../rules/report';
 import OrdersPanel from './NexusOrders';
@@ -15,7 +15,13 @@ import TechTreePanel from './TechTree';
 import WarlordsPanel from './Warlords';
 import DuelsPanel from './Duels';
 import JournalPanel from './Journal';
+import ChroniclePanel from './Chronicle';
+import GameNightPanel from './GameNight';
+import BountyBoardPanel, { useBountyPayouts } from './BountyBoard';
+import WarRoomPanel from './WarRoom';
+import type { Focus } from './HexMap';
 import { useImporter } from './importer';
+import { BOUNTY } from '../rules/nexusData';
 import { Dropzone, Loading, Panel, TextField, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
 
@@ -33,7 +39,7 @@ export function newCampaign(): Campaign {
  * round, their turn report and the games they know of. The GM's page (gm, #/campaign/gm) has the whole map and every
  * editor and control.
  */
-export default function CampaignPage({ gm = false }: { gm?: boolean }) {
+export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: boolean; tab?: string; at?: string }) {
   const { state, update } = useStore();
   const cloud = useCloud();
   const importFiles = useImporter();
@@ -43,12 +49,38 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
   const [tab, setTab] = useCampaignTab();
   const [logSeen, setLogSeen] = useState(tab === 'log');
   if (tab === 'log' && !logSeen) setLogSeen(true);
+  const [focus, setFocus] = useState<Focus>();
+  const showSector = (sectorId: string) => {
+    setTab('map');
+    setFocus((p) => ({ sectorId, n: (p?.n ?? 0) + 1 }));
+  };
+  const showGame = (id: string) => {
+    setTab('log');
+    setTimeout(() => {
+      const el = document.getElementById(`log-${id}`);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.remove('flash');
+      void el.offsetWidth;
+      el.classList.add('flash');
+    }, 50);
+  };
+  const jump = (e: ChronicleEntry) => (e.eventId ? showGame(e.eventId) : e.sectorId && showSector(e.sectorId));
+  // A link to a tab (#/campaign/:tab[/:at]): a game to show on the log, a sector on the map.
+  useEffect(() => {
+    if (!TABS.some((x) => x.id === openTab)) return;
+    if (openTab === 'log' && at) showGame(at);
+    else if (openTab === 'map' && at) showSector(at);
+    else setTab(openTab as CampaignTab);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openTab, at, !!state.campaign]);
   // Signed out, this browser is the GM's own copy.
   const canGm = cloud.isGm || !cloud.email;
   const mine = state.forces.find((f) => f.nexus?.factionId && (!f.owner || f.owner === cloud.email))?.nexus?.factionId;
   const myFaction = c?.factions.some((f) => f.id === mine) ? mine : undefined;
   // The player page's eyes: your faction's, or (for the GM only) any faction's or everything (''). '-' sees nothing.
   const viewAs = canGm ? pickedView ?? myFaction ?? '' : myFaction ?? '-';
+  useBountyPayouts(BOUNTY.enabled ? c : undefined, canGm);
 
   const importer = (
     <Dropzone accept=".json,application/json" onFiles={importFiles}>
@@ -154,7 +186,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
         {tab === 'map' && (
           <>
             <ReportPanel c={c} viewer={fog} />
-            <Suspense fallback={<Loading />}><HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} /></Suspense>
+            <Suspense fallback={<Loading />}><HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} focus={focus} /></Suspense>
             <OrdersPanel c={c} />
             {viewAs !== '-' && <TechTreePanel c={c} setC={setC} faction={viewAs || undefined} />}
           </>
@@ -168,6 +200,10 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
             <JournalPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />
           </>
         )}
+        {tab === 'chronicle' && <ChroniclePanel c={c} viewer={fog} onJump={jump} />}
+        {tab === 'night' && <GameNightPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />}
+        {tab === 'bounties' && <BountyBoardPanel c={c} setC={setC} gm={false} />}
+        {tab === 'stats' && <WarRoomPanel c={c} />}
         {tab === 'log' && <LogPanel c={c} setC={setC} viewer={fog} />}
         {footer}
       </>
@@ -208,7 +244,7 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
         <>
           <ReportPanel c={c} />
           <FactionsPanel c={c} setC={setC} />
-          <Suspense fallback={<Loading />}><HexMapPanel c={c} setC={setC} onRecord={(sectorId) => {
+          <Suspense fallback={<Loading />}><HexMapPanel c={c} setC={setC} focus={focus} onRecord={(sectorId) => {
             setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
             setTab('log');
             setTimeout(() => document.getElementById('record-game')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
@@ -225,6 +261,10 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
           <JournalPanel c={c} setC={setC} gm />
         </>
       )}
+      {tab === 'chronicle' && <ChroniclePanel c={c} onJump={jump} />}
+      {tab === 'night' && <GameNightPanel c={c} setC={setC} gm />}
+      {tab === 'bounties' && <BountyBoardPanel c={c} setC={setC} gm />}
+      {tab === 'stats' && <WarRoomPanel c={c} />}
       {/* Kept mounted once opened, so a half-filled record survives a look at another tab. */}
       {logSeen && (
         <div className="cols-2" style={tab === 'log' ? undefined : { display: 'none' }}>
@@ -237,11 +277,15 @@ export default function CampaignPage({ gm = false }: { gm?: boolean }) {
   );
 }
 
-type CampaignTab = 'map' | 'warlord' | 'duels' | 'log';
+type CampaignTab = 'map' | 'warlord' | 'duels' | 'bounties' | 'stats' | 'night' | 'chronicle' | 'log';
 const TABS: { id: CampaignTab; label: string }[] = [
   { id: 'map', label: 'Map' },
   { id: 'warlord', label: 'Warlord' },
   { id: 'duels', label: 'Duels & Journal' },
+  ...(BOUNTY.enabled ? [{ id: 'bounties' as const, label: 'Bounties' }] : []),
+  { id: 'stats', label: 'War Room' },
+  { id: 'night', label: 'Game night' },
+  { id: 'chronicle', label: 'Chronicle' },
   { id: 'log', label: 'Log' },
 ];
 const TAB_KEY = 'opr-campaign-tab';
@@ -258,6 +302,8 @@ function useCampaignTab(): [CampaignTab, (t: CampaignTab) => void] {
   });
   return [tab, (t) => {
     setTab(t);
+    // A link's tab (#/campaign/:tab) would come back on a reload; the page's own tab wins from here.
+    if (/^#\/campaign\/(?!gm)/.test(location.hash)) history.replaceState(null, '', href.campaign());
     try {
       localStorage.setItem(TAB_KEY, t);
     } catch {
@@ -485,17 +531,11 @@ function RecordPanel({ c, setC, preset }: { c: Campaign; setC: SetC; preset: { s
 /** The games played. A player's log (viewer) only has the games their faction fought, or that it could see; '-' sees none. */
 function LogPanel({ c, setC, viewer }: { c: Campaign; setC: SetC; viewer?: string }) {
   const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
-  const known = useMemo(() => {
-    if (!viewer || viewer === '-') return undefined;
-    const seen = visibleTo(c, viewer);
-    return new Set([...seen, ...rememberedBy(c, viewer, seen)]);
-  }, [c, viewer]);
-  const log = viewer === '-' ? [] : !known ? c.log
-    : c.log.filter((e) => e.crisis || e.marauder || e.attacker === viewer || e.defender === viewer || e.winner === viewer || known.has(e.sectorId));
+  const log = useMemo(() => logFor(c, viewer), [c, viewer]);
   return (
     <Panel id="campaign.log" title="Campaign log" extra={<span className="muted small">{log.length} game{log.length === 1 ? '' : 's'}</span>}>
       {log.length === 0 ? <p className="muted small">No games {viewer ? 'you know of ' : ''}yet.</p> : [...log].reverse().map((e) => (
-        <div key={e.id} className="list-item small">
+        <div key={e.id} id={`log-${e.id}`} className="list-item small">
           <span className="muted" title={`Round ${e.round ?? 1}`}>R{e.round ?? 1} · {e.date}</span>
           <span className="grow">
             {e.skirmish ? <>⚔ Skirmish: <b>{factionName(c, e.winner)} wins</b>{e.defender === ECHOES.id ? <> a patrol against the {ECHOES.name}</> : ''}</>

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { nowIso, uid } from '../model/factory';
 import { useStore } from '../model/store';
 import { readImageAsDataUrl } from '../model/io';
@@ -46,8 +46,10 @@ const TOOLS: { key: Tool; label: string; hint: string }[] = [
  * The sector map. The GM's map (gm) has the editing tools and can be seen as any faction sees it; a player's map is fogged
  * for their faction (fog: its id; none for the whole map) and only shows what they know.
  */
-export default function HexMapPanel({ c, setC, onRecord, gm = true, fog }: {
+export default function HexMapPanel({ c, setC, onRecord, gm = true, fog, focus }: {
   c: Campaign; setC: SetC; onRecord?: (sectorId: string) => void; gm?: boolean; fog?: string;
+  /** A sector to pick and scroll to (a new `n` each time it's asked for). */
+  focus?: Focus;
 }) {
   const [genOpen, setGenOpen] = useState(false);
   if (!c.map && !gm) {
@@ -71,10 +73,12 @@ export default function HexMapPanel({ c, setC, onRecord, gm = true, fog }: {
       </div>
     );
   }
-  return <MapEditor c={c} setC={setC} onRecord={onRecord} gm={gm} fog={fog} />;
+  return <MapEditor c={c} setC={setC} onRecord={onRecord} gm={gm} fog={fog} focus={focus} />;
 }
 
-function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; onRecord?: (sectorId: string) => void; gm: boolean; fog?: string }) {
+export interface Focus { sectorId: string; n: number }
+
+function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: SetC; onRecord?: (sectorId: string) => void; gm: boolean; fog?: string; focus?: Focus }) {
   const map = c.map!;
   const [tools, setTool] = useState<Tool>('select');
   const tool: Tool = gm ? tools : 'select';
@@ -85,6 +89,13 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
   const viewAs = gm ? gmView : fog ?? '';
   const sight = useMemo(() => sightMap(c, viewAs || undefined), [c, viewAs]);
   const [sel, setSel] = useState<Hex | null>(null);
+  useEffect(() => {
+    const s = focus?.n ? c.sectors.find((x) => x.id === focus.sectorId) : undefined;
+    if (!s || !isPlaced(s)) return;
+    setSel({ q: s.q!, r: s.r! });
+    setEditing(false);
+    document.getElementById('sector-map')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [focus?.n]);
   const [moving, setMoving] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
@@ -241,7 +252,7 @@ function MapEditor({ c, setC, onRecord, gm, fog }: { c: Campaign; setC: SetC; on
 
   return (
     <>
-      <Panel id={gm ? 'campaign.map' : 'campaign.playerMap'} title="Sector map" extra={
+      <Panel id={gm ? 'campaign.map' : 'campaign.playerMap'} domId="sector-map" title="Sector map" extra={
         <div className="row">
           {gm && <button onClick={() => setGenOpen(true)}>Generate…</button>}
           {gm && <SpreadButton c={c} setC={setC} />}

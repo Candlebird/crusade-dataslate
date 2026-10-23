@@ -2,7 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
-import { ECHOES, DIFFICULTY_LEVELS, FOG, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_DUELS, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP, WARLORDS } from './nexusData';
+import { BOUNTY, ECHOES, DIFFICULTY_LEVELS, FOG, GAME_NIGHT, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_DUELS, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, PRODUCTION, UMBRA_SHOP, WARLORDS } from './nexusData';
 import { FEATS, rewardText } from './feats';
 import { EXPEDITION, GARRISON, MENTORING, PROJECT_DIE, PROJECTS, RECON, SOLO_PATROL, SORTIE, SORTIE_QUIRKS, SORTIE_TRINKETS, TRAINING, type ExpeditionCheck } from './downtimeData';
 
@@ -188,6 +188,22 @@ export const NEXUS_TEXT = {
   ],
   reports: [
     "When the GM ends a round, a turn report tells what happened: battles won and lost, the Echoes' spread, new sectors on the map, guardians, hero offers and your planets' production. You only read about what your faction fought in or could see.",
+    "The campaign page's Chronicle tab tells the whole war round by round: games, captures, raids, galactic events, new Warlords, and your own Crossroads Journals and duels. Pick a faction to read only its story; click an entry to see the game in the log or the sector on the map.",
+    'The Forces page has a Since you last looked panel: the news since your last visit, each line a link. Mark all seen clears it.',
+  ],
+  gameNight: [
+    "The Game night tab plans the evening. Each player ticks that they're coming (the GM can tick anyone); the list starts fresh each round.",
+    `Once the GM reveals the round's sealed orders, every attack whose attacker is coming gets a table: against the defender when they're coming too, otherwise the GM plays the defender's side with the Echoes. AI-held sectors and guardians are fought at the sector's Supply rating. Both sides bring the attacking detachment's Supply Limit (rounded down to ${GAME_NIGHT.step}; ${GAME_NIGHT.fallbackPoints} without one).`,
+    'Players left over take on the nearest Marauder band, then each other in a skirmish, and the last one plays a patrol against the Echoes. Each table gets a mission.',
+  ],
+  bounties: [
+    `The GM keeps a Bounty Board of ${BOUNTY.slots} bounties, dealt from a pool: break a Marauder band, seize or hold a sector, topple the leading faction, slay a guardian, win without a Hero, strike into the Void. Any faction can claim one. A bounty stays up until it's claimed, so it can last several rounds.`,
+    `Each bounty has a difficulty of 1 to 3 stars, and its rewards are rolled to match: worth about ${BOUNTY.budget.slice(1).join(', ')} Umbra Shards, in up to ${BOUNTY.maxRewards} of Materials, Research, Blueprints, Building Expansions, Archive unlocks, Umbra Shards, trait tokens or a relic. The GM can change a bounty's kind, target, difficulty and rewards, reroll its rewards, or regenerate it outright.`,
+    "A game in the log claims a bounty as soon as it's recorded (only games played after the bounty went up count); a hold is checked at each round's end. The faction's share is paid at once; Umbra Shards, trait tokens and relics go to the force that won it, paid when its player next opens the campaign page. Claimed bounties stay on the board, marked claimed, until the round ends, when new ones replace them.",
+  ],
+  warRoom: [
+    "The War Room tab sets every force's record side by side: games, wins, losses and draws, win rate and average VP. Pick a force to see its record by opponent and by mission, and its units: games played, kills, times wiped and kills per game. Its MVP is the unit with the most kills.",
+    "Records come from each force's battle log (patrols aside); VP, missions and unit lines come from games played on the battle tracker.",
   ],
   catchUp: [
     `Factions that fall behind get help: at each round's end, a faction gains +${R.underdogUs} Umbra Shards for every ${R.underdogStep} sectors it's behind the faction holding the most (up to +${R.underdogMax * R.underdogUs}), paid with its round income.`,

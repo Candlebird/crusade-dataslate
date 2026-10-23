@@ -20,6 +20,9 @@ import { accrueResearch } from './tech';
 import { buildReport } from './report';
 import { hasPerk, syncWarlords } from './warlords';
 import { localDate } from '../model/date';
+import { claimBounties, holdBounties, refreshBounties } from './bounties';
+import { BOUNTY } from './nexusData';
+import type { FinishedBattle } from './tracker';
 
 // Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
 // a Strategic Asset, and one against the Echoes is a patrol). The round closes with the Battle: the sealed-order attacks.
@@ -170,14 +173,17 @@ export interface RoundEnd {
  * campaign's forces, sector difficulty is rescaled to their Supply too.
  */
 export function endRound(
-  c: Campaign, rand: Rand = Math.random, date = localDate(), forces?: Force[], books?: CatalogBook[],
+  c: Campaign, rand: Rand = Math.random, date = localDate(), forces?: Force[], books?: CatalogBook[], history: FinishedBattle[] = [],
 ): RoundEnd {
   const round = currentRound(c);
+  // Bounties the round's games earned are claimed; a hold counts the sectors as the round leaves them.
+  const bounties = BOUNTY.enabled ? claimBounties(c, history, forces ?? [], date) : [];
   // Warlords' levels are brought up to date, and fallen ones lost, before their perks count.
   const warlords = forces ? syncWarlords(c, forces) : undefined;
   const holdings: RoundSnapshot['holdings'] = {};
   for (const f of c.factions) holdings[f.id] = c.sectors.filter((s) => s.owner === f.id).map((s) => s.id);
   const snapshot: RoundSnapshot = { round, date, holdings, underdog: underdogBonus(c) };
+  if (BOUNTY.enabled) bounties.push(...holdBounties(c, holdings, round, forces ?? [], date));
   const event = activeEvent(c);
   if (event) snapshot.event = event.id;
 
@@ -228,11 +234,15 @@ export function endRound(
   const marauders = moveMarauders(c, threat, rand, uid, forces);
   const offers = forces && books ? rollOffers(c, books, forces, rand, uid) : undefined;
   const guardians = forces && books ? placeGuardians(c, books, forces, rand, uid) : [];
+  // Claimed bounties (and ones whose target is gone) make way for new ones.
+  const posted = BOUNTY.enabled ? refreshBounties(c, rand, uid) : [];
   const end: Omit<RoundEnd, 'report'> = {
     round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, difficulty, cleared, fresh,
     event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, research, built, offers, guardians, marauders, warlords,
   };
   const report = buildReport(c, end, { production, research, built, offers, guardians }, date, rand);
+  report.lines.push(...bounties.map((text) => ({ icon: '🎯', text })));
+  if (posted.length) report.lines.push({ icon: '🎯', text: `${posted.length} new bount${posted.length === 1 ? 'y is' : 'ies are'} on the Bounty Board.` });
   return { ...end, report };
 }
 

@@ -7,6 +7,7 @@ import { Dropzone } from './ui';
 import { useImporter } from './importer';
 import { useCloud } from '../cloud/CloudSync';
 import { EmblemBadge } from './Emblem';
+import SinceLastLooked from './SinceLastLooked';
 
 export default function ForceList() {
   const { state, update } = useStore();
@@ -35,6 +36,8 @@ export default function ForceList() {
           <button className="primary" onClick={create}>+ New force</button>
         </div>
       </div>
+
+      <SinceLastLooked />
 
       {local.length > 0 && (
         <div className="panel notice">
