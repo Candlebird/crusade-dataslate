@@ -1,6 +1,7 @@
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { useStore } from '../model/store';
 import type { Force } from '../model/types';
+import { Icon } from './Icon';
 
 // Forces with edit mode switched on. Kept in memory only, so every reload starts locked again.
 const editing = new Set<string>();
@@ -41,7 +42,7 @@ export function EditModeButton({ f }: { f: Force }) {
       onClick={toggle}
       title={edit ? 'Hide the manual controls again' : 'Show the manual controls, to fix an untracked game or a wrong reward'}
     >
-      {edit ? '✎ Editing — done' : '✎ Edit mode'}
+      <Icon name="l:pencil" /> {edit ? 'Editing — done' : 'Edit mode'}
     </button>
   );
 }

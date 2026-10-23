@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useStore } from '../model/store';
 import { allTags, bookOf, datasheetTags, normalizeTag, setDatasheetTags, tagsIn } from '../model/tags';
 import type { CatalogBook, Unit } from '../model/types';
+import { Icon } from './Icon';
 
 export function TagChips({ tags }: { tags: string[] }) {
   return <>{tags.map((t) => <span key={t} className="tag utag">{t}</span>)}</>;
@@ -28,7 +29,7 @@ export function DatasheetTags({ book, name }: { book: CatalogBook; name: string 
       {tags.map((t) => (
         <span key={t} className="tag utag">
           {t}
-          <button type="button" aria-label={`Remove tag ${t}`} title="Remove tag" onClick={() => save(tags.filter((x) => x !== t))}>✕</button>
+          <button type="button" aria-label={`Remove tag ${t}`} title="Remove tag" onClick={() => save(tags.filter((x) => x !== t))}><Icon name="l:x" /></button>
         </span>
       ))}
       {adding ? (

@@ -3,7 +3,7 @@ import type { Loadout } from '../armyforge/book';
 import { STARTING_SUPPLY } from '../rules/data';
 import { RULES_VERSION } from '../rules/migrate';
 import { detectCategory, ruleRating } from '../rules/engine';
-import { randomEmblem } from './emblem';
+import { SHAPE_IDS, randomEmblem } from './emblem';
 
 export const uid = () => crypto.randomUUID().slice(0, 12);
 export const nowIso = () => new Date().toISOString();
@@ -12,7 +12,7 @@ export function newForce(name = 'New Force'): Force {
   return {
     id: uid(), name, faction: '', player: '', description: '', startingSupply: STARTING_SUPPLY,
     battles: 0, wins: 0, ledger: [], units: [], umbraShards: 0, rulesVersion: RULES_VERSION, createdAt: nowIso(), updatedAt: nowIso(),
-    emblem: randomEmblem(),
+    emblem: randomEmblem(Math.random, SHAPE_IDS),
   };
 }
 

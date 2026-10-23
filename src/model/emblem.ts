@@ -4,6 +4,7 @@
  */
 import type { Category } from '../rules/data';
 import type { EmblemLayer, EmblemShape, Unit } from './types';
+import { SYMBOL_BOX, SYMBOL_SHAPES, type SymbolShape } from './emblemSymbols';
 
 /** How big each layer is drawn, background first, as a share of the emblem. */
 export const LAYER_SCALE = [1, 0.62, 0.34] as const;
@@ -19,8 +20,8 @@ function star(points: number, outer: number, inner: number): string {
   return `M${pts.join('L')}Z`;
 }
 
-/** Each shape as an SVG path filling the 100 × 100 box. */
-export const EMBLEM_SHAPES: Record<EmblemShape, { name: string; path: string }> = {
+/** The plain shapes, each as an SVG path filling the 100 × 100 box. */
+const BASE_SHAPES: Record<Exclude<EmblemShape, SymbolShape>, { name: string; path: string }> = {
   circle: { name: 'Circle', path: 'M50 2A48 48 0 1 1 49.99 2Z' },
   ring: { name: 'Ring', path: 'M50 2A48 48 0 1 1 49.99 2ZM50 28A22 22 0 1 0 50.01 28Z' },
   square: { name: 'Square', path: 'M6 6H94V94H6Z' },
@@ -41,7 +42,22 @@ export const EMBLEM_SHAPES: Record<EmblemShape, { name: string; path: string }> 
   },
 };
 
+/**
+ * Every shape: the plain ones, then the symbols. A symbol's path fills a `box` × `box` square instead and is filled
+ * non-zero (its holes are drawn as cut-outs already).
+ */
+export const EMBLEM_SHAPES: Record<EmblemShape, { name: string; path: string; box?: number }> = {
+  ...BASE_SHAPES,
+  ...(Object.fromEntries(Object.entries(SYMBOL_SHAPES).map(([id, s]) => [id, { ...s, box: SYMBOL_BOX }])) as Record<SymbolShape, { name: string; path: string; box: number }>),
+};
+
 export const SHAPE_IDS = Object.keys(EMBLEM_SHAPES) as EmblemShape[];
+/** The plain shapes alone. Default emblems and portraits are rolled from these, so adding symbols didn't change them. */
+export const BASE_SHAPE_IDS = Object.keys(BASE_SHAPES) as EmblemShape[];
+
+/** How much to scale a shape's path so it fills the 100 × 100 box. */
+export const shapeScale = (shape: EmblemShape): number => 100 / (EMBLEM_SHAPES[shape].box ?? 100);
+export const shapeFillRule = (shape: EmblemShape): 'evenodd' | 'nonzero' => (EMBLEM_SHAPES[shape].box ? 'nonzero' : 'evenodd');
 
 /** Colours offered as one-click picks (any colour can still be chosen). */
 export const EMBLEM_PALETTE = ['#c9a24a', '#e8e2d0', '#1b1d22', '#b3352b', '#5fb3b3', '#3d6fb6', '#4f8a3c', '#8e44ad', '#d9822b', '#7a7f8a'];
@@ -58,15 +74,18 @@ export function emblemLayers(emblem: unknown): EmblemLayer[] | undefined {
 /** Shapes that make a good background: they fill most of the box. */
 const BACKGROUNDS: EmblemShape[] = ['circle', 'square', 'diamond', 'shield', 'hexagon', 'burst'];
 
-/** A random emblem: a solid background, then two shapes in colours that differ from the one beneath. */
-export function randomEmblem(rand: () => number = Math.random): EmblemLayer[] {
+/**
+ * A random emblem: a solid background, then two shapes from `shapes` in colours that differ from the one beneath.
+ * Seeded defaults keep to the plain shapes; the 🎲 button passes every shape.
+ */
+export function randomEmblem(rand: () => number = Math.random, shapes: readonly EmblemShape[] = BASE_SHAPE_IDS): EmblemLayer[] {
   const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)];
   const colors: string[] = [];
   for (let i = 0; i < 3; i++) colors.push(pick(EMBLEM_PALETTE.filter((c) => c !== colors[i - 1])));
   return [
     { shape: pick(BACKGROUNDS), color: colors[0] },
-    { shape: pick(SHAPE_IDS), color: colors[1] },
-    { shape: pick(SHAPE_IDS.filter((s) => s !== 'ring')), color: colors[2] },
+    { shape: pick(shapes), color: colors[1] },
+    { shape: pick(shapes.filter((s) => s !== 'ring')), color: colors[2] },
   ];
 }
 
@@ -111,12 +130,12 @@ export function defaultPortrait(u: Pick<Unit, 'id' | 'category'>): EmblemLayer[]
 /** How many layers, from the bottom, a unit's portrait takes from its force's emblem. */
 export const FORCE_LAYERS = 2;
 
-/** A random top layer for a portrait over `under`: a shape in a colour none of the layers beneath use. */
-export function randomTop(under: EmblemLayer[], rand: () => number = Math.random): EmblemLayer {
+/** A random top layer for a portrait over `under`: a shape from `shapes` in a colour none of the layers beneath use. */
+export function randomTop(under: EmblemLayer[], rand: () => number = Math.random, shapes: readonly EmblemShape[] = BASE_SHAPE_IDS): EmblemLayer {
   const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)];
   const used = new Set(under.map((l) => l.color.toLowerCase()));
   const colors = EMBLEM_PALETTE.filter((c) => !used.has(c));
-  return { shape: pick(SHAPE_IDS.filter((s) => s !== 'ring')), color: pick(colors.length ? colors : EMBLEM_PALETTE) };
+  return { shape: pick(shapes.filter((s) => s !== 'ring')), color: pick(colors.length ? colors : EMBLEM_PALETTE) };
 }
 
 /** A unit's portrait in its force: the force emblem's lower layers, with `top` (or one rolled from the unit's id). */

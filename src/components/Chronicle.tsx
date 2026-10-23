@@ -4,6 +4,7 @@ import { chronicle, chronicleOf, type ChronicleEntry } from '../rules/chronicle'
 import { factionColor } from '../rules/nexus';
 import { href } from '../route';
 import { Panel } from './ui';
+import { Glyph } from './Icon';
 
 /** The Campaign Chronicle: the war's history round by round, as the viewer knows it. An entry with a game or a sector jumps to it. */
 export default function ChroniclePanel({ c, viewer, onJump }: { c: Campaign; viewer?: string; onJump: (e: ChronicleEntry) => void }) {
@@ -28,7 +29,7 @@ export default function ChroniclePanel({ c, viewer, onJump }: { c: Campaign; vie
           <ul className="report">
             {r.entries.map((e, i) => (
               <li key={i}>
-                <span className="report-icon">{e.icon}</span>
+                <span className="report-icon"><Glyph g={e.icon} /></span>
                 {e.eventId || e.sectorId
                   ? <a href={e.eventId ? href.campaign('log', e.eventId) : href.campaign('map', e.sectorId)}
                       title={e.eventId ? 'Show the game in the log' : 'Show the sector on the map'}

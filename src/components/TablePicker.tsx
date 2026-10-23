@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { rollUntilNew } from '../rules/engine';
 import { Modal } from './ui';
+import { Icon } from './Icon';
 
 export interface PickEntry {
   name: string;
@@ -114,15 +115,15 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
       )}
       {group && (
         <>
-          {group.restricted && <p className="small" style={{ color: 'var(--warn)' }}>⚠ {group.restricted}</p>}
+          {group.restricted && <p className="small" style={{ color: 'var(--warn)' }}><Icon name="g:hazard-sign" /> {group.restricted}</p>}
           {group.rollable && group.entries.length > 0 && (
             <div className="row" style={{ marginBottom: '0.6rem' }}>
-              <button onClick={roll}>🎲 Roll D{group.entries.length}</button>
+              <button onClick={roll}><Icon name="g:perspective-dice-six-faces-six" /> Roll D{group.entries.length}</button>
               {rolls.slice(0, -1).map((r, i) => (
                 <span key={i} className="muted small" title="Already had — rerolled"><s>{r} {group.entries[r - 1].name}</s></span>
               ))}
               {rolled != null && <span className="dice-result">{rolled}</span>}
-              {rolled != null && <span>→ {group.entries[rolled - 1].name}{isOwned(group.entries[rolled - 1]) ? ' (already had — nothing left to reroll into)' : ''}</span>}
+              {rolled != null && <span><Icon name="l:arrow-right" /> {group.entries[rolled - 1].name}{isOwned(group.entries[rolled - 1]) ? ' (already had — nothing left to reroll into)' : ''}</span>}
             </div>
           )}
           <div className="pick-list">

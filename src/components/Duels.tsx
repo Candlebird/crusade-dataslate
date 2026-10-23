@@ -11,6 +11,7 @@ import { factionName } from '../rules/nexus';
 import { href } from '../route';
 import { Modal, Panel, Stepper, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
+import { Icon } from './Icon';
 
 type SetC = (fn: (c: Campaign) => void) => void;
 const today = () => localDate();
@@ -123,7 +124,7 @@ function Challenge({ c, setC, me, gm, own }: { c: Campaign; setC: SetC; me?: str
           {theirsToPick.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
       )}
-      <button className="primary" disabled={!fromFaction || !to || !a} onClick={send}>⚔ Request a duel</button>
+      <button className="primary" disabled={!fromFaction || !to || !a} onClick={send}><Icon name="g:crossed-swords" /> Request a duel</button>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LEVEL_THRESHOLDS } from '../rules/data';
 import { xpProgress, type Issue } from '../rules/engine';
+import { Icon, IconText } from './Icon';
 
 export function Modal({ title, onClose, children, footer, wide }: {
   title: ReactNode;
@@ -19,7 +20,7 @@ export function Modal({ title, onClose, children, footer, wide }: {
       <div className="modal" style={wide ? { maxWidth: 980 } : undefined} role="dialog" aria-modal="true">
         <div className="modal-head">
           <h2>{title}</h2>
-          <button className="ghost" onClick={onClose} aria-label="Close">✕</button>
+          <button className="ghost" onClick={onClose} aria-label="Close"><Icon name="l:x" /></button>
         </div>
         <div className="modal-body">{children}</div>
         {footer && <div className="modal-foot">{footer}</div>}
@@ -160,7 +161,7 @@ export function Toaster() {
       clearTimeout(timer);
     };
   }, []);
-  return msg ? <div className={`toast ${msg.kind === 'error' ? 'error' : ''}`}>{msg.text}</div> : null;
+  return msg ? <div className={`toast ${msg.kind === 'error' ? 'error' : ''}`}><IconText text={msg.text} /></div> : null;
 }
 
 /** The brief stand-in while a lazily loaded page or panel arrives. */
@@ -221,7 +222,7 @@ export function Panel({ id, title, extra, h = 2, className, domId, collapsed, le
       <div className="panel-title">
         <span className="panel-head">
           <button type="button" className="ghost icon fold" onClick={toggle} aria-expanded={!closed} title={closed ? 'Expand' : 'Collapse'}>
-            {closed ? '▸' : '▾'}
+            <Icon name={closed ? 'l:chevron-right' : 'l:chevron-down'} />
           </button>
           {/* The title folds it too: a bigger target on phones. The arrow stays the keyboard control. */}
           <H className="fold-title" onClick={toggle}>{title}</H>

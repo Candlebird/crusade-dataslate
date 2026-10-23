@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORY_COLORS, EMBLEM_SHAPES, SHAPE_IDS, defaultEmblem, defaultPortrait, forceEmblem, echoPortrait, emblemLayers, portraitInForce, randomEmblem, randomTop, unitPortrait } from './emblem';
+import { BASE_SHAPE_IDS, CATEGORY_COLORS, EMBLEM_SHAPES, SHAPE_IDS, defaultEmblem, defaultPortrait, forceEmblem, echoPortrait, emblemLayers, portraitInForce, randomEmblem, randomTop, unitPortrait } from './emblem';
 import { rng } from '../rules/hexmap';
 
 describe('emblemLayers', () => {
@@ -36,12 +36,29 @@ describe('randomEmblem', () => {
 });
 
 describe('EMBLEM_SHAPES', () => {
-  it('gives every shape a closed path inside the 100 × 100 box', () => {
-    for (const id of SHAPE_IDS) {
+  it('gives every plain shape a closed path inside the 100 × 100 box', () => {
+    for (const id of BASE_SHAPE_IDS) {
       const { path } = EMBLEM_SHAPES[id];
       expect(path.trim().endsWith('Z')).toBe(true);
       const nums = (path.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
       expect(nums.every((v) => v >= 0 && v <= 100)).toBe(true);
+    }
+  });
+
+  it('gives every symbol a path in its own box', () => {
+    const symbols = SHAPE_IDS.filter((id) => !BASE_SHAPE_IDS.includes(id));
+    expect(symbols.length).toBeGreaterThan(0);
+    for (const id of symbols) {
+      const { path, box } = EMBLEM_SHAPES[id];
+      expect(box).toBe(512);
+      expect(path).toMatch(/^m[-\d.]/i);
+    }
+  });
+
+  it('keeps seeded defaults to the plain shapes', () => {
+    const rand = rng('defaults');
+    for (let n = 0; n < 200; n++) {
+      for (const l of randomEmblem(rand)) expect(l.shape === 'none' || BASE_SHAPE_IDS.includes(l.shape)).toBe(true);
     }
   });
 });

@@ -3,6 +3,7 @@ import type { Campaign } from '../model/types';
 import { BUILDINGS, NEXUS_TECH, TECH_BRANCHES, type Building } from '../rules/nexusData';
 import { research, researchBlock, researchRate, techCost, techStatus, type ResearchVia } from '../rules/tech';
 import { Panel, confirmAction, toast } from './ui';
+import { Glyph, Icon } from './Icon';
 
 type SetC = (fn: (c: Campaign) => void) => void;
 
@@ -54,7 +55,7 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
       <div className="tech-tree" style={{ gridTemplateColumns: `3rem repeat(${TECH_BRANCHES.length}, minmax(10rem, 1fr))` }}>
         <span />
         {TECH_BRANCHES.map((br) => (
-          <div key={br.id} className="tech-branch" title={br.desc}><span className="tech-icon">{br.icon}</span> {br.name}</div>
+          <div key={br.id} className="tech-branch" title={br.desc}><span className="tech-icon"><Glyph g={br.icon} /></span> {br.name}</div>
         ))}
         {TIERS.map((tier) => (
           <TierRow key={tier} tier={tier}>
@@ -68,8 +69,8 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
                   return (
                     <div key={b.id} className={`tech-card ${st}`}>
                       <div className="tech-name">
-                        <span>{b.icon} {b.name}</span>
-                        {st === 'known' ? <span className="tag green">known</span> : st === 'open' ? <span className="tag gold">{techCost(b)} 🔬</span> : <span className="tag">🔒</span>}
+                        <span><Glyph g={b.icon} /> {b.name}</span>
+                        {st === 'known' ? <span className="tag green">known</span> : st === 'open' ? <span className="tag gold">{techCost(b)} <Icon name="g:microscope" /></span> : <span className="tag"><Icon name="l:lock" /></span>}
                       </div>
                       <div className="small">{b.desc}</div>
                       <div className="tech-tags">

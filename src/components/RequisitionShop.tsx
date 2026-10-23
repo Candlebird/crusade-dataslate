@@ -8,6 +8,7 @@ import { NEEDS_UNIT, RELIC_TIER, requisitionEligible, requisitionProblem } from 
 import { unitName } from '../rules/battle';
 import { Modal, RelicOption, toast } from './ui';
 import { localDate } from '../model/date';
+import { Icon } from './Icon';
 
 export default function RequisitionShop({ force, onClose }: { force: Force; onClose: () => void }) {
   const { state, updateForce } = useStore();
@@ -170,7 +171,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
               {!NEEDS_UNIT.has(sel.name) && sel.name !== 'Increase Supply' && (
                 <label className="field span-all">Note<input value={note} placeholder="What changed" onChange={(e) => setNote(e.target.value)} /></label>
               )}
-              {result && <div className="span-all panel" style={{ margin: 0 }}>✓ {result}</div>}
+              {result && <div className="span-all panel" style={{ margin: 0 }}><Icon name="l:check" /> {result}</div>}
             </div>
           )}
         </div>

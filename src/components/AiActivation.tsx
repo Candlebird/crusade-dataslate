@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AI_STYLES, AI_TREES, randomActivation, type AiAnswer } from '../rules/aiTrees';
 import type { TrackerSide, TrackerUnit } from '../rules/tracker';
+import { Icon } from './Icon';
 
 /**
  * Runs one AI activation: pick a unit (at random, or the one chosen in the table), then answer its decision
@@ -32,7 +33,7 @@ export default function AiActivation({ side, unitId, onPick, setUnit }: {
     return (
       <div className="ai-activation">
         <div className="row">
-          <button className="primary" disabled={!ready.length} onClick={roll}>🎲 Activate a random unit</button>
+          <button className="primary" disabled={!ready.length} onClick={roll}><Icon name="g:perspective-dice-six-faces-six" /> Activate a random unit</button>
           <span className="muted small">{ready.length ? `${ready.length} unit${ready.length > 1 ? 's' : ''} still to activate this round` : 'Every unit has activated this round.'}</span>
         </div>
       </div>
@@ -79,7 +80,7 @@ export default function AiActivation({ side, unitId, onPick, setUnit }: {
                 {node.answers.map((a) => (
                   <button key={a.label} onClick={() => setPath((p) => [...p, { node: last?.go ?? tree.start, answer: a }])}>{a.label}</button>
                 ))}
-                {path.length > 0 && <button className="ghost small" onClick={() => setPath((p) => p.slice(0, -1))}>← Back</button>}
+                {path.length > 0 && <button className="ghost small" onClick={() => setPath((p) => p.slice(0, -1))}><Icon name="l:arrow-left" /> Back</button>}
               </div>
             </>
           )}
@@ -88,7 +89,7 @@ export default function AiActivation({ side, unitId, onPick, setUnit }: {
               <p className="ai-order">{order}</p>
               <div className="row">
                 <button className="primary" onClick={() => finish()}>Done: mark activated</button>
-                <button className="ghost small" onClick={() => setPath((p) => p.slice(0, -1))}>← Back</button>
+                <button className="ghost small" onClick={() => setPath((p) => p.slice(0, -1))}><Icon name="l:arrow-left" /> Back</button>
               </div>
             </>
           )}

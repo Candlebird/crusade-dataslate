@@ -24,6 +24,7 @@ import { useImporter } from './importer';
 import { BOUNTY } from '../rules/nexusData';
 import { Dropzone, Loading, Panel, TextField, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
+import { Glyph, Icon } from './Icon';
 
 // The map is the page's heaviest part; it loads with the Map tab.
 const HexMapPanel = lazy(() => import('./HexMap'));
@@ -146,7 +147,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         <div className="page-head"><div><h1>{c.name}</h1></div></div>
         <div className="panel">
           <p>Only the GM can open the GM's side of the campaign.</p>
-          <a className="btn" href={href.campaign()}>← Back to the campaign</a>
+          <a className="btn" href={href.campaign()}><Icon name="l:arrow-left" /> Back to the campaign</a>
         </div>
       </>
     );
@@ -171,7 +172,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
                 </select>
               </label>
             )}
-            {canGm && <a className="btn primary" href={href.campaignGm()}>GM controls →</a>}
+            {canGm && <a className="btn primary" href={href.campaignGm()}>GM controls <Icon name="l:arrow-right" /></a>}
           </div>
         </div>
         <p className="muted small">
@@ -226,7 +227,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
           <h1><TextField value={c.name} onCommit={(v) => setC((d) => void (d.name = v || 'Nexus Wars'))} /></h1>
         </div>
         <div className="row">
-          <a className="btn" href={href.campaign()}>← Player view</a>
+          <a className="btn" href={href.campaign()}><Icon name="l:arrow-left" /> Player view</a>
           <button onClick={guard} title="Give every AI-held planet, station, anomaly, void sector and Lost Archive without one a guardian (the round's end does this too)">Place guardians</button>
           <button className="primary" onClick={() => exportCampaign(c)}>Export campaign.json</button>
         </div>
@@ -341,7 +342,7 @@ function ReportPanel({ c, viewer }: { c: Campaign; viewer?: string }) {
         <ul className="report">
           {lines.map((l, i) => (
             <li key={i} title={sectorName(l.sectorId)}>
-              <span className="report-icon" aria-hidden>{l.icon}</span>
+              <span className="report-icon" aria-hidden><Glyph g={l.icon} /></span>
               <span>{l.text}</span>
             </li>
           ))}
@@ -389,7 +390,7 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                           d.sectors = d.sectors.filter((s) => !(s.type === 'home' && s.owner === fa.id));
                           for (const s of d.sectors) if (s.owner === fa.id) s.owner = undefined;
                         });
-                      }}>✕</button>
+                      }}><Icon name="l:x" /></button>
                     </td>
                   </tr>
                 );
@@ -454,7 +455,7 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                       {s.type === 'void' && <label className="row" title="One-off reward already taken"><input type="checkbox" checked={!!s.rewardClaimed} onChange={(e) => setS(s.id, (d) => void (d.rewardClaimed = e.target.checked || undefined))} /> Claimed</label>}
                     </td>
                     <td className="s-full" data-label="Lore"><TextField value={s.notes} placeholder="Lore, terrain…" onCommit={(v) => setS(s.id, (d) => void (d.notes = v))} /></td>
-                    <td className="s-end"><button className="ghost icon" aria-label="Remove sector" onClick={() => setC((d) => void (d.sectors = d.sectors.filter((x) => x.id !== s.id)))}>✕</button></td>
+                    <td className="s-end"><button className="ghost icon" aria-label="Remove sector" onClick={() => setC((d) => void (d.sectors = d.sectors.filter((x) => x.id !== s.id)))}><Icon name="l:x" /></button></td>
                   </tr>
                 );
               })}
@@ -538,19 +539,19 @@ function LogPanel({ c, setC, viewer }: { c: Campaign; setC: SetC; viewer?: strin
         <div key={e.id} id={`log-${e.id}`} className="list-item small">
           <span className="muted" title={`Round ${e.round ?? 1}`}>R{e.round ?? 1} · {e.date}</span>
           <span className="grow">
-            {e.skirmish ? <>⚔ Skirmish: <b>{factionName(c, e.winner)} wins</b>{e.defender === ECHOES.id ? <> a patrol against the {ECHOES.name}</> : ''}</>
-              : e.crisis ? <>☠ Nexus Crisis at <b>{sectorName(e.sectorId)}</b>: {e.winner === ECHOES.id ? <b>the Echo Lord prevails</b> : <b>the factions defeat the Echo Lord</b>}</>
-              : e.marauder ? <>🏴 <b>{sectorName(e.sectorId)}</b>: {factionName(c, e.attacker)} vs <b>{e.marauder.name}</b> ({e.marauder.strength} Supply) — {e.winner === e.attacker ? <b>the band is broken</b> : <b>the Marauders hold</b>}</>
-              : e.spread ? <>☣ <b>{factionName(c, e.winner)}</b> spread to <b>{sectorName(e.sectorId)}</b>{e.defender && <> from {factionName(c, e.defender)}</>}</> : <>
+            {e.skirmish ? <><Icon name="g:crossed-swords" /> Skirmish: <b>{factionName(c, e.winner)} wins</b>{e.defender === ECHOES.id ? <> a patrol against the {ECHOES.name}</> : ''}</>
+              : e.crisis ? <><Icon name="g:crowned-skull" /> Nexus Crisis at <b>{sectorName(e.sectorId)}</b>: {e.winner === ECHOES.id ? <b>the Echo Lord prevails</b> : <b>the factions defeat the Echo Lord</b>}</>
+              : e.marauder ? <><Icon name="g:hood" /> <b>{sectorName(e.sectorId)}</b>: {factionName(c, e.attacker)} vs <b>{e.marauder.name}</b> ({e.marauder.strength} Supply) — {e.winner === e.attacker ? <b>the band is broken</b> : <b>the Marauders hold</b>}</>
+              : e.spread ? <><Icon name="g:biohazard" /> <b>{factionName(c, e.winner)}</b> spread to <b>{sectorName(e.sectorId)}</b>{e.defender && <> from {factionName(c, e.defender)}</>}</> : <>
               <b>{sectorName(e.sectorId)}</b>: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} —{' '}
               {e.winner ? <b>{factionName(c, e.winner)} wins</b> : 'draw'}
             </>}
-            {e.loot && <span title={`Guardian loot (rolled ${e.loot.roll})`}> · 🎁 {factionName(c, e.loot.factionId)} looted {e.loot.name}{e.loot.amount ? ` (+${e.loot.amount}${e.loot.id === 'research' ? ' Research' : ' Materials'})` : ''}</span>}
+            {e.loot && <span title={`Guardian loot (rolled ${e.loot.roll})`}> · <Icon name="g:open-treasure-chest" /> {factionName(c, e.loot.factionId)} looted {e.loot.name}{e.loot.amount ? ` (+${e.loot.amount}${e.loot.id === 'research' ? ' Research' : ' Materials'})` : ''}</span>}
             {e.notes && <span className="muted"> · {e.notes}</span>}
           </span>
           {!viewer && <button className="ghost icon" aria-label="Delete log entry"
             title={e.undo ? 'Delete the entry and put the sector back, unless a later game changed it' : 'Delete the entry'}
-            onClick={() => confirmAction(`Delete this ${e.crisis ? 'Nexus Crisis battle' : e.skirmish ? 'skirmish' : `${sectorName(e.sectorId)} ${e.spread ? 'spread' : 'game'}`} from the log?${e.undo ? ` The sector goes back to how the ${e.spread ? 'spread' : 'game'} found it.` : ''}`) && setC((d) => removeSectorGame(d, e.id))}>✕</button>}
+            onClick={() => confirmAction(`Delete this ${e.crisis ? 'Nexus Crisis battle' : e.skirmish ? 'skirmish' : `${sectorName(e.sectorId)} ${e.spread ? 'spread' : 'game'}`} from the log?${e.undo ? ` The sector goes back to how the ${e.spread ? 'spread' : 'game'} found it.` : ''}`) && setC((d) => removeSectorGame(d, e.id))}><Icon name="l:x" /></button>}
         </div>
       ))}
     </Panel>

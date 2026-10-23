@@ -14,6 +14,7 @@ import { EXPEDITION_SITES } from '../rules/downtimeData';
 import { rewardText } from '../rules/downtime';
 import { relicHolderText, relicHolders } from '../rules/engine';
 import { Panel } from './ui';
+import { IconText } from './Icon';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
 
@@ -38,13 +39,13 @@ function Prose({ lines }: { lines: string[] }) {
 function Entries({ title, entries, roll }: { title?: string; entries: TableEntry[]; roll?: boolean }) {
   return (
     <>
-      {title && <h3>{title}</h3>}
+      {title && <h3><IconText text={title} /></h3>}
       <table className="compact small">
         <tbody>
           {entries.map((e, i) => (
             <tr key={e.name}>
               {roll && <td className="muted">{i + 1}</td>}
-              <td><b>{e.name}</b></td>
+              <td><b><IconText text={e.name} /></b></td>
               <td>{e.desc}</td>
             </tr>
           ))}

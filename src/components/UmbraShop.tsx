@@ -9,6 +9,7 @@ import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_ROUNDS, UMBRA_SHOP, ho
 import { isReinforced } from '../rules/production';
 import { Modal, RelicOption, toast } from './ui';
 import { localDate } from '../model/date';
+import { Icon } from './Icon';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
 const NEEDS_UNIT = new Set<UmbraBuy>(['knowledge', 'relic', 'evolution']);
@@ -204,7 +205,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
                   <span className="muted small">Changes your copy of the campaign — report it to the GM.</span>
                 </label>
               )}
-              {result && <div className="span-all panel" style={{ margin: 0 }}>✓ {result}</div>}
+              {result && <div className="span-all panel" style={{ margin: 0 }}><Icon name="l:check" /> {result}</div>}
             </div>
           )}
         </div>

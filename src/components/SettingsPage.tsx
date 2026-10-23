@@ -92,6 +92,16 @@ export default function SettingsPage() {
             </Dropzone>
           </Panel>
 
+          <Panel id="settings.credits" title="Credits">
+            <p className="muted small">
+              Game icons and emblem symbols by Lorc, Delapouite, Skoll, Caro Asercion and others from{' '}
+              <a href="https://game-icons.net" target="_blank" rel="noreferrer">game-icons.net</a>, under{' '}
+              <a href="https://creativecommons.org/licenses/by/3.0/" target="_blank" rel="noreferrer">CC BY 3.0</a>.
+              Interface icons from <a href="https://lucide.dev" target="_blank" rel="noreferrer">Lucide</a>, under the{' '}
+              <a href="https://lucide.dev/license" target="_blank" rel="noreferrer">ISC licence</a>.
+            </p>
+          </Panel>
+
           <div className="panel">
             <div className="panel-title"><h3>Danger zone</h3></div>
             {cloud.email && (

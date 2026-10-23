@@ -8,6 +8,7 @@ import { href } from '../route';
 import { datasheetTags, matchesTags, tagsIn } from '../model/tags';
 import { DatasheetTags, TagFilter } from './Tags';
 import { Modal, Stepper } from './ui';
+import { Icon } from './Icon';
 
 type Tab = 'catalog' | 'text' | 'blank';
 
@@ -73,7 +74,7 @@ function CatalogTab({ onAdd, budget }: { onAdd: (u: Unit[]) => void; budget?: nu
           <select value={bookId} onChange={(e) => { setBookId(e.target.value); setUnitId(null); }}>
             {state.books.map((b) => <option key={b.uid} value={b.uid}>{b.name}</option>)}
           </select>
-          {book && <a href={bookPageUrl(book.uid, book.name)} target="_blank" rel="noreferrer" title="Open this army on Army Forge">↗</a>}
+          {book && <a href={bookPageUrl(book.uid, book.name)} target="_blank" rel="noreferrer" title="Open this army on Army Forge"><Icon name="l:external-link" /></a>}
           <input placeholder="Search datasheets…" value={query} onChange={(e) => setQuery(e.target.value)} style={{ flex: 1 }} />
         </div>
         {budget !== undefined && (

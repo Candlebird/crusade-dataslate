@@ -1,6 +1,7 @@
 import type { Category, RelicTier } from '../rules/data';
 import type { MissionDef } from '../rules/missions';
 import type { FinishedBattle, TrackedBattle } from '../rules/tracker';
+import type { SymbolShape } from './emblemSymbols';
 
 export interface WeaponTrait {
   id: string;
@@ -201,7 +202,8 @@ export interface ArmyList {
 
 export type EmblemShape =
   | 'circle' | 'ring' | 'square' | 'diamond' | 'shield' | 'hexagon' | 'triangle' | 'star'
-  | 'burst' | 'cross' | 'chevron' | 'crescent' | 'bolt' | 'wings' | 'skull';
+  | 'burst' | 'cross' | 'chevron' | 'crescent' | 'bolt' | 'wings' | 'skull'
+  | SymbolShape;
 
 /** One layer of a force emblem; 'none' leaves the layer empty. */
 export interface EmblemLayer {

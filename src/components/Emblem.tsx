@@ -2,7 +2,10 @@ import { useState, type ReactNode } from 'react';
 import type { EmblemLayer, EmblemShape, Unit } from '../model/types';
 import { Modal } from './ui';
 import { useStore } from '../model/store';
-import { EMBLEM_PALETTE, EMBLEM_SHAPES, LAYER_NAMES, LAYER_SCALE, SHAPE_IDS, emblemLayers, randomEmblem, unitPortrait } from '../model/emblem';
+import { BASE_SHAPE_IDS, EMBLEM_PALETTE, EMBLEM_SHAPES, LAYER_NAMES, LAYER_SCALE, SHAPE_IDS, emblemLayers, randomEmblem, shapeFillRule, shapeScale, unitPortrait } from '../model/emblem';
+import { Icon } from './Icon';
+
+const SYMBOL_IDS = SHAPE_IDS.filter((s) => !BASE_SHAPE_IDS.includes(s));
 
 /** The emblem's layers as SVG, in a 100 × 100 box; for drawing inside another SVG (the Nexus Map). */
 export function EmblemShapes({ layers }: { layers: EmblemLayer[] }) {
@@ -12,9 +15,9 @@ export function EmblemShapes({ layers }: { layers: EmblemLayer[] }) {
         if (l.shape === 'none') return null;
         const s = LAYER_SCALE[i];
         return (
-          <path key={i} d={EMBLEM_SHAPES[l.shape].path} fill={l.color} fillRule="evenodd"
+          <path key={i} d={EMBLEM_SHAPES[l.shape].path} fill={l.color} fillRule={shapeFillRule(l.shape)}
             stroke="rgba(0,0,0,0.55)" strokeWidth={1} strokeLinejoin="round" vectorEffect="non-scaling-stroke"
-            transform={`translate(${50 - 50 * s} ${50 - 50 * s}) scale(${s})`} />
+            transform={`translate(${50 - 50 * s} ${50 - 50 * s}) scale(${s * shapeScale(l.shape)})`} />
         );
       })}
     </>
@@ -35,8 +38,8 @@ export function EmblemBadge({ emblem, size = 32, title }: { emblem: unknown; siz
 
 function ShapeIcon({ shape }: { shape: EmblemShape }) {
   return (
-    <svg width={22} height={22} viewBox="0 0 100 100" aria-hidden>
-      <path d={EMBLEM_SHAPES[shape].path} fill="currentColor" fillRule="evenodd" />
+    <svg width={22} height={22} viewBox={`0 0 ${100 / shapeScale(shape)} ${100 / shapeScale(shape)}`} aria-hidden>
+      <path d={EMBLEM_SHAPES[shape].path} fill="currentColor" fillRule={shapeFillRule(shape)} />
     </svg>
   );
 }
@@ -51,9 +54,10 @@ export function Portrait({ unit, size = 32, title }: { unit: Pick<Unit, 'id' | '
 /**
  * Building an emblem (a force's) or a portrait (a unit's): a shape and a colour for each of the three layers. A portrait
  * has a `fallback` (its default), so it's never empty, and resetting goes back to that. The bottom `fixedLayers` can't be
- * changed (a portrait's come from its force), and `roll` makes the 🎲 Random emblem instead of a wholly random one.
+ * changed (a portrait's come from its force), and `roll` makes the 🎲 Random emblem instead of a wholly random one
+ * (which, unlike the seeded defaults, can use the symbols too).
  */
-export function EmblemEditor({ emblem, onChange, readOnly, fallback, fixedLayers = 0, roll = () => randomEmblem() }: {
+export function EmblemEditor({ emblem, onChange, readOnly, fallback, fixedLayers = 0, roll = () => randomEmblem(Math.random, SHAPE_IDS) }: {
   emblem: unknown; onChange: (e: EmblemLayer[] | undefined) => void; readOnly?: boolean; fallback?: EmblemLayer[];
   fixedLayers?: number; roll?: () => EmblemLayer[];
 }) {
@@ -62,11 +66,17 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback, fixedLayers
     return readOnly ? <p className="muted small">No emblem. The Nexus Map shows a plain marker.</p> : (
       <div>
         <p className="muted small">No emblem yet. The Nexus Map shows a plain marker until you make one.</p>
-        <button className="primary" onClick={() => onChange(randomEmblem())}>Create emblem</button>
+        <button className="primary" onClick={() => onChange(randomEmblem(Math.random, SHAPE_IDS))}>Create emblem</button>
       </div>
     );
   }
   const setLayer = (i: number, patch: Partial<EmblemLayer>) => onChange(layers.map((l, j) => (j === i ? { ...l, ...patch } : l)));
+  const shapeButton = (s: EmblemShape, i: number, l: EmblemLayer) => (
+    <button key={s} type="button" role="radio" aria-checked={l.shape === s} className={l.shape === s ? 'on' : ''}
+      title={EMBLEM_SHAPES[s].name} aria-label={EMBLEM_SHAPES[s].name} onClick={() => setLayer(i, { shape: s })}>
+      <ShapeIcon shape={s} />
+    </button>
+  );
   return (
     <div className="emblem-editor">
       <div className="emblem-preview">
@@ -81,14 +91,11 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback, fixedLayers
               <div className="emblem-shapes" role="radiogroup" aria-label={`${LAYER_NAMES[i]} shape`}>
                 {i > 0 && (
                   <button type="button" role="radio" aria-checked={l.shape === 'none'} className={l.shape === 'none' ? 'on' : ''}
-                    title="None" onClick={() => setLayer(i, { shape: 'none' })}>∅</button>
+                    title="None" onClick={() => setLayer(i, { shape: 'none' })}><Icon name="l:ban" /></button>
                 )}
-                {SHAPE_IDS.map((s) => (
-                  <button key={s} type="button" role="radio" aria-checked={l.shape === s} className={l.shape === s ? 'on' : ''}
-                    title={EMBLEM_SHAPES[s].name} aria-label={EMBLEM_SHAPES[s].name} onClick={() => setLayer(i, { shape: s })}>
-                    <ShapeIcon shape={s} />
-                  </button>
-                ))}
+                {BASE_SHAPE_IDS.map((s) => shapeButton(s, i, l))}
+                <span className="emblem-shapes-break muted small">Symbols</span>
+                {SYMBOL_IDS.map((s) => shapeButton(s, i, l))}
               </div>
               <div className="emblem-colors">
                 {EMBLEM_PALETTE.map((c) => (
@@ -101,7 +108,7 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback, fixedLayers
             </fieldset>
           ))}
           <div className="row">
-            <button onClick={() => onChange(roll())}>🎲 Random</button>
+            <button onClick={() => onChange(roll())}><Icon name="g:perspective-dice-six-faces-six" /> Random</button>
             {fallback
               ? <button className="ghost" disabled={!emblemLayers(emblem) || JSON.stringify(emblem) === JSON.stringify(fallback)} onClick={() => onChange(undefined)}>Back to default</button>
               : <button className="ghost" onClick={() => onChange(undefined)}>Remove emblem</button>}
@@ -127,7 +134,7 @@ export function EmblemButton({ emblem, onChange, readOnly, fallback, fixedLayers
       <button type="button" className="emblem-button" title={readOnly ? title : `Edit ${title.toLowerCase()}`} aria-label={readOnly ? title : `Edit ${title.toLowerCase()}`}
         onClick={() => setOpen(true)}>
         <EmblemBadge emblem={emblemLayers(emblem) ?? fallback} size={size} />
-        {!readOnly && <span className="emblem-button-hint" aria-hidden>✎</span>}
+        {!readOnly && <span className="emblem-button-hint" aria-hidden><Icon name="l:pencil" /></span>}
       </button>
       {open && (
         <Modal title={title} onClose={close} footer={<button className="primary" onClick={close}>Done</button>}>
@@ -154,12 +161,13 @@ export function drawEmblem(ctx: CanvasRenderingContext2D, layers: EmblemLayer[],
     let p = paths.get(d);
     if (!p) paths.set(d, (p = new Path2D(d)));
     const s = LAYER_SCALE[i];
+    const k = s * shapeScale(l.shape);
     ctx.save();
     ctx.translate(50 - 50 * s, 50 - 50 * s);
-    ctx.scale(s, s);
-    ctx.lineWidth = 100 / size / s;
+    ctx.scale(k, k);
+    ctx.lineWidth = 100 / size / k;
     ctx.fillStyle = l.color;
-    ctx.fill(p, 'evenodd');
+    ctx.fill(p, shapeFillRule(l.shape));
     ctx.stroke(p);
     ctx.restore();
   });

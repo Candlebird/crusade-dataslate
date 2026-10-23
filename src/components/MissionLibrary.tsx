@@ -4,6 +4,7 @@ import { nowIso, uid } from '../model/factory';
 import { href } from '../route';
 import { OBJECTIVE_ROLLS, SOURCES, allMissions, type MissionDef, type MissionSource, type ObjectiveRoll } from '../rules/missions';
 import { Stepper, TextArea, TextField, confirmAction, toast } from './ui';
+import { Icon } from './Icon';
 
 // The group's missions. Built-ins come from rules/missions.ts; custom ones are saved here and shared with every player.
 
@@ -166,7 +167,7 @@ function MissionForm({ m, onChange }: { m: MissionDef; onChange: (m: MissionDef)
             <Stepper value={c.vp} onChange={(n) => set((d) => void (d.counters![i].vp = n))} />
             <span className="small muted">max</span>
             <Stepper value={c.max ?? 0} min={0} onChange={(n) => set((d) => void (d.counters![i].max = n || undefined))} />
-            <button className="ghost icon" aria-label="Remove tally" onClick={() => set((d) => void d.counters!.splice(i, 1))}>✕</button>
+            <button className="ghost icon" aria-label="Remove tally" onClick={() => set((d) => void d.counters!.splice(i, 1))}><Icon name="l:x" /></button>
           </div>
         ))}
         <div><button onClick={() => set((d) => void (d.counters ??= []).push({ id: uid(), label: 'New tally', vp: 1 }))}>+ Add tally</button></div>
@@ -180,7 +181,7 @@ function MissionForm({ m, onChange }: { m: MissionDef; onChange: (m: MissionDef)
               <TextField className="grow" value={r.title} onCommit={(v) => set((d) => void (d.rules![i].title = v))} placeholder="Title" />
               <span className="small muted">round</span>
               <Stepper value={r.round ?? 0} min={0} onChange={(n) => set((d) => void (d.rules![i].round = n || undefined))} />
-              <button className="ghost icon" aria-label="Remove rule" onClick={() => set((d) => void d.rules!.splice(i, 1))}>✕</button>
+              <button className="ghost icon" aria-label="Remove rule" onClick={() => set((d) => void d.rules!.splice(i, 1))}><Icon name="l:x" /></button>
             </div>
             <TextArea rows={2} value={r.text} onCommit={(v) => set((d) => void (d.rules![i].text = v))} />
           </div>

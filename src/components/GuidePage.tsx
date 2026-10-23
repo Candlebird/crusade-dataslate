@@ -1,6 +1,7 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { href } from '../route';
 import { Panel } from './ui';
+import { Icon } from './Icon';
 
 /** One numbered tutorial step: a title, the page it happens on, and the instructions. */
 function Step({ n, title, where, children }: { n: number; title: string; where?: ReactNode; children: ReactNode }) {
@@ -131,7 +132,7 @@ export default function GuidePage() {
           rewards from it, whenever they get to it.
         </p>
         <p className="muted small">
-          No time to play? Press <b>⚡ Auto-battle</b> on a running battle. Each side picks its force (the other player picks their own, or the AI
+          No time to play? Press <b><Icon name="g:power-lightning" /> Auto-battle</b> on a running battle. Each side picks its force (the other player picks their own, or the AI
           generates one), and every unit gets an Attack and Defense from its Quality, Defense, weapons, traits, upgrades, relics, scars and
           level. The units then take turns attacking for 4 rounds; the team that destroys the most points wins (close is a draw). A unit brought
           to half strength, or beaten in melee, takes a Morale test and may be Shaken, losing its next turn. A battle over a Nexus sector also
@@ -150,7 +151,7 @@ export default function GuidePage() {
         <Step n={3} title="Claim the rewards">
           <p>
             Press <b>Claim rewards</b> next to your side. The post-battle wizard opens with the result, mission and units already filled in.
-            Check them, record deaths, roll your rewards, and apply. The side then shows <span className="tag green">✓ claimed</span>.
+            Check them, record deaths, roll your rewards, and apply. The side then shows <span className="tag green"><Icon name="l:check" /> claimed</span>.
           </p>
           <p className="small muted">
             If a side shows <b>Claim as…</b>, no force was loaded for it during the game. Pick the force you played with from the menu.

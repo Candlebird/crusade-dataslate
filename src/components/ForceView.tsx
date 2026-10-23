@@ -38,6 +38,7 @@ import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
 import { localDate } from '../model/date';
 import { EmblemButton } from './Emblem';
 import { defaultEmblem, emblemLayers } from '../model/emblem';
+import { Icon } from './Icon';
 
 /** Hands the force to another player on the campaign, e.g. when you've been looking after their army. */
 function TransferForce({ f }: { f: Force }) {
@@ -119,11 +120,11 @@ export default function ForceView({ forceId }: { forceId: string }) {
           </h1>
         </div>
         <div className="row">
-          {armyUrl && <a className="btn" href={armyUrl} target="_blank" rel="noreferrer">Army Forge ↗</a>}
+          {armyUrl && <a className="btn" href={armyUrl} target="_blank" rel="noreferrer">Army Forge <Icon name="l:external-link" /></a>}
           <button onClick={() => exportForce(f)}>Export force file</button>
           {/* A Nexus Wars force raises its units at its planets (Production, in the Nexus Wars panel); adding one here skips the bank. */}
           {edit && <button onClick={() => setAdding(true)}>+ Add unit</button>}
-          <button className="primary" onClick={() => go(href.battle(f.id))}>⚔ Record battle</button>
+          <button className="primary" onClick={() => go(href.battle(f.id))}><Icon name="g:crossed-swords" /> Record battle</button>
           {!theirs && <EditModeButton f={f} />}
         </div>
       </div>
@@ -139,7 +140,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
       {!theirs && levelling.length > 0 && (
         <div className="panel notice">
           <div className="panel-title">
-            <h3>⬆ {levelling.length === 1 ? '1 unit needs' : `${levelling.length} units need`} to finish levelling up</h3>
+            <h3><Icon name="g:upgrade" /> {levelling.length === 1 ? '1 unit needs' : `${levelling.length} units need`} to finish levelling up</h3>
           </div>
           {levelling.map((u) => {
             const n = pendingLevels(u);
@@ -221,11 +222,11 @@ export default function ForceView({ forceId }: { forceId: string }) {
                           <td className="num" data-label="Pts">{u.points}</td>
                           <td className="num" data-label="BP">{battlePoints(u, s)}</td>
                           <td className="s-full">
-                            {pendingLevels(u) > 0 && <span className="tag gold" title="Level-ups waiting to be picked">⬆ Level up</span>}
+                            {pendingLevels(u) > 0 && <span className="tag gold" title="Level-ups waiting to be picked"><Icon name="g:upgrade" /> Level up</span>}
                             {u.status === 'comatose' && <span className="tag cyan">Comatose</span>}
                             {u.status === 'removed' && <span className="tag red">Fallen</span>}
                             {u.scars.length > 0 && <span className="tag red">{u.scars.length} scar{u.scars.length > 1 ? 's' : ''}</span>}
-                            {issues.length > 0 && <span className="tag gold" title={issues.map((i) => i.text).join('\n')}>⚠ {issues.length}</span>}
+                            {issues.length > 0 && <span className="tag gold" title={issues.map((i) => i.text).join('\n')}><Icon name="g:hazard-sign" /> {issues.length}</span>}
                           </td>
                         </tr>
                       );
@@ -301,7 +302,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                         <td className="num" data-label="RP"><input type="number" value={e.rp} onChange={(ev) => set((d) => void (d.ledger[i].rp = Number(ev.target.value) || 0))} /></td>
                         <td className="num" data-label="Supply"><input type="number" step={50} value={e.supply} onChange={(ev) => set((d) => void (d.ledger[i].supply = Number(ev.target.value) || 0))} /></td>
                         <td className="num small" data-label="US" title="Umbra Shards (history only — the balance is set in Force details)">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
-                        <td className="s-end"><button className="ghost icon" onClick={() => set((d) => void d.ledger.splice(i, 1))} aria-label="Delete entry">✕</button></td>
+                        <td className="s-end"><button className="ghost icon" onClick={() => set((d) => void d.ledger.splice(i, 1))} aria-label="Delete entry"><Icon name="l:x" /></button></td>
                       </tr>
                     ) : (
                       <tr key={e.id}>
@@ -472,7 +473,7 @@ function HeroOffers({ f, c }: { f: Force; c: Campaign }) {
         return (
           <div key={o.id} className="row" title={o.unit.rules.join(', ')}>
             <span className="grow">
-              ★ <b>{o.unit.unitType}</b> <span className="muted">— level {levelForXp(o.unit.xp)}, {o.unit.points} pts{relic ? <>, carrying <b>{relic.name}</b> ({relic.tier})</> : ''}. {o.fee} US; {offerEnds(o) > currentRound(c) ? 'leaves after next round' : 'leaves when this round ends'}.</span>
+              <Icon name="g:round-star" /> <b>{o.unit.unitType}</b> <span className="muted">— level {levelForXp(o.unit.xp)}, {o.unit.points} pts{relic ? <>, carrying <b>{relic.name}</b> ({relic.tier})</> : ''}. {o.fee} US; {offerEnds(o) > currentRound(c) ? 'leaves after next round' : 'leaves when this round ends'}.</span>
             </span>
             <button disabled={!!block} title={block ?? `Hire for ${o.fee} Umbra Shards; they join ${f.name} for good`} onClick={() => {
               if (!confirmAction(`Hire ${o.unit.unitType} into ${f.name} for ${o.fee} Umbra Shards?`)) return;
@@ -496,7 +497,7 @@ function HeroOffers({ f, c }: { f: Force; c: Campaign }) {
 export function ForceImage({ image, onChange }: { image?: string; onChange: (img: string | undefined) => void }) {
   return (
     <div>
-      {image ? <img className="portrait" src={image} alt="" /> : <div className="portrait portrait-empty">✠</div>}
+      {image ? <img className="portrait" src={image} alt="" /> : <div className="portrait portrait-empty"><Icon name="g:holy-symbol" /></div>}
       <div className="row" style={{ marginTop: '0.4rem' }}>
         <label className="btn" style={{ cursor: 'pointer' }}>
           {image ? 'Change picture' : 'Add picture'}
@@ -701,7 +702,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
                 {n.pending.length === 0 ? <span className="muted">Nothing.</span> : n.pending.map((p, i) => (
                   <div key={i} className="row">
                     <span className="grow">{p}</span>
-                    {edit && <button className="ghost icon" aria-label="Remove" onClick={() => set((d) => void d.nexus!.pending.splice(i, 1))}>✕</button>}
+                    {edit && <button className="ghost icon" aria-label="Remove" onClick={() => set((d) => void d.nexus!.pending.splice(i, 1))}><Icon name="l:x" /></button>}
                   </div>
                 ))}
               </div>

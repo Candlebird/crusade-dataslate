@@ -9,6 +9,7 @@ import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
 import { MARKS, traitMark } from './marks';
 import { Issues, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
+import { Icon } from './Icon';
 
 export default function ListPage({ forceId, listId }: { forceId: string; listId: string }) {
   const { state, updateForce } = useStore();
@@ -75,7 +76,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
           <div className="row">
             <button onClick={duplicate}>Duplicate</button>
             <button className="danger" onClick={remove}>Delete</button>
-            <button className="primary" onClick={() => window.print()} disabled={!t.units}>🖶 Print</button>
+            <button className="primary" onClick={() => window.print()} disabled={!t.units}><Icon name="l:printer" /> Print</button>
           </div>
         </div>
 

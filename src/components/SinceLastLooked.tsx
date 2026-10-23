@@ -3,6 +3,7 @@ import { useCloud } from '../cloud/CloudSync';
 import { useStore } from '../model/store';
 import { digest, loadSeen, saveSeen } from '../rules/digest';
 import { Panel } from './ui';
+import { Glyph } from './Icon';
 
 const SHOWN = 8;
 
@@ -36,7 +37,7 @@ export default function SinceLastLooked() {
     <Panel id="home.digest" title="Since you last looked" extra={<button onClick={markSeen}>Mark all seen</button>}>
       <ul className="report">
         {(all ? fresh : fresh.slice(0, SHOWN)).map((i) => (
-          <li key={i.key}><span className="report-icon">{i.icon}</span><a href={i.href}>{i.text}</a></li>
+          <li key={i.key}><span className="report-icon"><Glyph g={i.icon} /></span><a href={i.href}>{i.text}</a></li>
         ))}
       </ul>
       {!all && fresh.length > SHOWN && <button className="ghost small" onClick={() => setAll(true)}>{fresh.length - SHOWN} more</button>}

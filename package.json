@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "icons": "node scripts/icons.mjs"
   },
   "dependencies": {
     "firebase": "^12.19.0",
@@ -15,6 +16,8 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@iconify-json/game-icons": "^1.2.1",
+    "@iconify-json/lucide": "^1.2.10",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",

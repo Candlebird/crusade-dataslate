@@ -6,6 +6,7 @@ import { relicBearer, relicHolders, relicTaken, rollDie } from '../rules/engine'
 import { useStore } from '../model/store';
 import { unitName } from '../rules/battle';
 import { RelicOption, Stepper } from './ui';
+import { Icon } from './Icon';
 
 export function UnitSelect({ label, units, value, onChange, empty }: { label: string; units: Unit[]; value: string; onChange: (id: string) => void; empty: string }) {
   return (
@@ -58,7 +59,7 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
           <>
             {item.kind === 'shardRoll' && <span className="muted small">{NEXUS_ROUNDS.shardMineRoll}+ = 1 shard</span>}
             {item.kind === 'relicRoll' && <span className="muted small">6 = Common relic</span>}
-            <button onClick={() => setPick({ roll: rollDie(sides) })}>🎲 Roll D{sides}</button>
+            <button onClick={() => setPick({ roll: rollDie(sides) })}><Icon name="g:perspective-dice-six-faces-six" /> Roll D{sides}</button>
             <select value={pick.roll ?? ''} onChange={(ev) => setPick({ roll: Number(ev.target.value) || null })}>
               <option value="">— result —</option>
               {Array.from({ length: sides }, (_, i) => <option key={i} value={i + 1}>{i + 1}{table ? `. ${table[i].text}` : ''}</option>)}

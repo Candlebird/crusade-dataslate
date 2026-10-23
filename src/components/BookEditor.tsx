@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { splitRules } from '../model/bookEdit';
 import type { CatalogUnit } from '../model/types';
 import { Modal, confirmAction } from './ui';
+import { Icon } from './Icon';
 
 type CatalogWeapon = CatalogUnit['weapons'][number];
 
@@ -65,7 +66,7 @@ export function DatasheetEditor({ unit, onSave, onClose }: { unit: CatalogUnit; 
                     onChange={(e) => setWeapon(i, { attacks: /^\d+$/.test(e.target.value) ? Number(e.target.value) : e.target.value })} />
                 </td>
                 <td><input value={weaponRules[i] ?? ''} placeholder="AP(1), Rending" onChange={(e) => setWeaponRules((r) => r.map((x, j) => (j === i ? e.target.value : x)))} /></td>
-                <td><button className="ghost icon" aria-label={`Remove ${w.name}`} onClick={() => removeWeapon(i)}>✕</button></td>
+                <td><button className="ghost icon" aria-label={`Remove ${w.name}`} onClick={() => removeWeapon(i)}><Icon name="l:x" /></button></td>
               </tr>
             ))}
           </tbody>
@@ -81,7 +82,7 @@ export function DatasheetEditor({ unit, onSave, onClose }: { unit: CatalogUnit; 
             <div key={s.id} className="list-item small">
               <span className="grow"><b>{s.label}</b> <span className="muted">{s.options.map((o) => `${o.label} (+${o.cost})`).join(' · ')}</span></span>
               <button className="ghost icon" aria-label={`Remove ${s.label}`}
-                onClick={() => confirmAction(`Remove the "${s.label}" upgrades from ${u.name}?`) && set({ sections: u.sections.filter((x) => x.id !== s.id) })}>✕</button>
+                onClick={() => confirmAction(`Remove the "${s.label}" upgrades from ${u.name}?`) && set({ sections: u.sections.filter((x) => x.id !== s.id) })}><Icon name="l:x" /></button>
             </div>
           ))}
         </>

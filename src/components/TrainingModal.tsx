@@ -17,6 +17,7 @@ import { Modal, confirmAction, toast } from './ui';
 import { FeatList } from './Feats';
 import { uid } from '../model/factory';
 import { localDate } from '../model/date';
+import { Icon } from './Icon';
 import { awardFeats, trainingFeats } from '../rules/feats';
 import { EmblemBadge, Portrait, drawEmblem } from './Emblem';
 
@@ -533,7 +534,7 @@ function RunSummary({ run }: { run: TrainingRun }) {
         <tbody>
           {[...run.towers].sort((a, b) => b.kills - a.kills || b.dealt - a.dealt).map((t) => (
             <tr key={t.unitId} className={t === lead ? 'mvp' : ''}>
-              <td>{t === lead ? '★ ' : ''}{t.name}{t.dead ? <span className="muted"> (fell)</span> : null}</td>
+              <td>{t === lead ? <><Icon name="g:round-star" /> </> : null}{t.name}{t.dead ? <span className="muted"> (fell)</span> : null}</td>
               <td>{t.kills}</td>
               <td>{n(t.dealt)}</td>
               <td>{n(t.saved)}</td>

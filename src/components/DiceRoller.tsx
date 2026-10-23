@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { REWARD_TABLES, SCAR_TABLE, type RewardTableKey } from '../rules/data';
 import { rollDice, rollDie } from '../rules/engine';
 import { Modal, Stepper } from './ui';
+import { Icon } from './Icon';
 
 const SIDES = [3, 6, 10, 20];
 
@@ -33,7 +34,7 @@ export default function DiceRoller() {
   return (
     <>
       <a href="#" className={open ? 'active' : ''} title="Dice roller" onClick={(e) => { e.preventDefault(); setOpen(true); }}>
-        🎲 Dice
+        <Icon name="g:perspective-dice-six-faces-six" /> Dice
       </a>
       {open && <DiceModal onClose={() => setOpen(false)} />}
     </>
@@ -91,7 +92,7 @@ function DiceModal({ onClose }: { onClose: () => void }) {
             {TABLES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
           </select>
         </label>
-        <button onClick={rollTable}>🎲 Roll on table</button>
+        <button onClick={rollTable}><Icon name="g:perspective-dice-six-faces-six" /> Roll on table</button>
       </div>
 
       {last && (
@@ -104,7 +105,7 @@ function DiceModal({ onClose }: { onClose: () => void }) {
           <div className="dice-tray">
             {last.dice.map((d, i) => <DieFace key={i} value={d} item={last} />)}
           </div>
-          {last.result && <div>→ {last.result}</div>}
+          {last.result && <div><Icon name="l:arrow-right" /> {last.result}</div>}
         </div>
       )}
 

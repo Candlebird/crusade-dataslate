@@ -6,6 +6,7 @@ import { factionColor, factionName } from '../rules/nexus';
 import { forceStats, played, type ForceStats, type Record3 } from '../rules/warRoom';
 import { href } from '../route';
 import { Panel } from './ui';
+import { Icon } from './Icon';
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const vp = (n?: number) => (n === undefined ? '—' : String(Math.round(n * 10) / 10));
@@ -70,7 +71,7 @@ export default function WarRoomPanel({ c }: { c: Campaign }) {
             <select value={shown.id} onChange={(e) => setPicked(e.target.value)} aria-label="Force">
               {league.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
-            <a className="btn" href={href.force(shown.id)}>Force page →</a>
+            <a className="btn" href={href.force(shown.id)}>Force page <Icon name="l:arrow-right" /></a>
           </span>
         }>
           <ForceDetail s={stats.get(shown.id)!} />
@@ -92,7 +93,7 @@ function ForceDetail({ s }: { s: ForceStats }) {
         <div className="stat" title="The best opponent's VP, averaged"><b>{vp(s.avgOppVp)}</b><span>Opp. VP</span></div>
       </div>
       {s.mvp && (
-        <p>🏅 <b>MVP: {s.mvp.name}</b> <span className="muted">— {s.mvp.kills} kills in {s.mvp.games} game{s.mvp.games === 1 ? '' : 's'}, wiped {s.mvp.wiped}×</span></p>
+        <p><Icon name="g:medal" /> <b>MVP: {s.mvp.name}</b> <span className="muted">— {s.mvp.kills} kills in {s.mvp.games} game{s.mvp.games === 1 ? '' : 's'}, wiped {s.mvp.wiped}×</span></p>
       )}
 
       <div className="cols-2">
@@ -112,7 +113,7 @@ function ForceDetail({ s }: { s: ForceStats }) {
               <tbody>
                 {s.units.map((u) => (
                   <tr key={u.unitId}>
-                    <td data-label="Unit">{u.unitId === s.mvp?.unitId ? '🏅 ' : ''}{u.name}</td>
+                    <td data-label="Unit">{u.unitId === s.mvp?.unitId ? <><Icon name="g:medal" /> </> : null}{u.name}</td>
                     <td className="num" data-label="Games">{u.games}</td>
                     <td className="num" data-label="Kills">{u.kills}</td>
                     <td className="num" data-label="Wiped">{u.wiped}</td>

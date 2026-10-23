@@ -7,6 +7,7 @@ import DiceRoller from './components/DiceRoller';
 import { Loading, Toaster } from './components/ui';
 import AccountButton from './cloud/AccountButton';
 import { JoinPanel } from './cloud/Players';
+import { Icon } from './components/Icon';
 
 // The pages beyond the forces load on first visit, so the first screen doesn't wait for the map, the tracker and the rules.
 const BattleWizard = lazy(() => import('./components/BattleWizard'));
@@ -26,7 +27,7 @@ export default function App() {
     <div className="app">
       <header className="topbar">
         <a className="brand" href={href.forces()}>
-          <span className="brand-sigil">✠</span>
+          <span className="brand-sigil"><Icon name="g:holy-symbol" /></span>
           <span>
             Crusade <em>Dataslate</em>
           </span>

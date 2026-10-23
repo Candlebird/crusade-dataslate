@@ -32,6 +32,7 @@ import NexusBox, { UnitSelect } from './NexusBox';
 import { Stepper, confirmAction, toast } from './ui';
 import { SOLO_PATROL } from '../rules/downtimeData';
 import { localDate } from '../model/date';
+import { Icon } from './Icon';
 
 const STEPS = ['Setup', 'Units', 'Deaths', 'Rewards', 'Summary'] as const;
 const OUTCOME_LABEL: Record<DeathOutcome, string> = { scar: 'Battle scar', xp: '+1 XP', none: 'Nothing' };
@@ -206,9 +207,9 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       {step === 4 && <SummaryStep outcome={preview} />}
 
       <div className="row">
-        {step > 0 && <button onClick={() => setStep(step - 1)}>← Back</button>}
+        {step > 0 && <button onClick={() => setStep(step - 1)}><Icon name="l:arrow-left" /> Back</button>}
         <span className="spacer" />
-        {step < STEPS.length - 1 && <button className="primary" onClick={() => setStep(step + 1)}>Next: {STEPS[step + 1]} →</button>}
+        {step < STEPS.length - 1 && <button className="primary" onClick={() => setStep(step + 1)}>Next: {STEPS[step + 1]} <Icon name="l:arrow-right" /></button>}
         {step === STEPS.length - 1 && <button className="primary" onClick={apply}>Apply to force</button>}
       </div>
     </>
@@ -386,7 +387,7 @@ function DeathsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInp
                   {r.death.dice.map((d, i) => <span key={i} className={`die-face sm${d === 6 ? ' hit' : ''}${d === 1 ? ' one' : ''}`}>{d}</span>)}
                 </span>
               )}
-              <button onClick={roll}>🎲 Roll {n}D6</button>
+              <button onClick={roll}><Icon name="g:perspective-dice-six-faces-six" /> Roll {n}D6</button>
               <select
                 value={r.death?.outcome ?? ''}
                 onChange={(e) => setUnit(u.id, { death: e.target.value ? { dice: [], outcome: e.target.value as DeathOutcome } : null, scar: '' })}
@@ -397,7 +398,7 @@ function DeathsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInp
             </div>
             {r.death?.outcome === 'scar' && (
               <div className="row" style={{ marginTop: '0.5rem' }}>
-                <button onClick={rollScar}>🎲 Roll D10 scar</button>
+                <button onClick={rollScar}><Icon name="g:perspective-dice-six-faces-six" /> Roll D10 scar</button>
                 <select value={r.scar} onChange={(e) => setUnit(u.id, { scar: e.target.value })}>
                   <option value="">— choose —</option>
                   <optgroup label="Battle scars">
@@ -469,7 +470,7 @@ function RewardBox({ row, units, input, pick, setPick }: {
         {row.fixed ? <span className="tag green">granted</span> : (
           <>
             <span className="spacer" />
-            <button onClick={() => setPick({ roll: rollDie(table.entries.length) })}>🎲 Roll D{table.entries.length}</button>
+            <button onClick={() => setPick({ roll: rollDie(table.entries.length) })}><Icon name="g:perspective-dice-six-faces-six" /> Roll D{table.entries.length}</button>
             <select value={pick.roll ?? ''} onChange={(ev) => setPick({ roll: Number(ev.target.value) || null })}>
               <option value="">— result —</option>
               {table.entries.map((x, i) => <option key={i} value={i + 1}>{i + 1}. {x.text}</option>)}

@@ -43,13 +43,14 @@ import { quirkInfo, trinketInfo, veteranTitle } from '../rules/sortie';
 import { unitBookUrl } from '../armyforge/book';
 import { go, href } from '../route';
 import { EmblemButton } from './Emblem';
-import { FORCE_LAYERS, portraitInForce, randomTop, unitPortrait } from '../model/emblem';
+import { FORCE_LAYERS, SHAPE_IDS, portraitInForce, randomTop, unitPortrait } from '../model/emblem';
 import { ForceImage } from './ForceView';
 import TablePicker, { type PickEntry, type PickGroup, type Picked } from './TablePicker';
 import { traitMark } from './marks';
 import { Issues, Panel, Stepper, TextArea, TextField, XpBar, toast } from './ui';
 import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
 import { localDate } from '../model/date';
+import { Icon } from './Icon';
 
 type Picker =
   | { kind: 'trait' }
@@ -220,7 +221,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           </div>
           <h1 className="with-emblem">
             <EmblemButton emblem={u.portrait && unitPortrait(u, f)} fallback={portraitInForce(u, f)} readOnly={theirs} title="Portrait"
-              fixedLayers={FORCE_LAYERS} roll={() => portraitInForce(u, f, randomTop(portraitInForce(u, f).slice(0, FORCE_LAYERS)))}
+              fixedLayers={FORCE_LAYERS} roll={() => portraitInForce(u, f, randomTop(portraitInForce(u, f).slice(0, FORCE_LAYERS), Math.random, SHAPE_IDS))}
               onChange={(e) => set((d) => void (d.portrait = e))}>
               <p className="muted small" style={{ margin: 0 }}>
                 Stands for the unit in the Training Grounds and on a Sortie. Its background and middle come from the force's emblem.
@@ -232,7 +233,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             {u.name && u.unitType}
             {u.name && u.bookName && ' · '}
             {u.bookName}
-            {bookUrl && <> · <a href={bookUrl} target="_blank" rel="noreferrer">View on Army Forge ↗</a></>}
+            {bookUrl && <> · <a href={bookUrl} target="_blank" rel="noreferrer">View on Army Forge <Icon name="l:external-link" /></a></>}
           </div>
         </div>
         <div className="row">
@@ -264,7 +265,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       {pending > 0 && (
         <div className="panel notice">
           <div className="panel-title">
-            <h3>⬆ Level {earned} reached — {pending} upgrade{pending > 1 ? 's' : ''} to pick</h3>
+            <h3><Icon name="g:upgrade" /> Level {earned} reached — {pending} upgrade{pending > 1 ? 's' : ''} to pick</h3>
           </div>
           <p className="muted small" style={{ marginTop: 0 }}>Each level buys one trait, weapon trait or relic. This goes away once every level is spent.</p>
           <div className="row" style={{ flexWrap: 'wrap' }}>
@@ -344,7 +345,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               {u.rules.map((r, i) => (
                 <span key={r + i} className="tag">
                   {r}
-                  {edit && <button aria-label={`Remove ${r}`} onClick={() => setRules(u.rules.filter((_, j) => j !== i))}>✕</button>}
+                  {edit && <button aria-label={`Remove ${r}`} onClick={() => setRules(u.rules.filter((_, j) => j !== i))}><Icon name="l:x" /></button>}
                 </span>
               ))}
               {edit && <form
@@ -408,7 +409,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                 <label className="row small" title="Free traits don't use a level">
                   <input type="checkbox" checked={!!up.free} onChange={(e) => set((d) => void (d.upgrades[i].free = e.target.checked || undefined))} />Free
                 </label>
-                <button className="ghost icon" aria-label="Remove trait" onClick={() => set((d) => void d.upgrades.splice(i, 1))}>✕</button>
+                <button className="ghost icon" aria-label="Remove trait" onClick={() => set((d) => void d.upgrades.splice(i, 1))}><Icon name="l:x" /></button>
               </div>
             ))}
           </Panel>
@@ -462,7 +463,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                       <select value={r.tier} onChange={(e) => set((d) => void (d.relics[i].tier = e.target.value as RelicTier))}>
                         {TIERS.map((t) => <option key={t}>{t}</option>)}
                       </select>
-                      <button className="ghost icon" aria-label="Remove relic" onClick={() => set((d) => void d.relics.splice(i, 1))}>✕</button>
+                      <button className="ghost icon" aria-label="Remove relic" onClick={() => set((d) => void d.relics.splice(i, 1))}><Icon name="l:x" /></button>
                     </>
                   ) : <span className="tag gold">{r.tier}</span>}
                 </div>
@@ -476,7 +477,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                     <b style={{ color: '#e08a80' }}>{sc.name}</b>
                     {sc.desc && <div className="muted small">{sc.desc}</div>}
                   </div>
-                  {edit && <button className="ghost icon" aria-label="Remove scar" onClick={() => set((d) => void d.scars.splice(i, 1))}>✕</button>}
+                  {edit && <button className="ghost icon" aria-label="Remove scar" onClick={() => set((d) => void d.scars.splice(i, 1))}><Icon name="l:x" /></button>}
                 </div>
               ))}
             </Panel>
@@ -499,7 +500,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                         <b style={{ color: q.good ? 'var(--green)' : '#e08a80' }}>{q.name}</b>
                         <div className="muted small">{q.text}</div>
                       </div>
-                      {edit && <button className="ghost icon" aria-label="Remove quirk" onClick={() => set((d) => void d.quirks?.splice(i, 1))}>✕</button>}
+                      {edit && <button className="ghost icon" aria-label="Remove quirk" onClick={() => set((d) => void d.quirks?.splice(i, 1))}><Icon name="l:x" /></button>}
                     </div>
                   ) : null;
                 })}
@@ -631,7 +632,7 @@ function WeaponRow({ w, infantry, onChange, onRemove, onAddTrait, onRemoveTrait 
           A
           <TextField value={String(w.attacks)} onCommit={(v) => onChange((x) => void (x.attacks = /^\d+$/.test(v) ? Number(v) : v))} className="" />
         </label>
-        <button className="ghost icon" aria-label="Remove weapon" onClick={onRemove}>✕</button>
+        <button className="ghost icon" aria-label="Remove weapon" onClick={onRemove}><Icon name="l:x" /></button>
       </div>
       <div className="small" style={{ marginTop: 4 }}>
         <span className="muted">{w.range ? `${w.range}"` : 'Melee'} · </span>
@@ -646,7 +647,7 @@ function WeaponRow({ w, infantry, onChange, onRemove, onAddTrait, onRemoveTrait 
         {w.traits.map((t) => (
           <span key={t.id} className={`tag ${t.unique ? 'gold' : 'green'}`} title={t.free ? 'Free' : undefined}>
             {traitMark(t)} {t.name}{t.free && ' (free)'}
-            <button aria-label={`Remove ${t.name}`} onClick={() => onRemoveTrait(t.id)}>✕</button>
+            <button aria-label={`Remove ${t.name}`} onClick={() => onRemoveTrait(t.id)}><Icon name="l:x" /></button>
           </span>
         ))}
         <button className="ghost small" onClick={onAddTrait}>+ Trait</button>

@@ -19,6 +19,7 @@ import { go, href } from '../route';
 import { attackBattle, overrunBlock } from '../rules/overrun';
 import { useEndRound } from './RoundPanel';
 import { Panel, confirmAction, toast } from './ui';
+import { Icon } from './Icon';
 
 type Firebase = typeof import('../cloud/firebase');
 
@@ -163,7 +164,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
           <h3>Declared</h3>
           {expected.length === 0 ? <p className="muted small">No forces are linked to factions yet.</p> : (
             <div className="row">
-              {expected.map((f) => <span key={f.id} className="tag" title={isDeclared(f) ? 'Declared' : 'Waiting'}>{isDeclared(f) ? '✓' : '…'} {label(f)}</span>)}
+              {expected.map((f) => <span key={f.id} className="tag" title={isDeclared(f) ? 'Declared' : 'Waiting'}>{isDeclared(f) ? <Icon name="l:check" /> : '…'} {label(f)}</span>)}
             </div>
           )}
           {cloud.isGm && (
@@ -223,9 +224,9 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
         <div key={m.forceId} className="list-item small">
           <span className="grow">
             <b>{who(m.factionId, m.forceId)}</b> moves to <b>{sectorName(m.sectorId)}</b>
-            {!moved && m.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}>⚠ {f}</span>)}
+            {!moved && m.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}><Icon name="g:hazard-sign" /> {f}</span>)}
           </span>
-          {moved && <span className="tag green">✓ Moved</span>}
+          {moved && <span className="tag green"><Icon name="l:check" /> Moved</span>}
         </div>
       ))}
       {met.map((m) => <MeetingRow key={m.key} c={c} m={m} round={round} gm={gm} who={(id) => who('', id)} sectorName={sectorName} />)}
@@ -248,17 +249,17 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
           <div key={a.forceId ?? a.factionId} className="list-item small">
             <span className="grow">
               <b>{who(a.factionId, a.forceId)}</b> attacks <b>{sectorName(a.sectorId)}</b> ({factionName(c, a.defender)})
-              {!fought && a.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}>⚠ {f}</span>)}
+              {!fought && a.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}><Icon name="g:hazard-sign" /> {f}</span>)}
             </span>
             {fought ? (
-              <span className="tag green" title={fought.notes || undefined}>✓ Fought: {fought.winner ? `${factionName(c, fought.winner)} won` : 'a draw'}</span>
+              <span className="tag green" title={fought.notes || undefined}><Icon name="l:check" /> Fought: {fought.winner ? `${factionName(c, fought.winner)} won` : 'a draw'}</span>
             ) : (
               <span className="row" style={{ gap: 4 }}>
-                <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}>⚔ Start battle</a>
+                <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}><Icon name="g:crossed-swords" /> Start battle</a>
                 {!block && mine ? (
-                  <button className="small" onClick={() => autoBattle(a)} title="The garrison is small enough to settle on the auto-battle instead of at the table. It can still go wrong.">⚡ Overrun</button>
+                  <button className="small" onClick={() => autoBattle(a)} title="The garrison is small enough to settle on the auto-battle instead of at the table. It can still go wrong."><Icon name="g:power-lightning" /> Overrun</button>
                 ) : gm && sector ? (
-                  <button className="small" onClick={() => autoBattle(a)} title={`GM fallback, for an attack nobody can play at the table (no overrun: ${block})`}>🎲 Auto-battle</button>
+                  <button className="small" onClick={() => autoBattle(a)} title={`GM fallback, for an attack nobody can play at the table (no overrun: ${block})`}><Icon name="g:perspective-dice-six-faces-six" /> Auto-battle</button>
                 ) : null}
               </span>
             )}
@@ -266,7 +267,7 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
         );
       })}
       {holds.map((h) => (
-        <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds{dug(h.forceId) && <span className="tag" style={{ marginLeft: 6 }} title="If its sector is attacked this round, it fights the battle and picks the deployment">⛊ Dug in</span>}</span></div>
+        <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds{dug(h.forceId) && <span className="tag" style={{ marginLeft: 6 }} title="If its sector is attacked this round, it fights the battle and picks the deployment"><Icon name="g:trench-spade" /> Dug in</span>}</span></div>
       ))}
     </>
   );
@@ -304,18 +305,18 @@ function MeetingRow({ c, m, round, gm, who, sectorName }: {
   return (
     <div className="list-item small" style={{ flexWrap: 'wrap' }}>
       <span className="grow">
-        ⚔ <b>{who(a)}</b> and <b>{who(b)}</b> {HOW[m.how]} <b>{sectorName(m.sectorId)}</b>
+        <Icon name="g:crossed-swords" /> <b>{who(a)}</b> and <b>{who(b)}</b> {HOW[m.how]} <b>{sectorName(m.sectorId)}</b>
         {status !== 'settled' && m.sides.map((id) => (
-          <span key={id} className="tag" style={{ marginLeft: 6 }}>{who(id)}: {calls[id] === 'fight' ? '⚔ Fight' : calls[id] === 'pass' ? '↷ Pass' : '…'}</span>
+          <span key={id} className="tag" style={{ marginLeft: 6 }}>{who(id)}: {calls[id] === 'fight' ? <><Icon name="g:crossed-swords" /> Fight</> : calls[id] === 'pass' ? <><Icon name="l:redo-2" /> Pass</> : '…'}</span>
         ))}
       </span>
       {status === 'settled' ? (
         <>
-          <span className="tag green">✓ {result ? `${who(result)} won: ${who(result === a ? b : a)} falls back` : 'A draw: both stay put'}</span>
+          <span className="tag green"><Icon name="l:check" /> {result ? `${who(result)} won: ${who(result === a ? b : a)} falls back` : 'A draw: both stay put'}</span>
           {gm && <button className="small" onClick={() => edit((x) => unsettleMeeting(x, round, m.key))}>Undo</button>}
         </>
       ) : status === 'passed' ? (
-        <span className="tag">↷ They pass by</span>
+        <span className="tag"><Icon name="l:redo-2" /> They pass by</span>
       ) : null}
       {status !== 'settled' && m.sides.filter(mine).map((id) => (
         <span key={id} className="row" style={{ gap: 4 }}>
@@ -326,7 +327,7 @@ function MeetingRow({ c, m, round, gm, who, sectorName }: {
       ))}
       {status === 'fight' && either && (
         <span className="row" style={{ gap: 4 }}>
-          <button className="small" onClick={() => setAuto(meetingBattle(c, m, state.forces, state.settings))}>⚡ Auto-battle</button>
+          <button className="small" onClick={() => setAuto(meetingBattle(c, m, state.forces, state.settings))}><Icon name="g:power-lightning" /> Auto-battle</button>
           {m.sides.map((id) => <button key={id} className="small" title="Played at the table" onClick={() => settle(id, 'At the table')}>{who(id)} won</button>)}
           <button className="small" title="Played at the table" onClick={() => settle('', 'At the table')}>Draw</button>
         </span>

@@ -9,6 +9,7 @@ import { useCloud } from '../cloud/CloudSync';
 import { EmblemBadge } from './Emblem';
 import { forceEmblem } from '../model/emblem';
 import SinceLastLooked from './SinceLastLooked';
+import { Icon } from './Icon';
 
 export default function ForceList() {
   const { state, update } = useStore();
@@ -67,7 +68,7 @@ export default function ForceList() {
               <h3 className="with-emblem"><EmblemBadge emblem={forceEmblem(f)} size={28} />{f.name}</h3>
               {cloud.email && f.owner && f.owner !== cloud.email && <div className="tag">{f.owner.split('@')[0]}'s force</div>}
               {levelling > 0 && (!cloud.email || !f.owner || f.owner === cloud.email) && (
-                <div className="tag gold">⬆ {levelling} unit{levelling > 1 ? 's' : ''} to level up</div>
+                <div className="tag gold"><Icon name="g:upgrade" /> {levelling} unit{levelling > 1 ? 's' : ''} to level up</div>
               )}
               <div className="sub">
                 {f.faction || 'Unknown faction'}

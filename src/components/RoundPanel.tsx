@@ -16,6 +16,7 @@ import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY } from '../rules/nexusData';
 import { Panel, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
 import { breaksLeft, echoMarks, holders } from '../rules/voidspawn';
+import { Icon } from './Icon';
 
 /** End the current round on a copy of the campaign (the spread is random, so it's rolled once, here) and store the result. */
 export function useEndRound() {
@@ -117,19 +118,19 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
       extra={gm && <button className="primary" onClick={endNow} title="When everyone has played what they're going to play this round">End round…</button>}>
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         <span className="tag red" title={`Up ${NEXUS_ROUNDS.threatPerRound} each round, down ${NEXUS_ROUNDS.threatPerWin} per Battle won against them (${NEXUS_ROUNDS.threatPerVoidspawnWin} at a Voidspawn) and ${NEXUS_ROUNDS.threatPerPatrolWin} per patrol (a skirmish won against them)`}>
-          ☣ {ECHOES.name} threat {threat}/{NEXUS_ROUNDS.threatMax}
+          <Icon name="g:biohazard" /> {ECHOES.name} threat {threat}/{NEXUS_ROUNDS.threatMax}
         </span>
         {marked
           ? <span className="muted">If the round ended now: threat {coming}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>
           : <span className="muted">If the round ended now: threat {coming}, spreading {spreads} sector{spreads === 1 ? '' : 's'}{ahead.size ? ', most likely into the leader\'s space' : ''}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>}
         {gm && !marked && (
-          <button className="small" onClick={markNow} title={`Show where the ${ECHOES.name} will spread when this round ends, so the players can hold the line`}>⚠ Mark their targets</button>
+          <button className="small" onClick={markNow} title={`Show where the ${ECHOES.name} will spread when this round ends, so the players can hold the line`}><Icon name="g:hazard-sign" /> Mark their targets</button>
         )}
       </div>
       {marked && (
         <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}
           title={`Each falls when the round ends, unless a detachment of its own faction (anyone's, if it's unclaimed) stands there, or a faction that won a Battle against the ${ECHOES.name} this round breaks the mark`}>
-          <span className="muted">⚠ The {ECHOES.name} are massing:</span>
+          <span className="muted"><Icon name="g:hazard-sign" /> The {ECHOES.name} are massing:</span>
           {!marks.length && <span className="muted">nowhere this round.</span>}
           {marks.map(({ s, by, status }) => (
             <span key={s.id} className={`tag ${status === 'open' ? 'red' : 'green'}`}>
@@ -197,7 +198,7 @@ function EventRow({ c, gm }: { c: Campaign; gm: boolean }) {
   return (
     <div className="small" style={{ marginTop: '0.5rem' }}>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-        <span className="tag gold">✦ Galactic Event: {event ? event.name : 'none'}</span>
+        <span className="tag gold"><Icon name="g:diamonds" /> Galactic Event: {event ? event.name : 'none'}</span>
         {gm && <><button className="small" onClick={() => change((d) => rollEvent(d))} title="Roll a D12 on the Galactic Events table">{event ? 'Re-roll' : 'Roll a Galactic Event'}</button>
         <select value="" aria-label="Pick the Galactic Event" onChange={(e) => e.target.value && change((d) => setEvent(d, e.target.value))}>
           <option value="">Pick one…</option>
@@ -224,7 +225,7 @@ function CrisisRow({ c }: { c: Campaign }) {
   return (
     <div className="small" style={{ marginTop: '0.5rem' }}>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-        <span className="tag red">☠ Nexus Crisis: {lord?.name ?? 'an Echo Lord'} at {at?.name ?? 'the Voidspawn'}</span>
+        <span className="tag red"><Icon name="g:crowned-skull" /> Nexus Crisis: {lord?.name ?? 'an Echo Lord'} at {at?.name ?? 'the Voidspawn'}</span>
         <span className={`tag${crisis.result === 'won' ? ' gold' : ''}`}>{crisis.result === 'won' ? 'Won' : crisis.result === 'lost' ? 'Lost' : 'Not fought yet'}</span>
         {!crisis.battleId && <a className="btn small" href={href.crisis()}>Start the Crisis battle</a>}
       </div>
@@ -262,7 +263,7 @@ function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
               <span key={u.id} className="tag gold" title={STRATEGIC_ASSETS.find((x) => x.key === u.asset)?.desc}>
                 {assetName(u.asset)}{u.forceId && `: ${forces.find((d) => d.id === u.forceId)?.name ?? 'a detachment'}`}
                 <button className="ghost icon" aria-label={`Take back ${assetName(u.asset)}`} title="Spent by mistake: take it back"
-                  onClick={() => change((d) => refundAsset(d, u.id))}>✕</button>
+                  onClick={() => change((d) => refundAsset(d, u.id))}><Icon name="l:x" /></button>
               </span>
             ))}
             {a.left > 0 && (

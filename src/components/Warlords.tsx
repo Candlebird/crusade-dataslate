@@ -5,6 +5,7 @@ import { levelForXp } from '../rules/engine';
 import { WARLORDS, type WarlordPathId } from '../rules/nexusData';
 import { canRevive, changePath, chooseWarlord, loseWarlord, pathById, reviveWarlord, perksOf, syncWarlords, warlordBlock, warlordCandidates, warlordsStale } from '../rules/warlords';
 import { Panel, confirmAction, toast } from './ui';
+import { Glyph } from './Icon';
 
 type SetC = (fn: (c: Campaign) => void) => void;
 
@@ -28,7 +29,7 @@ export default function WarlordsPanel({ c, setC, faction, gm }: { c: Campaign; s
           const path = pathById(f.path);
           return (
             <span key={f.id} className="stat" title={path ? `${path.name}: ${path.desc}` : 'No Warlord named yet'}>
-              <b>{f.warlord ? `${path?.icon ?? ''} ${f.warlord.name}` : '—'}</b>
+              <b>{f.warlord ? <><Glyph g={path?.icon} /> {f.warlord.name}</> : '—'}</b>
               <span className="muted small">{shown.length > 1 ? `${f.name}: ` : ''}{f.warlord ? `level ${f.warlord.level}` : 'no Warlord'}</span>
             </span>
           );
@@ -96,7 +97,7 @@ function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: Campai
 
   return (
     <div className="warlord">
-      <h3>{f.name}{path && <span className="muted"> — {path.icon} Path of the {path.name}</span>}</h3>
+      <h3>{f.name}{path && <span className="muted"> — <Glyph g={path.icon} /> Path of the {path.name}</span>}</h3>
       {f.warlord ? (
         <p>
           <b>{f.warlord.name}</b>, level {f.warlord.level}
@@ -142,7 +143,7 @@ function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: Campai
       )}
       {(path ? [path] : WARLORDS.paths).map((p) => (
         <div key={p.id} className="small">
-          {!path && <div><b>{p.icon} {p.name}</b> <span className="muted">— {p.desc}</span></div>}
+          {!path && <div><b><Glyph g={p.icon} /> {p.name}</b> <span className="muted">— {p.desc}</span></div>}
           <ul>
             {p.perks.map((k, i) => (
               <li key={k.id} className={path && !unlocked.includes(k.id) ? 'muted' : undefined}>

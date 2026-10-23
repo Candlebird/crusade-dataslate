@@ -14,6 +14,7 @@ import { JOURNAL, JOURNAL_CATALYSTS, JOURNAL_COMPLICATIONS, JOURNAL_CONTEXTS, ty
 import { currentRound, factionName } from '../rules/nexus';
 import { Panel, TextArea, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
+import { Icon } from './Icon';
 
 type SetC = (fn: (c: Campaign) => void) => void;
 const today = () => localDate();
@@ -177,7 +178,7 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
     <div className="warlord">
       <h3>
         {j.warlord} <span className="muted small">— {factionName(c, j.factionId)}, round {j.round}</span>
-        {gm && status !== 'done' && <button className="ghost small" onClick={discard} title="Discard this journal">✕</button>}
+        {gm && status !== 'done' && <button className="ghost small" onClick={discard} title="Discard this journal"><Icon name="l:x" /></button>}
       </h3>
       {!u && <p className="warn small">{force ? `${j.warlord} is no longer in play.` : `Load ${j.warlord}'s force in this browser to play the journal.`}</p>}
       {j.note && <p><i>{j.note}</i></p>}

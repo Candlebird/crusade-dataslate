@@ -12,6 +12,7 @@ import type { RelicTier } from '../rules/data';
 import { factionColor, factionName } from '../rules/nexus';
 import { BOUNTY, BOUNTY_KINDS } from '../rules/nexusData';
 import { Panel, toast } from './ui';
+import { Icon, IconText } from './Icon';
 
 type SetC = (fn: (c: Campaign) => void) => void;
 
@@ -108,7 +109,7 @@ function BountyCard({ c, setC, b, i, gm }: { c: Campaign; setC: SetC; b: Bounty;
 
   return (
     <div className="list-item small bounty" style={{ alignItems: 'flex-start', opacity: b.claimed ? 0.7 : undefined }}>
-      <span className="bounty-stars" title={`Difficulty ${b.difficulty}`}>{STARS[b.difficulty] ?? b.difficulty}</span>
+      <span className="bounty-stars" title={`Difficulty ${b.difficulty}`}>{STARS[b.difficulty] ? <IconText text={STARS[b.difficulty]} /> : b.difficulty}</span>
       <span className="grow">
         <b>{kind.name}</b> — {bountyText(c, b)}
         <br />
@@ -166,7 +167,7 @@ function BountyCard({ c, setC, b, i, gm }: { c: Campaign; setC: SetC; b: Bounty;
                       </select>
                     : <input type="number" min={1} value={r.n} style={{ width: '4.5em' }}
                         onChange={(e) => edit((x) => { const y = x.rewards[ri]; if (y.kind !== 'relic') y.n = Math.max(1, Number(e.target.value) || 1); })} />}
-                  <button className="ghost icon" title="Remove this reward" onClick={() => edit((x) => void x.rewards.splice(ri, 1))}>✕</button>
+                  <button className="ghost icon" title="Remove this reward" onClick={() => edit((x) => void x.rewards.splice(ri, 1))}><Icon name="l:x" /></button>
                 </span>
               ))}
               <button className="ghost small" onClick={() => edit((x) => void x.rewards.push({ kind: 'shards', n: 1 }))}>+ Reward</button>

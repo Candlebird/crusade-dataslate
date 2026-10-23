@@ -22,8 +22,11 @@ import {
 import { SORTIE_BOSSES, SORTIE_REGIONS } from '../rules/sortieStory';
 import { Modal, confirmAction, toast } from './ui';
 import { EmblemBadge, Portrait } from './Emblem';
+import { Glyph, Icon, IconText, SvgIcon, type IconName } from './Icon';
 
-const NODE_ICON: Record<SortieNodeKind, string> = { fight: '⚔', elite: '☠', camp: '⛺', shrine: '✧', cache: '▣', shop: '⚖', boss: '♛' };
+const NODE_ICON: Record<SortieNodeKind, IconName> = {
+  fight: 'g:crossed-swords', elite: 'g:crowned-skull', camp: 'g:camping-tent', shrine: 'g:sparkles', cache: 'g:locked-chest', shop: 'g:scales', boss: 'g:warlord-helmet',
+};
 const NODE_NAME: Record<SortieNodeKind, string> = { fight: 'Echo pack', elite: 'Elite Echoes', camp: 'Camp', shrine: 'Encounter', cache: 'Cache', shop: 'Shop', boss: 'Echo lord' };
 const INTENT: Record<SortieIntentKind, [string, string]> = {
   melee: ['⚔', 'Will fight in melee'],
@@ -141,7 +144,7 @@ function Token({ face, m, current }: { face: React.ReactNode; m: { hp: number; m
     <span className={`sortie-token${down ? ' down' : ''}${m.routed ? ' routed' : ''}${current ? ' current' : ''}`} title={down ? 'Fallen' : m.routed ? 'Routed' : m.shaken ? 'Shaken' : undefined}>
       {face}
       <Hp hp={m.hp} max={m.max} />
-      {marks && <span className="sortie-mark">{marks}</span>}
+      {marks && <span className="sortie-mark"><IconText text={marks} /></span>}
     </span>
   );
 }
@@ -506,7 +509,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
         <div className="sortie-choice">
           <button className="ghost small sortie-recap-row" onClick={() => setBoonsOpen(!boonsOpen)}>
             <b>Boons</b>{' '}
-            <span className="muted">· {unlockedBoons(story).filter((id) => !SORTIE_BOONS[id].curse).length} of {Object.values(SORTIE_BOONS).filter((b) => !b.curse).length} unlocked {boonsOpen ? '▴' : '▾'}</span>
+            <span className="muted">· {unlockedBoons(story).filter((id) => !SORTIE_BOONS[id].curse).length} of {Object.values(SORTIE_BOONS).filter((b) => !b.curse).length} unlocked <Icon name={boonsOpen ? 'l:chevron-up' : 'l:chevron-down'} /></span>
           </button>
           {boonsOpen && (
             <div className="sortie-bestiary">
@@ -532,7 +535,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
         {story?.bestiary && Object.keys(story.bestiary).length ? (
           <div className="sortie-choice">
             <button className="ghost small sortie-recap-row" onClick={() => setBestiaryOpen(!bestiaryOpen)}>
-              <b>Bestiary</b> <span className="muted">· {Object.keys(story.bestiary).length} met · {Object.values(story.bestiary).filter((b) => b.slain).length} lore learned {bestiaryOpen ? '▴' : '▾'}</span>
+              <b>Bestiary</b> <span className="muted">· {Object.keys(story.bestiary).length} met · {Object.values(story.bestiary).filter((b) => b.slain).length} lore learned <Icon name={bestiaryOpen ? 'l:chevron-up' : 'l:chevron-down'} /></span>
             </button>
             {bestiaryOpen && (
               <div className="sortie-bestiary">
@@ -621,7 +624,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
           {run.screen === 'event' && <EventScreen run={run} onChoose={(i) => doit(() => eventChoose(run, i))} onLeave={() => doit(() => leaveEvent(run, book))} />}
           {run.screen === 'camp' && (
             <div className="sortie-panel">
-              <h3>⛺ Camp</h3>
+              <h3><Icon name="g:camping-tent" /> Camp</h3>
               {run.scene && <p className="small sortie-scene">{run.scene}</p>}
               <p className="small">Rest here, or call it a day and head home{run.mode === 'shard' ? ' with the haul' : ''}.</p>
               <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
@@ -632,7 +635,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
           )}
           {run.screen === 'shop' && run.shop && (
             <div className="sortie-panel">
-              <h3>⚖ Shop</h3>
+              <h3><Icon name="g:scales" /> Shop</h3>
               {run.scene && <p className="small sortie-scene">{run.scene}</p>}
               <p className="muted small">
                 Spend the run’s Supply: you have <b>{run.haul.supply}</b>.{run.mode === 'shard' ? ' What you spend here doesn’t come home in the haul.' : ''}
@@ -776,8 +779,8 @@ function LineOrder({ units, down, onMove }: { units: Unit[]; down?: boolean[]; o
           <span className="sortie-slot-tag">{SLOTS[i]}</span>
           <Portrait unit={u} size={22} />
           <span className="grow">{unitName(u)}{isFort(u) && <span className="muted"> · holds the Back</span>}{down?.[i] && <span className="muted"> · down</span>}</span>
-          <button className="ghost" aria-label={`Move ${unitName(u)} forward`} disabled={i === 0 || isFort(u) || isFort(units[i - 1])} onClick={() => onMove(i, -1)}>▲</button>
-          <button className="ghost" aria-label={`Move ${unitName(u)} back`} disabled={i === units.length - 1 || isFort(u) || isFort(units[i + 1])} onClick={() => onMove(i, 1)}>▼</button>
+          <button className="ghost" aria-label={`Move ${unitName(u)} forward`} disabled={i === 0 || isFort(u) || isFort(units[i - 1])} onClick={() => onMove(i, -1)}><Icon name="l:chevron-up" /></button>
+          <button className="ghost" aria-label={`Move ${unitName(u)} back`} disabled={i === units.length - 1 || isFort(u) || isFort(units[i + 1])} onClick={() => onMove(i, 1)}><Icon name="l:chevron-down" /></button>
         </div>
       ))}
     </div>
@@ -833,12 +836,12 @@ function MapScreen({ run, onEnter }: { run: SortieRun; onEnter: (n: SortieNode) 
             >
               <title>{n.hidden ? 'Unknown: get nearer to see it' : n.kind === 'boss' ? `${bossOf(run).name} (${bossOf(run).unit})` : n.affix ? `${NODE_NAME[n.kind]}: ${SORTIE.affixes[n.affix].name}` : NODE_NAME[n.kind]}</title>
               <circle r={n.kind === 'boss' ? 21 : 16} />
-              <text textAnchor="middle" dominantBaseline="central">{n.hidden ? '?' : NODE_ICON[n.kind]}</text>
+              {n.hidden ? <text textAnchor="middle" dominantBaseline="central">?</text> : <SvgIcon name={NODE_ICON[n.kind]} x={0} y={0} size={n.kind === 'boss' ? 24 : 18} className="sortie-node-icon" />}
               {n.omen && !n.hidden && (
                 <g className="sortie-omen" transform="translate(13 -13)">
                   <title>An omen of the lord</title>
                   <circle r={6} />
-                  <text textAnchor="middle" dominantBaseline="central">✦</text>
+                  <SvgIcon name="g:diamonds" x={0} y={0} size={8} />
                 </g>
               )}
             </g>
@@ -855,7 +858,7 @@ function EventScreen({ run, onChoose, onLeave }: { run: SortieRun; onChoose: (i:
   const done = run.event?.result !== undefined;
   return (
     <div className="sortie-panel">
-      <h3>✧ {ev.name}</h3>
+      <h3><Icon name="g:sparkles" /> {ev.name}</h3>
       <p className="small">{ev.text}</p>
       {run.scene && <p className="small sortie-scene">{run.scene}</p>}
       {!done && (
@@ -979,7 +982,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
                     <div className="row small" style={{ gap: 6 }}>
                       <Portrait unit={p.unit} size={26} />
                       <span className="grow"><b>{p.name}</b> <span className="muted">Q{p.quality}+ D{p.defense}+</span>{p.shield > 0 && <span className="sortie-status"> · shield {p.shield}</span>}</span>
-                      {c.orders[p.key] && <span className="sortie-ordered" title="Has its order for the round">✓</span>}
+                      {c.orders[p.key] && <span className="sortie-ordered" title="Has its order for the round"><Icon name="l:check" /></span>}
                     </div>
                     <div className="sortie-models">
                       {p.models.map((m, j) => <Token key={j} face={null} m={m} current={m === current} />)}
@@ -1031,7 +1034,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
                         <span className="sortie-models">{e.models.map((m, i) => <Token key={i} face={null} m={m} />)}</span>
                         {statusesOf(e, c.round).length > 0 && <span className="small sortie-status">{statusesOf(e, c.round).join(', ')}</span>}
                       </span>
-                      {icon && <span className="sortie-intent" title={intent}>{icon}</span>}
+                      {icon && <span className="sortie-intent" title={intent}><Glyph g={icon} /></span>}
                     </button>
                   );
                 })}

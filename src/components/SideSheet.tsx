@@ -4,6 +4,7 @@ import { useStore } from '../model/store';
 import type { ArmyList } from '../model/types';
 import { href } from '../route';
 import { ListSheet } from './ListPage';
+import { Icon } from './Icon';
 
 /** The printable army sheet of a generated side (the Void Echoes), laid out like a crusade force's battle list. */
 export default function SideSheet({ sideId }: { sideId: string }) {
@@ -29,8 +30,8 @@ export default function SideSheet({ sideId }: { sideId: string }) {
       <div className="page-head no-print">
         <div><h1>{side.name} army sheet</h1></div>
         <div className="row">
-          <a className="btn" href={href.tracker()}>← Back to the battle</a>
-          <button className="primary" onClick={() => window.print()}>🖶 Print</button>
+          <a className="btn" href={href.tracker()}><Icon name="l:arrow-left" /> Back to the battle</a>
+          <button className="primary" onClick={() => window.print()}><Icon name="l:printer" /> Print</button>
         </div>
       </div>
       <ListSheet force={force} list={list} settings={state.settings} books={state.books} coreRules={state.coreRules ?? []} />

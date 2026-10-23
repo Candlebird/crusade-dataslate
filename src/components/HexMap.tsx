@@ -32,12 +32,18 @@ import { href } from '../route';
 import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 import SectorDanger from './SectorDanger';
 import { localDate } from '../model/date';
+import { GLYPHS, Glyph, Icon, SvgIcon } from './Icon';
 
 type SetC = (fn: (c: Campaign) => void) => void;
 type Tool = 'select' | 'type' | 'owner' | 'move' | 'unplace';
 
 const SIZE = 40;
 const GLYPH: Record<SectorType, string> = { home: '♜', planet: '◉', research: '⌬', void: '✠', anomaly: '✺', empty: '·', voidspawn: '☣', archive: '❖' };
+/** A sector's glyph drawn in the map: its icon, or the plain dot for empty space. */
+function HexGlyph({ type, x, y }: { type: SectorType; x: number; y: number }) {
+  const name = GLYPHS[GLYPH[type]];
+  return name ? <SvgIcon name={name} x={x} y={y - 4} size={18} className="hex-glyph" /> : <text x={x} y={y + 3} className="hex-glyph">{GLYPH[type]}</text>;
+}
 const TOOLS: { key: Tool; label: string; hint: string }[] = [
   { key: 'select', label: 'Select', hint: 'Click a hex to see or edit it' },
   { key: 'type', label: 'Paint type', hint: 'Click hexes to set their type (creates a sector on empty space)' },
@@ -339,7 +345,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                     <g key={s.id} data-q={h.q} data-r={h.r} className={`hex hex-${s.type}${isSel ? ' hex-sel' : ''}`} opacity={0.45}>
                       <polygon points={hexCorners(p.x, p.y, SIZE - 1)} className="hex-base" fill="#121418" />
                       <polygon points={hexCorners(p.x, p.y, SIZE - 1)} fill="none" className="hex-edge" stroke="#4a525c" strokeWidth={1} strokeDasharray="3 3" />
-                      <text x={p.x} y={p.y + 3} className="hex-glyph">{GLYPH[s.type]}</text>
+                      <HexGlyph type={s.type} x={p.x} y={p.y} />
                       <text x={p.x} y={p.y + 21} className="hex-name">{s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name}</text>
                     </g>
                   );
@@ -352,15 +358,15 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                     {s.image && <image href={s.image} x={p.x - SIZE} y={p.y - SIZE} width={SIZE * 2} height={SIZE * 2} preserveAspectRatio="xMidYMid slice" clipPath={`url(#clip-${s.id})`} opacity="0.75" />}
                     {col && <polygon points={hexCorners(p.x, p.y, SIZE - 1)} fill={col} fillOpacity={s.image ? 0.15 : 0.3} />}
                     <polygon points={hexCorners(p.x, p.y, SIZE - (col ? 3 : 1))} fill="none" className="hex-edge" stroke={col ?? (front?.has(s.id) ? '#5fb3b3' : '#4a525c')} strokeWidth={col || front?.has(s.id) ? 3 : 1} />
-                    <text x={p.x} y={p.y + 3} className="hex-glyph">{GLYPH[s.type]}</text>
+                    <HexGlyph type={s.type} x={p.x} y={p.y} />
                     <text x={p.x} y={p.y + 21} className="hex-name">{s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name}</text>
-                    {isReinforced(s) && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Reinforced</title>⛨</text>}
-                    {s.type === 'void' && s.rewardClaimed && <text x={p.x + 15} y={p.y - 17} className="hex-mark"><title>Reward claimed</title>✓</text>}
-                    {stormed(c, s.id) && <text x={p.x} y={p.y - 17} className="hex-mark"><title>{activeEvent(c)?.name}: can't be attacked this round</title>🌀</text>}
-                    {activeCrisis(c)?.sectorId === s.id && <text x={p.x - 15} y={p.y - 17} className="hex-mark"><title>Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name}</title>☠</text>}
-                    {s.guardian && <text x={p.x + 15} y={p.y - 17} className="hex-mark"><title>Guardian: {s.guardian.name} ({s.guardian.tier})</title>♛</text>}
+                    {isReinforced(s) && <SvgIcon name="g:checked-shield" x={p.x - 15} y={p.y - 21} size={11} className="hex-mark" title="Reinforced" />}
+                    {s.type === 'void' && s.rewardClaimed && <SvgIcon name="g:check-mark" x={p.x + 15} y={p.y - 21} size={11} className="hex-mark" title="Reward claimed" />}
+                    {stormed(c, s.id) && <SvgIcon name="g:tornado" x={p.x} y={p.y - 21} size={11} className="hex-mark" title={`${activeEvent(c)?.name}: can't be attacked this round`} />}
+                    {activeCrisis(c)?.sectorId === s.id && <SvgIcon name="g:crowned-skull" x={p.x - 15} y={p.y - 21} size={11} className="hex-mark" title={`Nexus Crisis: ${lordById(activeCrisis(c)!.lord)?.name}`} />}
+                    {s.guardian && <SvgIcon name="g:warlord-helmet" x={p.x + 15} y={p.y - 21} size={11} className="hex-mark" title={`Guardian: ${s.guardian.name} (${s.guardian.tier})`} />}
                     {markOn(c, s.id) && !markOn(c, s.id)!.brokenBy && (
-                      <text x={p.x + 19} y={p.y + 13} className="hex-mark hex-echo"><title>{MARK_TIP}</title>⚠</text>
+                      <SvgIcon name="g:hazard-sign" x={p.x + 19} y={p.y + 9} size={11} className="hex-mark hex-echo" title={MARK_TIP} />
                     )}
                     {ratingFor(s, viewAs) !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff"><title>AI garrison{viewAs ? ` for ${factionName(c, viewAs)}` : " (the biggest faction's scale)"}: {ratingFor(s, viewAs)} Supply</title>{ratingFor(s, viewAs)}</text>}
                     {/* Detachments: your own always, anyone else's only while you can see the sector. */}
@@ -375,7 +381,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                             const col = color(here[0].nexus?.factionId) ?? '#888';
                             if (!layers) return <>
                               <circle r={6.5} fill={col} stroke="#07080b" strokeWidth={1.5} />
-                              <text y={3} className="hex-force-n">{here.length > 1 ? here.length : '⚑'}</text>
+                              {here.length > 1 ? <text y={3} className="hex-force-n">{here.length}</text> : <SvgIcon name="g:barbute" x={0} y={0} size={9} className="hex-force-n" />}
                             </>;
                             return <>
                               <circle r={9} fill="#07080b" stroke={col} strokeWidth={1.6} />
@@ -418,7 +424,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                   <g key={m.id} data-q={s.q} data-r={s.r} className="hex-band" transform={`translate(${p.x + 19 - n * 9}, ${p.y + 9})`}>
                     <title>{m.name}: Marauders, {m.strength} Supply</title>
                     <circle r={6.5} />
-                    <text y={3}>🏴</text>
+                    <SvgIcon name="g:hood" x={0} y={0} size={9} />
                   </g>
                 );
               })}
@@ -426,7 +432,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
             <div className="map-zoom">
               <button className="icon" aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(4, z * 1.25))}>+</button>
               <button className="icon" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}>−</button>
-              <button className="icon" aria-label="Reset view" title="Reset view" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>⟲</button>
+              <button className="icon" aria-label="Reset view" title="Reset view" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}><Icon name="l:rotate-ccw" /></button>
             </div>
           </div>
 
@@ -443,11 +449,11 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
         </div>
 
         <div className="map-legend small muted">
-          {SECTOR_TYPE_KEYS.map((t) => <span key={t} title={SECTOR_TYPES[t].desc}>{GLYPH[t]} {SECTOR_TYPES[t].label}</span>)}
-          <span>⛨ Reinforced</span>
-          <span>✓ Reward claimed</span>
-          <span>♛ Guardian</span>
-          <span>🏴 Marauders</span>
+          {SECTOR_TYPE_KEYS.map((t) => <span key={t} title={SECTOR_TYPES[t].desc}><Glyph g={GLYPH[t]} /> {SECTOR_TYPES[t].label}</span>)}
+          <span><Icon name="g:checked-shield" /> Reinforced</span>
+          <span><Icon name="l:check" /> Reward claimed</span>
+          <span><Icon name="g:warlord-helmet" /> Guardian</span>
+          <span><Icon name="g:hood" /> Marauders</span>
           <span title="Where a band goes next round. Any detachment on its road stops it."><i className="swatch band-road-swatch" /> Marauder road</span>
           {sidesOf(c).map((f) => <span key={f.id}><i className="swatch" style={{ background: f.color }} /> {f.name}</span>)}
         </div>
@@ -498,7 +504,7 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
       <>
         {s.image && <img className="sector-art" src={s.image} alt="" />}
         <h3 style={{ marginBottom: 0 }}>{s.name}</h3>
-        <div className="small"><span className="tag">{GLYPH[s.type]} {SECTOR_TYPES[s.type].label}</span><span className="tag">Out of sight</span></div>
+        <div className="small"><span className="tag"><Glyph g={GLYPH[s.type]} /> {SECTOR_TYPES[s.type].label}</span><span className="tag">Out of sight</span></div>
         <p className="small muted">You've seen this sector before, but it's beyond your sight now: who holds it, and what guards it, is unknown.</p>
         {s.notes && <p className="small lore">{s.notes}</p>}
       </>
@@ -511,20 +517,20 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
       {s.image && <img className="sector-art" src={s.image} alt="" />}
       <h3 style={{ marginBottom: 0 }}>{s.name}</h3>
       <div className="small">
-        <span className="tag">{GLYPH[s.type]} {SECTOR_TYPES[s.type].label}</span>
+        <span className="tag"><Glyph g={GLYPH[s.type]} /> {SECTOR_TYPES[s.type].label}</span>
         <span className="tag" style={ownerColor ? { borderColor: ownerColor, color: ownerColor } : undefined}>{factionName(c, s.owner)}</span>
-        {isReinforced(s) && <span className="tag">⛨ Reinforced{hasBuilding(s, 'walls') ? ' (Walls)' : ''}</span>}
-        {s.type === 'void' && s.rewardClaimed && <span className="tag">✓ Reward claimed</span>}
-        {stormed(c, s.id) && <span className="tag red">🌀 {activeEvent(c)?.name}: can't be attacked this round</span>}
-        {activeCrisis(c)?.sectorId === s.id && <span className="tag red">☠ Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name} rises here</span>}
-        {isRaided(c, s) && <span className="tag red">🏴 Raided: produces nothing this round</span>}
+        {isReinforced(s) && <span className="tag"><Icon name="g:checked-shield" /> Reinforced{hasBuilding(s, 'walls') ? ' (Walls)' : ''}</span>}
+        {s.type === 'void' && s.rewardClaimed && <span className="tag"><Icon name="l:check" /> Reward claimed</span>}
+        {stormed(c, s.id) && <span className="tag red"><Icon name="g:tornado" /> {activeEvent(c)?.name}: can't be attacked this round</span>}
+        {activeCrisis(c)?.sectorId === s.id && <span className="tag red"><Icon name="g:crowned-skull" /> Nexus Crisis: {lordById(activeCrisis(c)!.lord)?.name} rises here</span>}
+        {isRaided(c, s) && <span className="tag red"><Icon name="g:hood" /> Raided: produces nothing this round</span>}
         <EchoMarkTag c={c} s={s} gm={gm} viewer={viewer} setC={setC} />
       </div>
       <p className="small">{benefit ? <><b>{benefit.name}:</b> {benefit.desc}</> : SECTOR_TYPES[s.type].desc}</p>
       <SectorDanger s={s} factionId={viewer} />
       {g && (
         <p className="small" title={g.unit.notes}>
-          <span className={`tag${g.tier === 'Legendary' ? ' gold' : g.tier === 'Rare' ? ' red' : ''}`}>♛ {g.tier} guardian</span>{' '}
+          <span className={`tag${g.tier === 'Legendary' ? ' gold' : g.tier === 'Rare' ? ' red' : ''}`}><Icon name="g:warlord-helmet" /> {g.tier} guardian</span>{' '}
           <b>{g.name}</b>, a {g.unit.unitType} ({g.unit.points} pts) with doubled Tough{g.unit.relics[0] ? <>, carrying <b>{g.unit.relics[0].name}</b></> : ''}.
           {' '}It leads the garrison{ratingFor(s, viewer) !== undefined ? <>: <b>{ratingFor(s, viewer)} Supply</b> in all</> : ''}. Slay it with a Hero and roll {GUARDIANS.stealRoll}+ to take its relic.
         </p>
@@ -539,9 +545,9 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
         </div>
       )}
       {blocked && <p className="small"><span className="tag red">{blocked}</span></p>}
-      {running?.sectorId === s.id && <p className="small">⚔ <a href={href.tracker()}>{running.mission.name}</a> is being fought here, round {running.round}.</p>}
+      {running?.sectorId === s.id && <p className="small"><Icon name="g:crossed-swords" /> <a href={href.tracker()}>{running.mission.name}</a> is being fought here, round {running.round}.</p>}
       <div className="row" style={{ marginTop: '0.75rem' }}>
-        <a className="btn primary" href={href.tracker(s.id)} title="Open the battle tracker set up for this sector; finishing the battle updates the map">⚔ Start a battle here</a>
+        <a className="btn primary" href={href.tracker(s.id)} title="Open the battle tracker set up for this sector; finishing the battle updates the map"><Icon name="g:crossed-swords" /> Start a battle here</a>
         {gm && onRecord && <button onClick={onRecord} title="Log a game you didn't track">Record a game here</button>}
         {gm && <button onClick={onEdit}>Edit</button>}
       </div>
@@ -597,7 +603,7 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
         const tier = marauderTier(m);
         return (
           <div key={m.id}>
-            <span className="tag red">🏴 Marauders</span> <b>{m.name}</b>: <b>{m.strength} Supply</b>, about since round {m.since}.
+            <span className="tag red"><Icon name="g:hood" /> Marauders</span> <b>{m.name}</b>: <b>{m.strength} Supply</b>, about since round {m.since}.
             {' '}Beat them and roll <span className={`tag${tier === 'Legendary' ? ' gold' : tier === 'Rare' ? ' red' : ''}`}>{tier}</span> Guardian loot.
             {(() => {
               const h = bandHeading(c, m);
@@ -605,14 +611,14 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
             })()}
             {m.barred && (
               <div className="band-challenge">
-                <span className="tag red">⚔ Turned on {m.barred.by.map((id) => factionName(c, id)).join(' & ')}</span>{' '}
+                <span className="tag red"><Icon name="g:crossed-swords" /> Turned on {m.barred.by.map((id) => factionName(c, id)).join(' & ')}</span>{' '}
                 for barring their road at {c.sectors.find((x) => x.id === m.barred!.sectorId)?.name}. Before round {m.barred.round} ends,
                 fight them (win and they're broken, lose and they take {MARAUDERS.lostToll} Materials) or pay {MARAUDERS.toll} Materials.
                 Do neither and they take the {MARAUDERS.toll} anyway.
                 {m.barred.by.filter((id) => gm || id === viewer).map((id) => (
                   <div key={id} className="row" style={{ marginTop: '0.35rem' }}>
                     <b>{factionName(c, id)}</b>
-                    <button onClick={() => startAuto(m.id, id)} title="Fight it out on the auto-battle: the detachment that barred them against the band">⚡ Auto-battle</button>
+                    <button onClick={() => startAuto(m.id, id)} title="Fight it out on the auto-battle: the detachment that barred them against the band"><Icon name="g:power-lightning" /> Auto-battle</button>
                     <button onClick={() => pay(m.id, id)} title={`Pay ${MARAUDERS.toll} Materials from your banks`}>Pay {MARAUDERS.toll}</button>
                   </div>
                 ))}
@@ -632,7 +638,7 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
       })}
       {coming.map(({ m, h }) => (
         <div key={`coming-${m.id}`}>
-          <span className="tag red">🏴 {h.target.id === s.id ? 'Coming here' : 'On their road'}</span>{' '}
+          <span className="tag red"><Icon name="g:hood" /> {h.target.id === s.id ? 'Coming here' : 'On their road'}</span>{' '}
           {h.target.id === s.id
             ? headingText(c, `${m.name} (${m.strength} Supply)`, h)
             : `${m.name} (${m.strength} Supply) pass through here on their way to ${h.target.name}. A detachment of any faction standing here bars the road: they halt in front of it and raid nothing, then turn on it (fight them or pay ${MARAUDERS.toll} Materials).`}
@@ -672,7 +678,7 @@ function DetachmentsHere({ c, s, forces, gm, setC }: { c: Campaign; s: Sector; f
           <b>Detachments here:</b>{' '}
           {here.map((f) => (
             <span key={f.id} className="tag" style={{ borderColor: factionColor(c, f.nexus?.factionId) }}>
-              {emblemLayers(f.emblem) ? <EmblemBadge emblem={f.emblem} size={14} /> : '⚑'} {detachmentName(c, forces, f)}
+              {emblemLayers(f.emblem) ? <EmblemBadge emblem={f.emblem} size={14} /> : <Icon name="g:barbute" />} {detachmentName(c, forces, f)}
             </span>
           ))}
         </p>
@@ -726,31 +732,31 @@ function ProductionBox({ s }: { s: Sector }) {
   return (
     <div className="small" style={{ margin: '0.5rem 0' }}>
       <div>
-        <b>⚒ Production</b>{' '}
+        <b><Icon name="g:anvil" /> Production</b>{' '}
         <span className="muted" title={`Banks ${rate} Materials each round${trade ? ` (${trade} from its Trade Hub)` : ''}, up to ${cap}. Lost if the sector is taken.`}>
           {s.bank ?? 0}/{cap} Materials banked · +{rate} a round
         </span>
       </div>
       <div className="muted" style={{ marginTop: '0.25rem' }}>
-        Buildings: {built.length + (k ? 1 : 0)} of {buildingSlots(s, c ?? undefined)} slots used{s.core && <> · <span className="tag gold" title="Building Expansion: one more building slot">✦ Building Expansion</span></>}
+        Buildings: {built.length + (k ? 1 : 0)} of {buildingSlots(s, c ?? undefined)} slots used{s.core && <> · <span className="tag gold" title="Building Expansion: one more building slot"><Icon name="g:diamonds" /> Building Expansion</span></>}
       </div>
       {built.map((id) => {
         const x = buildingById(id);
         return (
           <div key={id} className="row" title={x?.desc}>
             <span className="grow">
-              {x?.icon} {x?.name ?? id} {x?.rule === 'table' && <span className="tag" title="The app doesn't apply this one: remember it at the table">at the table</span>}{' '}
+              <Glyph g={x?.icon} /> {x?.name ?? id} {x?.rule === 'table' && <span className="tag" title="The app doesn't apply this one: remember it at the table">at the table</span>}{' '}
               <span className="muted">— {x?.desc}</span>
             </span>
             <button className="ghost icon" aria-label={`Tear down ${x?.name ?? id}`} title="Tear down (no refund)"
-              onClick={() => confirmAction(`Tear down the ${x?.name ?? id} at ${s.name}? There's no refund.`) && edit((y) => demolish(y, id))}>✕</button>
+              onClick={() => confirmAction(`Tear down the ${x?.name ?? id} at ${s.name}? There's no refund.`) && edit((y) => demolish(y, id))}><Icon name="l:x" /></button>
           </div>
         );
       })}
       {k && (
         <div className="row" title={going?.desc}>
           <span className="grow">
-            🏗 {going?.name ?? k.id} <span className="tag gold">building</span>{' '}
+            <Icon name="g:crane" /> {going?.name ?? k.id} <span className="tag gold">building</span>{' '}
             <span className="muted">— finished when round {k.round} ends. Paid {price({ cost: k.supply, shards: k.shards })}.</span>
           </span>
           <button className="ghost" title="Stop building; everything paid comes back"
@@ -790,10 +796,10 @@ function ProductionBox({ s }: { s: Sector }) {
         </>
       )}
       {!k && free > 0 && locked > 0 && <div className="muted">{locked} more building{locked === 1 ? '' : 's'} to research in the tech tree (the Research panel).</div>}
-      {!k && free <= 0 && <div className="muted">Every slot is built. Tear one down (✕) to build something else.</div>}
+      {!k && free <= 0 && <div className="muted">Every slot is built. Tear one down (<Icon name="l:x" />) to build something else.</div>}
       {hasBuilding(s, 'exchange') && (
         <div className="row" style={{ marginTop: '0.25rem' }}>
-          <span className="grow">⇄ Grand Exchange{s.exchanged === (c?.round ?? 1) ? <span className="muted"> — traded this round</span> : <span className="muted"> — once a round, with {payer?.name ?? 'a force'}</span>}</span>
+          <span className="grow"><Icon name="l:arrow-left-right" /> Grand Exchange{s.exchanged === (c?.round ?? 1) ? <span className="muted"> — traded this round</span> : <span className="muted"> — once a round, with {payer?.name ?? 'a force'}</span>}</span>
           {([['buyShard', `${X.materials} Materials → ${X.shards} US`], ['sellShard', `${X.shards} US → ${X.back} Materials`]] as [ExchangeTrade, string][]).map(([t, label]) => (
             <button key={t} disabled={!!trade1(t)} title={trade1(t)} onClick={() => {
               edit((y, cc, fs) => {
@@ -807,7 +813,7 @@ function ProductionBox({ s }: { s: Sector }) {
       )}
       {s.type === 'planet' && !s.core && (owner?.cores ?? 0) > 0 && (
         <div className="row" style={{ marginTop: '0.25rem' }}>
-          <span className="grow">✦ {owner?.name} has {owner?.cores} Building Expansion{owner?.cores === 1 ? '' : 's'}: install one here for a building slot more, for good.</span>
+          <span className="grow"><Icon name="g:diamonds" /> {owner?.name} has {owner?.cores} Building Expansion{owner?.cores === 1 ? '' : 's'}: install one here for a building slot more, for good.</span>
           <button disabled={!!coreBlocked} title={coreBlocked} onClick={() => confirmAction(`Install a Building Expansion at ${s.name}? It can't be moved again, and stays if the planet is taken.`)
             && edit((y, cc) => void installCore(cc, y))}>Install</button>
         </div>
@@ -868,7 +874,7 @@ function SectorEditor({ c, s, setSector, setC, onDone, onDeleted }: {
       </div>
       <label className="field span-all">Lore<TextArea value={s.notes} rows={4} placeholder="Lore, terrain, rumours…" onCommit={(v) => setSector((d) => void (d.notes = v))} /></label>
       <div className="span-all row">
-        <button onClick={() => setSector((d) => { const r = rollSector(d.type); d.name = r.name; d.notes = r.notes; })} title="Random name and lore">🎲 Reroll name &amp; lore</button>
+        <button onClick={() => setSector((d) => { const r = rollSector(d.type); d.name = r.name; d.notes = r.notes; })} title="Random name and lore"><Icon name="g:perspective-dice-six-faces-six" /> Reroll name &amp; lore</button>
       </div>
       <div className="span-all row">
         {s.image && <img className="sector-art thumb" src={s.image} alt="" />}
@@ -972,7 +978,7 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
           <label className="field">Rows<Stepper value={o.rows} min={3} onChange={(n) => resize(o.cols, Math.min(n, 30))} /></label>
           <label className="field span-all">
             Seed
-            <span className="row"><input value={o.seed} onChange={(e) => set({ seed: e.target.value })} /><button onClick={() => set({ seed: randomSeed() })} title="New seed">🎲</button></span>
+            <span className="row"><input value={o.seed} onChange={(e) => set({ seed: e.target.value })} /><button onClick={() => set({ seed: randomSeed() })} title="New seed"><Icon name="g:perspective-dice-six-faces-six" /></button></span>
             <span className="muted small">The same seed and settings give the same map.</span>
           </label>
           <label className="field span-all">
@@ -983,7 +989,7 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
         </div>
         <div className="fields">
           {(Object.keys(o.counts) as (keyof GenCounts)[]).map((t) => (
-            <label key={t} className="field" title={SECTOR_TYPES[t].desc}>{GLYPH[t]} {SECTOR_TYPES[t].label}<Stepper value={o.counts[t]} min={0} onChange={(n) => setCount(t, n)} /></label>
+            <label key={t} className="field" title={SECTOR_TYPES[t].desc}><span><Glyph g={GLYPH[t]} /> {SECTOR_TYPES[t].label}</span><Stepper value={o.counts[t]} min={0} onChange={(n) => setCount(t, n)} /></label>
           ))}
           <label className="span-all row small">
             <input type="checkbox" checked={o.replace} onChange={(e) => set({ replace: e.target.checked })} />
@@ -1029,12 +1035,12 @@ function EchoMarkTag({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
   };
   if (m.brokenBy)
     return <>
-      <span className="tag green">🛡 Mark broken by {factionName(c, m.brokenBy)}: the {ECHOES.name} won't take it this round</span>
+      <span className="tag green"><Icon name="g:shield" /> Mark broken by {factionName(c, m.brokenBy)}: the {ECHOES.name} won't take it this round</span>
       {gm && <button className="small" onClick={() => setC((d) => restoreMark(d, s.id))} title="Undo the break">Restore mark</button>}
     </>;
   return <>
     <span className={`tag ${held.length ? 'green' : 'red'}`} title={MARK_TIP}>
-      ⚠ The {ECHOES.name} are massing here{held.length ? `: ${held.map((id) => factionName(c, id)).join(', ')} hold${held.length === 1 ? 's' : ''} the line` : ': it falls when the round ends'}
+      <Icon name="g:hazard-sign" /> The {ECHOES.name} are massing here{held.length ? `: ${held.map((id) => factionName(c, id)).join(', ')} hold${held.length === 1 ? 's' : ''} the line` : ': it falls when the round ends'}
     </span>
     {!held.length && can.map((f) => (
       <button key={f.id} className="small" onClick={() => breakIt(f.id)}
@@ -1059,7 +1065,7 @@ function SpreadButton({ c, setC }: { c: Campaign; setC: SetC }) {
   return (
     <button onClick={spread} disabled={!options.length}
       title={options.length ? `Spread into one of ${options.length} neighbouring sector${options.length === 1 ? '' : 's'} at random` : 'No sector next to their territory to spread into'}>
-      ☣ {ECHOES.name} spread
+      <Icon name="g:biohazard" /> {ECHOES.name} spread
     </button>
   );
 }

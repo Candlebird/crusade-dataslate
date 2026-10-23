@@ -12,6 +12,7 @@ import { blankDatasheet, removeDatasheet, saveDatasheet } from '../model/bookEdi
 import type { CatalogBook, CatalogUnit } from '../model/types';
 import { useImporter } from './importer';
 import { localDate } from '../model/date';
+import { Icon } from './Icon';
 
 export default function BooksPage() {
   const { state, update, addBook } = useStore();
@@ -138,7 +139,7 @@ export default function BooksPage() {
                 {b.faction && `${b.faction} · `}v{b.version}{b.edited ? ' (edited)' : ''} · {b.units.length} datasheets · {b.rules.length} rules · {b.spells.length} spells · fetched {localDate(b.importedAt)}
               </div>
             </div>
-            {b.uid === ECHOES_BOOK ? <span className="muted small" title="Ships with the site, so every player has it">Built in</span> : <a className="btn" href={bookPageUrl(b.uid, b.name)} target="_blank" rel="noreferrer">Army Forge ↗</a>}
+            {b.uid === ECHOES_BOOK ? <span className="muted small" title="Ships with the site, so every player has it">Built in</span> : <a className="btn" href={bookPageUrl(b.uid, b.name)} target="_blank" rel="noreferrer">Army Forge <Icon name="l:external-link" /></a>}
             {proxy && b.uid !== ECHOES_BOOK && (
               <button disabled={!!busy} onClick={() => fetchInto(b.uid)} title="Fetch the latest version from Army Forge">
                 {busy === b.uid ? 'Refreshing…' : 'Refresh'}
@@ -153,7 +154,7 @@ export default function BooksPage() {
                 update((d) => void (d.books = d.books.filter((x) => x.uid !== b.uid)));
               }}
             >
-              ✕
+              <Icon name="l:x" />
             </button>}
           </div>
         ))}
@@ -249,9 +250,9 @@ function BookBrowser({ uid }: { uid: string }) {
                   {editMode && (
                     <td className="s-end">
                       <div className="row" style={{ flexWrap: 'nowrap' }}>
-                        <button className="ghost icon" aria-label={`Edit ${u.name}`} title="Edit" onClick={() => setEditing(u)}>✎</button>
+                        <button className="ghost icon" aria-label={`Edit ${u.name}`} title="Edit" onClick={() => setEditing(u)}><Icon name="l:pencil" /></button>
                         <button className="ghost icon" aria-label={`Remove ${u.name}`} title="Remove"
-                          onClick={() => confirmAction(`Remove ${u.name} from ${book.name}? Units already built from it are kept.`) && changeBook((b) => removeDatasheet(b, u.id))}>✕</button>
+                          onClick={() => confirmAction(`Remove ${u.name} from ${book.name}? Units already built from it are kept.`) && changeBook((b) => removeDatasheet(b, u.id))}><Icon name="l:x" /></button>
                       </div>
                     </td>
                   )}

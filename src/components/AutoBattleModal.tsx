@@ -6,6 +6,7 @@ import { loadForce, loadUnits, sidePoints, teamName, teamsOf, type TeamKey, type
 import { echoesBook, randomEchoes } from '../rules/echoForce';
 import { ECHOES } from '../rules/nexusData';
 import { Modal, Stepper, confirmAction, toast } from './ui';
+import { Icon } from './Icon';
 
 type Set = (fn: (d: TrackedBattle) => void) => void;
 
@@ -80,7 +81,7 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
         {block && <span className="tag red">{block}</span>}
         <span className="spacer" />
         <button onClick={close}>Cancel</button>
-        <button className="primary" disabled={!!block} onClick={fight}>⚔ Fight</button>
+        <button className="primary" disabled={!!block} onClick={fight}><Icon name="g:crossed-swords" /> Fight</button>
       </>
     );
   } else {
@@ -118,8 +119,8 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
       <>
         <span className="muted small">{applyNote ?? 'Applying ends the battle with these losses and kill XP; record it for each force as usual.'}</span>
         <span className="spacer" />
-        <button onClick={fight} title="Throw this run away and fight again">🎲 Fight again</button>
-        <button className="primary" onClick={apply}>✓ Apply result</button>
+        <button onClick={fight} title="Throw this run away and fight again"><Icon name="g:perspective-dice-six-faces-six" /> Fight again</button>
+        <button className="primary" onClick={apply}><Icon name="l:check" /> Apply result</button>
       </>
     ) : (
       <>
@@ -130,7 +131,7 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
       </>
     );
   }
-  return <Modal title="⚡ Auto-battle" onClose={close} footer={footer} wide>{body}</Modal>;
+  return <Modal title={<><Icon name="g:power-lightning" /> Auto-battle</>} onClose={close} footer={footer} wide>{body}</Modal>;
 }
 
 /** Wounds left on every unit after the moves so far. */
@@ -170,7 +171,7 @@ function SideSetup({ b, side, set, fixedAi }: { b: TrackedBattle; side: TrackerS
         fixedAi ? null : book ? (
           <div className="row small">
             <Stepper value={target} step={50} min={50} onChange={setTarget} /> pts
-            <button onClick={generate} title={`A random ${ECHOES.name} army up to the target points`}>🎲 Generate</button>
+            <button onClick={generate} title={`A random ${ECHOES.name} army up to the target points`}><Icon name="g:perspective-dice-six-faces-six" /> Generate</button>
           </div>
         ) : !side.units.length && <div className="muted small">Import the {ECHOES.name} book to generate an army, or set it up on the tracker.</div>
       ) : (
@@ -227,7 +228,7 @@ function HpBar({ f, hp }: { f: Fighter; hp: number }) {
   const pct = (hp / f.maxHp) * 100;
   return (
     <div className={`auto-hp${hp <= 0 ? ' dead' : ''}`} title={`${hp}/${f.maxHp} wounds`}>
-      <div className="row small"><span className="grow">{hp <= 0 ? '💀 ' : ''}{f.name}</span><span className="muted">{hp}/{f.maxHp}</span></div>
+      <div className="row small"><span className="grow">{hp <= 0 ? <><Icon name="g:death-skull" /> </> : null}{f.name}</span><span className="muted">{hp}/{f.maxHp}</span></div>
       <div className="auto-hp-track"><div style={{ width: `${pct}%` }} /></div>
     </div>
   );

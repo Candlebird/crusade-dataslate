@@ -64,6 +64,7 @@ import AutoBattleModal from './AutoBattleModal';
 import { overrunBlock } from '../rules/overrun';
 import { Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
+import { Icon } from './Icon';
 
 /** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
 export default function BattleTracker({ sectorId, attacker, forceId, crisis }: { sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean }) {
@@ -128,7 +129,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
         <div className="row">
           <a className="btn" href={href.missions()}>Mission library</a>
           {!b.ended && <button onClick={() => setAuto(true)} disabled={!!autoBlock}
-            title={autoBlock ? `Play this one at the table (no overrun: ${autoBlock}); the GM can still settle it on the auto-battle` : 'No time to play it out? Let the units fight it out on their stats'}>⚡ Auto-battle</button>}
+            title={autoBlock ? `Play this one at the table (no overrun: ${autoBlock}); the GM can still settle it on the auto-battle` : 'No time to play it out? Let the units fight it out on their stats'}><Icon name="g:power-lightning" /> Auto-battle</button>}
           {!b.ended && <button className="primary" onClick={() => set((d) => void (d.ended = true))}>End battle</button>}
           <button className="danger" onClick={() => confirmAction('Throw away this battle?') && update((s) => void delete s.battle)}>Discard</button>
         </div>
@@ -171,8 +172,8 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
           <div className="small muted">Round</div>
           <div className="score-vp">{b.round}<span className="muted small"> / {b.mission.rounds}</span></div>
           <div className="row" style={{ justifyContent: 'center' }}>
-            <button disabled={b.round <= 1} onClick={() => set(prevRound)} aria-label="Previous round">◀</button>
-            <button className={last ? '' : 'primary'} onClick={() => set(nextRound)}>{last ? 'Extra round' : 'Next round ▶'}</button>
+            <button disabled={b.round <= 1} onClick={() => set(prevRound)} aria-label="Previous round"><Icon name="l:chevron-left" /></button>
+            <button className={last ? '' : 'primary'} onClick={() => set(nextRound)}>{last ? 'Extra round' : <>Next round <Icon name="l:chevron-right" /></>}</button>
           </div>
         </div>
       </div>
@@ -186,7 +187,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
               Markers
               <Stepper value={b.objectives} min={0} onChange={(n) => set((d) => setObjectives(d, n))} />
               {typeof b.mission.objectives === 'string' && (
-                <button className="ghost small" onClick={() => set((d) => setObjectives(d, rollObjectives(d.mission.objectives as 'D3+2' | 'D3')))} title={`Reroll ${b.mission.objectives}`}>🎲</button>
+                <button className="ghost small" onClick={() => set((d) => setObjectives(d, rollObjectives(d.mission.objectives as 'D3+2' | 'D3')))} title={`Reroll ${b.mission.objectives}`}><Icon name="g:perspective-dice-six-faces-six" /></button>
               )}
             </span>
           }
@@ -274,7 +275,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
                 ))}
               </select>
               {DEPLOYMENT_STYLES.map((t) => (
-                <button key={t.group} className="ghost small" title={`Roll on the ${t.group} table: ${t.desc}`} onClick={() => set((d) => void (d.deploymentStyle = rollDeployment(t.group)))}>🎲 {t.group}</button>
+                <button key={t.group} className="ghost small" title={`Roll on the ${t.group} table: ${t.desc}`} onClick={() => set((d) => void (d.deploymentStyle = rollDeployment(t.group)))}><Icon name="g:perspective-dice-six-faces-six" /> {t.group}</button>
               ))}
             </span>
           </div>
@@ -432,7 +433,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
           <label className="row"><input type="checkbox" checked={withAi} onChange={(e) => { setWithAi(e.target.checked); if (!e.target.checked) setPlayers((n) => Math.max(2, n)); }} />Include AI</label>
           <label className="row"><input type="checkbox" checked={pickForces} onChange={(e) => setPickForces(e.target.checked)} />Random forces</label>
           <label className="row"><input type="checkbox" checked={pickMission} onChange={(e) => setPickMission(e.target.checked)} />Random mission</label>
-          <button onClick={randomize} title="Split the players into random teams (or all against the AI), and roll forces and a mission if ticked">🎲 Randomize</button>
+          <button onClick={randomize} title="Split the players into random teams (or all against the AI), and roll forces and a mission if ticked"><Icon name="g:perspective-dice-six-faces-six" /> Randomize</button>
         </div>
         {forces.length > 0 && <p className="small">Forces, in side order: {forces.map((f) => { const t = forceTotals(f, state.settings); return `${f.name} (${t.pointsUsed} pts, ${t.bp} BP)`; }).join(', ')}. You can swap them once the battle starts.</p>}
         <p className="muted small">Teams share objectives and VP. You can add, remove or regroup players once the battle starts.</p>
@@ -454,7 +455,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
         ))}
         <div className="row" style={{ marginTop: '0.8rem' }}>
           <button className="primary" disabled={!m} onClick={() => m && start(m)}>Start {m ? m.name : 'battle'}</button>
-          <button onClick={() => setId(rollAdvancedMission().id)} title="Roll the mission type (1-2 Face-Off, 3-4 Progressive, 5-6 Attack & Defend), then a D6">🎲 Random OPR mission</button>
+          <button onClick={() => setId(rollAdvancedMission().id)} title="Roll the mission type (1-2 Face-Off, 3-4 Progressive, 5-6 Attack & Defend), then a D6"><Icon name="g:perspective-dice-six-faces-six" /> Random OPR mission</button>
         </div>
       </Panel>
       {!sector && !crisis && <SoloPatrol mission={m} />}
@@ -551,7 +552,7 @@ function PastBattles() {
               </div>
               {x.notes && <div className="muted small">{x.notes}</div>}
             </div>
-            <button className="ghost icon" aria-label="Delete this battle" onClick={() => remove(x)}>✕</button>
+            <button className="ghost icon" aria-label="Delete this battle" onClick={() => remove(x)}><Icon name="l:x" /></button>
           </div>
         );
       })}
@@ -561,7 +562,7 @@ function PastBattles() {
 
 /** Claim one side's rewards: open the record wizard for one of my forces, filled in from the battle. */
 function Claim({ battle, side, claimed, by, mine }: { battle: FinishedBattle; side: TrackerSide; claimed: boolean; by?: Force; mine: Force[] }) {
-  if (claimed) return <span className="tag green">✓ claimed{by ? ` by ${by.name}` : ''}</span>;
+  if (claimed) return <span className="tag green"><Icon name="l:check" /> claimed{by ? ` by ${by.name}` : ''}</span>;
   if (side.ai) return null;
   const own = mine.find((f) => f.id === side.forceId);
   if (own) return <a className="btn primary small" href={href.battle(own.id, battle.id, side.id)}>Claim rewards</a>;
@@ -592,9 +593,9 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
       <div className="row">
         {b.sides.map((s) => {
           if (!s.forceId) return <span key={s.id} className="muted small">{s.name}: no force loaded.</span>;
-          if (b.recorded.includes(s.id)) return <span key={s.id} className="tag green">{s.name} recorded ✓</span>;
+          if (b.recorded.includes(s.id)) return <span key={s.id} className="tag green">{s.name} recorded <Icon name="l:check" /></span>;
           if (!state.forces.some((f) => f.id === s.forceId)) return <span key={s.id} className="muted small">{s.name}: its force was deleted.</span>;
-          return <a key={s.id} className="btn primary" href={href.battle(s.forceId)}>⚔ Record battle for {s.name}</a>;
+          return <a key={s.id} className="btn primary" href={href.battle(s.forceId)}><Icon name="g:crossed-swords" /> Record battle for {s.name}</a>;
         })}
       </div>
       {c && game && (
@@ -621,7 +622,7 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
       <div className="row" style={{ marginTop: '0.75rem' }}>
         <span className="muted small">Done? Finishing shares the battle with the group under Past battles, where anyone who hasn't recorded it yet can still claim their rewards.</span>
         <span className="spacer" />
-        <button className="primary" onClick={onFinish}>✓ Finish & save result</button>
+        <button className="primary" onClick={onFinish}><Icon name="l:check" /> Finish & save result</button>
       </div>
     </div>
   );
@@ -677,7 +678,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
         <span className="row small muted">
           {sidePoints(side) ? `${sidePoints(side)} pts · ` : ''}{side.units.length ? `${side.bp} BP · ` : ''}{alive}/{side.units.length} units
           {b.sides.length > 2 && (
-            <button className="ghost icon" aria-label={`Remove ${side.name}`} onClick={() => confirmAction(`Remove ${side.name} from this battle?`) && set((d) => removeSide(d, id))}>✕</button>
+            <button className="ghost icon" aria-label={`Remove ${side.name}`} onClick={() => confirmAction(`Remove ${side.name} from this battle?`) && set((d) => removeSide(d, id))}><Icon name="l:x" /></button>
           )}
         </span>
       </div>
@@ -716,10 +717,10 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
               <div className="row">
                 <Stepper value={target} step={50} min={50} onChange={setTarget} />
                 <span className="small muted">pts</span>
-                <button onClick={generate} title="Build a random army from the Void Echoes book, up to the target points">🎲 Generate</button>
+                <button onClick={generate} title="Build a random army from the Void Echoes book, up to the target points"><Icon name="g:perspective-dice-six-faces-six" /> Generate</button>
                 {!!garrison && garrison !== target && <button className="ghost small" onClick={() => setTarget(garrison)} title="The sector's difficulty rating">Sector garrison {garrison} pts</button>}
                 {enemies > 0 && enemies !== target && <button className="ghost small" onClick={() => setTarget(enemies)}>Match {enemies} pts{reinforced ? ' (Reinforced)' : ''}</button>}
-                {!!side.roster?.length && <a className="btn" href={href.sideSheet(side.id)}>📄 Army sheet</a>}
+                {!!side.roster?.length && <a className="btn" href={href.sideSheet(side.id)}><Icon name="l:file-text" /> Army sheet</a>}
               </div>
             ) : (
               <span className="muted small">Import the {ECHOES.name} army book on the <a href={href.books()}>Books page</a> to generate an army.</span>
@@ -743,7 +744,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
             </span>
           </label>
           <Stepper value={a.count} min={0} onChange={(n) => setSide((s) => void (s.agendas[i].count = n))} />
-          <button className="ghost icon" aria-label="Remove agenda" onClick={() => setSide((s) => void s.agendas.splice(i, 1))}>✕</button>
+          <button className="ghost icon" aria-label="Remove agenda" onClick={() => setSide((s) => void s.agendas.splice(i, 1))}><Icon name="l:x" /></button>
         </div>
       ))}
       {side.agendas.length < MAX_AGENDAS && (
@@ -764,7 +765,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
               <div className="muted small">{COMBAT_MANIPULATIONS.find((c) => m.text.includes(c.name))?.desc}</div>
             </span>
           </label>
-          <button className="ghost icon" aria-label="Remove" onClick={() => setSide((s) => void s.manipulations.splice(i, 1))}>✕</button>
+          <button className="ghost icon" aria-label="Remove" onClick={() => setSide((s) => void s.manipulations.splice(i, 1))}><Icon name="l:x" /></button>
         </div>
       ))}
       <select value="" onChange={(e) => e.target.value && setSide((s) => void s.manipulations.push({ text: `${MANIPULATION_PREFIX}: ${e.target.value}`, used: false }))}>
