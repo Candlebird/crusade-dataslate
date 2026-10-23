@@ -59,6 +59,25 @@ service cloud.firestore {
       allow create, update: if own(id) && player() && sealing();
     }
 
+    // Painting Backlog (candlebird.github.io/painting-backlog): paint progress, keyed by unit id, or "x-…" for models
+    // that aren't in a force. Everyone sees the group's progress. Whoever owns the unit's force edits it (so it follows
+    // a force that's handed over); other entries only their owner. The Dataslate itself never reads these.
+    function forceOwner(d) { return 'forceId' in d && exists(/databases/$(database)/documents/forces/$(d.forceId)) && get(/databases/$(database)/documents/forces/$(d.forceId)).data.owner == email(); }
+    function paintEditor(d) { return d.owner == email() || forceOwner(d); }
+    match /paint/{id} {
+      allow read: if player();
+      allow create: if player() && request.resource.data.owner == email() && (!('forceId' in request.resource.data) || forceOwner(request.resource.data));
+      allow update: if player() && paintEditor(resource.data) && request.resource.data.owner == email();
+      allow delete: if player() && paintEditor(resource.data);
+    }
+    // One photo per paint entry, written in the same batch as its paint document.
+    match /paintPhotos/{id} {
+      allow read: if player();
+      allow create, update: if player() && request.resource.data.owner == email() && request.resource.data.data.size() < 900000
+        && getAfter(/databases/$(database)/documents/paint/$(id)).data.owner == email();
+      allow delete: if player() && exists(/databases/$(database)/documents/paint/$(id)) && paintEditor(get(/databases/$(database)/documents/paint/$(id)).data);
+    }
+
     // House rules are the GM's; core rule texts anyone can import.
     match /shared/{id} {
       allow read: if player();
