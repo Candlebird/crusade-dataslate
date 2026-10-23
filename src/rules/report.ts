@@ -123,6 +123,12 @@ const lootText = (e: CampaignEvent) =>
   e.loot ? ` Among its remains: ${e.loot.name}${e.loot.amount ? ` (+${e.loot.amount}${e.loot.id === 'research' ? ' Research' : ' Materials'})` : ''}.` : '';
 
 function battleLine(c: Campaign, e: CampaignEvent, name: (id: string) => string, rand: Rand): TurnReportLine {
+  const line = plainBattleLine(c, e, name, rand);
+  // An auto-battle's best war story, so the fight reads as more than a result.
+  return e.stories?.length ? { ...line, text: `${line.text} ${e.stories[0]}` } : line;
+}
+
+function plainBattleLine(c: Campaign, e: CampaignEvent, name: (id: string) => string, rand: Rand): TurnReportLine {
   const vars = {
     sector: name(e.sectorId), echoes: ECHOES.name,
     attacker: factionName(c, e.attacker), defender: factionName(c, e.defender), winner: factionName(c, e.winner),

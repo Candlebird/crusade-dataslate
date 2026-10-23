@@ -101,7 +101,9 @@ export interface TrackedBattle {
   notes: string;
   ended: boolean;
   /** Settled by auto-battle instead of being played: who won, and the points of enemy each team destroyed. */
-  auto?: { winner: TeamKey | 'draw'; dealt: Partial<Record<TeamKey, number>> };
+  auto?: { winner: TeamKey | 'draw'; dealt: Partial<Record<TeamKey, number>>;
+    /** The fight's war stories (autoBattle.ts warStories), for the log and the turn report. */
+    stories?: string[] };
   /** Ids of the sides already recorded in their force's crusade log. */
   recorded: string[];
 }
@@ -385,7 +387,8 @@ export function sectorGame(b: TrackedBattle, c: Campaign | undefined, forces: Fo
     : `${b.mission.name}: ${teamsOf(b).map((t) => `${teamName(b, t)} ${sc[t]!.total}`).join(', ')} VP.`)
     + (standIn ? ` The ${ECHOES.name} stood in for ${factionName(c, standIn)}.` : '');
   const forceId = membersOf(b, b.attacker).map((x) => forces.find((f) => f.id === x.forceId)).find((f) => f?.nexus?.factionId === attacker)?.id;
-  return { event: { sectorId: sector.id, attacker, defender, winner: won, notes, battleId: b.id, ...(forceId ? { forceId } : {}) } };
+  const stories = b.auto?.stories;
+  return { event: { sectorId: sector.id, attacker, defender, winner: won, notes, battleId: b.id, ...(forceId ? { forceId } : {}), ...(stories?.length ? { stories } : {}) } };
 }
 
 /**
@@ -471,6 +474,7 @@ export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInp
         ? `Auto-battle (${b.mission.name}): destroyed ${b.auto.dealt[side.team] ?? 0} pts, lost ${teamsOf(b).filter((t) => t !== side.team).reduce((n, t) => n + (b.auto!.dealt[t] ?? 0), 0)} pts.`
         : `${b.mission.name}, ${scores} VP after round ${b.round}.`,
       allies.length ? `Allied with ${allies.map((x) => x.name).join(' & ')}.` : '',
+      ...(b.auto?.stories ?? []),
       b.notes,
     ].filter(Boolean).join(' '),
     units,

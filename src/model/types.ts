@@ -558,6 +558,8 @@ export interface CampaignEvent {
   notes: string;
   /** The tracked battle this game was recorded from, if any. */
   battleId?: string;
+  /** An auto-battle's war stories: its most notable moments, a line each (rules/autoBattle.ts warStories). */
+  stories?: string[];
   /** Not a game: the Void Echoes spread into the sector at the end of a round. */
   spread?: boolean;
   /** The campaign round it happened in. */
@@ -647,7 +649,9 @@ export interface Campaign {
   /** The last round whose revealed moves the GM has applied. */
   movedOrders?: number;
   /** Meeting engagements for one orders round (rules/meetings.ts): each side's call and each fight's winner ('' a draw), by meeting key. */
-  meetings?: { round: number; calls: Record<string, Record<string, MeetingCall>>; results: Record<string, string> };
+  meetings?: { round: number; calls: Record<string, Record<string, MeetingCall>>; results: Record<string, string>;
+    /** Auto-battled fights' war stories, by meeting key. */
+    stories?: Record<string, string[]> };
   /** Nexus Duels: battles two players agreed to fight for a wager (rules/duels.ts). */
   duels?: NexusDuel[];
   /** Crossroads Journals: a short vignette for each faction's Warlord, once a round (rules/journal.ts). */

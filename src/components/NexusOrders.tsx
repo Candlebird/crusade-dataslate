@@ -296,11 +296,12 @@ function MeetingRow({ c, m, round, gm, who, sectorName }: {
     fn(s.campaign);
     s.campaign.updatedAt = nowIso();
   });
-  const settle = (winner: string, how: string) => {
-    edit((x) => settleMeeting(x, round, m.key, winner));
+  const settle = (winner: string, how: string, stories: string[] = []) => {
+    edit((x) => settleMeeting(x, round, m.key, winner, stories));
     toast(`${how}: ${winner ? `${who(winner)} wins and takes ${sectorName(m.sectorId)}` : 'a draw, both stay where they were'}.`);
   };
-  const applyAuto = (r: AutoResult) => settle(r.winner === 'A' ? m.sides[0] : r.winner === 'B' ? m.sides[1] : '', 'Auto-battle');
+  const applyAuto = (r: AutoResult, stories: string[]) => settle(r.winner === 'A' ? m.sides[0] : r.winner === 'B' ? m.sides[1] : '', 'Auto-battle', stories);
+  const stories = c.meetings?.round === round ? c.meetings.stories?.[m.key] ?? [] : [];
   const [a, b] = m.sides;
   return (
     <div className="list-item small" style={{ flexWrap: 'wrap' }}>
@@ -314,6 +315,7 @@ function MeetingRow({ c, m, round, gm, who, sectorName }: {
         <>
           <span className="tag green"><Icon name="l:check" /> {result ? `${who(result)} won: ${who(result === a ? b : a)} falls back` : 'A draw: both stay put'}</span>
           {gm && <button className="small" onClick={() => edit((x) => unsettleMeeting(x, round, m.key))}>Undo</button>}
+          {stories.map((x) => <div key={x} className="muted" style={{ flexBasis: '100%' }}><Icon name="g:quill-ink" /> {x}</div>)}
         </>
       ) : status === 'passed' ? (
         <span className="tag"><Icon name="l:redo-2" /> They pass by</span>

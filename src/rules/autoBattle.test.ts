@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newUnit } from '../model/factory';
 import type { Campaign, Unit } from '../model/types';
-import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, autoOdds, autoSetup, avgAttacks, fighter, fightersOf } from './autoBattle';
+import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, autoOdds, autoSetup, avgAttacks, fighter, fightersOf, warStories } from './autoBattle';
 import { FACE_OFF_MISSIONS } from './missions';
 import { leaders, loadUnits, newBattle, resultFor } from './tracker';
 
@@ -218,5 +218,69 @@ describe('auto-battle heroes and forecast', () => {
     const two = autoOdds(frail, {}, new Set(weak.map((x) => x.sideId)), 50, seeded(9));
     expect(two.A!.unitsLost).toBe(one.A!.unitsLost);
     expect(two.A!.scar).toBeGreaterThan(one.A!.scar);
+  });
+});
+
+describe('auto-battle stances and war stories', () => {
+  const even = () => fightersOf(battle(Array.from({ length: 5 }, () => squad()), Array.from({ length: 5 }, () => squad())), []);
+
+  it('Cautious units pull back at half strength, and lose fewer units and win less', () => {
+    const f = even();
+    const r = autoBattle(f, seeded(11), AUTO_BATTLE.rounds, { stances: { A: 'cautious' } });
+    const pulled = r.fighters.filter((x) => x.withdrawn);
+    expect(pulled.length).toBeGreaterThan(0);
+    for (const x of pulled) {
+      expect(x.team).toBe('A');
+      expect(x.hp).toBeGreaterThan(0);
+      expect(x.hp).toBeLessThanOrEqual(x.maxHp / 2);
+      // Out of the fight: nothing targets it after it pulls back, and it makes no more moves.
+      const at = r.moves.findIndex((m) => m.withdrew?.includes(x.key));
+      expect(r.moves.slice(at + 1).some((m) => m.attacker === x.key || m.target === x.key)).toBe(false);
+    }
+    const rolls = new Set([f[0].sideId]);
+    const careful = autoOdds(f, { stances: { A: 'cautious' } }, rolls, 300, seeded(2)).A!;
+    const plain = autoOdds(f, {}, rolls, 300, seeded(2)).A!;
+    expect(careful.unitsLost).toBeLessThan(plain.unitsLost);
+    expect(careful.scar).toBeLessThan(plain.scar);
+    expect(careful.win).toBeLessThan(plain.win);
+  });
+
+  it('All-out wins more often, without losing fewer units', () => {
+    const f = even();
+    const rolls = new Set([f[0].sideId]);
+    const all = autoOdds(f, { stances: { A: 'allout' } }, rolls, 300, seeded(4)).A!;
+    const plain = autoOdds(f, {}, rolls, 300, seeded(4)).A!;
+    expect(all.win).toBeGreaterThan(plain.win);
+    expect(all.unitsLost).toBeGreaterThan(plain.unitsLost * 0.8);
+  });
+
+  it('tells the war stories: a small unit felling a big one, a unit with several kills, best first', () => {
+    const b = battle([squad({ name: 'Scouts', points: 80 })], [squad({ name: 'Tank', points: 400 }), squad({ name: 'Grunts' })]);
+    const f = fightersOf(b, []);
+    const [scouts, tank, grunts] = ['Scouts', 'Tank', 'Grunts'].map((n) => f.find((x) => x.name === n)!);
+    const r = {
+      fighters: f.map((x) => ({ ...x, hp: x === scouts ? 1 : 0 })),
+      moves: [
+        { round: 1, kind: 'shoot' as const, attacker: scouts.key, target: tank.key, dmg: 5, back: 0, targetHp: 0, attackerHp: scouts.hp },
+        { round: 3, kind: 'charge' as const, attacker: scouts.key, target: grunts.key, dmg: 5, back: 4, targetHp: 0, attackerHp: 1 },
+      ],
+      dealt: { A: 550 }, lost: { A: 0.8, B: 1 }, winner: 'A' as const,
+    };
+    const stories = warStories(f, r, (t) => (t === 'A' ? 'Alpha' : 'Bravo'));
+    expect(stories[0]).toBe('Scouts (80 pts) brought down Tank (400 pts) in round 1.');
+    expect(stories).toContain('Scouts destroyed Tank and Grunts.');
+    expect(stories).toContain('Bravo was wiped out by round 3.');
+    expect(stories).toHaveLength(3);
+    expect(warStories(f, r, undefined, 5)).toContain('Scouts held on to the end with a single wound left.');
+    // A real fight tells at least one.
+    const real = autoBattle(even(), seeded(8));
+    expect(warStories(even(), real).length).toBeGreaterThan(0);
+  });
+
+  it('keeps the war stories on the battle, for the log and the turn report', () => {
+    const b = battle([squad()], [squad()]);
+    const r = autoBattle(fightersOf(b, []), seeded(1));
+    applyAutoBattle(b, r, ['A tale.']);
+    expect(b.auto?.stories).toEqual(['A tale.']);
   });
 });

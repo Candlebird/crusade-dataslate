@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../model/store';
 import type { Force } from '../model/types';
-import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, autoOdds, autoSetup, type AutoOdds, type AutoResult, type Fighter, type Move } from '../rules/autoBattle';
+import { AUTO_BATTLE, STANCES, applyAutoBattle, autoBattle, autoBattleBlock, autoOdds, autoSetup, warStories, type AutoOdds, type AutoResult, type Fighter, type Move, type Stance } from '../rules/autoBattle';
 import { loadForce, loadUnits, sidePoints, teamName, teamsOf, type TeamKey, type TrackedBattle, type TrackerSide } from '../rules/tracker';
 import { echoesBook, randomEchoes } from '../rules/echoForce';
 import { ECHOES } from '../rules/nexusData';
@@ -16,7 +16,7 @@ type Set = (fn: (d: TrackedBattle) => void) => void;
  * band's), and the AI side keeps the army it was given.
  */
 export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }: {
-  b: TrackedBattle; set: Set; onClose: () => void; onApply?: (r: AutoResult) => void; applyNote?: string;
+  b: TrackedBattle; set: Set; onClose: () => void; onApply?: (r: AutoResult, stories: string[]) => void; applyNote?: string;
 }) {
   const { state } = useStore();
   const [result, setResult] = useState<AutoResult | null>(null);
@@ -28,10 +28,18 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
   const block = autoBattleBlock(b);
   // The crusade forces' sides. Their units make death rolls, unless the result goes elsewhere and losses don't carry over.
   const crusade = b.sides.filter((s) => s.forceId && !s.ai);
-  const odds = useMemo(
-    () => (block || !crusade.length ? null : autoOdds(fighters, setup, new Set(onApply ? [] : crusade.map((s) => s.id)))),
-    [setup, block],
-  );
+  const crusadeTeams = [...new Set(crusade.map((s) => s.team))];
+  // How each crusade team fights; the AI always commits.
+  const [stances, setStances] = useState<Partial<Record<TeamKey, Stance>>>({});
+  const opts = { ...setup, stances };
+  // The forecast for every stance a team could take (the others as picked), so the player can weigh them up.
+  const odds = useMemo(() => {
+    if (block || !crusade.length) return null;
+    const rolls = new Set(onApply ? [] : crusade.map((s) => s.id));
+    const per = (t: TeamKey) => Object.fromEntries(STANCES.map((st) => [st, autoOdds(fighters, { ...setup, stances: { ...stances, [t]: st } }, rolls)[t]!]));
+    return Object.fromEntries(crusadeTeams.map((t) => [t, per(t)])) as Partial<Record<TeamKey, Record<Stance, AutoOdds>>>;
+  }, [setup, block, stances]);
+  const stories = useMemo(() => (result ? warStories(fighters, result, (t) => teamName(b, t)) : []), [result]);
   const done = !!result && shown >= result.moves.length;
 
   const close = () => {
@@ -39,16 +47,16 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
     onClose();
   };
   const fight = () => {
-    setResult(autoBattle(fighters, Math.random, AUTO_BATTLE.rounds, setup));
+    setResult(autoBattle(fighters, Math.random, AUTO_BATTLE.rounds, opts));
     setShown(0);
   };
   const apply = () => {
     if (!result) return;
     if (onApply) {
-      onApply(result);
+      onApply(result, stories);
       return onClose();
     }
-    set((d) => applyAutoBattle(d, result));
+    set((d) => applyAutoBattle(d, result, stories));
     toast(result.winner === 'draw' ? 'Auto-battle: a draw.' : `Auto-battle: ${teamName(b, result.winner)} wins.`);
     onClose();
   };
@@ -73,10 +81,11 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
         )}
         {odds && (
           <div className="small">
-            <b>Forecast</b> <span className="muted">({AUTO_BATTLE.forecastRuns} simulated runs of this fight)</span>
-            <ul style={{ margin: '0.25rem 0', paddingLeft: '1.2rem' }}>
-              {[...new Set(crusade.map((s) => s.team))].map((t) => <li key={t}>{teamName(b, t)}: {oddsText(odds[t]!, !onApply)}</li>)}
-            </ul>
+            <b>Stance and forecast</b> <span className="muted">({AUTO_BATTLE.forecastRuns} simulated runs of this fight for each stance; pick how your side fights)</span>
+            {crusadeTeams.map((t) => (
+              <StancePicker key={t} name={crusadeTeams.length > 1 ? teamName(b, t) : undefined} odds={odds[t]!} scars={!onApply}
+                value={stances[t] ?? 'committed'} onChange={(st) => setStances({ ...stances, [t]: st })} />
+            ))}
           </div>
         )}
         <div className="auto-teams">
@@ -101,6 +110,7 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
   } else {
     const moves = result.moves.slice(0, shown);
     const hp = hpAfter(fighters, moves);
+    const pulled = new Set(moves.flatMap((m) => m.withdrew ?? []));
     const round = moves.length ? moves[moves.length - 1].round : 1;
     const byKey = new Map(fighters.map((f) => [f.key, f]));
     const nextRoundAt = result.moves.findIndex((m, i) => i >= shown && m.round > (result.moves[shown]?.round ?? 0));
@@ -110,7 +120,7 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
           {teams.map((t) => (
             <div key={t} className={`auto-team team-${t}`}>
               <h3>{teamName(b, t)}</h3>
-              {fighters.filter((f) => f.team === t).map((f) => <HpBar key={f.key} f={f} hp={hp.get(f.key)!} />)}
+              {fighters.filter((f) => f.team === t).map((f) => <HpBar key={f.key} f={f} hp={hp.get(f.key)!} withdrawn={pulled.has(f.key)} />)}
             </div>
           ))}
         </div>
@@ -124,8 +134,15 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
             <span className="muted">
               Army lost: {teams.map((t) => `${teamName(b, t)} ${Math.round((result.lost[t] ?? 0) * 100)}%`).join(', ')}.
               The side that lost the smaller share wins; within {AUTO_BATTLE.drawMargin * 100} points of each other is a draw.
+              {pulled.size > 0 && ` A unit that pulled back counts ${AUTO_BATTLE.withdrawCost * 100}% of what it had left as lost: it gave up the ground.`}
             </span>
           </p>
+        )}
+        {done && stories.length > 0 && (
+          <div className="small">
+            <b><Icon name="g:quill-ink" /> War stories</b>
+            <ul style={{ margin: '0.25rem 0', paddingLeft: '1.2rem' }}>{stories.map((x) => <li key={x}>{x}</li>)}</ul>
+          </div>
         )}
       </>
     );
@@ -150,14 +167,38 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
 
 const pct = (n: number) => (n > 0 && n < 0.01 ? '<1%' : `${Math.round(n * 100)}%`);
 
-/** "wins 95% · loses ~2 units · 24% chance of a scar · 3% chance of Comatose", without the death rolls when losses don't carry over. */
-function oddsText(o: AutoOdds, scars: boolean): string {
-  const lost = Math.round(o.unitsLost * 10) / 10;
-  return [
-    `wins ${pct(o.win)}${o.draw >= 0.01 ? ` (draws ${pct(o.draw)})` : ''}`,
-    `loses ~${lost} unit${lost === 1 ? '' : 's'}`,
-    ...(scars ? [`${pct(o.scar)} chance of a scar`, `${pct(o.comatose)} chance of Comatose`] : []),
-  ].join(' · ');
+/** A team's stances side by side: wins, units lost and, when losses carry over, the chance of a scar or of Comatose. */
+function StancePicker({ name, odds, scars, value, onChange }: {
+  name?: string; odds: Record<Stance, AutoOdds>; scars: boolean; value: Stance; onChange: (s: Stance) => void;
+}) {
+  return (
+    <div className="table-wrap">
+      {name && <div><b>{name}</b></div>}
+      <table className="compact">
+        <thead>
+          <tr><th>Stance</th><th>Wins</th><th>Units lost</th>{scars && <><th>Scar</th><th>Comatose</th></>}</tr>
+        </thead>
+        <tbody>
+          {STANCES.map((st) => {
+            const o = odds[st];
+            const s = AUTO_BATTLE.stances[st];
+            return (
+              <tr key={st} onClick={() => onChange(st)} style={{ cursor: 'pointer', fontWeight: st === value ? 'bold' : undefined }}>
+                <td>
+                  <label className="row" style={{ gap: 4 }}>
+                    <input type="radio" checked={st === value} onChange={() => onChange(st)} /> {s.label} <span className="muted small" style={{ fontWeight: 'normal' }}>{s.text}</span>
+                  </label>
+                </td>
+                <td>{pct(o.win)}{o.draw >= 0.01 && <span className="muted"> (draw {pct(o.draw)})</span>}</td>
+                <td>~{Math.round(o.unitsLost * 10) / 10}</td>
+                {scars && <><td>{pct(o.scar)}</td><td>{pct(o.comatose)}</td></>}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 /** Wounds left on every unit after the moves so far. */
@@ -250,11 +291,15 @@ function FighterTable({ fighters }: { fighters: Fighter[] }) {
   );
 }
 
-function HpBar({ f, hp }: { f: Fighter; hp: number }) {
+function HpBar({ f, hp, withdrawn }: { f: Fighter; hp: number; withdrawn?: boolean }) {
   const pct = (hp / f.maxHp) * 100;
+  const out = withdrawn && hp > 0;
   return (
-    <div className={`auto-hp${hp <= 0 ? ' dead' : ''}`} title={`${hp}/${f.maxHp} wounds`}>
-      <div className="row small"><span className="grow">{hp <= 0 ? <><Icon name="g:death-skull" /> </> : null}{f.name}</span><span className="muted">{hp}/{f.maxHp}</span></div>
+    <div className={`auto-hp${hp <= 0 || out ? ' dead' : ''}`} title={`${hp}/${f.maxHp} wounds${out ? ', pulled back' : ''}`}>
+      <div className="row small">
+        <span className="grow">{hp <= 0 ? <><Icon name="g:death-skull" /> </> : out ? <><Icon name="g:exit-door" /> </> : null}{f.name}{out && <span className="muted"> (pulled back)</span>}</span>
+        <span className="muted">{hp}/{f.maxHp}</span>
+      </div>
       <div className="auto-hp-track"><div style={{ width: `${pct}%` }} /></div>
     </div>
   );
@@ -273,6 +318,7 @@ function MoveText({ m, byKey, b }: { m: Move; byKey: Map<string, Fighter>; b: Tr
   if (m.kind === 'heal' && t) return <>R{m.round}: {who(a)}{side(a.team)} heals {who(t)} for <b>{m.dmg}</b>.{notes}</>;
   if (m.kind === 'advance' || !t) return <>R{m.round}: {who(a)}{side(a.team)} advances{t && m.targetHp <= 0 ? <>; {who(t)} <b>destroyed!</b></> : null}.{notes}</>;
   const shaken = (m.shaken ?? []).map((k) => byKey.get(k)?.name).filter(Boolean);
+  const pulled = (m.withdrew ?? []).map((k) => byKey.get(k)?.name).filter(Boolean);
   return (
     <>
       R{m.round}: {who(a)}{side(a.team)} {m.kind === 'charge' ? 'charges' : 'shoots'} {who(t)}{side(t.team)}:{' '}
@@ -282,6 +328,7 @@ function MoveText({ m, byKey, b }: { m: Move; byKey: Map<string, Fighter>; b: Tr
       {m.kind === 'charge' && m.targetHp > 0 && (m.cowed ? '; too Shaken to strike back'
         : <>; strikes back for {m.back ? <b>{m.back}</b> : 'nothing'}{m.attackerHp <= 0 && <> — <b>{a.name} destroyed!</b></>}</>)}
       {shaken.length > 0 && <>. <b>{shaken.join(' and ')} {shaken.length > 1 ? 'are' : 'is'} Shaken.</b></>}
+      {pulled.length > 0 && <>{shaken.length ? ' ' : '. '}<b>{pulled.join(' and ')} pull{pulled.length > 1 ? '' : 's'} back</b> from the fight</>}
       {notes}
     </>
   );

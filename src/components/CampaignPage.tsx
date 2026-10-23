@@ -548,6 +548,7 @@ function LogPanel({ c, setC, viewer }: { c: Campaign; setC: SetC; viewer?: strin
             </>}
             {e.loot && <span title={`Guardian loot (rolled ${e.loot.roll})`}> · <Icon name="g:open-treasure-chest" /> {factionName(c, e.loot.factionId)} looted {e.loot.name}{e.loot.amount ? ` (+${e.loot.amount}${e.loot.id === 'research' ? ' Research' : ' Materials'})` : ''}</span>}
             {e.notes && <span className="muted"> · {e.notes}</span>}
+            {e.stories?.map((x) => <div key={x} className="muted small"><Icon name="g:quill-ink" /> {x}</div>)}
           </span>
           {!viewer && <button className="ghost icon" aria-label="Delete log entry"
             title={e.undo ? 'Delete the entry and put the sector back, unless a later game changed it' : 'Delete the entry'}

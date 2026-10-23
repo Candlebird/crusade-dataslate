@@ -576,8 +576,8 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
   });
   if (!bands.length && !coming.length) return null;
   const who = by || s.owner && c.factions.some((f) => f.id === s.owner) && s.owner || c.factions[0]?.id || '';
-  const record = (bandId: string, fid: string, winner: string, notes = '', forceId?: string) => setC((d) => {
-    const e: CampaignEvent = { id: uid(), date: localDate(), sectorId: s.id, attacker: fid, defender: MARAUDER_ID, winner, notes, ...(forceId ? { forceId } : {}) };
+  const record = (bandId: string, fid: string, winner: string, notes = '', forceId?: string, stories: string[] = []) => setC((d) => {
+    const e: CampaignEvent = { id: uid(), date: localDate(), sectorId: s.id, attacker: fid, defender: MARAUDER_ID, winner, notes, ...(forceId ? { forceId } : {}), ...(stories.length ? { stories } : {}) };
     recordMarauderGame(d, e, bandId);
     toast(winner === fid ? `${factionName(d, fid)} broke the band${e.loot ? ` and found ${e.loot.name}` : ''}.`
       : winner ? `The Marauders held${e.toll ? ` and took ${e.toll} Materials` : ''}.` : 'A draw: the band stays, but takes no toll.');
@@ -591,11 +591,11 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
     const m = c.marauders?.find((x) => x.id === bandId);
     if (m) setAuto({ bandId, factionId: fid, b: bandBattle(c, m, fid, state.forces, state.books, state.settings) });
   };
-  const applyAuto = (r: AutoResult) => {
+  const applyAuto = (r: AutoResult, stories: string[]) => {
     if (!auto) return;
     const winner = r.winner === 'A' ? auto.factionId : r.winner === 'B' ? MARAUDER_ID : '';
     const m = c.marauders?.find((x) => x.id === auto.bandId);
-    record(auto.bandId, auto.factionId, winner, 'Auto-battle', m && bandBlocker(c, m, auto.factionId, state.forces)?.id);
+    record(auto.bandId, auto.factionId, winner, 'Auto-battle', m && bandBlocker(c, m, auto.factionId, state.forces)?.id, stories);
   };
   return (
     <div className="marauder-box small">

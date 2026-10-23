@@ -2,6 +2,7 @@ import {
   BATTLE_RP, LEVEL_THRESHOLDS, MARKED_XP, MAX_AGENDAS, MAX_NORMAL_TRAITS, MAX_SCARS, MAX_UNIQUE_TRAITS, MAX_WEAPON_TRAITS,
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
+import { AUTO_BATTLE, STANCES } from './autoBattle';
 import { BOUNTY, ECHOES, ECHO_MARKS, DIFFICULTY_LEVELS, FOG, GAME_NIGHT, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_DUELS, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, OVERRUN, PRODUCTION, UMBRA_SHOP, WARLORDS } from './nexusData';
 import { BIG_UNIT, BIG_UNIT_PER } from './echoForce';
 import { FEATS, rewardText } from './feats';
@@ -78,6 +79,8 @@ export const NEXUS_TEXT = {
     `Each sector also has a modifier that helps whoever defends it (two when it's rated in the top ${Math.round((1 - NEXUS_DIFFICULTY.hardAt) * 100)}% of the scale). Sectors held by the AI roll new modifiers every round; a faction's sectors keep theirs.`,
     `Attacking an AI-held sector: play 1 v AI and generate the garrison at the sector's difficulty. Its modifiers apply to the AI side. A generated ${ECHOES.name} army is mostly troops: it takes one unit of over ${BIG_UNIT} pts (a big monster or vehicle) for every full ${BIG_UNIT_PER} pts, so none below ${BIG_UNIT_PER}, and only one of each.`,
     `Overrun: a detachment may fight an AI-held sector's garrison on the auto-battle instead of at the table when the garrison is no more than ${Math.round(OVERRUN.share * 100)}% of its Supply Limit up to ${OVERRUN.knee}, plus ${Math.round(OVERRUN.upper * 100)}% of what it has past that (1000 Supply overruns up to 700, 2000 up to 1400, 4000 up to 3000). It's a real fight and it can go wrong: before you fight, the auto-battle shows a forecast from 100 simulated runs of that exact fight (how often you win, how many units you can expect to lose, and the chance of a scar or of Comatose). Attack options you can overrun show ⚡ on the orders, and once orders are revealed the attack row has an ⚡ Overrun button. Guardians, the Voidspawn, homes and other players' sectors are always fought at the table. An overrun counts like any battle: it takes the sector, breaks Echo marks and counts for bounties.`,
+    `Stances: on any auto-battle, each player's side picks how it fights, and the forecast shows all three side by side. ${STANCES.map((k) => `${AUTO_BATTLE.stances[k].label}: ${AUTO_BATTLE.stances[k].text}`).join('. ')}. A unit that pulls back keeps its wounds but counts ${AUTO_BATTLE.withdrawCost * 100}% of what it had left as lost, when judging who won. Cautious is the way to bring a valued unit home; All-out is for a fight you must win.`,
+    "War stories: an auto-battle tells its most notable moments (a small unit felling a big one, a unit that destroyed several, a comeback, a last stand) in the log and the turn report.",
     "Fallback: an attack nobody can get to the table for can be settled on the auto-battle by the GM (🎲 Auto-battle on the attack row), including against another player's sector, where the defender's dug-in detachment (or one standing there) fights it. One player's quiet week doesn't stall the campaign.",
   ],
   rounds: [

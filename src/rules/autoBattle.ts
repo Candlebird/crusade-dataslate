@@ -31,7 +31,21 @@ export const AUTO_BATTLE = {
   scar: -0.04,
   /** What the Attack shown on a unit is measured against: Defense 4+, 5 models, Tough(1). */
   baseline: { defense: 4, size: 5, tough: 1 },
+  /**
+   * How hard a crusade force pushes an off-table fight. `attack` scales the wounds its units deal, `taken` the wounds
+   * they take; a Cautious unit brought to half strength pulls out of the fight instead of fighting to the death.
+   */
+  /** A unit that pulled out counts this share of what it had left as lost, when judging who won: it gave up the ground. */
+  withdrawCost: 0.5,
+  stances: {
+    cautious: { label: 'Cautious', attack: 1, taken: 1, withdraw: true, fearless: false, text: 'units pull back at half strength instead of fighting on, which gives up ground' },
+    committed: { label: 'Committed', attack: 1, taken: 1, withdraw: false, fearless: false, text: 'fights it out' },
+    allout: { label: 'All-out', attack: 1.25, taken: 1.25, withdraw: false, fearless: true, text: 'hits harder and takes harder hits, and never takes a Morale test' },
+  },
 };
+
+export type Stance = keyof typeof AUTO_BATTLE.stances;
+export const STANCES = Object.keys(AUTO_BATTLE.stances) as Stance[];
 
 /** A weapon reduced to what the auto-battle needs. */
 export interface Gun {
@@ -117,6 +131,8 @@ export interface Fighter {
   revived: boolean;
   /** Dice it rolls on the death roll if destroyed (2 with Lowered Constitution). */
   deathDice?: number;
+  /** Pulled out of the fight (a Cautious stance at half strength): out of reach, but not destroyed. */
+  withdrawn?: boolean;
 }
 
 export type MoveKind = 'shoot' | 'charge' | 'advance' | 'rally' | 'return' | 'stunned' | 'heal';
@@ -135,6 +151,8 @@ export interface Move {
   cowed?: boolean;
   /** Units that failed a Morale test from this move. */
   shaken?: string[];
+  /** Units that pulled out of the fight after this move. */
+  withdrew?: string[];
   targetHp: number;
   attackerHp: number;
   /** What its abilities did along the way. */
@@ -414,6 +432,8 @@ export interface AutoOptions {
   first?: TeamKey;
   /** The first of this team's non-hero units destroyed comes back once, at full strength, next round (Endless Tide). */
   tide?: TeamKey;
+  /** How hard each team pushes (Committed if not set). */
+  stances?: Partial<Record<TeamKey, Stance>>;
 }
 
 /** What the battle's sector modifiers and Galactic Event do in an auto-battle. */
@@ -605,11 +625,15 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
   const fighters = start.map((f) => ({ ...f, notes: [...f.notes], status: [...f.status] }));
   const teams = [...new Set(fighters.map((f) => f.team))];
   const moves: Move[] = [];
-  const standing = () => teams.filter((t) => fighters.some((f) => f.team === t && f.hp > 0));
+  const standing = () => teams.filter((t) => fighters.some((f) => f.team === t && f.hp > 0 && !f.withdrawn));
   let first = Math.floor(rng() * teams.length);
   if (opts.first && teams.includes(opts.first)) first = teams.indexOf(opts.first);
   joinHeroes(fighters);
   auras(fighters, rng);
+  const stance = (f: Fighter) => AUTO_BATTLE.stances[opts.stances?.[f.team] ?? 'committed'];
+  // Wounds from `a` onto `t`, as hard as their stances push.
+  const push = (a: Fighter, t: Fighter) => stance(a).attack * stance(t).taken;
+  const up = (f: Fighter) => f.hp > 0 && !f.withdrawn;
   // Endless Tide: the unit waiting to come back, then '' once it has.
   let tide: Fighter | '' | undefined;
   const fallen = (t: Fighter) => {
@@ -624,11 +648,11 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
       tide = '';
     }
     // Shuffle each team's activation order, then take turns.
-    const queues = teams.map((t) => fighters.filter((f) => f.team === t && f.hp > 0).map((f) => ({ f, r: rng() })).sort((a, b) => a.r - b.r).map((x) => x.f));
+    const queues = teams.map((t) => fighters.filter((f) => f.team === t && up(f)).map((f) => ({ f, r: rng() })).sort((a, b) => a.r - b.r).map((x) => x.f));
     for (let turn = 0; queues.some((q) => q.length); turn++) {
       const q = queues[(first + turn) % teams.length];
       const f = q.shift();
-      if (!f || f.hp <= 0) continue;
+      if (!f || !up(f)) continue;
       // What enemy hits left on it lasts until now.
       const st = f.status;
       f.status = [];
@@ -644,12 +668,12 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
         moves.push({ round, attacker: f.key, kind: 'rally', dmg: 0, back: 0, targetHp: f.hp, attackerHp: f.hp, ...say() });
         continue;
       }
-      const enemies = fighters.filter((x) => x.team !== f.team && x.hp > 0);
+      const enemies = fighters.filter((x) => x.team !== f.team && up(x));
       if (!enemies.length) break;
       // Heals and shields come before it acts.
       for (const e of effects(f.abilities, 'heal')) {
         if (!due(e.every, round)) continue;
-        const pool: Fighter[] = e.ally ? fighters.filter((x) => x.team === f.team && x.hp > 0) : [f];
+        const pool: Fighter[] = e.ally ? fighters.filter((x) => x.team === f.team && up(x)) : [f];
         const who: Fighter = [...pool].sort((a, b) => b.maxHp - b.hp - (a.maxHp - a.hp))[0];
         const n = Math.min(e.n, who.maxHp - who.hp);
         if (n <= 0) continue;
@@ -663,7 +687,7 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
         notes.push(`${e.source}: shield of ${e.n}`);
       }
       // A hero is only picked out once the unit it joined is gone.
-      const open = enemies.filter((x) => !x.host || !fighters.some((y) => y.key === x.host && y.hp > 0));
+      const open = enemies.filter((x) => !x.host || !fighters.some((y) => y.key === x.host && up(y)));
       const t = pickTarget(f, open.length ? open : enemies, round, rng);
       let kind = moveKind(f, round, t);
       // Slowed or knocked back: no charging this turn.
@@ -697,7 +721,7 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
       const soft = melee && fields.some((e) => e.status === 'slow') ? 0.75 : 1;
       const marked = t.status.includes('mark') ? 1.25 : 1;
       if (t.hp > 0) {
-        const n = hurt(t, roll(expected(f, t, kind, round, dazed ? -1 : 0) * fury(f, melee, round, notes) * soft * marked, rng), notes);
+        const n = hurt(t, roll(expected(f, t, kind, round, dazed ? -1 : 0) * fury(f, melee, round, notes) * soft * marked * push(f, t), rng), notes);
         procs(f, t, melee, n, rng, notes);
         falls(t, f, rng, notes);
       }
@@ -710,7 +734,7 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
       // A Shaken unit can't strike back.
       if (melee && t.hp > 0 && !t.shaken && f.hp > 0) {
         const was = f.hp;
-        let n = roll(expected(t, f, 'charge', round, t.status.includes('daze') ? -1 : 0) * AUTO_BATTLE.strikeBack * fury(t, true, round, notes), rng);
+        let n = roll(expected(t, f, 'charge', round, t.status.includes('daze') ? -1 : 0) * AUTO_BATTLE.strikeBack * fury(t, true, round, notes) * push(t, f), rng);
         for (const e of effects(t.abilities, 'thorns')) if (rng() < e.chance) { n += e.n; notes.push(`${e.source}: ${e.n} back`); }
         hurt(f, n, notes);
         procs(t, f, true, was - f.hp, rng, notes);
@@ -720,13 +744,19 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
         fallen(f);
       }
       const shaken: string[] = [];
-      for (const x of [t, f]) if (halfStrength(x, rng)) shaken.push(x.key);
+      for (const x of [t, f]) if (!stance(x).fearless && halfStrength(x, rng)) shaken.push(x.key);
       // The loser of a melee tests too.
       if (melee && dmg !== back) {
         const loser = dmg < back ? f : t;
-        if (moraleTest(loser, rng)) shaken.push(loser.key);
+        if (!stance(loser).fearless && moraleTest(loser, rng)) shaken.push(loser.key);
       }
-      moves.push({ round, attacker: f.key, target: t.key, kind, dmg, back, targetHp: t.hp, attackerHp: f.hp, ...(hazard ? { hazard } : {}), ...(cowed ? { cowed } : {}), ...(shaken.length ? { shaken } : {}), ...say() });
+      // Cautious: a unit at half strength pulls out, and takes any hero that joined it along.
+      const withdrew: string[] = [];
+      for (const x of [t, f]) {
+        if (!stance(x).withdraw || !up(x) || x.hp > x.maxHp / 2) continue;
+        for (const y of [x, ...fighters.filter((h) => h.host === x.key && up(h))]) { y.withdrawn = true; withdrew.push(y.key); }
+      }
+      moves.push({ round, attacker: f.key, target: t.key, kind, dmg, back, targetHp: t.hp, attackerHp: f.hp, ...(hazard ? { hazard } : {}), ...(cowed ? { cowed } : {}), ...(shaken.length ? { shaken } : {}), ...(withdrew.length ? { withdrew } : {}), ...say() });
     }
     first = (first + 1) % teams.length;
   }
@@ -739,11 +769,82 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
   for (const t of teams) {
     const mine = fighters.filter((f) => f.team === t);
     const total = mine.reduce((n, f) => n + f.points, 0);
-    lost[t] = total ? (dealtTo(mine) / total) : 1;
+    const yielded = mine.filter((f) => f.withdrawn).reduce((n, f) => n + (f.points * f.hp * AUTO_BATTLE.withdrawCost) / f.maxHp, 0);
+    lost[t] = total ? ((dealtTo(mine) + yielded) / total) : 1;
   }
   const order = [...teams].sort((a, b) => lost[a]! - lost[b]!);
   const draw = order.length > 1 && lost[order[1]]! - lost[order[0]]! <= AUTO_BATTLE.drawMargin;
   return { fighters, moves, dealt, lost, winner: draw ? 'draw' : order[0] };
+}
+
+/** How many war stories a fight tells. */
+const STORIES = 3;
+
+/**
+ * The fight's most notable moments, told in a line each, for the log and the turn report: a small unit bringing down a
+ * big one, a unit that destroyed several, a comeback, a last stand, a unit hanging on by a single wound. Best first.
+ */
+export function warStories(start: Fighter[], r: AutoResult, team: (t: TeamKey) => string = (t) => `Team ${t}`, max = STORIES): string[] {
+  const out: { score: number; text: string }[] = [];
+  const byKey = new Map(r.fighters.map((f) => [f.key, f]));
+  // A name both sides use gets its team, so the line says whose it was.
+  const name = (f: Fighter) => (r.fighters.some((x) => x.team !== f.team && x.name === f.name) ? `${f.name} (${team(f.team)})` : f.name);
+  const kills = new Map<string, Fighter[]>();
+  // Each unit's biggest kill against the odds: a small unit bringing down a much bigger one.
+  const giants = new Map<string, { score: number; text: string }>();
+  const killed = (by: Fighter, t: Fighter, round: number) => {
+    kills.set(by.key, [...(kills.get(by.key) ?? []), t]);
+    const score = 10 + (t.points / Math.max(1, by.points)) * 2;
+    if (t.points >= 1.5 * by.points && t.points >= 150 && score > (giants.get(by.key)?.score ?? 0))
+      giants.set(by.key, { score, text: `${name(by)} (${by.points} pts) brought down ${name(t)} (${t.points} pts) in round ${round}.` });
+  };
+  for (const m of r.moves) {
+    const a = byKey.get(m.attacker)!;
+    const t = m.target ? byKey.get(m.target) : undefined;
+    if (t && m.kind !== 'heal' && m.targetHp <= 0 && (m.dmg > 0 || m.kind === 'advance')) killed(a, t, m.round);
+    if (t && m.kind === 'charge' && m.back > 0 && m.attackerHp <= 0) killed(t, a, m.round);
+    for (const n of m.notes ?? []) {
+      if (n.endsWith(`${a.name} makes a last stand`) && a.hp > 0) out.push({ score: 9, text: `${name(a)} made a last stand in round ${m.round}, and lived to tell of it.` });
+      const up = r.fighters.find((f) => n.endsWith(`${f.name} gets back up`));
+      if (up) out.push({ score: 7, text: `${name(up)} was cut down in round ${m.round}, and got back up.` });
+    }
+  }
+  out.push(...giants.values());
+  for (const [key, ts] of kills) {
+    if (ts.length < 2) continue;
+    const f = byKey.get(key)!;
+    const list = ts.map(name);
+    out.push({ score: 6 * ts.length, text: `${name(f)} destroyed ${list.slice(0, -1).join(', ')} and ${list[list.length - 1]}.` });
+  }
+  for (const f of r.fighters) {
+    const was = start.find((x) => x.key === f.key);
+    if (was && f.hp === 1 && was.hp >= 3 && !f.withdrawn) out.push({ score: 5, text: `${name(f)} held on to the end with a single wound left.` });
+  }
+  const pulled = r.fighters.filter((f) => f.withdrawn && !f.host);
+  if (pulled.length) out.push({ score: 3, text: `${pulled.map(name).join(', ')} pulled back from the fight, battered but alive.` });
+  // A comeback: the winner had lost the bigger share of its army after round 2.
+  if (r.winner !== 'draw') {
+    const hp = new Map(start.map((f) => [f.key, f.hp]));
+    for (const m of r.moves.filter((x) => x.round <= 2)) {
+      hp.set(m.attacker, m.attackerHp);
+      if (m.target) hp.set(m.target, m.targetHp);
+    }
+    const share = (t: TeamKey) => {
+      const mine = start.filter((f) => f.team === t);
+      const total = mine.reduce((n, f) => n + f.points, 0);
+      return total ? mine.reduce((n, f) => n + (f.points * (f.hp - Math.max(0, hp.get(f.key)!))) / f.maxHp, 0) / total : 0;
+    };
+    const w = r.winner;
+    const behind = Object.keys(r.lost).some((t) => t !== w && share(w) > share(t as TeamKey) + AUTO_BATTLE.drawMargin);
+    if (behind) out.push({ score: 15, text: `${team(w)} was losing after round 2, and turned it around.` });
+    // Wiped out before the end.
+    for (const t of Object.keys(r.lost) as TeamKey[]) {
+      const last = Math.max(0, ...r.moves.filter((m) => m.targetHp <= 0 && byKey.get(m.target ?? '')?.team === t).map((m) => m.round));
+      if (t !== w && r.fighters.filter((f) => f.team === t).every((f) => f.hp <= 0) && last < AUTO_BATTLE.rounds)
+        out.push({ score: 8, text: `${team(t)} was wiped out by round ${last}.` });
+    }
+  } else if (Object.keys(r.lost).length === 2) out.push({ score: 4, text: 'Neither side could break the other.' });
+  return out.sort((a, b) => b.score - a.score).slice(0, max).map((x) => x.text);
 }
 
 /** What a fight is likely to cost one team, from many simulated runs. */
@@ -792,7 +893,7 @@ export function autoOdds(fighters: Fighter[], opts: AutoOptions, rolls: Set<stri
 }
 
 /** Write the outcome onto the tracked battle: wounds, losses and kill XP, and who won. It's then recorded like any other battle. */
-export function applyAutoBattle(b: TrackedBattle, r: AutoResult) {
+export function applyAutoBattle(b: TrackedBattle, r: AutoResult, stories: string[] = []) {
   // Already applied (a second click before the dialog closed): its kill XP would count twice.
   if (b.ended) return;
   for (const f of r.fighters) {
@@ -802,7 +903,7 @@ export function applyAutoBattle(b: TrackedBattle, r: AutoResult) {
     u.destroyed = f.hp <= 0;
     u.xp = (u.xp ?? 0) + f.xp;
   }
-  b.auto = { winner: r.winner, dealt: r.dealt };
+  b.auto = { winner: r.winner, dealt: r.dealt, ...(stories.length ? { stories } : {}) };
   b.round = Math.max(b.round, Math.min(b.mission.rounds, AUTO_BATTLE.rounds));
   b.ended = true;
 }

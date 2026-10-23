@@ -67,14 +67,18 @@ export function callMeeting(c: Campaign, round: number, key: string, forceId: st
 }
 
 /** The fight's result: the winning detachment, or '' for a draw. */
-export function settleMeeting(c: Campaign, round: number, key: string, winner: string) {
+export function settleMeeting(c: Campaign, round: number, key: string, winner: string, stories: string[] = []) {
   if (c.meetings?.round !== round) c.meetings = { round, calls: {}, results: {} };
   c.meetings.results[key] = winner;
+  if (stories.length) (c.meetings.stories ??= {})[key] = stories;
+  else delete c.meetings.stories?.[key];
 }
 
 /** Take a result back, to fight again. */
 export function unsettleMeeting(c: Campaign, round: number, key: string) {
-  if (c.meetings?.round === round) delete c.meetings.results[key];
+  if (c.meetings?.round !== round) return;
+  delete c.meetings.results[key];
+  delete c.meetings.stories?.[key];
 }
 
 /**
