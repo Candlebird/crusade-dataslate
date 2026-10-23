@@ -2,7 +2,8 @@
  * Force emblems: three shapes stacked on top of each other, each with its own colour. The emblem is kept on the
  * force, so it reaches every player with the force's cloud copy, and it stands for the force on the Nexus Map.
  */
-import type { EmblemLayer, EmblemShape } from './types';
+import type { Category } from '../rules/data';
+import type { EmblemLayer, EmblemShape, Unit } from './types';
 
 /** How big each layer is drawn, background first, as a share of the emblem. */
 export const LAYER_SCALE = [1, 0.62, 0.34] as const;
@@ -66,5 +67,54 @@ export function randomEmblem(rand: () => number = Math.random): EmblemLayer[] {
     { shape: pick(BACKGROUNDS), color: colors[0] },
     { shape: pick(SHAPE_IDS), color: colors[1] },
     { shape: pick(SHAPE_IDS.filter((s) => s !== 'ring')), color: colors[2] },
+  ];
+}
+
+// ── Unit portraits ────────────────────────────────────────────────────────────
+// The same three stacked shapes stand for a unit in the downtime games (Training Grounds, Sortie). A unit without its
+// own portrait gets one rolled from its id, on a background in its category's colour, so it looks the same everywhere.
+
+/** Background colour of a default portrait, by category. */
+export const CATEGORY_COLORS: Record<Category, string> = {
+  Hero: '#c9a24a', Infantry: '#4f8a3c', Elite: '#8e44ad', 'Vehicle/Monster': '#b3352b', Aircraft: '#3d6fb6', Fortification: '#7a7f8a',
+};
+
+/** Repeatable dice from a string. */
+export function seededRand(seed: string): () => number {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) h = Math.imul(h ^ seed.charCodeAt(i), 16777619);
+  return () => {
+    h = (h + 0x6d2b79f5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), h | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/** A unit's default portrait: random shapes from its id, on its category's colour. */
+export function defaultPortrait(u: Pick<Unit, 'id' | 'category'>): EmblemLayer[] {
+  const layers = randomEmblem(seededRand(u.id));
+  const bg = CATEGORY_COLORS[u.category] ?? EMBLEM_PALETTE[0];
+  layers[0] = { ...layers[0], color: bg };
+  if (layers[1].color === bg) layers[1] = { ...layers[1], color: '#1b1d22' };
+  return layers;
+}
+
+/** The portrait a unit shows: its own if it has a usable one, else its default. */
+export const unitPortrait = (u: Pick<Unit, 'id' | 'category' | 'portrait'>): EmblemLayer[] => emblemLayers(u.portrait) ?? defaultPortrait(u);
+
+/** Void Echoes' colours: ash, bruise and ghost-light. */
+const ECHO_PALETTE = ['#2a1f33', '#4b2d5c', '#7d5ba6', '#5fb3b3', '#a9f0e6', '#1b1d22', '#8a8fa0'];
+
+/** An Echo's portrait, the same for every Echo of a type. */
+export function echoPortrait(type: string): EmblemLayer[] {
+  const rand = seededRand(`echo:${type}`);
+  const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)];
+  const colors: string[] = [];
+  for (let i = 0; i < 3; i++) colors.push(pick(ECHO_PALETTE.filter((c) => c !== colors[i - 1])));
+  return [
+    { shape: pick(['circle', 'hexagon', 'diamond', 'burst'] as EmblemShape[]), color: colors[0] },
+    { shape: pick(['skull', 'crescent', 'star', 'wings', 'bolt', 'triangle'] as EmblemShape[]), color: colors[1] },
+    { shape: pick(['none', 'circle', 'ring', 'diamond'] as (EmblemShape | 'none')[]), color: colors[2] },
   ];
 }

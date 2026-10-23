@@ -9,7 +9,7 @@ import { emptyNexus, unitsUsed } from './nexus';
 import { NEXUS_ROUNDS } from './nexusData';
 import { loadForce, newSide } from './tracker';
 import {
-  activeProject, claimGarrisons, freeUnits, garrison, garrisonClaims, mentor, mentorProblem, projectProblem, reconTargets, scout, tasksOf,
+  activeProject, claimGarrisons, freeUnits, garrison, garrisonClaims, mentor, mentorProblem, projectProblem, reconTargets, scout, sortieScout, tasksOf,
   unitsBusy, workProject,
 } from './tasks';
 
@@ -127,6 +127,17 @@ describe('recon', () => {
     expect(reconSeen(c, 'A')).toContain('x');
     c.round! += 1;
     expect(reconSeen(c, 'A')).toEqual([]);
+  });
+
+  it('scouts the nearest unseen sector after a Shard run', () => {
+    const c = campaign();
+    const f = force();
+    c.sectors.push({ id: 'x', name: 'Beyond', type: 'empty', notes: '', q: 8, r: 0 });
+    expect(visibleTo(c, 'A').has('x')).toBe(false);
+    expect(sortieScout(c, f)).toMatch(/^scouted /);
+    expect(reconSeen(c, 'A').length).toBeGreaterThan(0);
+    c.sectors = c.sectors.filter((s) => s.owner === 'A');
+    expect(sortieScout(c, f)).toBe('');
   });
 });
 

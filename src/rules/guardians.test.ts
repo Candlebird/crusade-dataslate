@@ -136,11 +136,14 @@ describe('placeGuardians', () => {
     expect(placeGuardians(c, [{ ...book, uid: 'other' }], [], () => 0, ids())).toHaveLength(GUARDED.length);
   });
 
-  it('does nothing without the Void Echoes book, or a book without heroes', () => {
-    const c = campaign();
+  it('falls back to the built-in Void Echoes book when none is imported', () => {
     const other: CatalogBook = { ...book, uid: 'other', name: 'Someone Else' };
-    expect(placeGuardians(c, [], [], () => 0, ids())).toEqual([]);
-    expect(placeGuardians(c, [other], [], () => 0, ids())).toEqual([]);
+    expect(placeGuardians(campaign(), [], [], () => 0, ids())).toHaveLength(GUARDED.length);
+    expect(placeGuardians(campaign(), [other], [], () => 0, ids())).toHaveLength(GUARDED.length);
+  });
+
+  it('does nothing with a Void Echoes book without heroes', () => {
+    const c = campaign();
     const noHeroes: CatalogBook = { ...book, units: book.units.filter((u) => !hasRule(u.rules, 'Hero')) };
     expect(placeGuardians(c, [noHeroes], [], () => 0, ids())).toEqual([]);
     expect(c.sectors.some((s) => s.guardian)).toBe(false);

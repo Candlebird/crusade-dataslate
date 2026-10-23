@@ -2,16 +2,17 @@ import type { Campaign, Force, Sector, SectorGarrison, Unit, UnitTaskKind } from
 import { unitName } from './battle';
 import { GARRISON, MENTORING, PROJECT_DIE, PROJECTS, RECON, type ProjectDef } from './downtimeData';
 import { levelForXp } from './engine';
-import { explore } from './fog';
+import { explore, rememberedBy, visibleTo } from './fog';
 import { hexDistance, isPlaced, type Rand } from './hexmap';
 import { currentRound, markUnitsUsed, unitsUsed } from './nexus';
 import { isReinforced, produces } from './production';
 
-// Unit tasks (Nexus Wars downtime): one unit, one task, for the whole round. Mentoring, a Project, Recon or Garrison.
+// Unit tasks (Nexus Wars downtime): one unit, one task, for the whole round. Mentoring, a Project, Recon, Garrison or a
+// Shard Sortie.
 // Each takes effect when it's set; the unit is busy for the rest of the round and fights in no battle, the round's main
 // Battle included. The numbers are in downtimeData.ts.
 
-export const TASK_NAMES: Record<UnitTaskKind, string> = { mentor: 'Mentoring', project: 'Project', recon: 'Recon', garrison: 'Garrison' };
+export const TASK_NAMES: Record<UnitTaskKind, string> = { mentor: 'Mentoring', project: 'Project', recon: 'Recon', garrison: 'Garrison', sortie: 'Sortie' };
 
 /** The units of this force on a task this round, and what each is doing. */
 export function tasksOf(f: Force, c: Campaign | undefined): Record<string, UnitTaskKind> {
@@ -144,11 +145,16 @@ export function workProject(
 // ── Recon ─────────────────────────────────────────────────────────────────────
 
 /** Where the faction's Recon can reach: placed sectors within range of one of its sectors or detachments. */
-export function reconTargets(c: Campaign, factionId: string): Sector[] {
-  const from = [
+/** The faction's own placed sectors, and those its detachments stand on. */
+function homeHexes(c: Campaign, factionId: string) {
+  return [
     ...c.sectors.filter((s) => s.owner === factionId),
     ...Object.values(c.positions ?? {}).filter((p) => p.factionId === factionId).map((p) => c.sectors.find((s) => s.id === p.sectorId)),
   ].filter((s): s is Sector & { q: number; r: number } => !!s && isPlaced(s));
+}
+
+export function reconTargets(c: Campaign, factionId: string): Sector[] {
+  const from = homeHexes(c, factionId);
   return c.sectors.filter((s) => isPlaced(s) && from.some((h) => hexDistance(h, s) <= RECON.range));
 }
 
@@ -175,6 +181,29 @@ export function scout(c: Campaign, f: Force, unitId: string, sectorId: string, d
   const summary = `Recon — ${unitName(u)} scouted ${target.name}: ${area.length} sector${area.length === 1 ? '' : 's'} in sight until round ${round + RECON.rounds - 1} ends`;
   f.ledger.push({ id: newId(), date, label: summary, rp: 0, supply: 0 });
   return summary;
+}
+
+/**
+ * A won Shard run scouts on the way home: the nearest sector the faction can't see (one it has never seen first) comes
+ * into sight with the hexes around it, as a Recon would. Returns a summary bit, or '' if there was nothing to scout.
+ */
+export function sortieScout(c: Campaign, f: Force): string {
+  const factionId = f.nexus?.factionId ?? '';
+  const faction = c.factions.find((x) => x.id === factionId);
+  const from = homeHexes(c, factionId);
+  if (!faction || !from.length) return '';
+  const visible = visibleTo(c, factionId);
+  const remembered = rememberedBy(c, factionId, visible);
+  const near = (s: Sector & { q: number; r: number }) => Math.min(...from.map((h) => hexDistance(h, s)));
+  const target = c.sectors
+    .filter((s): s is Sector & { q: number; r: number } => isPlaced(s) && !visible.has(s.id))
+    .sort((a, b) => Number(remembered.has(a.id)) - Number(remembered.has(b.id)) || near(a) - near(b))[0];
+  if (!target) return '';
+  const round = currentRound(c);
+  const area = reconArea(c, target);
+  faction.recon = [...(faction.recon ?? []).filter((r) => r.round > round - RECON.rounds), { round, sectorIds: area.map((s) => s.id) }];
+  explore(c);
+  return `scouted ${target.name} on the way back (${area.length} sector${area.length === 1 ? '' : 's'} in sight until round ${round + RECON.rounds - 1} ends)`;
 }
 
 // ── Garrison ──────────────────────────────────────────────────────────────────
@@ -231,4 +260,35 @@ export function claimGarrisons(c: Campaign, f: Force, date: string, newId: () =>
     lines.push(line);
   }
   return lines.join('; ');
+}
+
+// ── Sortie ────────────────────────────────────────────────────────────────────
+
+/** What stops three units setting out together on a Sortie, or null when they can: three different active units, at most one Fortification. */
+export function partyProblem(units: (Unit | undefined)[]): string | null {
+  if (units.length !== 3 || units.some((u) => !u)) return 'Choose three units.';
+  if (new Set(units.map((u) => u!.id)).size !== 3) return 'Choose three different units.';
+  const unfit = units.find((u) => u!.status !== 'active');
+  if (unfit) return `${unitName(unfit)} isn't fit to go.`;
+  if (units.filter((u) => u!.category === 'Fortification').length > 1) return 'Only one Fortification can hold the back.';
+  return null;
+}
+
+/** What stops a party setting out on a Shard Sortie, or null when it can. */
+export function sortieProblem(f: Force, c: Campaign | undefined, units: (Unit | undefined)[]): string | null {
+  const why = partyProblem(units);
+  if (why) return why;
+  if (f.umbraShards < 1) return 'A Shard Sortie costs 1 Umbra Shard.';
+  const busy = c && units.find((u) => !freeUnits(f, c).some((x) => x.id === u!.id));
+  if (busy) return `${unitName(busy)} is busy or already fought this round.`;
+  return null;
+}
+
+/** Pay the Umbra Shard for a Shard Sortie; in a Nexus campaign all three units are busy for the round. */
+export function startSortie(f: Force, c: Campaign | undefined, unitIds: string[]) {
+  const units = unitIds.map((id) => f.units.find((x) => x.id === id));
+  const why = sortieProblem(f, c, units);
+  if (why) throw new Error(why);
+  f.umbraShards -= 1;
+  if (c) setBusy(f, c, unitIds, 'sortie');
 }

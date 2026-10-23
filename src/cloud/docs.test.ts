@@ -97,9 +97,9 @@ describe('cloud docs', () => {
     const s = buildSeedState();
     const book = { ...s.books[0], name: 'Changed' };
     applyDoc(s, `books/${book.uid}`, book);
-    expect(s.books.map((b) => b.name)).toEqual(['Changed']);
+    expect(s.books.map((b) => b.name)).toEqual(['Void Echoes', 'Changed']);
     applyDoc(s, `books/${book.uid}`, null);
-    expect(s.books).toEqual([]);
+    expect(s.books.map((b) => b.name)).toEqual(['Void Echoes']);
     applyDoc(s, 'campaign/current', { id: 'c' });
     expect(s.campaign).toEqual({ id: 'c' });
     applyDoc(s, 'campaign/current', null);

@@ -193,7 +193,8 @@ describe('guardians', () => {
     expect(hasRule(g.unit.rules, 'Hero')).toBe(true);
     expect(ruleRating(g.unit.rules, 'Tough')).toBeGreaterThanOrEqual(GUARDIANS.toughFactor);
     expect(placeGuardians(c, [book], [], Math.random, uid)).toEqual([]);
-    expect(placeGuardians(campaign(), [], [], Math.random, uid)).toEqual([]);
+    // With no copy of the book imported, the one that ships with the site stands in.
+    expect(placeGuardians(campaign(), [], [], Math.random, uid)).toHaveLength(3);
   });
 
   it('leads the garrison', () => {

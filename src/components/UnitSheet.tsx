@@ -36,8 +36,11 @@ import {
 } from '../rules/engine';
 import { nexusAccess } from '../rules/nexus';
 import { unitName } from '../rules/battle';
+import { quirkInfo, trinketInfo, veteranTitle } from '../rules/sortie';
 import { unitBookUrl } from '../armyforge/book';
 import { go, href } from '../route';
+import { EmblemEditor, Portrait } from './Emblem';
+import { defaultPortrait } from '../model/emblem';
 import { ForceImage } from './ForceView';
 import TablePicker, { type PickEntry, type PickGroup, type Picked } from './TablePicker';
 import { traitMark } from './marks';
@@ -70,6 +73,23 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
   if (!f || !u) return <div className="panel empty">Unit not found. <a href={href.forces()}>Back to forces</a></div>;
 
   const set = (fn: (d: Unit) => void) => updateUnit(f.id, u.id, fn);
+  /** Equip a spare trinket (or '-' to take it off): the one it had goes back to the spares. */
+  const equipTrinket = (id: string) => {
+    if (!id) return;
+    updateForce(f.id, (fd) => {
+      const d = fd.units.find((x) => x.id === u.id);
+      if (!d) return;
+      const spares = [...(fd.sortie?.trinkets ?? [])];
+      if (id !== '-') {
+        const i = spares.indexOf(id);
+        if (i < 0) return;
+        spares.splice(i, 1);
+      }
+      if (d.trinket) spares.push(d.trinket);
+      d.trinket = id === '-' ? undefined : id;
+      (fd.sortie ??= {}).trinkets = spares;
+    });
+  };
   const s = state.settings;
   const bookUrl = unitBookUrl(u, state.books);
   const issues = validateUnit(u);
@@ -125,6 +145,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
     }
     if (picker.kind === 'scar') return [{ key: 'scar', label: 'Battle scars', entries: SCAR_TABLE, rollable: true }];
     const held = relicHolders(state.forces, state.campaign);
+    const earned = f.sortie?.relics ?? [];
     const relicGroup = (key: string, label: string, list: typeof RELICS): PickGroup => ({
       key,
       label,
@@ -138,12 +159,13 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
     return [
       ...TIERS.map((t) => relicGroup(t, t, RELICS.filter((r) => r.tier === t && !r.nexus))),
       relicGroup('nexus', 'Nexus', RELICS.filter((r) => r.nexus)),
+      ...(earned.length ? [relicGroup('sortie', 'Sortie (free)', RELICS.filter((r) => r.sortie && earned.includes(r.sortie)))] : []),
     ];
   };
 
   /** Relics are bought with RP at their tier's requisition price, unless taken free (e.g. as a reward). */
   const relicCheck = (e: PickEntry | null, free: boolean): string | null => {
-    if (!e || free) return null;
+    if (!e || free || (e.meta as (typeof RELICS)[number] | undefined)?.sortie) return null;
     const cost = relicCost((e.meta as (typeof RELICS)[number] | undefined)?.tier ?? 'Common');
     return cost > rp ? `Needs ${cost} RP (the force has ${rp}).` : null;
   };
@@ -174,7 +196,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
     } else {
       const def = p.meta as (typeof RELICS)[number] | undefined;
       const tier = def?.tier ?? 'Common';
-      const cost = p.free ? 0 : relicCost(tier);
+      const cost = p.free || def?.sortie ? 0 : relicCost(tier);
       updateForce(f.id, (fd) => {
         fd.units.find((x) => x.id === u.id)?.relics.push({ id: uid(), name: p.name, tier, profile: def?.profile, note: def?.note });
         if (cost) fd.ledger.push({ id: uid(), date: localDate(), label: `${tier} Relic — ${unitName(u)}: ${p.name}`, rp: -cost, supply: 0 });
@@ -191,7 +213,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           <div className="crumbs">
             <a href={href.forces()}>Forces</a> / <a href={href.force(f.id)}>{f.name}</a> / Unit sheet
           </div>
-          <h1>{u.name || u.unitType || 'Unnamed unit'}</h1>
+          <h1 className="with-emblem"><Portrait unit={u} size={40} />{u.name || u.unitType || 'Unnamed unit'}</h1>
           <div className="muted">
             {u.name && u.unitType}
             {u.name && u.bookName && ' · '}
@@ -443,6 +465,53 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                 </div>
               ))}
             </Panel>
+            {u.sortieRecord && (u.sortieRecord.runs || u.sortieRecord.lords) ? (
+              <Panel id="unit.sortieRecord" title="Sortie record" h={3}>
+                {veteranTitle(u) && <div><b className="sortie-title">{veteranTitle(u)}</b></div>}
+                <div className="muted small">
+                  {u.sortieRecord.runs} run{u.sortieRecord.runs === 1 ? '' : 's'} come back from standing · {u.sortieRecord.lords} Echo lord{u.sortieRecord.lords === 1 ? '' : 's'} slain
+                </div>
+              </Panel>
+            ) : null}
+            {u.quirks?.length ? (
+              <Panel id="unit.quirks" title="Sortie quirks" h={3}>
+                <p className="muted small" style={{ marginTop: 0 }}>Picked up on Sorties; they only count on a Sortie.</p>
+                {u.quirks.map((id, i) => {
+                  const q = quirkInfo(id);
+                  return q ? (
+                    <div key={id} className="list-item">
+                      <div className="grow">
+                        <b style={{ color: q.good ? 'var(--green)' : '#e08a80' }}>{q.name}</b>
+                        <div className="muted small">{q.text}</div>
+                      </div>
+                      {edit && <button className="ghost icon" aria-label="Remove quirk" onClick={() => set((d) => void d.quirks?.splice(i, 1))}>✕</button>}
+                    </div>
+                  ) : null;
+                })}
+              </Panel>
+            ) : null}
+            {u.trinket || f.sortie?.trinkets?.length ? (
+              <Panel id="unit.trinket" title="Sortie trinket" h={3}>
+                <p className="muted small" style={{ marginTop: 0 }}>One per unit, found on Sorties; each has a trade-off, and it only counts on a Sortie.</p>
+                {u.trinket && trinketInfo(u.trinket) && (
+                  <div className="list-item">
+                    <div className="grow">
+                      <b>{trinketInfo(u.trinket)!.name}</b>
+                      <div className="muted small">{trinketInfo(u.trinket)!.text}</div>
+                    </div>
+                  </div>
+                )}
+                {edit && (
+                  <select value="" onChange={(e) => equipTrinket(e.target.value)}>
+                    <option value="">{u.trinket ? 'Swap or take off…' : 'Equip a spare…'}</option>
+                    {u.trinket && <option value="-">Take it off</option>}
+                    {[...new Set(f.sortie?.trinkets ?? [])].map((t) => (
+                      <option key={t} value={t}>{trinketInfo(t)?.name ?? t}: {trinketInfo(t)?.text}</option>
+                    ))}
+                  </select>
+                )}
+              </Panel>
+            ) : null}
           </div>
         </div>
 
@@ -462,6 +531,10 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           </div>
           <Panel id="unit.validation" title="Validation" h={3}>
             <Issues issues={issues} />
+          </Panel>
+          <Panel id="unit.portrait" title="Portrait" h={3} collapsed lead={<Portrait unit={u} size={48} />}>
+            <p className="muted small" style={{ margin: 0 }}>Stands for the unit in the Training Grounds and on a Sortie.</p>
+            <EmblemEditor emblem={u.portrait} fallback={defaultPortrait(u)} readOnly={!edit} onChange={(e) => set((d) => void (d.portrait = e))} />
           </Panel>
           <Panel id="unit.notes" title="Notes" h={3}>
             <TextArea rows={6} value={u.notes} placeholder="Background, honours, grudges…" onCommit={(v) => set((d) => void (d.notes = v))} />

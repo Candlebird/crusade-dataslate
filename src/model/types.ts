@@ -60,6 +60,8 @@ export interface Unit {
   bookUid?: string;
   category: Category;
   categoryOverridden: boolean;
+  /** Three stacked shapes that stand for the unit in the downtime games; unset = a default from its id (model/emblem.ts). */
+  portrait?: EmblemLayer[];
   points: number;
   size: number;
   quality: number;
@@ -70,6 +72,12 @@ export interface Unit {
   xp: number;
   upgrades: Upgrade[];
   scars: Scar[];
+  /** Habits picked up on Sorties, good and bad (rules/sortie.ts quirkInfo); they only count on a Sortie. */
+  quirks?: string[];
+  /** The Sortie trinket it carries (SORTIE_TRINKETS, downtimeData.ts); it only counts on a Sortie. */
+  trinket?: string;
+  /** Its Sortie record: runs it came back from standing, and Echo lords slain (rules/sortie.ts veteranTitle). */
+  sortieRecord?: { runs: number; lords: number };
   relics: Relic[];
   /** Manual BP adjustment (e.g. Heroic Rise +1). */
   bpAdjust: number;
@@ -150,7 +158,7 @@ export interface ForceNexus {
 }
 
 /** A unit's downtime task for a round. */
-export type UnitTaskKind = 'project' | 'mentor' | 'recon' | 'garrison';
+export type UnitTaskKind = 'project' | 'mentor' | 'recon' | 'garrison' | 'sortie';
 
 /** A Project under way on a world (rules/tasks.ts): one at a time, lost if the world changes hands. */
 export interface SectorProject {
@@ -200,6 +208,71 @@ export interface EmblemLayer {
   color: string;
 }
 
+/** A force's Sortie history: lords with a grudge, regions it can go deep into, and relics it brought home. */
+export interface ForceSortie {
+  /** Echo lords that beat a party, by id, and how many times (a nemesis grows tougher each time). */
+  nemesis?: Record<string, number>;
+  /** Regions whose story thread the force finished, unlocking their deep version. */
+  deep?: string[];
+  /** Regions whose relic the force has brought home (once each); any unit that can carry one takes it for free. */
+  relics?: string[];
+  /** The hardest difficulty tier unlocked (0 = none yet): winning a run at it unlocks the next. */
+  tier?: number;
+  /** Trinkets brought home and not carried by a unit (SORTIE_TRINKETS ids). */
+  trinkets?: string[];
+  /** The last few runs, newest first. */
+  recaps?: SortieRecap[];
+  /** The highest Ascension level unlocked past the top tier (0 = none yet). */
+  ascension?: number;
+  /** Echoes and lords the force's parties have met, by Echo datasheet name (or 'lord:<id>'). */
+  bestiary?: Record<string, SortieBeast>;
+  /** Counts across every run, for boon unlocks (seeded from the recaps when first needed). */
+  stats?: { runs: number; wins: number; flawless: number; deepest: number };
+}
+
+/** A bestiary entry: fights it was met in, and squads of it slain (the first slain unlocks its lore). */
+export interface SortieBeast {
+  met: number;
+  slain: number;
+  /** For a lord: the most pact-mark heat it was slain under. */
+  mark?: number;
+}
+
+/** A run looked back on: where it went, how it ended and what it brought home. */
+export interface SortieRecap {
+  id: string;
+  date: string;
+  region: string;
+  lord: string;
+  over: 'won' | 'fell' | 'broke' | 'home' | 'quit';
+  mode: 'free' | 'shard';
+  length: 'short' | 'long';
+  tier?: number;
+  ascension?: number;
+  depth: number;
+  won: number;
+  party: string[];
+  /** The run's journal, oldest first. */
+  lines: string[];
+  /** What came home (XP, haul, quirks, trinkets, unlocks). */
+  gained: string;
+  /** The weekly challenge it was (an ISO week like '2026-W43'), and its score. */
+  weekly?: string;
+  score?: number;
+}
+
+/** A force's best weekly challenge run, on the campaign's board. */
+export interface SortieBoardEntry {
+  week: string;
+  forceId: string;
+  force: string;
+  player: string;
+  depth: number;
+  score: number;
+  over: SortieRecap['over'];
+  date: string;
+}
+
 export interface Force {
   id: string;
   name: string;
@@ -225,6 +298,10 @@ export interface Force {
   lists?: ArmyList[];
   /** Most waves cleared in one training run (rules/training.ts). */
   trainingBest?: number;
+  /** Furthest any unit got on one Sortie: nodes cleared (rules/sortie.ts). */
+  sortieBest?: number;
+  /** What the force's Sorties are remembered for (rules/sortie.ts). */
+  sortie?: ForceSortie;
   /** Version of the trait and relic names it was saved with (see rules/migrate.ts). */
   rulesVersion?: number;
   createdAt: string;
@@ -549,6 +626,8 @@ export interface Campaign {
   duels?: NexusDuel[];
   /** Crossroads Journals: a short vignette for each faction's Warlord, once a round (rules/journal.ts). */
   journals?: CrossroadsJournal[];
+  /** The weekly Sortie challenge: each force's best run of the last few weeks (rules/downtime.ts postWeekly). */
+  sortieBoard?: SortieBoardEntry[];
 }
 
 /** A check rolled in a Crossroads Journal: a D6 at or over `target`. `rolls` holds the first roll and any re-roll (the last one stands). */

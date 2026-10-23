@@ -13,7 +13,7 @@ import {
 } from '../rules/tasks';
 import { Modal, confirmAction, toast } from './ui';
 
-const TASK_DESC: Record<UnitTaskKind, string> = {
+const TASK_DESC: Record<Exclude<UnitTaskKind, 'sortie'>, string> = {
   mentor: `A veteran teaches a lower-level unit of its own category: the pupil gains +${MENTORING.xpPerLevel} XP per mentor level. Both units are busy.`,
   project: `Work on one of your worlds: add a D${PROJECT_DIE} of progress to its Project (one per world). It pays out when it reaches its goal.`,
   recon: `Scout a sector up to ${RECON.range} hexes from your sectors and detachments: it and the hexes around it are in sight for ${RECON.rounds} rounds.`,
@@ -25,7 +25,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
   const { update } = useStore();
   const factionId = force.nexus?.factionId ?? '';
   const free = freeUnits(force, c);
-  const [task, setTask] = useState<UnitTaskKind>('project');
+  const [task, setTask] = useState<Exclude<UnitTaskKind, 'sortie'>>('project');
   const [unitId, setUnitId] = useState(free[0]?.id ?? '');
   const [pupilId, setPupilId] = useState('');
   const [sectorId, setSectorId] = useState('');
@@ -42,7 +42,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
   const pid = on ? on.id : projectId;
   const pupils = unit ? free.filter((u) => u.id !== unit.id && u.category === unit.category && levelForXp(u.xp) < levelForXp(unit.xp)) : [];
 
-  const pick = (t: UnitTaskKind) => {
+  const pick = (t: keyof typeof TASK_DESC) => {
     setTask(t);
     setSectorId('');
     setPupilId('');
@@ -103,7 +103,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
     >
       <div className="fields">
         <div className="span-all row" role="radiogroup" aria-label="Task">
-          {(Object.keys(TASK_NAMES) as UnitTaskKind[]).map((t) => (
+          {(Object.keys(TASK_DESC) as (keyof typeof TASK_DESC)[]).map((t) => (
             <button key={t} role="radio" aria-checked={task === t} className={task === t ? 'primary' : ''} onClick={() => pick(t)}>{TASK_NAMES[t]}</button>
           ))}
         </div>

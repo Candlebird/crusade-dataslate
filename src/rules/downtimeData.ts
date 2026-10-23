@@ -621,3 +621,406 @@ export const TRAINING_ENEMIES: Record<TrainingEnemyKind, TrainingEnemyDef> = {
   brute: { name: 'Brute', desc: 'Slow, huge, and hits hard. Shoots on the move (3 tiles).', hp: 22, speed: 0.6, armor: 0, attacks: 4, quality: 3, ap: 1, gun: { range: 3, attacks: 2, ap: 1 }, cost: 6, from: 4, spawn: 'main', color: '#c0583e', size: 0.34, shape: 'spikes' },
   lord: { name: 'Echo Lord', desc: `Every ${TRAINING.bossEvery}th wave. Armour 1. Shoots on the move (5 tiles).`, hp: 80, speed: 0.5, armor: 1, attacks: 6, quality: 3, ap: 2, gun: { range: 5, attacks: 3, ap: 1 }, cost: 20, from: 1, spawn: 'boss', color: '#e04a6a', size: 0.45, shape: 'crown' },
 };
+
+/**
+ * Sortie: a Darkest Dungeon-like run between games. A party of three units sets out across a branching map of fights
+ * with the Void Echoes, camps, shrines and caches. Fights are turn based: the party stands in a line of front, middle
+ * and back (a Fortification always at the back) that turns every round, the Echo squads stand at Close, Mid or Far
+ * range (several can share one), and every model on both sides acts on its own initiative. A free run earns XP only; a
+ * Shard run costs an Umbra Shard and all three units' downtime task, earns more XP and brings home a haul, but each
+ * unit wiped out takes a scar. The logic is in sortie.ts; the game is components/SortieModal.tsx.
+ */
+/** Sortie quirks, each with its opposite: picking one up drops the other. The region ones are `native:<region>` and
+ * `haunted:<region>` (rules/sortie.ts quirkInfo). */
+export const SORTIE_QUIRKS: Record<string, { name: string; text: string; good: boolean; foe: string }> = {
+  steady: { name: 'Steady', text: '+1 to morale tests.', good: true, foe: 'shaky' },
+  shaky: { name: 'Shaky', text: '-1 to morale tests.', good: false, foe: 'steady' },
+  quick: { name: 'Quick', text: '+1 initiative.', good: true, foe: 'jumpy' },
+  jumpy: { name: 'Jumpy', text: '-2 initiative in the first round of a fight.', good: false, foe: 'quick' },
+  eagle: { name: 'Eagle-eyed', text: '+1 to hit when shooting.', good: true, foe: 'myopic' },
+  myopic: { name: 'Short-sighted', text: '-1 to hit when shooting at Far.', good: false, foe: 'eagle' },
+  brute: { name: 'Brawler', text: '+1 to hit in melee.', good: true, foe: 'clumsy' },
+  clumsy: { name: 'Clumsy', text: '-1 to hit in melee.', good: false, foe: 'brute' },
+  hardy: { name: 'Hardy', text: '+2 wounds on each model.', good: true, foe: 'frail' },
+  frail: { name: 'Frail', text: '-2 wounds on each model.', good: false, foe: 'hardy' },
+};
+
+/** Sortie trinkets: each with a gain and a cost, one to a unit, and they only count on a Sortie. `init`, `morale`,
+ * `melee`, `shoot` and `def` add to initiative, morale tests, hitting and Defense; `hp` to each model's wounds; `stress`
+ * multiplies the stress the unit takes. */
+export interface SortieTrinket {
+  name: string;
+  text: string;
+  init?: number;
+  morale?: number;
+  melee?: number;
+  shoot?: number;
+  def?: number;
+  hp?: number;
+  stress?: number;
+}
+
+export const SORTIE_TRINKETS: Record<string, SortieTrinket> = {
+  spurs: { name: 'Rusted Spurs', text: '+1 initiative, -1 to morale tests.', init: 1, morale: -1 },
+  charm: { name: 'Bone Charm', text: '+1 to morale tests, -1 initiative.', morale: 1, init: -1 },
+  lens: { name: 'Cracked Lens', text: '+1 to hit when shooting, -1 in melee.', shoot: 1, melee: -1 },
+  knuckles: { name: 'Spiked Knuckles', text: '+1 to hit in melee, -1 when shooting.', melee: 1, shoot: -1 },
+  plate: { name: 'Salvaged Plate', text: '+1 Defense, -1 initiative.', def: 1, init: -1 },
+  flask: { name: 'Calming Flask', text: 'Half the stress, but -1 wound on each model.', stress: 0.5, hp: -1 },
+  idol: { name: 'Hungry Idol', text: '+2 wounds on each model, but half again the stress.', hp: 2, stress: 1.5 },
+  mask: { name: 'Mourning Mask', text: 'Half the stress, but -1 to hit when shooting.', stress: 0.5, shoot: -1 },
+  shroud: { name: 'Echo Shroud', text: '+1 Defense, but half again the stress.', def: 1, stress: 1.5 },
+  totem: { name: 'War Totem', text: '+1 to hit in melee and +1 initiative, but -2 wounds on each model.', melee: 1, init: 1, hp: -2 },
+};
+
+export const SORTIE = {
+  /** Rows of the map before the boss (the last of them all camps); each row holds up to `width` nodes. */
+  rows: { short: 5, long: 8 },
+  width: 3,
+  /** XP earned for each fight won, up to the cap of the run's mode and length. */
+  xp: { fight: 0.5, elite: 1, boss: { short: 1, long: 2 } },
+  caps: { free: { short: 2, long: 4 }, shard: { short: 4, long: 6 } },
+  /** A Shard run's haul for each fight won and cache found. Falling loses it; heading home from a camp keeps it. */
+  haul: {
+    fight: { supply: 5 },
+    elite: { supply: 10, rp: 1 },
+    boss: { supply: 15, rp: 1 },
+    cache: { supply: 5 },
+    /** The boss of a long run drops an Umbra Shard this often. */
+    longShard: 0.5,
+  },
+  /** Every model's wounds are its Tough times this. */
+  hpMul: 3,
+  /**
+   * Distances: 1 Close, 2 Mid, 3 Far, and each slot back in the party's line adds one. How far a gun reaches by its
+   * range: up to 12" one step, up to 24" two, up to 36" three, longer four (so the Back is for the longest guns).
+   */
+  ranges: [[12, 1], [24, 2], [36, 3], [999, 4]] as [number, number][],
+  /** How likely an Echo shot is to pick each slot, Front to Back. */
+  aim: [3, 2, 1],
+  /** The chance each boon offered is a rare one (an elite always offers one). */
+  rareChance: 0.2,
+  ranks: 3,
+  /** Initiative is a d6 a model, +`fast` for Fast or Flying, −`slow` for Slow (or slowed). */
+  fast: 2,
+  slow: 2,
+  /** Rounds before a skill can be used again. */
+  cooldown: { charge: 2, regroup: 2, heal: 2, shield: 2, barrage: 2, field: 3, outflank: 3 } as Record<string, number>,
+  /** Charge reaches this far (Jump Packs one more) and brings its target to Close. */
+  chargeReach: 2,
+  /** Fearless rerolls a failed morale test; a Hero (or Combat Stims) adds this to the roll. */
+  heroMorale: 1,
+  /**
+   * A fight's Echoes cost this many times the unit's power (its points, with each level adding a share), as bent by
+   * the size-up, climbing by `ramp` of that from the first row to the last before the boss, whatever the run's length.
+   */
+  budget: 1,
+  /**
+   * Sizing the unit up (sortie.ts sizeUp): trial fights per step, halving steps, the range of scales, and the share of
+   * its wounds the fresh unit should keep on average (a loss keeps none) in each kind of fight.
+   */
+  sizeUp: { tries: 30, steps: 6, min: 0.2, max: 5, left: { fight: 0.82, elite: 0.65, boss: 0.4 } as Record<'fight' | 'elite' | 'boss', number> },
+  ramp: 0.5,
+  /** At most this many Echo squads in a fight. */
+  squads: 3,
+  /**
+   * Camp: rest mends this share of each model's wounds and brings back `raise` of the squad's fallen (at least one).
+   * After a fight, patching up mends `patch` and brings one back.
+   */
+  rest: 0.5,
+  raise: 0.3,
+  patch: 0.4,
+  /** Node kinds by chance, rows 1 on (row 0 is all fights, the last row all camps). Elites only from 40% of the way in.
+   * A camp, encounter, cache or shop never leads to another one. */
+  odds: { fight: 0.42, elite: 0.15, camp: 0.11, shrine: 0.21, cache: 0.05, shop: 0.06 },
+  /** Supply prices at a shop (for a common or rare boon, and a heal of `healShare`), on any run. */
+  shop: { boon: 10, rare: 18, heal: 8, healShare: 0.4, boons: 3 },
+  /** How a pick of the next encounter weighs a thread's next step, a region's own encounter and a common one. */
+  storyWeight: { next: 12, region: 3, common: 1 },
+  /** At most this share of the Echo lord's wounds can be taken by story choices before the fight. */
+  maxWeaken: 0.5,
+  /** An elite's lead-in: one affix each, at random. */
+  affixes: {
+    armoured: { name: 'Armoured', text: '+1 Defense.' },
+    swift: { name: 'Swift', text: 'Fast: +2 initiative and they close in quicker.' },
+    regenerating: { name: 'Regenerating', text: 'Every round each Echo mends a share of its wounds.' },
+    vengeful: { name: 'Vengeful', text: 'When one of their squads is wiped out, the Front unit takes wounds.' },
+    frenzied: { name: 'Frenzied', text: 'A quarter more attacks.' },
+    shrouded: { name: 'Shrouded', text: 'Stealth: -1 to hit them from Mid or Far.' },
+  },
+  /** An Echo lord that wipes out or turns back a party is remembered: it turns up again `odds` of the time, a share
+   * tougher per grudge level (up to `max`), and slaying it pays `bounty` RP per level. */
+  nemesis: { odds: 0.5, tough: 0.2, max: 3, bounty: 1 },
+  /** Difficulty tiers, unlocked one at a time by winning a run at the hardest one open. Each adds its twist to those
+   * before it, and multiplies the XP (cap included) and the haul by `pay`. */
+  tiers: [
+    { name: 'Standard', text: 'The Echoes as they come.', pay: 1 },
+    { name: 'Tier 1', text: 'Elite Echoes come a fifth bigger.', pay: 1.2 },
+    { name: 'Tier 2', text: 'Half the camps along the way are Echo packs instead.', pay: 1.4 },
+    { name: 'Tier 3', text: 'The Echo lord has a second signature ability.', pay: 1.6 },
+    { name: 'Tier 4', text: 'Every fight is a tenth bigger.', pay: 1.8 },
+    { name: 'Tier 5', text: 'Echo packs carry an affix too.', pay: 2 },
+  ],
+  tierTwist: { elite: 1.2, camps: 0.5, fights: 1.1 },
+  /** Quirks a unit picks up on a run: at most `max`; a unit still standing deep enough in (`depth` nodes) may pick up a
+   * good one (`good`, `goodWon` if the run was won), a unit wiped out a bad one (`bad`); `region` of them are about the
+   * region. */
+  quirks: { max: 3, depth: 3, good: 0.25, goodWon: 0.5, bad: 0.5, region: 1 / 3 },
+  /** A region's deep version (unlocked by finishing its thread): fights are bigger by `budget`, the haul by `haul`. */
+  deep: { budget: 1.2, haul: 1.5 },
+  /**
+   * Stress, for the run only: each unit fills a bar up to `max` from wounds (`wounds` times the share of the unit's
+   * wounds a fight cost it), a shaken model (`shaken`), a unit of the party wiped out (`lost`), a choice gone wrong
+   * (`fail`), a curse or a shrine's wounds (`hurt`). A fight won takes off `won`, a camp `camp`, patching up or field
+   * dressings `patch`. A full bar cracks the unit at the start of a round: it refuses its orders for the round, or
+   * fights wild at -1 to hit, and comes back down to `after`.
+   */
+  stress: { max: 10, after: 5, wounds: 6, shaken: 1, lost: 3, fail: 2, hurt: 1, won: 1, camp: 6, patch: 3, refuse: 0.5 },
+  /** Trinkets drop from an elite won (`elite`), a cache (`cache`) and a choice that pays off (`event`). */
+  trinkets: { elite: 0.5, cache: 0.25, event: 0.15, spares: 12 },
+  /** The weekly challenge: one seed a week, the same region, lord and map for every force, at this tier and length.
+   * Its score is `depth` per node, `won` per fight won, `boss` for the lord and `alive` per unit still standing. */
+  weekly: { tier: 1, length: 'long' as const, depth: 10, won: 5, boss: 50, alive: 10, weeks: 4 },
+  /** Run recaps a force keeps, newest first. */
+  recaps: 8,
+  /** Hidden nodes: this share of the middle rows shows as '?' until the party can see it. It sees `sight` steps
+   * ahead, one more with a scout (Scout, Strider or Ambush) in the party. */
+  hidden: { share: 0.35, sight: 1 },
+  /** Veteran titles, by runs a unit came back from standing; slaying `lords` Echo lords adds the lord title. */
+  veteran: { titles: [[3, 'Road-worn'], [6, 'Ash-walker'], [10, 'Hollow-sworn']] as [number, string][], lords: 3, lordTitle: 'Lordbane' },
+  /** Ambushes: stepping onto a fight that started hidden, the Echoes may strike first (`init` more initiative in the
+   * first round), `odds` of the time. A scout in the party, or the lantern, stops it. */
+  ambush: { odds: 0.25, init: 10 },
+  /** Last stands: a party unit knocked down to its last model (or a lone model to a third of its wounds) may stand
+   * fast, `odds` of the time and once a fight: for this round and the next it hits at +1, makes `mul` times the
+   * attacks and takes no morale tests. */
+  lastStand: { odds: 0.35, rounds: 2, mul: 1.5 },
+  /** Pact marks: hardships a party takes on before a run (once the force has won one), each paying `pay` more XP and
+   * Requisition per point of heat. The most heat a lord was slain under goes in the bestiary. Not on the weekly. */
+  marks: {
+    pay: 0.1,
+    proud: 1 / 3,
+    fierce: 1.15,
+    bleed: 0.75,
+    list: [
+      { id: 'proud', name: 'Mark of Pride', heat: 2, text: 'A third of the plain fights are elites.' },
+      { id: 'fierce', name: 'Mark of Fury', heat: 2, text: 'Every Echo makes 15% more attacks.' },
+      { id: 'scarred', name: 'Mark of the Scarred', heat: 2, text: 'The lord comes with one more rematch trick (up to three).' },
+      { id: 'bleed', name: 'Mark of Blood', heat: 1, text: 'The party sets out at three quarters of its wounds.' },
+      { id: 'fuse', name: 'Mark of the Short Fuse', heat: 1, text: 'No last stands.' },
+      { id: 'silent', name: 'Mark of Silence', heat: 1, text: 'No omens on the road.' },
+    ] as { id: SortieMarkId; name: string; heat: number; text: string }[],
+  },
+  /** Battle scars: run-only traits a party unit earns once each, named in the recap. */
+  scars: {
+    blooded: { name: 'Blooded', text: '+1 to its morale tests.', how: 'made a last stand in a fight it won' },
+    headhunter: { name: 'Headhunter', text: 'a tenth more attacks.', how: 'struck the last blow against elites', mul: 1.1 },
+    survivor: { name: 'Survivor', text: 'more wounds on every model.', how: 'came through a won fight at a quarter of its wounds or less' },
+  } as Record<SortieScarId, { name: string; text: string; how: string; mul?: number }>,
+  /** Lord omens: nodes that tell of the lord. Reading `need` of them takes away a rematch trick, or else its own
+   * signature ability. About `share` of the nodes past the first row have one, and never fewer than `need` + 1. */
+  omens: { share: 0.2, need: 3 },
+  /** Rematches: a lord slain by the force before comes back changed, with one more trick for each time (up to all three). */
+  rematch: {
+    def: 1,
+    atk: 1.25,
+    regen: 0.05,
+    tricks: [
+      { name: 'Hardened', text: '+1 to its saves.' },
+      { name: 'Vengeful', text: 'a quarter more attacks.' },
+      { name: 'Regenerating', text: 'mends a twentieth of its wounds at the start of each round.' },
+    ],
+  },
+  /** Boons a force's parties are offered from the start; the rest unlock one by one as its runs reach `unlocks` goals.
+   * Curses are always on offer, and the weekly challenge offers every boon. */
+  boonsAtStart: ['scope', 'blades', 'bayonets', 'medic', 'drill', 'trophy', 'stims', 'wall', 'relay', 'spotter', 'dressing', 'grit'] as string[],
+  unlocks: {
+    rally: { goal: 'runs', n: 2 },
+    salvo: { goal: 'wins', n: 1 },
+    hymn: { goal: 'lore', n: 3 },
+    respite: { goal: 'runs', n: 4 },
+    ward: { goal: 'lords', n: 2 },
+    lantern: { goal: 'beasts', n: 8 },
+    hide: { goal: 'flawless', n: 1 },
+    cells: { goal: 'tier', n: 2 },
+    banner: { goal: 'wins', n: 3 },
+    scavenge: { goal: 'deepest', n: 7 },
+    packs: { goal: 'deep', n: 1 },
+    rounds: { goal: 'relics', n: 2 },
+  } as Record<string, { goal: SortieGoal; n: number }>,
+  /** Ascension, past the top tier: each level adds the next curse in order, and pays `pay` more. */
+  ascension: {
+    pay: 0.1,
+    curses: [
+      { id: 'swollen', name: 'Swollen packs', text: 'Every fight but the lord’s is a tenth bigger again.' },
+      { id: 'thin', name: 'Thin camps', text: 'Camps mend half as much.' },
+      { id: 'dear', name: 'Dear wares', text: 'Shop prices are half again as much.' },
+      { id: 'grim', name: 'Grim lord', text: 'The Echo lord has a quarter more wounds.' },
+      { id: 'frayed', name: 'Frayed nerves', text: 'The party sets out with 3 stress each.' },
+      { id: 'lean', name: 'Lean pickings', text: 'Fights won offer one boon fewer.' },
+      { id: 'dark', name: 'Darker roads', text: 'More of the map is hidden.' },
+      { id: 'hunted', name: 'Hunted', text: 'Ambushes come twice as often.' },
+    ] as { id: SortieCurseId; name: string; text: string }[],
+    fights: 1.1, rest: 0.5, prices: 1.5, lord: 1.25, stress: 3, hidden: 0.6, ambush: 2,
+  },
+};
+
+/** What a boon's unlock counts: runs finished, runs won, wins with no unit wiped out, the deepest step reached, lords
+ * slain, kinds of Echo met, Echo lore learned, the hardest tier unlocked, story threads finished, relics brought home. */
+export type SortieGoal = 'runs' | 'wins' | 'flawless' | 'deepest' | 'lords' | 'beasts' | 'lore' | 'tier' | 'deep' | 'relics';
+
+export type SortieMarkId = 'proud' | 'fierce' | 'scarred' | 'bleed' | 'fuse' | 'silent';
+export type SortieScarId = 'blooded' | 'headhunter' | 'survivor';
+
+export type SortieCurseId = 'swollen' | 'thin' | 'dear' | 'grim' | 'frayed' | 'lean' | 'dark' | 'hunted';
+
+export type SortieAffix = keyof typeof SORTIE.affixes;
+
+export type SortieMode = 'free' | 'shard';
+export type SortieLength = 'short' | 'long';
+
+export type SortieBoonId = 'scope' | 'blades' | 'ward' | 'medic' | 'drill' | 'cells' | 'packs' | 'hide' | 'trophy' | 'banner' | 'bayonets' | 'stims'
+  | 'wall' | 'relay' | 'spotter' | 'dressing' | 'salvo' | 'grit' | 'rally' | 'rounds' | 'scavenge'
+  | 'pact' | 'fury' | 'adrenal' | 'hymn' | 'respite' | 'lantern';
+
+export const SORTIE_BOONS: Record<SortieBoonId, {
+  name: string;
+  text: string;
+  ranged?: boolean;
+  melee?: boolean;
+  shard?: boolean;
+  /** Turns up less often; an elite always offers one. */
+  rare?: boolean;
+  /** Strong with a cost, and only ever from a shrine. */
+  curse?: boolean;
+}> = {
+  scope: { name: 'Targeting Scope', text: '+1 to hit when shooting at Far range.', ranged: true },
+  cells: { rare: true, name: 'Overcharged Cells', text: 'Every ranged weapon reaches one step further.', ranged: true },
+  blades: { name: 'Honed Blades', text: 'Melee weapons get +1 AP.', melee: true },
+  bayonets: { name: 'Bayonets', text: 'Every model makes 1 more melee attack.' },
+  packs: { rare: true, name: 'Jump Packs', text: 'Charge reaches Far range.', melee: true },
+  ward: { rare: true, name: 'Echo-Ward', text: '+1 Defense in the first round of every fight.' },
+  medic: { name: 'Field Medic', text: 'After each fight, one fallen model gets back up with a little health (or the most hurt mends some).' },
+  drill: { name: 'Battle Drill', text: '+1 initiative for every model.' },
+  hide: { rare: true, name: 'Thick Hide', text: 'Every model gets +1 Tough.' },
+  trophy: { name: 'Echo Trophy', text: 'Every Echo a unit kills mends 1 wound on that unit.' },
+  banner: { rare: true, name: 'Tattered Banner', text: 'Every unit starts each fight with a shield of 1 wound per model standing.' },
+  stims: { name: 'Combat Stims', text: '+1 to every morale test.' },
+  wall: { name: 'Shield Wall', text: 'The Front unit gets +1 Defense.' },
+  relay: { name: 'Vox Relay', text: 'The Middle unit gets +1 to hit.' },
+  spotter: { name: 'Spotter Drone', text: "The Back unit's guns reach one step further.", ranged: true },
+  dressing: { name: 'Field Dressing', text: "When the line turns, the unit falling back from the Front mends a sixth of each model's wounds." },
+  salvo: { rare: true, name: 'Opening Salvo', text: '+1 to hit in the first round of every fight.' },
+  grit: { name: 'Grit', text: 'Models down to half their wounds or less get +1 Defense.' },
+  rally: { name: 'Rally Cry', text: 'At the start of every round, shaken models steady.' },
+  rounds: { rare: true, name: 'Rending Rounds', text: 'Ranged weapons get Rending (a 6 to hit gets AP(4)).', ranged: true },
+  pact: { curse: true, name: 'Void Pact', text: '+1 to hit with everything, but every fight opens with each model losing a sixth of its wounds (never the last).' },
+  fury: { curse: true, name: 'Berserk Rite', text: 'Melee weapons get +2 AP, but every unit has -1 Defense.', melee: true },
+  adrenal: { curse: true, name: 'Adrenal Surge', text: '+2 initiative for every model, but -1 to every morale test.' },
+  hymn: { name: 'Battle Hymn', text: 'The party takes half the stress.' },
+  respite: { name: 'Brief Respite', text: 'Every fight won takes 2 more stress off each unit.' },
+  lantern: { name: 'Pathfinder’s Lantern', text: 'Every hidden node on the map shows, and the party sees a step further ahead.' },
+  scavenge: { name: 'Scavenger', text: 'Every fight won adds half again to the haul.', shard: true },
+};
+
+/** What a shrine choice does. A chance rolls once; `fail` happens instead when it misses. */
+export interface SortieOutcome {
+  text: string;
+  boon?: boolean;
+  /** Share of each model's wounds mended (1 = all), and fallen models brought back. */
+  heal?: number;
+  revive?: number;
+  /** Wounds dealt, spread over the models (times the run's health multiplier). */
+  hurt?: number;
+  tough?: number;
+  /** Haul, on a Shard run. */
+  supply?: number;
+  rp?: number;
+  fight?: boolean;
+  /** A cursed boon: strong, with a cost. */
+  curse?: boolean;
+  /** A rare boon instead of any. */
+  rare?: boolean;
+  /** Marks a step of a story thread done, so the next step can turn up. */
+  flag?: string;
+  /** The Echo lord starts the last fight short this share of its wounds (they add up, to at most `maxWeaken`). */
+  weaken?: number;
+}
+
+export interface SortieChoice {
+  label: string;
+  /** Only for units with one of these rules, or 'ranged' / 'melee' for a weapon of that kind, or 'squad' / 'solo'. */
+  needs?: string[];
+  chance?: number;
+  win: SortieOutcome;
+  fail?: SortieOutcome;
+}
+
+export interface SortieEvent {
+  id: string;
+  name: string;
+  text: string;
+  choices: SortieChoice[];
+  /** A story step: only turns up once a choice has set this flag. */
+  after?: string;
+}
+
+export const SORTIE_EVENTS: SortieEvent[] = [
+  {
+    id: 'cache', name: 'Abandoned supply cache', text: 'Crates lie half-buried in ash, their seals cracked. Something has been at them, and may still be near.',
+    choices: [
+      { label: 'Take what lies on top', win: { text: 'A few sound crates.', supply: 5 } },
+      { label: 'Dig through it all', chance: 0.5, win: { text: 'Deep in the pile: something worth carrying.', boon: true, supply: 5 }, fail: { text: 'Echoes boil out of the crates!', fight: true } },
+      { label: 'Scout the area first', needs: ['Scout', 'Stealth', 'Ambush'], win: { text: 'You find the nest before it finds you, and the crates are yours.', boon: true, supply: 5 } },
+    ],
+  },
+  {
+    id: 'shrine', name: 'Void shrine', text: 'A spire of black glass hums at a pitch you feel in your teeth. Touching it would change you.',
+    choices: [
+      { label: 'Lay hands on it', win: { text: 'Strength floods in, and it burns going in.', tough: 1, hurt: 2 } },
+      { label: 'Break it', needs: ['melee'], chance: 0.6, win: { text: 'It shatters, and the shards are worth something.', rp: 1 }, fail: { text: 'It bursts and cuts deep.', hurt: 3 } },
+      { label: 'Leave it be', win: { text: 'You walk on, the hum fading behind you.' } },
+    ],
+  },
+  {
+    id: 'patrol', name: 'Echo patrol', text: 'A pack of Echoes drifts past, not yet aware of you.',
+    choices: [
+      { label: 'Strike first', win: { text: 'You fall on them.', fight: true } },
+      { label: 'Let them pass', chance: 0.7, win: { text: 'They drift on.' }, fail: { text: 'One turns. They come for you.', fight: true } },
+      { label: 'Slip past unseen', needs: ['Stealth', 'Scout', 'Strider', 'Flying'], win: { text: 'They never knew you were there, and you saw how they move.', boon: true } },
+    ],
+  },
+  {
+    id: 'battlefield', name: 'Old battlefield', text: 'Wrecks and bones from a fight nobody won. Some of the gear is still good.',
+    choices: [
+      { label: 'Scavenge the wrecks', win: { text: 'Salvage worth hauling home.', supply: 10 } },
+      { label: 'Search for a weapon', chance: 0.5, win: { text: 'A fine piece, still working.', boon: true }, fail: { text: 'A booby trap.', hurt: 2 } },
+      { label: 'Bury the fallen', needs: ['Hero'], win: { text: 'The rite steadies everyone.', heal: 1 } },
+    ],
+  },
+  {
+    id: 'rift', name: 'Rift in the ground', text: 'A crack in the world blocks the way, breathing cold. Going around would cost time.',
+    choices: [
+      { label: 'Fly over', needs: ['Flying'], win: { text: 'Easy, and you spot a safe place to rest.', heal: 0.5 } },
+      { label: 'Climb across', needs: ['Strider', 'Scout'], win: { text: 'Sure-footed, you cross without a scratch, and find something on the far side.', boon: true } },
+      { label: 'Jump it', chance: 0.5, win: { text: 'You make it, and something glints at the edge.', rp: 1 }, fail: { text: 'Some of you do not land well.', hurt: 3 } },
+      { label: 'Go the long way', win: { text: 'Hours lost, but you rest on the way.', heal: 0.25 } },
+    ],
+  },
+  {
+    id: 'altar', name: 'Whispering altar', text: 'Something under the stone offers power, in a voice that sounds like your own. It will want something back.',
+    choices: [
+      { label: 'Take the bargain', win: { text: 'It is done, and you feel it settle in.', curse: true } },
+      { label: 'Smash it', needs: ['melee'], chance: 0.5, win: { text: 'The voice cuts off. In the rubble, something useful.', boon: true }, fail: { text: 'It screams, and the stone bites back.', hurt: 3 } },
+      { label: 'Walk away', win: { text: 'The whispering follows you a while, then stops.' } },
+    ],
+  },
+  {
+    id: 'survivor', name: 'A survivor', text: 'A lone soldier from a lost patrol stumbles out of the ruins, half-mad, clutching a field kit.',
+    choices: [
+      { label: 'Hear them out', win: { text: 'They teach you a hard-won trick and leave in the night.', boon: true } },
+      { label: 'Take the kit', win: { text: 'Bandages and stims.', heal: 0.5, revive: 1 } },
+      { label: 'Let them join', needs: ['squad'], chance: 0.5, win: { text: 'They fall in beside you. Two fallen get back up.', revive: 2 }, fail: { text: 'An Echo was wearing them.', fight: true } },
+    ],
+  },
+];

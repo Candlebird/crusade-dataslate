@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EMBLEM_SHAPES, SHAPE_IDS, emblemLayers, randomEmblem } from './emblem';
+import { CATEGORY_COLORS, EMBLEM_SHAPES, SHAPE_IDS, defaultPortrait, echoPortrait, emblemLayers, randomEmblem, unitPortrait } from './emblem';
 import { rng } from '../rules/hexmap';
 
 describe('emblemLayers', () => {
@@ -43,5 +43,26 @@ describe('EMBLEM_SHAPES', () => {
       const nums = (path.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
       expect(nums.every((v) => v >= 0 && v <= 100)).toBe(true);
     }
+  });
+});
+
+describe('portraits', () => {
+  it('gives every unit a steady default on its category colour', () => {
+    const a = defaultPortrait({ id: 'u1', category: 'Elite' });
+    expect(defaultPortrait({ id: 'u1', category: 'Elite' })).toEqual(a);
+    expect(emblemLayers(a)).toBeDefined();
+    expect(a[0].color).toBe(CATEGORY_COLORS.Elite);
+    expect(a[1].color).not.toBe(a[0].color);
+  });
+
+  it("prefers the unit's own portrait", () => {
+    const own = randomEmblem(() => 0.3);
+    expect(unitPortrait({ id: 'u1', category: 'Hero', portrait: own })).toBe(own);
+    expect(unitPortrait({ id: 'u1', category: 'Hero', portrait: [] as never })).toEqual(defaultPortrait({ id: 'u1', category: 'Hero' }));
+  });
+
+  it('draws every Echo of a type alike', () => {
+    expect(echoPortrait('Void Hound')).toEqual(echoPortrait('Void Hound'));
+    expect(emblemLayers(echoPortrait('Void Hound'))).toBeDefined();
   });
 });

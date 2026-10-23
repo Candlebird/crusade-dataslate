@@ -7,6 +7,7 @@ import { datasheetTags, matchesTags, tagsIn } from '../model/tags';
 import { DatasheetTags, TagFilter } from './Tags';
 import { Dropzone, Panel, confirmAction, toast } from './ui';
 import { DatasheetEditor } from './BookEditor';
+import { ECHOES_BOOK } from '../rules/echoForce';
 import { blankDatasheet, removeDatasheet, saveDatasheet } from '../model/bookEdit';
 import type { CatalogBook, CatalogUnit } from '../model/types';
 import { useImporter } from './importer';
@@ -137,14 +138,14 @@ export default function BooksPage() {
                 {b.faction && `${b.faction} · `}v{b.version}{b.edited ? ' (edited)' : ''} · {b.units.length} datasheets · {b.rules.length} rules · {b.spells.length} spells · fetched {localDate(b.importedAt)}
               </div>
             </div>
-            <a className="btn" href={bookPageUrl(b.uid, b.name)} target="_blank" rel="noreferrer">Army Forge ↗</a>
-            {proxy && (
+            {b.uid === ECHOES_BOOK ? <span className="muted small" title="Ships with the site, so every player has it">Built in</span> : <a className="btn" href={bookPageUrl(b.uid, b.name)} target="_blank" rel="noreferrer">Army Forge ↗</a>}
+            {proxy && b.uid !== ECHOES_BOOK && (
               <button disabled={!!busy} onClick={() => fetchInto(b.uid)} title="Fetch the latest version from Army Forge">
                 {busy === b.uid ? 'Refreshing…' : 'Refresh'}
               </button>
             )}
             <button onClick={() => setOpenId(openId === b.uid ? null : b.uid)}>{openId === b.uid ? 'Hide' : 'Browse'}</button>
-            <button
+            {b.uid !== ECHOES_BOOK && <button
               className="ghost icon"
               aria-label={`Remove ${b.name}`}
               onClick={() => {
@@ -153,7 +154,7 @@ export default function BooksPage() {
               }}
             >
               ✕
-            </button>
+            </button>}
           </div>
         ))}
       </Panel>

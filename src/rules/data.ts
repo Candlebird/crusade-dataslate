@@ -271,6 +271,8 @@ export interface RelicDef {
   note?: string;
   desc?: string;
   nexus?: boolean;
+  /** Brought home from a Sortie by finishing this region's story thread (sortieStory.ts), and only then. */
+  sortie?: string;
 }
 
 export const RELICS: RelicDef[] = [
@@ -304,6 +306,11 @@ export const RELICS: RelicDef[] = [
   { name: 'Chrono-Disruptor Matrix', tier: 'Legendary', desc: `Once per game, when activated: until the end of the round, enemy units within 12" can't move or charge.` },
   { name: 'Celestial Nullification Matrix', tier: 'Legendary', desc: 'Once per game: until the end of the round, enemy units within 12" get -1 to Defense rolls and -1 to casting rolls, and take 3 wounds for each failed cast in that area.' },
   // Nexus Wars relics
+  { name: "The Ninth's Last Charge", tier: 'Common', sortie: 'ashfields', profile: '3", A1, AP(4), Blast(6), Limited' },
+  { name: 'Servitor Power Cell', tier: 'Common', sortie: 'foundry', desc: 'Once per game, when activated, remove D3 wounds from this model or its unit.' },
+  { name: 'Singing Splinter', tier: 'Common', sortie: 'glass', desc: "Enemy units get -1 to hit rolls when they shoot at this model's unit from over 12\" away." },
+  { name: 'Bell of Severance', tier: 'Common', sortie: 'monastery', desc: "Once per game, when activated, pick one enemy unit within 18\". It can't cast spells or use auras until the end of the round." },
+  { name: "Halvar's Firing Key", tier: 'Common', sortie: 'wreck', desc: "Once per game, when this model's unit shoots, one of its weapons gets AP(+2) and Ignores Cover for that attack." },
   { name: 'Shadesplinter Cloak', tier: 'Common', nexus: true, desc: 'After this model and its unit use an Advance action, they count as being in cover.' },
   { name: 'Umbra Echo Plating', tier: 'Common', nexus: true, desc: "Once per round, when this model's unit takes wounds, ignore D3 of them." },
   { name: 'Warp-infusion', tier: 'Common', nexus: true, desc: 'Pick one non-relic melee weapon, which gets Quake.' },

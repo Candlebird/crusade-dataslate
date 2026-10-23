@@ -2,6 +2,7 @@ import { applySelection, type Selection } from '../armyforge/book';
 import { unitFromCatalog } from '../model/factory';
 import type { CatalogBook, CatalogUnit, Unit } from '../model/types';
 import { hasRule } from './engine';
+import { builtinEchoes } from '../model/seed';
 
 // A random Void Echoes army for the AI side, built from the imported army book to a points target
 // with OPR's list limits: a hero per 375 pts, no unit over 35% of the total, 1 + 1 per 750 pts copies.
@@ -11,7 +12,9 @@ export const ECHOES_BOOK = 'void-echoes-gf';
 export const BIG_UNIT = 250;
 type Rand = () => number;
 
-export const echoesBook = (books: CatalogBook[]) => books.find((b) => b.uid === ECHOES_BOOK) ?? books.find((b) => b.name === 'Void Echoes');
+/** The player's copy of the Void Echoes book (it may be edited), else the one that ships with the site. */
+export const echoesBook = (books: CatalogBook[]): CatalogBook =>
+  books.find((b) => b.uid === ECHOES_BOOK) ?? books.find((b) => b.name === 'Void Echoes') ?? builtinEchoes();
 
 export const pick = <T,>(rand: Rand, xs: readonly T[]): T => xs[Math.floor(rand() * xs.length)];
 

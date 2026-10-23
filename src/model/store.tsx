@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { DEFAULT_SETTINGS, type AppState, type CatalogBook, type Force, type Unit } from './types';
-import { buildSeedState } from './seed';
+import { buildSeedState, withBuiltinBooks } from './seed';
 import { migrateForce } from '../rules/migrate';
 import { migrateBattle } from '../rules/tracker';
 import { nowIso } from './factory';
@@ -18,6 +18,7 @@ function load(): AppState {
       const parsed = JSON.parse(raw) as AppState;
       return {
         ...parsed,
+        books: withBuiltinBooks(parsed.books ?? []),
         forces: parsed.forces.map(migrateForce),
         battle: migrateBattle(parsed.battle),
         settings: { ...DEFAULT_SETTINGS, ...parsed.settings, bp: { ...DEFAULT_SETTINGS.bp, ...parsed.settings?.bp } },
@@ -102,7 +103,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     [update],
   );
 
-  const replaceState = useCallback((s: AppState) => {
+  const replaceState = useCallback((next: AppState) => {
+    const s = { ...next, books: withBuiltinBooks(next.books ?? []) };
     latest.current = s;
     setState(s);
   }, []);

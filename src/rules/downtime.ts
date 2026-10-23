@@ -1,8 +1,9 @@
 // Downtime between games: Expeditions (a short dice story into the Nexus) and the bookkeeping for solo patrols.
-import type { Force, Unit } from '../model/types';
+import type { Campaign, Force, SortieBoardEntry, Unit } from '../model/types';
 import { SCAR_TABLE } from './data';
-import { EXPEDITION, EXPEDITION_SITES, SOLO_PATROL, type ExpeditionCheck, type ExpeditionReward, type ExpeditionSite, type ExpeditionVariant } from './downtimeData';
+import { EXPEDITION, EXPEDITION_SITES, SOLO_PATROL, SORTIE, SORTIE_BOONS, SORTIE_QUIRKS, type ExpeditionCheck, type ExpeditionReward, type ExpeditionSite, type ExpeditionVariant } from './downtimeData';
 import { applyScar, levelForXp } from './engine';
+import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicOf, runXp, threadDone, tierOf, trinketInfo, unlockedBoons, markHeat, veteranTitle, weeklyScore, type SortieRun } from './sortie';
 
 type Rand = () => number;
 
@@ -202,6 +203,180 @@ export function applyExpedition(force: Force, e: Expedition, date: string, newId
   force.ledger.push({ id: newId(), date, label: summary, rp: e.haul.rp, supply: e.haul.supply, ...(e.haul.us ? { us: e.haul.us } : {}) });
   return summary;
 }
+
+/**
+ * Pay a finished Sortie to the force: the XP (up to the run's cap) to each unit of the party, a Shard run's haul if it
+ * got home, and on a Shard run each unit wiped out takes a battle scar or is Lost. Returns a one-line summary.
+ */
+export function applySortie(force: Force, run: SortieRun, date: string, newId: () => string, rand: Rand = Math.random): string {
+  const units = run.party.map((m) => force.units.find((x) => x.id === m.unit.id)).filter((u): u is Unit => !!u && u.status !== 'removed');
+  if (!units.length) return '';
+  const xp = runXp(run);
+  for (const m of run.party) {
+    const u = units.find((x) => x.id === m.unit.id);
+    if (u) u.xp += memberXp(run, m);
+  }
+  const half = run.party.some((m) => !memberUp(m)) ? ` (${Math.floor(xp / 2)} for the units wiped out)` : '';
+  const bits = [`Sortie (${run.mode === 'shard' ? 'Shard' : 'free'}, ${run.length}) in ${regionName(run)} against ${bossOf(run).name} — ${run.party.map(memberName).join(', ')}: ${OUTCOME[run.over ?? 'quit']}, +${xp} XP each${half}`];
+  const haul = keepsHaul(run) ? run.haul : { supply: 0, rp: 0, us: 0 };
+  if (keepsHaul(run)) {
+    const got = [haul.supply ? `${haul.supply} Supply` : '', haul.rp ? `${haul.rp} RP` : '', haul.us ? `${haul.us} Umbra Shard${haul.us > 1 ? 's' : ''}` : ''].filter(Boolean);
+    if (got.length) bits.push(got.join(', '));
+    force.umbraShards += haul.us;
+  } else if (run.mode === 'shard' && (run.haul.supply || run.haul.rp || run.haul.us)) bits.push('the haul was lost');
+  for (const f of fallenUnits(run)) {
+    const u = units.find((x) => x.id === f.id);
+    if (!u) continue;
+    if (d6(rand) <= EXPEDITION.ambushScarOn) {
+      const scars = SCAR_TABLE.filter((s) => s.name !== 'Comatose');
+      const scar = scars[Math.floor(rand() * scars.length)];
+      const r = applyScar(u, { id: newId(), name: scar.name, desc: scar.desc });
+      bits.push(`${u.name || u.unitType}: ${scar.name}${r === 'removed' ? ' (removed)' : ''}`);
+    } else {
+      u.status = 'comatose';
+      bits.push(`${u.name || u.unitType}: Lost, sits out the next battle`);
+    }
+  }
+  // What the force carries from run to run: grudges, deep regions and relics (rules/sortieStory.ts).
+  const story = (force.sortie ??= {});
+  // Counts for boon unlocks, seeded from the recaps for a force that ran before they were kept.
+  const stats = (story.stats ??= {
+    runs: story.recaps?.length ?? 0,
+    wins: story.recaps?.filter((r) => r.over === 'won').length ?? 0,
+    flawless: 0,
+    deepest: Math.max(0, ...(story.recaps ?? []).map((r) => r.depth)),
+  });
+  const boonsBefore = unlockedBoons(story);
+  stats.runs++;
+  if (run.over === 'won') stats.wins++;
+  if (run.over === 'won' && run.party.every(memberUp)) stats.flawless++;
+  stats.deepest = Math.max(stats.deepest, run.depth);
+  const grudge = { ...story.nemesis };
+  const bounty = bountyOf(run);
+  if (run.lordWon) {
+    grudge[run.boss] = Math.min(SORTIE.nemesis.max, (grudge[run.boss] ?? 0) + 1);
+    bits.push(`${bossOf(run).name} will remember this`);
+  } else if (run.bossDown && grudge[run.boss]) {
+    delete grudge[run.boss];
+    if (bounty) bits.push(`a grudge settled: ${bounty} RP bounty`);
+  }
+  story.nemesis = grudge;
+  if (threadDone(run) && !run.deep && !story.deep?.includes(run.region)) {
+    story.deep = [...(story.deep ?? []), run.region];
+    bits.push(`unlocked ${regionOf(run).deep.name}`);
+  }
+  const relic = relicOf(run);
+  if (relic && !story.relics?.includes(run.region)) {
+    story.relics = [...(story.relics ?? []), run.region];
+    bits.push(`brought home ${relic.name} (free for a unit that can carry a relic)`);
+  }
+  // Quirks: a unit still standing deep in may pick up a good habit, one wiped out a bad one.
+  const goods = Object.keys(SORTIE_QUIRKS).filter((k) => SORTIE_QUIRKS[k].good);
+  const bads = Object.keys(SORTIE_QUIRKS).filter((k) => !SORTIE_QUIRKS[k].good);
+  for (const m of run.party) {
+    const u = units.find((x) => x.id === m.unit.id);
+    if (!u) continue;
+    const up = memberUp(m);
+    if (up && run.depth < SORTIE.quirks.depth) continue;
+    if (rand() >= (up ? (run.over === 'won' ? SORTIE.quirks.goodWon : SORTIE.quirks.good) : SORTIE.quirks.bad)) continue;
+    const id = rand() < SORTIE.quirks.region ? `${up ? 'native' : 'haunted'}:${run.region}` : (up ? goods : bads)[Math.floor(rand() * (up ? goods : bads).length)];
+    if (addQuirk(u, id)) bits.push(`${u.name || u.unitType} is now ${quirkInfo(id)!.name}`);
+  }
+  // Every unit's Sortie record: runs it came back from standing, and lords slain; a new title is worth a line.
+  for (const m of run.party) {
+    const u = units.find((x) => x.id === m.unit.id);
+    if (!u) continue;
+    const before = veteranTitle(u);
+    const rec = (u.sortieRecord ??= { runs: 0, lords: 0 });
+    if (memberUp(m) && run.over !== 'fell') rec.runs++;
+    if (run.bossDown) rec.lords++;
+    const after = veteranTitle(u);
+    if (after && after !== before) bits.push(`${u.name || u.unitType} is now known as ${after}`);
+  }
+  // The bestiary: every Echo met adds to the force's count, and the first one slain unlocks its lore.
+  const beasts = (story.bestiary ??= {});
+  const fresh: string[] = [];
+  const learned: string[] = [];
+  for (const [k, v] of Object.entries(run.met ?? {})) {
+    const b = (beasts[k] ??= { met: 0, slain: 0 });
+    if (!b.met && v.met) fresh.push(beastInfo(k).name);
+    if (!b.slain && v.slain) learned.push(beastInfo(k).name);
+    b.met += v.met;
+    b.slain += v.slain;
+  }
+  // The most pact-mark heat a lord was slain under.
+  const heat = markHeat(run);
+  if (run.bossDown && heat) {
+    const b = (beasts['lord:' + run.boss] ??= { met: 0, slain: 0 });
+    if (heat > (b.mark ?? 0)) {
+      b.mark = heat;
+      bits.push(`slew ${bossOf(run).name} under ${heat} pact heat, its hardest yet`);
+    }
+  }
+  // Battle scars are for the run only, but the recap names them.
+  const scars = run.party.flatMap((m) => (m.scars ?? []).map((id) => `${memberName(m)} ${SORTIE.scars[id].name}`));
+  if (scars.length) bits.push(`battle scars: ${scars.join(', ')}`);
+  if (fresh.length) bits.push(`met ${fresh.join(', ')} for the first time`);
+  if (learned.length) bits.push(`learned the lore of ${learned.join(', ')}`);
+  // Winning at the top tier unlocks the next Ascension level.
+  const asc = run.ascension ?? 0;
+  if (run.over === 'won' && tierOf(run) === SORTIE.tiers.length - 1 && asc >= (story.ascension ?? 0) && asc < SORTIE.ascension.curses.length) {
+    story.ascension = asc + 1;
+    bits.push(`unlocked Ascension ${story.ascension}`);
+  }
+  // Winning at the hardest tier open unlocks the next.
+  if (run.over === 'won' && tierOf(run) >= (story.tier ?? 0) && tierOf(run) < SORTIE.tiers.length - 1) {
+    story.tier = tierOf(run) + 1;
+    bits.push(`unlocked ${SORTIE.tiers[story.tier].name}`);
+  }
+  // Boons unlocked by what the force has done, this run and before.
+  const boonsNew = unlockedBoons(story).filter((id) => !boonsBefore.includes(id));
+  if (boonsNew.length) bits.push(`unlocked the boon${boonsNew.length === 1 ? '' : 's'} ${boonsNew.map((id) => SORTIE_BOONS[id].name).join(', ')}`);
+  // Trinkets found come home whatever happened, into the force's spares (up to SORTIE.trinkets.spares).
+  const found = (run.trinkets ?? []).slice(0, Math.max(0, SORTIE.trinkets.spares - (story.trinkets?.length ?? 0)));
+  if (found.length) {
+    story.trinkets = [...(story.trinkets ?? []), ...found];
+    bits.push(`found ${found.map((t) => trinketInfo(t)?.name ?? t).join(', ')}`);
+  }
+  const summary = bits.join('; ');
+  // A recap of the run, to look back on from the force.
+  story.recaps = [{
+    id: newId(), date, region: regionName(run), lord: bossOf(run).name, over: run.over ?? 'quit', mode: run.mode,
+    length: run.length, ...(run.tier ? { tier: run.tier } : {}), ...(run.ascension ? { ascension: run.ascension } : {}), depth: run.depth, won: run.won,
+    party: run.party.map(memberName), lines: run.journal.map((l) => l.text), gained: bits.slice(1).join('; ') || `+${xp} XP each`,
+    ...(run.weekly ? { weekly: run.weekly, score: weeklyScore(run) } : {}),
+  }, ...(story.recaps ?? [])].slice(0, SORTIE.recaps);
+  // The Shard paid at the start (startSortie) shows here, net of any brought home.
+  const us = haul.us - (run.mode === 'shard' ? 1 : 0);
+  force.ledger.push({ id: newId(), date, label: summary, rp: haul.rp + bounty, supply: haul.supply, ...(us ? { us } : {}) });
+  return summary;
+}
+
+/**
+ * Post a weekly challenge run to the campaign's board: a force keeps only its best run each week, and the board only
+ * the last few weeks. Returns the new board.
+ */
+export function postWeekly(board: Campaign['sortieBoard'], force: Force, run: SortieRun, date: string): SortieBoardEntry[] {
+  const list = [...(board ?? [])];
+  if (!run.weekly) return list;
+  const entry: SortieBoardEntry = {
+    week: run.weekly, forceId: force.id, force: force.name, player: force.player, depth: run.depth, score: weeklyScore(run),
+    over: run.over ?? 'quit', date,
+  };
+  const i = list.findIndex((e) => e.week === entry.week && e.forceId === force.id);
+  if (i < 0) list.push(entry);
+  else if (entry.score > list[i].score) list[i] = entry;
+  const weeks = [...new Set(list.map((e) => e.week))].sort().reverse().slice(0, SORTIE.weekly.weeks);
+  return list.filter((e) => weeks.includes(e.week));
+}
+
+/** A week's board, best first. */
+export const weekBoard = (board: Campaign['sortieBoard'], week: string) =>
+  (board ?? []).filter((e) => e.week === week).sort((a, b) => b.score - a.score || b.depth - a.depth);
+
+const OUTCOME: Record<NonNullable<SortieRun['over']>, string> = {
+  won: 'cleared the run', home: 'headed home', fell: 'wiped out', broke: 'broke and fled', quit: 'turned back',
+};
 
 /** The size of the enemy a solo patrol runs into. */
 export function rollPatrolEnemy(rand: Rand = Math.random): number {

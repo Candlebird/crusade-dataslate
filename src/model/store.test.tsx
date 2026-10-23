@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ECHOES_BOOK } from '../rules/echoForce';
 import type { AppState, CatalogBook } from './types';
 import { DEFAULT_SETTINGS } from './types';
 import { newForce, newUnit } from './factory';
@@ -102,13 +103,13 @@ describe('loading saved data', () => {
   it('starts from the seed when nothing is saved, and saves it', () => {
     const { state } = render();
     expect(state.forces).toEqual([]);
-    expect(state.books.length).toBe(1);
-    expect(saved().books[0].uid).toBe(state.books[0].uid);
+    expect(state.books.map((b) => b.name)).toEqual(['The Spears of Dothea', 'Void Echoes']);
+    expect(saved().books.map((b) => b.uid)).toEqual(state.books.map((b) => b.uid));
   });
 
   it('starts from the seed when the saved data is not JSON', () => {
     storage.set(KEY, '{broken');
-    expect(render().state.books.length).toBe(1);
+    expect(render().state.books.length).toBe(2);
   });
 
   it('brings old saved data up to date: forces, the tracked battle and missing settings', () => {
@@ -129,7 +130,8 @@ describe('loading saved data', () => {
     expect((state.battle as any).sides.map((s: any) => s.team)).toEqual(['A', 'B']);
     expect(state.battle!.attacker).toBe('B');
     expect(state.campaign?.name).toBe('Kept');
-    expect(state.books).toEqual([]);
+    // The built-in Void Echoes book is added to any save that lacks it.
+    expect(state.books.map((b) => b.uid)).toEqual([ECHOES_BOOK]);
   });
 
   it('loads data saved before settings existed', () => {
@@ -140,7 +142,7 @@ describe('loading saved data', () => {
   it('keeps a save it cannot read under its own key before the seed replaces it', () => {
     const broken = JSON.stringify({ version: 1, books: [] });
     storage.set(KEY, broken);
-    expect(render().state.books.length).toBe(1);
+    expect(render().state.books.length).toBe(2);
     expect(storage.get('opr-crusade-tracker:unreadable')).toBe(broken);
   });
 });
@@ -233,7 +235,7 @@ describe('addBook', () => {
     storage.set(KEY, JSON.stringify({ ...baseState(), books: [book({ name: 'Old', unitTags: { u1: ['Elite'] } })] }));
     const store = render();
     store.addBook(book({ name: 'Fresh' }));
-    const books = render().state.books;
+    const books = render().state.books.filter((b) => b.uid !== ECHOES_BOOK);
     expect(books.length).toBe(1);
     expect(books[0].name).toBe('Fresh');
     expect(books[0].unitTags).toEqual({ u1: ['Elite'] });
@@ -244,7 +246,7 @@ describe('addBook', () => {
     storage.set(KEY, JSON.stringify({ ...baseState(), books: [book({ unitTags: { u1: ['Old'] } })] }));
     const store = render();
     store.addBook(book({ unitTags: { u2: ['New'] } }));
-    expect(render().state.books[0].unitTags).toEqual({ u2: ['New'] });
+    expect(render().state.books.find((b) => b.uid === 'bk')!.unitTags).toEqual({ u2: ['New'] });
   });
 });
 

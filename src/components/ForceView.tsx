@@ -14,6 +14,7 @@ import ExpeditionModal from './ExpeditionModal';
 import PatrolModal from './PatrolModal';
 import UnitTaskModal from './UnitTaskModal';
 import TrainingModal from './TrainingModal';
+import SortieModal from './SortieModal';
 import type { Campaign, Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
 import { SOLO_PATROL } from '../rules/downtimeData';
@@ -25,8 +26,9 @@ import { nowIso } from '../model/factory';
 import { DetachmentsBox } from './Detachments';
 import { claimableRounds } from '../rules/rounds';
 import { TASK_NAMES, claimGarrisons, freeUnits, garrisonClaims, tasksOf } from '../rules/tasks';
-import { GARRISON, TRAINING } from '../rules/downtimeData';
+import { GARRISON, SORTIE, TRAINING } from '../rules/downtimeData';
 import { canTrain } from '../rules/training';
+import { canSortie } from '../rules/sortie';
 import { RESULT_LABEL, unitName } from '../rules/battle';
 import { listTotals, newList } from '../rules/lists';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
@@ -560,6 +562,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const [patrol, setPatrol] = useState(false);
   const [tasking, setTasking] = useState(false);
   const [training, setTraining] = useState(false);
+  const [sortie, setSortie] = useState(false);
   // As many Expeditions a round as there are free units: each unit takes part once a round.
   const expedited = !!c && !f.units.some((u) => u.status === 'active' && !unitsUsed(f, c).includes(u.id));
   const toClaim = c && n && faction ? claimableRounds(c, n, state.forces) : [];
@@ -584,6 +587,15 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
       {training && <TrainingModal force={f} onClose={() => setTraining(false)} />}
     </div>
   );
+  const sortieRow = (
+    <div className="span-all row">
+      <span className="grow small">
+        <b>Sortie:</b> a party of three sets out through Echo fights, camps and shrines to an Echo lord. Free runs earn up to {SORTIE.caps.free.short}–{SORTIE.caps.free.long} XP; a Shard run costs 1 Umbra Shard, earns up to {SORTIE.caps.shard.long} XP and brings home Supply and RP. <span className="muted">{f.sortieBest ? `Furthest: ${f.sortieBest} nodes.` : ''}</span>
+      </span>
+      <button disabled={f.units.filter(canSortie).length < 3} onClick={() => setSortie(true)}>Sortie…</button>
+      {sortie && <SortieModal force={f} c={c} onClose={() => setSortie(false)} />}
+    </div>
+  );
 
   return (
     <Panel id="force.nexus" title="Nexus Wars" h={3} className="nexus-box" extra={<button className="primary" onClick={onShop}>Spend Umbra Shards</button>}>
@@ -592,6 +604,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
           <p className="muted small">No campaign loaded. <a href={href.campaign()}>Import or start one</a> to link this force to a faction.</p>
           {patrolRow}
           {trainingRow}
+          {sortieRow}
         </>
       ) : (
         <div className="fields">
@@ -617,6 +630,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
           {n && !faction && <p className="span-all small" style={{ color: 'var(--warn)', margin: 0 }}>This faction is not in the loaded campaign.</p>}
           {!(n && faction) && patrolRow}
           {!(n && faction) && trainingRow}
+          {!(n && faction) && sortieRow}
           {n && faction && (
             <>
               <div className="span-all row">
@@ -641,6 +655,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
               {tasking && <UnitTaskModal force={f} c={c} onClose={() => setTasking(false)} />}
               {patrolRow}
               {trainingRow}
+              {sortieRow}
               <DetachmentsBox f={f} c={c} />
               <div className="span-all small">
                 <div className="muted">Controlled sectors</div>

@@ -293,16 +293,21 @@ function RelicRules() {
             </tbody>
           </table>
         </div>
-        <Toc items={[['x-crusade', 'Crusade relics'], ['x-nexus', 'Nexus relics'], ['x-rules', 'Relic weapon rules']]} />
+        <Toc items={[['x-crusade', 'Crusade relics'], ['x-nexus', 'Nexus relics'], ['x-sortie', 'Sortie relics'], ['x-rules', 'Relic weapon rules']]} />
       </div>
 
       <Section id="x-crusade" title="Crusade relics">
-        <RelicCase relics={RELICS.filter((r) => !r.nexus)} />
+        <RelicCase relics={RELICS.filter((r) => !r.nexus && !r.sortie)} />
       </Section>
 
       <Section id="x-nexus" title="Nexus relics">
         <Prose lines={CRUSADE_TEXT.nexusRelics} />
         <RelicCase relics={RELICS.filter((r) => r.nexus)} />
+      </Section>
+
+      <Section id="x-sortie" title="Sortie relics">
+        <p className="small">One for each Sortie region, brought home by following its story thread to the end and getting back alive (or beating its lord). Any unit of the force that can carry a relic takes it for free.</p>
+        <RelicCase relics={RELICS.filter((r) => r.sortie)} />
       </Section>
 
       <Section id="x-rules" title="Relic weapon rules">

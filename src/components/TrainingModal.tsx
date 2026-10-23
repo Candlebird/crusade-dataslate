@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../model/store';
-import type { Force } from '../model/types';
+import type { EmblemLayer, Force } from '../model/types';
+import { unitPortrait } from '../model/emblem';
 import type { Category } from '../rules/data';
 import { unitName } from '../rules/battle';
 import { levelForXp } from '../rules/engine';
@@ -11,6 +12,7 @@ import {
 } from '../rules/training';
 import { describe } from '../rules/abilities';
 import { Modal, confirmAction, toast } from './ui';
+import { EmblemBadge, Portrait, drawEmblem } from './Emblem';
 
 const STEP = 0.05;
 const N = TRAINING.mapSize;
@@ -27,6 +29,7 @@ const COLORS: Record<Category, string> = {
 export default function TrainingModal({ force, onClose }: { force: Force; onClose: () => void }) {
   const { updateForce } = useStore();
   const trainable = force.units.filter(canTrain);
+  const portraits = useMemo(() => Object.fromEntries(force.units.map((u) => [u.id, unitPortrait(u)])), [force.units]);
   const [chosen, setChosen] = useState<string[]>([]);
   const runRef = useRef<TrainingRun | null>(null);
   const powerRef = useRef(0);
@@ -116,7 +119,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
       }
       if (r.phase !== 'setup') idle = 0;
       if (r.phase !== 'wave') step(r, dt); // let the last shots fade
-      draw(canvas.current, r, live.current.sel);
+      draw(canvas.current, r, live.current.sel, portraits);
       ui += dt;
       // A few times a second in a wave, and whenever the phase changes.
       if ((r.phase === 'wave' && ui > 0.15) || r.phase !== phase) {
@@ -152,6 +155,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
         {trainable.map((u) => (
           <label key={u.id} className="row small" style={{ gap: 6 }}>
             <input type="checkbox" checked={chosen.includes(u.id)} disabled={!chosen.includes(u.id) && chosen.length >= TRAINING.squadMax} onChange={() => toggle(u.id)} />
+            <Portrait unit={u} size={22} />
             <span className="grow">{unitName(u)} <span className="muted">· {u.category} · level {levelForXp(u.xp)} · {u.points} pts</span></span>
           </label>
         ))}
@@ -255,7 +259,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
               disabled={t.dead}
               onClick={() => setSel(t.unitId)}
             >
-              <span className="swatch" style={{ background: COLORS[t.category] }} />
+              {portraits[t.unitId] ? <EmblemBadge emblem={portraits[t.unitId]} size={20} /> : <span className="swatch" style={{ background: COLORS[t.category] }} />}
               <span className="grow" style={{ textAlign: 'left' }}>{t.name}</span>
               <span className="muted">{t.dead ? 'fallen' : t.x < 0 ? 'bench' : `${Math.ceil(t.hp)}/${t.maxHp}`} · {t.xp} XP</span>
             </button>
@@ -319,7 +323,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
 }
 
 /** Draw the map: grid, base, units, enemies, shots, and the favoured direction. */
-function draw(cv: HTMLCanvasElement | null, run: TrainingRun, sel: string | null) {
+function draw(cv: HTMLCanvasElement | null, run: TrainingRun, sel: string | null, portraits: Record<string, EmblemLayer[]>) {
   const ctx = cv?.getContext('2d');
   if (!cv || !ctx) return;
   const s = cv.width / N;
@@ -403,14 +407,18 @@ function draw(cv: HTMLCanvasElement | null, run: TrainingRun, sel: string | null
     ctx.fillStyle = COLORS[t.category];
     ctx.globalAlpha = t.category === 'Aircraft' ? 0.75 : 1;
     ctx.fillRect(x + s * 0.12, y + s * 0.12, s * 0.76, s * 0.76);
+    const face = portraits[t.unitId];
+    if (face) drawEmblem(ctx, face, x + s * 0.17, y + s * 0.15, s * 0.66);
     ctx.globalAlpha = 1;
     if (dugIn(run, t)) { ctx.strokeStyle = '#d9d4c7'; ctx.lineWidth = 1; ctx.strokeRect(x + s * 0.06, y + s * 0.06, s * 0.88, s * 0.88); }
     if (t.unitId === sel) { ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.strokeRect(x + s * 0.04, y + s * 0.04, s * 0.92, s * 0.92); }
-    ctx.fillStyle = '#0c0d0f';
-    ctx.font = `bold ${Math.round(s * 0.42)}px sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(t.name.slice(0, 1).toUpperCase(), x + s / 2, y + s / 2 + 1);
+    if (!face) {
+      ctx.fillStyle = '#0c0d0f';
+      ctx.font = `bold ${Math.round(s * 0.42)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(t.name.slice(0, 1).toUpperCase(), x + s / 2, y + s / 2 + 1);
+    }
     bar(ctx, x + s * 0.1, y + s * 0.9, s * 0.8, t.hp / t.maxHp, '#6f9a4a');
     if (t.shield > 0) { ctx.strokeStyle = FX_COLOR.shield; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x + s / 2, y + s / 2, s * 0.58, 0, Math.PI * 2); ctx.stroke(); }
   }

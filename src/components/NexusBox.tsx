@@ -37,9 +37,9 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
   const held = relicHolders(state.forces, state.campaign);
   const wantsRelic = (item.kind === 'relicRoll' && pick.roll === 6) || item.kind === 'relic' || !!e?.nexusRelic;
   const relics = item.kind === 'relicRoll'
-    ? RELICS.filter((r) => r.tier === 'Common' && !r.nexus)
+    ? RELICS.filter((r) => r.tier === 'Common' && !r.nexus && !r.sortie)
     : item.kind === 'relic'
-      ? RELICS.filter((r) => (item.relic ? r.name === item.relic : r.tier === NEXUS_CRISIS.mvpTier))
+      ? RELICS.filter((r) => (item.relic ? r.name === item.relic : r.tier === NEXUS_CRISIS.mvpTier && !r.sortie))
       : RELICS.filter((r) => r.nexus && r.tier !== 'Legendary');
 
   let fixed = '';

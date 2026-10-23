@@ -1,5 +1,5 @@
-import type { EmblemLayer, EmblemShape } from '../model/types';
-import { EMBLEM_PALETTE, EMBLEM_SHAPES, LAYER_NAMES, LAYER_SCALE, SHAPE_IDS, emblemLayers, randomEmblem } from '../model/emblem';
+import type { EmblemLayer, EmblemShape, Unit } from '../model/types';
+import { EMBLEM_PALETTE, EMBLEM_SHAPES, LAYER_NAMES, LAYER_SCALE, SHAPE_IDS, emblemLayers, randomEmblem, unitPortrait } from '../model/emblem';
 
 /** The emblem's layers as SVG, in a 100 × 100 box; for drawing inside another SVG (the Nexus Map). */
 export function EmblemShapes({ layers }: { layers: EmblemLayer[] }) {
@@ -38,9 +38,19 @@ function ShapeIcon({ shape }: { shape: EmblemShape }) {
   );
 }
 
-/** Building the emblem: a shape and a colour for each of the three layers. */
-export function EmblemEditor({ emblem, onChange, readOnly }: { emblem: unknown; onChange: (e: EmblemLayer[] | undefined) => void; readOnly?: boolean }) {
-  const layers = emblemLayers(emblem);
+/** A unit's portrait: its own, or the default rolled from its id. */
+export function Portrait({ unit, size = 32, title }: { unit: Pick<Unit, 'id' | 'category' | 'portrait'> & { name?: string }; size?: number; title?: string }) {
+  return <EmblemBadge emblem={unitPortrait(unit)} size={size} title={title ?? unit.name ?? 'Portrait'} />;
+}
+
+/**
+ * Building an emblem (a force's) or a portrait (a unit's): a shape and a colour for each of the three layers. A portrait
+ * has a `fallback` (its default), so it's never empty, and resetting goes back to that.
+ */
+export function EmblemEditor({ emblem, onChange, readOnly, fallback }: {
+  emblem: unknown; onChange: (e: EmblemLayer[] | undefined) => void; readOnly?: boolean; fallback?: EmblemLayer[];
+}) {
+  const layers = emblemLayers(emblem) ?? fallback;
   if (!layers) {
     return readOnly ? <p className="muted small">No emblem. The Nexus Map shows a plain marker.</p> : (
       <div>
@@ -54,7 +64,7 @@ export function EmblemEditor({ emblem, onChange, readOnly }: { emblem: unknown; 
     <div className="emblem-editor">
       <div className="emblem-preview">
         <EmblemBadge emblem={layers} size={112} />
-        <div className="emblem-map-size" title="About how big it is on the Nexus Map"><EmblemBadge emblem={layers} size={22} /></div>
+        <div className="emblem-map-size" title={fallback ? 'About how big it is in the games' : 'About how big it is on the Nexus Map'}><EmblemBadge emblem={layers} size={22} /></div>
       </div>
       {!readOnly && (
         <>
@@ -85,10 +95,39 @@ export function EmblemEditor({ emblem, onChange, readOnly }: { emblem: unknown; 
           ))}
           <div className="row">
             <button onClick={() => onChange(randomEmblem())}>🎲 Random</button>
-            <button className="ghost" onClick={() => onChange(undefined)}>Remove emblem</button>
+            {fallback
+              ? <button className="ghost" disabled={!emblemLayers(emblem)} onClick={() => onChange(undefined)}>Back to default</button>
+              : <button className="ghost" onClick={() => onChange(undefined)}>Remove emblem</button>}
           </div>
         </>
       )}
     </div>
   );
+}
+
+const paths = new Map<string, Path2D>();
+
+/** Draw an emblem or portrait on a canvas, in the square at (x, y) of side `size`. */
+export function drawEmblem(ctx: CanvasRenderingContext2D, layers: EmblemLayer[], x: number, y: number, size: number) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(size / 100, size / 100);
+  ctx.lineWidth = 100 / size;
+  ctx.strokeStyle = 'rgba(0,0,0,0.55)';
+  layers.forEach((l, i) => {
+    if (l.shape === 'none') return;
+    const d = EMBLEM_SHAPES[l.shape].path;
+    let p = paths.get(d);
+    if (!p) paths.set(d, (p = new Path2D(d)));
+    const s = LAYER_SCALE[i];
+    ctx.save();
+    ctx.translate(50 - 50 * s, 50 - 50 * s);
+    ctx.scale(s, s);
+    ctx.lineWidth = 100 / size / s;
+    ctx.fillStyle = l.color;
+    ctx.fill(p, 'evenodd');
+    ctx.stroke(p);
+    ctx.restore();
+  });
+  ctx.restore();
 }
