@@ -6,6 +6,8 @@ import {
   deathDiceCount,
   deathOutcome,
   detectCategory,
+  dropWeaponTrait,
+  giveWeaponTrait,
   levelForXp,
   pendingLevels,
   previousBracketXp,
@@ -180,5 +182,43 @@ describe('rollUntilNew', () => {
 
   it('gives up when every face is had', () => {
     expect(rollUntilNew(6, () => true, seq(3))).toEqual([3]);
+  });
+});
+
+describe('weapon traits on one copy', () => {
+  const rifles = () => unit({ category: 'Infantry', weapons: [{ id: 'w', name: 'Rifle', count: 5, range: 24, attacks: 1, rules: ['AP(1)'], traits: [] }] });
+  const trait = (id: string) => ({ id, name: `Trait ${id}`, unique: false });
+
+  it('splits one copy off a stack and upgrades only that one', () => {
+    const u = rifles();
+    const id = giveWeaponTrait(u, 'w', trait('t1'), () => 'w2');
+    expect(id).toBe('w2');
+    expect(u.weapons.map((w) => [w.id, w.count, w.traits.length])).toEqual([['w', 4, 0], ['w2', 1, 1]]);
+    // An infantry upgrade's second trait goes on the same copy.
+    giveWeaponTrait(u, 'w2', trait('t2'), () => 'w3');
+    expect(u.weapons.map((w) => [w.id, w.count, w.traits.length])).toEqual([['w', 4, 0], ['w2', 1, 2]]);
+  });
+
+  it('upgrades a lone weapon in place', () => {
+    const u = unit({ weapons: [{ id: 'w', name: 'Blade', count: 1, range: 0, attacks: 2, rules: [], traits: [] }] });
+    expect(giveWeaponTrait(u, 'w', trait('t1'), () => 'w2')).toBe('w');
+    expect(u.weapons).toHaveLength(1);
+  });
+
+  it('puts a copy back in its stack once its last trait is gone', () => {
+    const u = rifles();
+    giveWeaponTrait(u, 'w', trait('t1'), () => 'w2');
+    giveWeaponTrait(u, 'w2', trait('t2'), () => 'w3');
+    dropWeaponTrait(u, 'w2', 't1');
+    expect(u.weapons).toHaveLength(2);
+    dropWeaponTrait(u, 'w2', 't2');
+    expect(u.weapons.map((w) => [w.id, w.count, w.traits.length])).toEqual([['w', 5, 0]]);
+  });
+
+  it('spends one level per upgraded copy, not per weapon carried', () => {
+    const u = rifles();
+    giveWeaponTrait(u, 'w', trait('t1'), () => 'w2');
+    giveWeaponTrait(u, 'w2', trait('t2'), () => 'w3');
+    expect(upgradesUsed(u)).toBe(1);
   });
 });

@@ -24,6 +24,8 @@ import {
   battlePoints,
   forceTotals,
   detectCategory,
+  dropWeaponTrait,
+  giveWeaponTrait,
   levelForXp,
   pendingLevels,
   relicCost,
@@ -185,12 +187,12 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       });
       if (token) toast('Used a Nexus trait token.');
     } else if (picker.kind === 'weaponTrait') {
-      set((d) => {
-        const w = d.weapons.find((x) => x.id === picker.weaponId);
-        w?.traits.push({ id: uid(), name: p.name, unique: p.group === 'unique', free: p.free || undefined });
-      });
+      // The trait goes on one copy of the weapon (split off from the stack), and an infantry upgrade's second trait follows it.
+      const copy = uid();
+      set((d) => void giveWeaponTrait(d, picker.weaponId, { id: uid(), name: p.name, unique: p.group === 'unique', free: p.free || undefined }, () => copy));
+      const weaponId = (u.weapons.find((x) => x.id === picker.weaponId)?.count ?? 1) > 1 ? copy : picker.weaponId;
       // An infantry weapon upgrade is two traits: keep the picker open for the second.
-      if (picker.n < picker.of) return setPicker({ ...picker, n: picker.n + 1, free: p.free });
+      if (picker.n < picker.of) return setPicker({ ...picker, weaponId, n: picker.n + 1, free: p.free });
     } else if (picker.kind === 'scar') {
       const result = applyScar(structuredClone(u), { id: uid(), name: p.name });
       set((d) => void applyScar(d, { id: uid(), name: p.name, desc: SCAR_TABLE.find((x) => x.name === p.name)?.desc }));
@@ -430,6 +432,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                 onChange={(fn) => set((d) => fn(d.weapons[i]))}
                 onRemove={() => set((d) => void d.weapons.splice(i, 1))}
                 onAddTrait={() => addWeaponTrait(w.id)}
+                onRemoveTrait={(traitId) => set((d) => dropWeaponTrait(d, w.id, traitId))}
               />
             ))}
           </Panel>
@@ -606,12 +609,13 @@ function FixedWeapon({ w }: { w: Weapon }) {
   );
 }
 
-function WeaponRow({ w, infantry, onChange, onRemove, onAddTrait }: {
+function WeaponRow({ w, infantry, onChange, onRemove, onAddTrait, onRemoveTrait }: {
   w: Weapon;
   infantry: boolean;
   onChange: (fn: (w: Weapon) => void) => void;
   onRemove: () => void;
   onAddTrait: () => void;
+  onRemoveTrait: (traitId: string) => void;
 }) {
   return (
     <div className="weapon">
@@ -639,10 +643,10 @@ function WeaponRow({ w, infantry, onChange, onRemove, onAddTrait }: {
         />
       </div>
       <div className="row" style={{ marginTop: 6 }}>
-        {w.traits.map((t, i) => (
+        {w.traits.map((t) => (
           <span key={t.id} className={`tag ${t.unique ? 'gold' : 'green'}`} title={t.free ? 'Free' : undefined}>
             {traitMark(t)} {t.name}{t.free && ' (free)'}
-            <button aria-label={`Remove ${t.name}`} onClick={() => onChange((x) => void x.traits.splice(i, 1))}>✕</button>
+            <button aria-label={`Remove ${t.name}`} onClick={() => onRemoveTrait(t.id)}>✕</button>
           </span>
         ))}
         <button className="ghost small" onClick={onAddTrait}>+ Trait</button>

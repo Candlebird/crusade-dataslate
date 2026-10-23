@@ -1,4 +1,4 @@
-import type { Campaign, Force, Settings, Unit, Weapon } from '../model/types';
+import type { Campaign, Force, Settings, Unit, Weapon, WeaponTrait } from '../model/types';
 import {
   type Category,
   type RelicTier,
@@ -143,6 +143,39 @@ function weaponTraitBp(w: Weapon, infantry: boolean, s: Settings): number {
     return infantry ? Math.ceil(n / 2) : n;
   };
   return per(false) * s.bp.normal + per(true) * s.bp.unique;
+}
+
+/**
+ * Give one copy of a weapon a trait. A weapon the unit carries several of is split first, and the trait goes on the copy
+ * split off: 5x Rifle becomes 4x Rifle and 1x Rifle with the trait, not 5x upgraded rifles. Returns the id of the weapon
+ * that took the trait.
+ */
+export function giveWeaponTrait(u: Unit, weaponId: string, trait: WeaponTrait, newId: () => string): string | undefined {
+  const i = u.weapons.findIndex((w) => w.id === weaponId);
+  if (i < 0) return undefined;
+  let w = u.weapons[i];
+  if (w.count > 1) {
+    w.count -= 1;
+    w = { ...structuredClone(w), id: newId(), count: 1, traits: [] };
+    u.weapons.splice(i + 1, 0, w);
+  }
+  w.traits.push(trait);
+  return w.id;
+}
+
+const sameProfile = (a: Weapon, b: Weapon) =>
+  a.name === b.name && a.range === b.range && String(a.attacks) === String(b.attacks) && a.rules.join('|') === b.rules.join('|');
+
+/** Take a trait off a weapon. A copy left with no traits goes back into the plain stack it was split from. */
+export function dropWeaponTrait(u: Unit, weaponId: string, traitId: string): void {
+  const w = u.weapons.find((x) => x.id === weaponId);
+  if (!w) return;
+  w.traits = w.traits.filter((t) => t.id !== traitId);
+  if (w.traits.length) return;
+  const stack = u.weapons.find((x) => x !== w && !x.traits.length && sameProfile(x, w));
+  if (!stack) return;
+  stack.count += w.count;
+  u.weapons = u.weapons.filter((x) => x !== w);
 }
 
 /** Levels spent on upgrades, weapon upgrades and relics (free ones excluded). */
