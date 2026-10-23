@@ -6,10 +6,12 @@ import { builtinEchoes } from '../model/seed';
 
 // A random Void Echoes army for the AI side, built from the imported army book to a points target
 // with OPR's list limits: a hero per 375 pts, no unit over 35% of the total, 1 + 1 per 750 pts copies.
-// Big units (over BIG_UNIT pts) only ever appear once: there's just one model of each.
+// Big units (over BIG_UNIT pts) only ever appear once: there's just one model of each, and only one per full
+// BIG_UNIT_PER pts, so a big army is mostly troops, not a wall of monsters that outlasts the fight.
 
 export const ECHOES_BOOK = 'void-echoes-gf';
 export const BIG_UNIT = 250;
+export const BIG_UNIT_PER = 2000;
 type Rand = () => number;
 
 /** The player's copy of the Void Echoes book (it may be edited), else the one that ships with the site. */
@@ -33,6 +35,7 @@ export function randomEchoes(book: CatalogBook, target: number, rand: Rand = Mat
   const maxCost = Math.floor(target * 0.35);
   const maxHeroes = Math.max(1, Math.floor(target / 375));
   const maxCopies = 1 + Math.floor(target / 750);
+  const maxBig = Math.floor(target / BIG_UNIT_PER);
   const out: Unit[] = [];
   let spent = 0;
   let heroes = 0;
@@ -40,8 +43,9 @@ export function randomEchoes(book: CatalogBook, target: number, rand: Rand = Mat
   for (let misses = 0; misses < 60; ) {
     const cu = pick(rand, book.units);
     // Upgrades that don't fit fall back to the bare datasheet.
+    const bigLeft = out.filter((u) => u.points > BIG_UNIT).length < maxBig;
     const fit = [applySelection(cu, randomSelection(cu, rand)), applySelection(cu, {})].find(
-      (l) => l.cost > 0 && l.cost <= maxCost && spent + l.cost <= target,
+      (l) => l.cost > 0 && l.cost <= maxCost && (bigLeft || l.cost <= BIG_UNIT) && spent + l.cost <= target,
     );
     const hero = !!fit && hasRule(fit.rules, 'Hero');
     const big = !!fit && (cu.cost > BIG_UNIT || fit.cost > BIG_UNIT || out.some((u) => u.unitType === cu.name && u.points > BIG_UNIT));

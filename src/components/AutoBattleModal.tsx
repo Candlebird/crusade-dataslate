@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../model/store';
 import type { Force } from '../model/types';
-import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, autoSetup, type AutoResult, type Fighter, type Move } from '../rules/autoBattle';
+import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, autoOdds, autoSetup, type AutoOdds, type AutoResult, type Fighter, type Move } from '../rules/autoBattle';
 import { loadForce, loadUnits, sidePoints, teamName, teamsOf, type TeamKey, type TrackedBattle, type TrackerSide } from '../rules/tracker';
 import { echoesBook, randomEchoes } from '../rules/echoForce';
 import { ECHOES } from '../rules/nexusData';
@@ -26,6 +26,12 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
   const { fighters } = setup;
   const teams = teamsOf(b);
   const block = autoBattleBlock(b);
+  // The crusade forces' sides. Their units make death rolls, unless the result goes elsewhere and losses don't carry over.
+  const crusade = b.sides.filter((s) => s.forceId && !s.ai);
+  const odds = useMemo(
+    () => (block || !crusade.length ? null : autoOdds(fighters, setup, new Set(onApply ? [] : crusade.map((s) => s.id)))),
+    [setup, block],
+  );
   const done = !!result && shown >= result.moves.length;
 
   const close = () => {
@@ -63,6 +69,14 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
           <div className="small">
             <b>In play</b>
             <ul style={{ margin: '0.25rem 0', paddingLeft: '1.2rem' }}>{setup.effects.map((e) => <li key={e}>{e}</li>)}</ul>
+          </div>
+        )}
+        {odds && (
+          <div className="small">
+            <b>Forecast</b> <span className="muted">({AUTO_BATTLE.forecastRuns} simulated runs of this fight)</span>
+            <ul style={{ margin: '0.25rem 0', paddingLeft: '1.2rem' }}>
+              {[...new Set(crusade.map((s) => s.team))].map((t) => <li key={t}>{teamName(b, t)}: {oddsText(odds[t]!, !onApply)}</li>)}
+            </ul>
           </div>
         )}
         <div className="auto-teams">
@@ -132,6 +146,18 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
     );
   }
   return <Modal title={<><Icon name="g:power-lightning" /> Auto-battle</>} onClose={close} footer={footer} wide>{body}</Modal>;
+}
+
+const pct = (n: number) => (n > 0 && n < 0.01 ? '<1%' : `${Math.round(n * 100)}%`);
+
+/** "wins 95% · loses ~2 units · 24% chance of a scar · 3% chance of Comatose", without the death rolls when losses don't carry over. */
+function oddsText(o: AutoOdds, scars: boolean): string {
+  const lost = Math.round(o.unitsLost * 10) / 10;
+  return [
+    `wins ${pct(o.win)}${o.draw >= 0.01 ? ` (draws ${pct(o.draw)})` : ''}`,
+    `loses ~${lost} unit${lost === 1 ? '' : 's'}`,
+    ...(scars ? [`${pct(o.scar)} chance of a scar`, `${pct(o.comatose)} chance of Comatose`] : []),
+  ].join(' · ');
 }
 
 /** Wounds left on every unit after the moves so far. */

@@ -1,7 +1,7 @@
 import type { Campaign, Force, Unit, Weapon } from '../model/types';
 import { abilitiesOf, describe, effects, modelled, type Ability, type Status } from './abilities';
 import { modifierOf } from './difficulty';
-import { hasRule, levelForXp, ruleRating } from './engine';
+import { deathDiceCount, hasRule, levelForXp, ruleRating } from './engine';
 import { activeEvent } from './nexus';
 import { teamsOf, type TeamKey, type TrackedBattle } from './tracker';
 import { leadsWith } from './warlords';
@@ -13,6 +13,8 @@ import { leadsWith } from './warlords';
 
 export const AUTO_BATTLE = {
   rounds: 4,
+  /** Runs behind the forecast shown before a fight. */
+  forecastRuns: 100,
   /** Each attack deals its expected wounds times a random factor from `luck` to `luck + 1`. */
   luck: 0.5,
   /** A melee target that survives strikes back with this share of its own melee. */
@@ -79,6 +81,8 @@ export interface Fighter {
   /** Charges in round 1 instead of shooting. */
   fast: boolean;
   hero: boolean;
+  /** The unit a hero has joined: it can't be picked out while that unit stands, as at the table. */
+  host?: string;
   /** Bonus to Morale tests (Fearless, Fanatical Garrison). */
   morale: number;
   /** Bonus to Defense in round 1 (Entrenched). */
@@ -111,6 +115,8 @@ export interface Fighter {
   status: Status[];
   /** Has used its once-a-battle revive. */
   revived: boolean;
+  /** Dice it rolls on the death roll if destroyed (2 with Lowered Constitution). */
+  deathDice?: number;
 }
 
 export type MoveKind = 'shoot' | 'charge' | 'advance' | 'rally' | 'return' | 'stunned' | 'heal';
@@ -302,7 +308,7 @@ export function fighter(u: Unit | undefined, t: { id: string; name: string; woun
   const f: Fighter = {
     key: `${sideId}:${t.id}`, sideId, team, unitId: t.id, name: t.name, points: t.points ?? u?.points ?? 0,
     quality, defense, size, tough, hp: t.wounds, maxHp: t.maxWounds, guns, defMod, fortified, ignore, evasive, impact, hitShoot, hitMelee, fast,
-    hero: !!u && hasRule(u.rules, 'Hero'), morale, r1Def: 0, earlyShoot: 0, mines: false, shaken: false, tested: false,
+    hero: !!u && hasRule(u.rules, 'Hero'), deathDice: u ? deathDiceCount(u) : 1, morale, r1Def: 0, earlyShoot: 0, mines: false, shaken: false, tested: false,
     atkBonus: Math.max(0.5, atkBonus), defBonus: Math.max(0.5, defBonus), shoot: 0, melee: 0, attack: 0, def: 0, notes, xp: 0,
     abilities, shield: 0, status: [], revived: false,
   };
@@ -580,6 +586,20 @@ function auras(fighters: Fighter[], rng: () => number) {
   }
 }
 
+/** Each hero joins one of its side's multi-model units, the biggest first, one hero to a unit. */
+function joinHeroes(fighters: Fighter[]) {
+  const taken = new Set<string>();
+  for (const h of fighters.filter((f) => f.hero && f.hp > 0 && !f.host)) {
+    const host = fighters
+      .filter((f) => f.team === h.team && !f.hero && f.size > 1 && f.hp > 0 && !taken.has(f.key))
+      .sort((a, b) => b.hp - a.hp)[0];
+    if (!host) continue;
+    taken.add(host.key);
+    h.host = host.key;
+    h.notes.push(`Joins ${host.name}: can't be picked out while it stands`);
+  }
+}
+
 /** Fight it out: units of each team take turns, each attacking once a round, for 4 rounds or until one team is left. */
 export function autoBattle(start: Fighter[], rng: () => number = Math.random, rounds = AUTO_BATTLE.rounds, opts: AutoOptions = {}): AutoResult {
   const fighters = start.map((f) => ({ ...f, notes: [...f.notes], status: [...f.status] }));
@@ -588,6 +608,7 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
   const standing = () => teams.filter((t) => fighters.some((f) => f.team === t && f.hp > 0));
   let first = Math.floor(rng() * teams.length);
   if (opts.first && teams.includes(opts.first)) first = teams.indexOf(opts.first);
+  joinHeroes(fighters);
   auras(fighters, rng);
   // Endless Tide: the unit waiting to come back, then '' once it has.
   let tide: Fighter | '' | undefined;
@@ -641,7 +662,9 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
         f.shield = e.n;
         notes.push(`${e.source}: shield of ${e.n}`);
       }
-      const t = pickTarget(f, enemies, round, rng);
+      // A hero is only picked out once the unit it joined is gone.
+      const open = enemies.filter((x) => !x.host || !fighters.some((y) => y.key === x.host && y.hp > 0));
+      const t = pickTarget(f, open.length ? open : enemies, round, rng);
       let kind = moveKind(f, round, t);
       // Slowed or knocked back: no charging this turn.
       if (kind === 'charge' && (st.includes('slow') || st.includes('knock'))) {
@@ -721,6 +744,51 @@ export function autoBattle(start: Fighter[], rng: () => number = Math.random, ro
   const order = [...teams].sort((a, b) => lost[a]! - lost[b]!);
   const draw = order.length > 1 && lost[order[1]]! - lost[order[0]]! <= AUTO_BATTLE.drawMargin;
   return { fighters, moves, dealt, lost, winner: draw ? 'draw' : order[0] };
+}
+
+/** What a fight is likely to cost one team, from many simulated runs. */
+export interface AutoOdds {
+  /** Share of runs it won, and drew. */
+  win: number;
+  draw: number;
+  /** Units it can expect to lose. */
+  unitsLost: number;
+  /** Chance at least one of its units (of the sides that make death rolls) picks up a scar, and that one goes Comatose. */
+  scar: number;
+  comatose: number;
+}
+
+/**
+ * Fight the same set-up `runs` times and tally, per team, how often it wins and what it costs. Only units on sides in
+ * `rolls` (the crusade forces) make death rolls: any 1 is a scar, and one scar in ten is Comatose.
+ */
+export function autoOdds(fighters: Fighter[], opts: AutoOptions, rolls: Set<string>, runs = AUTO_BATTLE.forecastRuns, rng: () => number = Math.random): Partial<Record<TeamKey, AutoOdds>> {
+  const teams = [...new Set(fighters.map((f) => f.team))];
+  const out: Partial<Record<TeamKey, AutoOdds>> = {};
+  for (const t of teams) out[t] = { win: 0, draw: 0, unitsLost: 0, scar: 0, comatose: 0 };
+  for (let i = 0; i < runs; i++) {
+    const r = autoBattle(fighters, rng, AUTO_BATTLE.rounds, opts);
+    for (const t of teams) {
+      const o = out[t]!;
+      if (r.winner === t) o.win++;
+      if (r.winner === 'draw') o.draw++;
+      let clean = 1;
+      let awake = 1;
+      for (const f of r.fighters) {
+        const before = fighters.find((x) => x.key === f.key)!;
+        if (f.team !== t || before.hp <= 0 || f.hp > 0) continue;
+        o.unitsLost++;
+        if (!rolls.has(f.sideId)) continue;
+        const scar = 1 - (5 / 6) ** (f.deathDice ?? 1);
+        clean *= 1 - scar;
+        awake *= 1 - scar / 10;
+      }
+      o.scar += 1 - clean;
+      o.comatose += 1 - awake;
+    }
+  }
+  for (const o of Object.values(out)) for (const k of ['win', 'draw', 'unitsLost', 'scar', 'comatose'] as const) o![k] /= runs;
+  return out;
 }
 
 /** Write the outcome onto the tracked battle: wounds, losses and kill XP, and who won. It's then recorded like any other battle. */

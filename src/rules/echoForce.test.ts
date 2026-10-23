@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { normalizeBook } from '../armyforge/book';
 import { hasRule } from './engine';
-import { BIG_UNIT, randomEchoes } from './echoForce';
+import { BIG_UNIT, BIG_UNIT_PER, randomEchoes } from './echoForce';
 
 const book = normalizeBook(JSON.parse(readFileSync('armies/void-echoes.gf.json', 'utf8')));
 
@@ -26,6 +26,7 @@ describe('random Void Echoes force', () => {
         expect(units.every((u) => u.bookName === book.name)).toBe(true);
         const big = units.filter((u) => u.points > BIG_UNIT).map((u) => u.unitType);
         expect(big.filter((t) => counts.get(t)! > 1)).toEqual([]);
+        expect(big.length).toBeLessThanOrEqual(Math.floor(target / BIG_UNIT_PER));
       }
     }
   });

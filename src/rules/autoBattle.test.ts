@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newUnit } from '../model/factory';
 import type { Campaign, Unit } from '../model/types';
-import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, autoSetup, avgAttacks, fighter, fightersOf } from './autoBattle';
+import { AUTO_BATTLE, applyAutoBattle, autoBattle, autoBattleBlock, autoOdds, autoSetup, avgAttacks, fighter, fightersOf } from './autoBattle';
 import { FACE_OFF_MISSIONS } from './missions';
 import { leaders, loadUnits, newBattle, resultFor } from './tracker';
 
@@ -180,5 +180,43 @@ describe('auto-battle abilities', () => {
     let stunned = false;
     for (let seed = 1; seed <= 30 && !stunned; seed++) stunned = fight(squad({ rules: ['Temporal Rift'] }), squad(), seed).moves.some((m) => m.kind === 'stunned');
     expect(stunned).toBe(true);
+  });
+});
+
+describe('auto-battle heroes and forecast', () => {
+  it("has a hero join its side's biggest unit, and nobody picks it out while that unit stands", () => {
+    const hero = squad({ name: 'Captain', size: 1, tough: 3, rules: ['Hero'] });
+    const b = battle([hero, squad({ size: 10 }), squad()], [squad(), squad(), squad()]);
+    const f = fightersOf(b, []);
+    const r = autoBattle(f, seeded(3));
+    const h = r.fighters.find((x) => x.hero)!;
+    const host = r.fighters.find((x) => x.key === h.host)!;
+    expect(host.size).toBe(10);
+    const hostDown = r.moves.findIndex((m) => m.target === host.key && m.targetHp <= 0);
+    const atHero = r.moves.findIndex((m) => m.target === h.key && m.kind !== 'heal');
+    if (atHero >= 0) {
+      expect(hostDown).toBeGreaterThanOrEqual(0);
+      expect(atHero).toBeGreaterThan(hostDown);
+    }
+  });
+
+  it('forecasts wins, losses, and scars only for the sides that make death rolls', () => {
+    const b = battle([squad(), squad(), squad(), squad()], [squad()]);
+    const f = fightersOf(b, []);
+    const odds = autoOdds(f, {}, new Set([b.sides[0].id]), 50, seeded(5));
+    expect(odds.A!.win).toBeGreaterThan(0.8);
+    expect(odds.B!.unitsLost).toBeGreaterThan(odds.A!.unitsLost);
+    expect(odds.B!.scar).toBe(0);
+    for (const o of [odds.A!, odds.B!]) {
+      expect(o.scar).toBeGreaterThanOrEqual(o.comatose);
+      expect(o.scar).toBeLessThanOrEqual(1);
+    }
+    // Lowered Constitution rolls two dice: more scars for the same losses.
+    const weak = fightersOf(battle([squad(), squad()], [squad(), squad()]), []);
+    const frail = weak.map((x) => ({ ...x, deathDice: 2 }));
+    const one = autoOdds(weak, {}, new Set(weak.map((x) => x.sideId)), 50, seeded(9));
+    const two = autoOdds(frail, {}, new Set(weak.map((x) => x.sideId)), 50, seeded(9));
+    expect(two.A!.unitsLost).toBe(one.A!.unitsLost);
+    expect(two.A!.scar).toBeGreaterThan(one.A!.scar);
   });
 });
