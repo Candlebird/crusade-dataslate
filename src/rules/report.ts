@@ -5,7 +5,8 @@ import { visibleTo } from './fog';
 import type { Rand } from './hexmap';
 import { ECHOES, NEXUS_ROUNDS, eventById, factionName } from './nexus';
 import type { RoundEnd } from './rounds';
-import { MARAUDER_ID } from './marauders';
+import { MARAUDER_ID, bandHeading } from './marauders';
+import { MARAUDERS } from './nexusData';
 
 // The turn report (Nexus Wars): what happened in a round, told like a war correspondent would, built when the GM ends
 // the round. Each line says who may read it: a line about a sector goes to the factions that fought there and the ones
@@ -96,6 +97,15 @@ const TEXT = {
     "{band} hit {sector}, but {owner}'s defenders threw them back.",
     'The defences of {sector} held: {band} limped off, bloodied.',
   ],
+  barredYours: ['Your detachment barred {band} at {at}: they never reached {sector}. Now they turn on you: fight them before this round ends, or pay {toll} Materials.'],
+  toll: ['{band} took {paid} Materials off you for barring their road: you never fought them or paid.'],
+  barredFor: ['{holder} barred {band} at {at}, on the road to your {sector}.'],
+  barred: [
+    '{holder} barred {band} at {at}, on the road to {sector}.',
+    '{band} found the road to {sector} blocked at {at} by {holder}.',
+  ],
+  headingYours: ['⚠ {band} ({strength} Supply) are coming for your {sector}: they get there {when}. Walls, a detachment there, or any detachment on their road stops them.'],
+  heading: ["{band} ({strength} Supply) are heading for {owner}'s {sector}: they get there {when}. Any detachment on their road stops them."],
   guardian: [
     '{guardian}, a {tier} guardian, now stands watch over {sector}.',
     'Something stirs at {sector}: {guardian} ({tier}) guards it now.',
@@ -187,13 +197,37 @@ export function buildReport(c: Campaign, r: Omit<RoundEnd, 'report'>, x: ReportE
     at(s.id, [], { icon: '♛', text: say(rand, TEXT.guardian, { guardian: s.guardian!.name, tier: s.guardian!.tier, sector: s.name }) });
 
   // The Marauders, seen by all.
-  for (const x of r.marauders?.raids ?? [])
+  for (const x of r.marauders?.raids ?? []) {
+    if (x.barred) {
+      // The ones who stood in the way, the faction they saved, and everyone else.
+      const vars = { band: x.band, sector: x.sector, at: x.barred.sector, toll: MARAUDERS.toll, holder: x.barred.by.map((id) => factionName(c, id)).join(' and ') };
+      const by = x.barred.by.filter(real);
+      for (const id of by) lines.push({ icon: '🛡', sectorId: x.barred.sectorId, factions: [id], text: say(rand, TEXT.barredYours, vars) });
+      const saved = real(x.owner) && !by.includes(x.owner) ? [x.owner] : [];
+      for (const id of saved) lines.push({ icon: '🛡', sectorId: x.barred.sectorId, factions: [id], text: say(rand, TEXT.barredFor, vars) });
+      const rest = c.factions.map((f) => f.id).filter((id) => !by.includes(id) && !saved.includes(id));
+      if (rest.length) lines.push({ icon: '🏴', sectorId: x.barred.sectorId, factions: rest, text: say(rand, TEXT.barred, vars) });
+      continue;
+    }
     lines.push({
       icon: '🏴', sectorId: x.sectorId,
       text: say(rand, x.repelled ? TEXT.raidRepelled : TEXT.raid, { band: x.band, sector: x.sector, stolen: x.stolen, owner: factionName(c, x.owner) }),
     });
+  }
+  for (const t of r.marauders?.tolls ?? [])
+    if (real(t.factionId)) lines.push({ icon: '🏴', factions: [t.factionId], text: say(rand, TEXT.toll, { band: t.band, paid: t.paid }) });
   for (const m of r.marauders?.spawned ?? [])
     lines.push({ icon: '🏴', sectorId: m.sectorId, text: say(rand, TEXT.bandNew, { band: m.name, strength: m.strength, sector: name(m.sectorId) }) });
+  // What's coming next round, so everyone can get in the way.
+  for (const m of c.marauders ?? []) {
+    const h = bandHeading(c, m);
+    if (!h) continue;
+    const vars = { band: m.name, strength: m.strength, sector: h.target.name, owner: factionName(c, h.target.owner), when: h.rounds <= 1 ? 'when this round ends' : `in ${h.rounds} rounds` };
+    const owner = real(h.target.owner) ? [h.target.owner] : [];
+    for (const id of owner) lines.push({ icon: '🏴', sectorId: h.target.id, factions: [id], text: say(rand, TEXT.headingYours, vars) });
+    const rest = c.factions.map((f) => f.id).filter((id) => !owner.includes(id));
+    if (rest.length) lines.push({ icon: '🏴', sectorId: h.target.id, factions: rest, text: say(rand, TEXT.heading, vars) });
+  }
 
   // The map.
   for (const s of r.cleared) at(s.id, [], { icon: '✧', text: say(rand, s.type === 'archive' ? TEXT.archiveGone : TEXT.hulkGone, { sector: s.name }) });

@@ -9,8 +9,14 @@ import { Modal, Stepper, confirmAction, toast } from './ui';
 
 type Set = (fn: (d: TrackedBattle) => void) => void;
 
-/** No time to play it out: pick each side's force, see how the units stack up, and let them fight it out for 4 rounds. */
-export default function AutoBattleModal({ b, set, onClose }: { b: TrackedBattle; set: Set; onClose: () => void }) {
+/**
+ * No time to play it out: pick each side's force, see how the units stack up, and let them fight it out for 4 rounds.
+ * With `onApply`, the result goes there instead of onto the battle (a fight that isn't on the tracker, like a Marauder
+ * band's), and the AI side keeps the army it was given.
+ */
+export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }: {
+  b: TrackedBattle; set: Set; onClose: () => void; onApply?: (r: AutoResult) => void; applyNote?: string;
+}) {
   const { state } = useStore();
   const [result, setResult] = useState<AutoResult | null>(null);
   // How many moves have been played back so far.
@@ -31,6 +37,10 @@ export default function AutoBattleModal({ b, set, onClose }: { b: TrackedBattle;
   };
   const apply = () => {
     if (!result) return;
+    if (onApply) {
+      onApply(result);
+      return onClose();
+    }
     set((d) => applyAutoBattle(d, result));
     toast(result.winner === 'draw' ? 'Auto-battle: a draw.' : `Auto-battle: ${teamName(b, result.winner)} wins.`);
     onClose();
@@ -58,7 +68,7 @@ export default function AutoBattleModal({ b, set, onClose }: { b: TrackedBattle;
           {teams.map((t) => (
             <div key={t} className={`auto-team team-${t}`}>
               <h3>{teamName(b, t)}</h3>
-              {b.sides.filter((s) => s.team === t).map((s) => <SideSetup key={s.id} b={b} side={s} set={set} />)}
+              {b.sides.filter((s) => s.team === t).map((s) => <SideSetup key={s.id} b={b} side={s} set={set} fixedAi={!!onApply} />)}
               <FighterTable fighters={fighters.filter((f) => f.team === t)} />
             </div>
           ))}
@@ -106,7 +116,7 @@ export default function AutoBattleModal({ b, set, onClose }: { b: TrackedBattle;
     );
     footer = done ? (
       <>
-        <span className="muted small">Applying ends the battle with these losses and kill XP; record it for each force as usual.</span>
+        <span className="muted small">{applyNote ?? 'Applying ends the battle with these losses and kill XP; record it for each force as usual.'}</span>
         <span className="spacer" />
         <button onClick={fight} title="Throw this run away and fight again">🎲 Fight again</button>
         <button className="primary" onClick={apply}>✓ Apply result</button>
@@ -133,7 +143,7 @@ function hpAfter(fighters: Fighter[], moves: Move[]) {
   return hp;
 }
 
-function SideSetup({ b, side, set }: { b: TrackedBattle; side: TrackerSide; set: Set }) {
+function SideSetup({ b, side, set, fixedAi }: { b: TrackedBattle; side: TrackerSide; set: Set; fixedAi?: boolean }) {
   const { state } = useStore();
   const forces: Force[] = state.forces;
   const force = forces.find((f) => f.id === side.forceId);
@@ -157,7 +167,7 @@ function SideSetup({ b, side, set }: { b: TrackedBattle; side: TrackerSide; set:
     <div className="auto-side">
       <div className="small"><b>{side.name}</b>{side.ai ? ' (AI)' : ''} <span className="muted">· {sidePoints(side)} pts</span></div>
       {side.ai ? (
-        book ? (
+        fixedAi ? null : book ? (
           <div className="row small">
             <Stepper value={target} step={50} min={50} onChange={setTarget} /> pts
             <button onClick={generate} title={`A random ${ECHOES.name} army up to the target points`}>🎲 Generate</button>

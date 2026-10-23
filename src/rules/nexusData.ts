@@ -496,8 +496,13 @@ export const MARAUDERS = {
   max: 2000,
   min: 400,
   repelLoss: 200,
-  /** Hexes a band moves each round. */
-  move: { min: 1, max: 2 },
+  /** Hexes a band moves each round (always the same, so everyone can count when it arrives). */
+  move: 2,
+  /** A band barred from its road turns on whoever barred it: they fight it before the next round ends, or pay `toll` Materials (taken at that round's end if they've done neither). Losing the fight costs `lostToll`. */
+  toll: 150,
+  lostToll: 250,
+  /** Most squads in a band an auto-battle fields. */
+  squads: 5,
   /** The share of a world's bank a raid carries off. */
   steal: 0.5,
   /** How much less a defended world (Walls, Reinforce or a garrison) draws a band. */

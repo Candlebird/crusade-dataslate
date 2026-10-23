@@ -416,6 +416,8 @@ table.compact .stepper input { width: 2.6rem; }
 .hex-empty .hex-glyph { fill: #666; }
 .hex-name { fill: var(--text); font: 600 7.5px var(--sans); text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: #07080b; stroke-width: 2.5px; }
 .hex-mark { fill: var(--text); font: 11px var(--sans); text-anchor: middle; }
+.band-road { fill: none; stroke: #e05a4a; stroke-width: 2px; stroke-dasharray: 5 4; stroke-linecap: round; opacity: 0.85; pointer-events: stroke; }
+.band-road-swatch { background: repeating-linear-gradient(90deg, #e05a4a 0 5px, transparent 5px 9px) !important; height: 3px !important; vertical-align: middle; }
 .hex-band circle { fill: #2a0d0d; stroke: #e05a4a; stroke-width: 1.5px; }
 .hex-band text { font: 8px var(--sans); text-anchor: middle; pointer-events: none; }
 .marauder-box { margin: 0.5rem 0; padding: 0.5rem; border: 1px solid #e05a4a55; border-radius: 6px; display: grid; gap: 0.5rem; }

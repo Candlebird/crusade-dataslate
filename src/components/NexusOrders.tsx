@@ -10,6 +10,7 @@ import { HOLD, applyMoves, foughtFor, myDetachments, playedDetachments, revealOr
 import { nowIso } from '../model/factory';
 import { spreadsAt, nextThreat } from '../rules/rounds';
 import { echoMarks, holders } from '../rules/voidspawn';
+import { standingEffects } from '../rules/standing';
 import { href } from '../route';
 import { useEndRound } from './RoundPanel';
 import { Panel, confirmAction, toast } from './ui';
@@ -126,15 +127,20 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
             const { moves, attacks } = moveTargets(c, f);
             const at = positionOf(c, f);
             const { move, why } = moveOf(c, f);
+            // What standing there does when the round ends: holding a mark, barring a band's road, guarding a world.
+            const fx = (id: string | undefined) => {
+              const t = id ? standingEffects(c, id, f.nexus!.factionId) : [];
+              return t.length ? ` · ${t.join(' · ')}` : '';
+            };
             return (
               <label key={f.id} className="field">
                 <span>{label(f)} <span className="muted small" title={why.join(', ')}>at {at?.name ?? '—'}, moves {move}</span></span>
                 <select value={own?.picks[f.id] ?? own?.picks[f.nexus!.factionId] ?? ''} onChange={(e) => pick(f.id, e.target.value)}>
                   <option value="">— Not declared —</option>
-                  <option value={HOLD}>Hold: stay put, no attack</option>
+                  <option value={HOLD}>Hold: stay put, no attack{fx(at?.id)}</option>
                   {moves.length > 0 && (
                     <optgroup label="Move">
-                      {moves.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.owner ? factionName(c, s.owner) : 'empty space'})</option>)}
+                      {moves.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.owner ? factionName(c, s.owner) : 'empty space'}){fx(s.id)}</option>)}
                     </optgroup>
                   )}
                   {attacks.length > 0 && (

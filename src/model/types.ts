@@ -457,6 +457,10 @@ export interface Marauder {
   strength: number;
   /** The round it turned up in. */
   since: number;
+  /** The faction world it's heading for, picked when the last round ended so everyone can see it coming. */
+  target?: string;
+  /** Barred from its road at the end of `round`: these factions' detachments at `sectorId` must fight it or pay its toll before the next round ends. */
+  barred?: { sectorId: string; by: string[]; round: number };
 }
 
 export interface SectorGuardian {
@@ -569,6 +573,8 @@ export interface CampaignEvent {
   loot?: { roll: number; id: string; name: string; factionId: string; amount?: number; sectorId?: string };
   /** A game against a Marauder band (not for the sector): the band as it was, so deleting a win brings it back. */
   marauder?: Marauder;
+  /** Materials a band took off the faction for barring its road (lost the fight), so deleting the entry gives them back. */
+  toll?: number;
 }
 
 /** A sector the Void Echoes are massing against: it falls when the round ends unless the line is held. */

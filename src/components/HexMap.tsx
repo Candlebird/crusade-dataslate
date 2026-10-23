@@ -22,8 +22,12 @@ import { positionOf, reach, setPosition } from '../rules/movement';
 import { detachmentName } from '../rules/detachments';
 import { emblemLayers } from '../model/emblem';
 import { EmblemBadge, EmblemShapes } from './Emblem';
-import { MARAUDER_ID, bandsAt, isRaided, marauderTier, recordMarauderGame } from '../rules/marauders';
-import { BUILDINGS, GUARDIANS, PRODUCTION } from '../rules/nexusData';
+import { MARAUDER_ID, bandHeading, bandsAt, isRaided, marauderTier, payToll, recordMarauderGame } from '../rules/marauders';
+import { bandBattle, bandBlocker } from '../rules/bandBattle';
+import type { AutoResult } from '../rules/autoBattle';
+import type { TrackedBattle } from '../rules/tracker';
+import AutoBattleModal from './AutoBattleModal';
+import { BUILDINGS, GUARDIANS, MARAUDERS, PRODUCTION } from '../rules/nexusData';
 import { href } from '../route';
 import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 import SectorDanger from './SectorDanger';
@@ -388,7 +392,23 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                   </g>
                 );
               })}
-              {/* Marauders: everyone sees them, fog or not. */}
+              {/* Marauders: everyone sees them, fog or not, and the road each one takes next. */}
+              {(c.marauders ?? []).map((m) => {
+                const h = bandHeading(c, m);
+                const s = c.sectors.find((x) => x.id === m.sectorId);
+                if (!h || !s || !isPlaced(s)) return null;
+                const pts = [s as Hex, ...h.road].map((x) => toPixel(x, SIZE));
+                return (
+                  <polyline key={`road-${m.id}`} className="band-road" points={pts.map((p) => `${p.x},${p.y}`).join(' ')} markerEnd="url(#band-arrow)">
+                    <title>{headingText(c, m.name, h)}</title>
+                  </polyline>
+                );
+              })}
+              <defs>
+                <marker id="band-arrow" viewBox="0 0 10 10" refX={8} refY={5} markerWidth={5} markerHeight={5} orient="auto-start-reverse">
+                  <path d="M0,0 L10,5 L0,10 z" fill="#e05a4a" />
+                </marker>
+              </defs>
               {(c.marauders ?? []).map((m, i, all) => {
                 const s = c.sectors.find((x) => x.id === m.sectorId);
                 if (!s || !isPlaced(s)) return null;
@@ -417,7 +437,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
               : <SectorView c={c} s={selSector} sight={selSight!} gm={gm} viewer={viewAs} setC={setC}
                 onEdit={() => setEditing(true)} onRecord={onRecord && (() => onRecord(selSector.id))} />)}
             {sel && (selSector ? selSight === 'hidden' : !gm) && <Uncharted />}
-            {selSector && <MarauderBox c={c} s={selSector} gm={gm} setC={setC} />}
+            {selSector && <MarauderBox c={c} s={selSector} gm={gm} viewer={viewAs} setC={setC} />}
             {sel && !selSector && gm && <EmptyHex c={c} h={sel} unplaced={unplaced} setC={setC} />}
           </div>
         </div>
@@ -428,6 +448,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
           <span>✓ Reward claimed</span>
           <span>♛ Guardian</span>
           <span>🏴 Marauders</span>
+          <span title="Where a band goes next round. Any detachment on its road stops it."><i className="swatch band-road-swatch" /> Marauder road</span>
           {sidesOf(c).map((f) => <span key={f.id}><i className="swatch" style={{ background: f.color }} /> {f.name}</span>)}
         </div>
 
@@ -529,16 +550,47 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
 }
 
 /** The Marauder bands in a sector, and (for the GM) logging a game against one. */
-function MarauderBox({ c, s, gm, setC }: { c: Campaign; s: Sector; gm: boolean; setC: SetC }) {
+/** Where a band is going and when it gets there, in words. */
+function headingText(c: Campaign, band: string, h: NonNullable<ReturnType<typeof bandHeading>>) {
+  const when = h.rounds <= 1 ? 'when this round ends' : `in ${h.rounds} rounds`;
+  return `${band} are after ${factionName(c, h.target.owner)}'s ${h.target.name} (${h.target.bank ?? 0} Materials). They reach it ${when}. `
+    + 'Walls or a detachment there throw them back; any detachment on their road stops them short.';
+}
+
+function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: boolean; viewer: string; setC: SetC }) {
+  const { state } = useStore();
   const bands = bandsAt(c, s.id);
   const [by, setBy] = useState('');
-  if (!bands.length) return null;
-  const who = by || s.owner && c.factions.some((f) => f.id === s.owner) && s.owner || c.factions[0]?.id || '';
-  const fight = (bandId: string, won: boolean) => setC((d) => {
-    const e: CampaignEvent = { id: uid(), date: localDate(), sectorId: s.id, attacker: who, defender: MARAUDER_ID, winner: won ? who : MARAUDER_ID, notes: '' };
-    recordMarauderGame(d, e, bandId);
-    toast(won ? `${factionName(d, who)} broke the band${e.loot ? ` and found ${e.loot.name}` : ''}.` : 'The Marauders held.');
+  // A band's fight against a faction that barred it, out on the auto-battle.
+  const [auto, setAuto] = useState<{ bandId: string; factionId: string; b: TrackedBattle } | null>(null);
+  // Bands coming for this sector, and the ones whose road runs through it.
+  const coming = (c.marauders ?? []).flatMap((m) => {
+    const h = bandHeading(c, m);
+    return h && h.road.some((x) => x.id === s.id) ? [{ m, h }] : [];
   });
+  if (!bands.length && !coming.length) return null;
+  const who = by || s.owner && c.factions.some((f) => f.id === s.owner) && s.owner || c.factions[0]?.id || '';
+  const record = (bandId: string, fid: string, winner: string, notes = '', forceId?: string) => setC((d) => {
+    const e: CampaignEvent = { id: uid(), date: localDate(), sectorId: s.id, attacker: fid, defender: MARAUDER_ID, winner, notes, ...(forceId ? { forceId } : {}) };
+    recordMarauderGame(d, e, bandId);
+    toast(winner === fid ? `${factionName(d, fid)} broke the band${e.loot ? ` and found ${e.loot.name}` : ''}.`
+      : winner ? `The Marauders held${e.toll ? ` and took ${e.toll} Materials` : ''}.` : 'A draw: the band stays, but takes no toll.');
+  });
+  const fight = (bandId: string, won: boolean) => record(bandId, who, won ? who : MARAUDER_ID);
+  const pay = (bandId: string, fid: string) => {
+    if (!confirmAction(`Pay ${MARAUDERS.toll} Materials to be left alone?`)) return;
+    setC((d) => toast(`Paid ${payToll(d, bandId, fid)} Materials.`));
+  };
+  const startAuto = (bandId: string, fid: string) => {
+    const m = c.marauders?.find((x) => x.id === bandId);
+    if (m) setAuto({ bandId, factionId: fid, b: bandBattle(c, m, fid, state.forces, state.books, state.settings) });
+  };
+  const applyAuto = (r: AutoResult) => {
+    if (!auto) return;
+    const winner = r.winner === 'A' ? auto.factionId : r.winner === 'B' ? MARAUDER_ID : '';
+    const m = c.marauders?.find((x) => x.id === auto.bandId);
+    record(auto.bandId, auto.factionId, winner, 'Auto-battle', m && bandBlocker(c, m, auto.factionId, state.forces)?.id);
+  };
   return (
     <div className="marauder-box small">
       {bands.map((m) => {
@@ -547,6 +599,25 @@ function MarauderBox({ c, s, gm, setC }: { c: Campaign; s: Sector; gm: boolean; 
           <div key={m.id}>
             <span className="tag red">🏴 Marauders</span> <b>{m.name}</b>: <b>{m.strength} Supply</b>, about since round {m.since}.
             {' '}Beat them and roll <span className={`tag${tier === 'Legendary' ? ' gold' : tier === 'Rare' ? ' red' : ''}`}>{tier}</span> Guardian loot.
+            {(() => {
+              const h = bandHeading(c, m);
+              return h ? <div className="muted">{headingText(c, 'They', h)}</div> : null;
+            })()}
+            {m.barred && (
+              <div className="band-challenge">
+                <span className="tag red">⚔ Turned on {m.barred.by.map((id) => factionName(c, id)).join(' & ')}</span>{' '}
+                for barring their road at {c.sectors.find((x) => x.id === m.barred!.sectorId)?.name}. Before round {m.barred.round} ends,
+                fight them (win and they're broken, lose and they take {MARAUDERS.lostToll} Materials) or pay {MARAUDERS.toll} Materials.
+                Do neither and they take the {MARAUDERS.toll} anyway.
+                {m.barred.by.filter((id) => gm || id === viewer).map((id) => (
+                  <div key={id} className="row" style={{ marginTop: '0.35rem' }}>
+                    <b>{factionName(c, id)}</b>
+                    <button onClick={() => startAuto(m.id, id)} title="Fight it out on the auto-battle: the detachment that barred them against the band">⚡ Auto-battle</button>
+                    <button onClick={() => pay(m.id, id)} title={`Pay ${MARAUDERS.toll} Materials from your banks`}>Pay {MARAUDERS.toll}</button>
+                  </div>
+                ))}
+              </div>
+            )}
             {gm && c.factions.length > 0 && (
               <div className="row" style={{ marginTop: '0.35rem' }}>
                 <select value={who} onChange={(e) => setBy(e.target.value)} aria-label="Faction fighting the band">
@@ -559,6 +630,19 @@ function MarauderBox({ c, s, gm, setC }: { c: Campaign; s: Sector; gm: boolean; 
           </div>
         );
       })}
+      {coming.map(({ m, h }) => (
+        <div key={`coming-${m.id}`}>
+          <span className="tag red">🏴 {h.target.id === s.id ? 'Coming here' : 'On their road'}</span>{' '}
+          {h.target.id === s.id
+            ? headingText(c, `${m.name} (${m.strength} Supply)`, h)
+            : `${m.name} (${m.strength} Supply) pass through here on their way to ${h.target.name}. A detachment of any faction standing here bars the road: they halt in front of it and raid nothing, then turn on it (fight them or pay ${MARAUDERS.toll} Materials).`}
+        </div>
+      ))}
+      {auto && (
+        <AutoBattleModal b={auto.b} onClose={() => setAuto(null)} onApply={applyAuto}
+          set={(fn) => setAuto((a) => { if (!a) return a; const b = structuredClone(a.b); fn(b); return { ...a, b }; })}
+          applyNote="Applying logs the game against the band. Losses don't carry over to the force." />
+      )}
     </div>
   );
 }
@@ -925,6 +1009,7 @@ const MAP_EXPORT_CSS = `
   .hex-mark { fill: #d9d4c7; font: 11px sans-serif; text-anchor: middle; }
   .hex-echo { fill: #e05a4a; font-size: 13px; }
   .hex-force-n { fill: #07080b; font: 700 8px sans-serif; text-anchor: middle; }
+  .band-road { fill: none; stroke: #e05a4a; stroke-width: 2px; stroke-dasharray: 5 4; opacity: 0.85; }
 `;
 
 const MARK_TIP = `The ${ECHOES.name} are massing here. It falls when the round ends unless a detachment of yours stands here `

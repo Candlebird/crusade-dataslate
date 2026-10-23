@@ -12,7 +12,7 @@ import { factionClaimedRound } from './detachments';
 import { rateSectors } from './difficulty';
 import { explore } from './fog';
 import { regroup } from './movement';
-import { moveMarauders, type Raid } from './marauders';
+import { moveMarauders, type Raid, type Toll } from './marauders';
 import { placeGuardians } from './guardians';
 import { rollOffers } from './heroes';
 import { accrueProduction, buildingsHeld, finishConstruction, warded } from './production';
@@ -189,7 +189,7 @@ export interface RoundEnd {
   /** Sectors that got a new guardian (needs the forces and books). */
   guardians: Sector[];
   /** What the Marauders did: raids (and raids thrown back), and bands that turned up. */
-  marauders: { raids: Raid[]; spawned: Marauder[] };
+  marauders: { raids: Raid[]; spawned: Marauder[]; tolls?: Toll[] };
   /** Warlords lost and levelled (when the forces were given). */
   warlords?: ReturnType<typeof syncWarlords>;
   report: TurnReport;
@@ -285,12 +285,15 @@ export function roundEndText(c: Campaign, r: RoundEnd) {
     : ` The Nexus Crisis was lost: ${r.crisis.lord} took ${r.crisis.lost.map((s) => s.name).join(', ') || 'nothing'}.`;
   const next = `${r.nextEvent ? ` Galactic event: ${eventById(r.nextEvent)?.name}.` : ''}${r.newCrisis ? ` Nexus Crisis! ${r.newCrisis.lord} rises at ${r.newCrisis.sectorName}.` : ''}`;
   const sector = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'the map edge';
-  const raids = r.marauders.raids.map((x) => x.repelled
+  const raids = r.marauders.raids.map((x) => x.barred
+    ? ` ${x.band} were barred at ${x.barred.sector} on their way to ${x.sector}.`
+    : x.repelled
     ? ` ${x.band} were thrown back from ${x.sector}${x.garrison === 'held' ? ' by its garrison' : ''}.`
     : ` ${x.band} raided ${x.sector} (−${x.stolen} Materials${x.garrison ? ', halved by its garrison' : ''}).`).join('');
+  const tolls = (r.marauders.tolls ?? []).map((t) => ` ${t.band} took ${t.paid} Materials off ${factionName(c, t.factionId)} for barring their road.`).join('');
   const bands = r.marauders.spawned.map((m) => ` Marauders! ${m.name} (${m.strength} Supply) turned up at ${sector(m.sectorId)}.`).join('');
   const lords = (r.warlords?.lost ?? []).map((w) => ` ${factionName(c, w.factionId)} lost its Warlord, ${w.name}.`).join('');
-  return `Round ${r.round} ended.${crisis} ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${lines}${gone('void', 'Space hulk', 'drifted off')}${gone('archive', 'Lost Archive', 'faded')}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''}${raids}${bands}${lords} Round ${currentRound(c)} begins.${next}${massing}`;
+  return `Round ${r.round} ended.${crisis} ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}; they ${where}.${lines}${gone('void', 'Space hulk', 'drifted off')}${gone('archive', 'Lost Archive', 'faded')}${r.fresh.length ? ` New point${r.fresh.length === 1 ? '' : 's'} of interest: ${r.fresh.map((s) => s.name).join(', ')}.` : ''}${r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : ''}${raids}${tolls}${bands}${lords} Round ${currentRound(c)} begins.${next}${massing}`;
 }
 
 /**
