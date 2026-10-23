@@ -3,9 +3,9 @@ import { describe, expect, it } from 'vitest';
 import type { Unit, Weapon } from '../model/types';
 import { normalizeBook } from '../armyforge/book';
 import { newForce, newUnit } from '../model/factory';
-import { applySortie, postWeekly, weekBoard } from './downtime';
+import { applySortie, bankOffTableXp, offTableKey, offTableLeft, postWeekly, weekBoard } from './downtime';
 import { partyProblem, sortieProblem, startSortie } from './tasks';
-import { SORTIE, SORTIE_BOONS } from './downtimeData';
+import { OFF_TABLE_XP, SORTIE, SORTIE_BOONS } from './downtimeData';
 import { SORTIE_BOSSES, SORTIE_REGIONS } from './sortieStory';
 import { RELICS } from './data';
 import { awardFeats, trainingFeats } from './feats';
@@ -443,6 +443,35 @@ describe('sortie', () => {
     for (const m of free.party) for (const x of m.models) x.hp = 0;
     applySortie(f, free, '2026-01-01', id, () => 0);
     expect(others.every((u) => u.status === 'active' && !u.scars.length)).toBe(true);
+  });
+
+  it('holds free runs to the off-table XP limit for the round, but not Shard runs', () => {
+    let n = 0;
+    const id = () => `id${n++}`;
+    const f = newForce();
+    const party = PARTIES.line();
+    f.units.push(...party);
+    const won = () => Object.assign(createRun(party, 1, 'free', 'long'), { over: 'won' as const, bossDown: true, xp: 99 });
+    applySortie(f, won(), '2026-01-01', id, () => 0.99, 'round-1');
+    expect(party.map((u) => u.xp)).toEqual([4, 4, 4]);
+    const text = applySortie(f, won(), '2026-01-01', id, () => 0.99, 'round-1');
+    expect(party.map((u) => u.xp)).toEqual([OFF_TABLE_XP.perRound, OFF_TABLE_XP.perRound, OFF_TABLE_XP.perRound]);
+    expect(text).toContain('off-table XP limit');
+    expect(party.map((u) => offTableLeft(u, 'round-1'))).toEqual([0, 0, 0]);
+    // A new round opens the allowance again; a Shard run never counts against it.
+    expect(offTableLeft(party[0], 'round-2')).toBe(OFF_TABLE_XP.perRound);
+    applySortie(f, Object.assign(createRun(party, 2, 'shard'), { over: 'won' as const, xp: 9 }), '2026-01-01', id, () => 0.99, 'round-1');
+    expect(party[0].xp).toBe(OFF_TABLE_XP.perRound + SORTIE.caps.shard.short);
+  });
+
+  it('shares the off-table XP limit with Training, by week outside a campaign', () => {
+    const [u] = PARTIES.line();
+    const key = offTableKey(undefined, '2026-10-22');
+    expect(key).toBe(weekKey('2026-10-22'));
+    expect(bankOffTableXp(u, 3, key)).toBe(3);
+    expect(bankOffTableXp(u, 3, key)).toBe(OFF_TABLE_XP.perRound - 3);
+    expect(bankOffTableXp(u, 3, key)).toBe(0);
+    expect(bankOffTableXp(u, 3, offTableKey(undefined, '2026-10-29'))).toBe(3);
   });
 
   it('is hard but winnable (balance probe)', () => {

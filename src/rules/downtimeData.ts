@@ -462,6 +462,9 @@ export const PROJECTS: ProjectDef[] = [
   { id: 'rareRelic', name: 'Forge a rare relic', goal: 18, desc: 'A free Rare relic, taken in the Requisition shop by the force that finishes it.', reward: { relic: 'Rare' } },
 ];
 
+/** Off-table XP: the most a unit banks from free Sorties and Training runs together in a round (a week outside a campaign). */
+export const OFF_TABLE_XP = { perRound: 5 };
+
 /**
  * Training sim: a tower-defense run between games. The squad stands around a base and holds off endless waves of Echo
  * drones. Nothing in it touches the campaign but XP: units don't become busy, and a unit that dies there is only out of

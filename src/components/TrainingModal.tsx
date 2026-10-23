@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useStore } from '../model/store';
-import type { EmblemLayer, Force } from '../model/types';
+import type { Campaign, EmblemLayer, Force } from '../model/types';
 import { unitPortrait } from '../model/emblem';
 import type { Category } from '../rules/data';
 import { unitName } from '../rules/battle';
 import { levelForXp } from '../rules/engine';
-import { TRAINING, type TrainingEnemyDef, type TrainingEnemyShape } from '../rules/downtimeData';
+import { OFF_TABLE_XP, TRAINING, type TrainingEnemyDef, type TrainingEnemyShape } from '../rules/downtimeData';
 import { raiderPool } from '../rules/raiders';
+import { bankOffTableXp, offTableKey, offTableLeft } from '../rules/downtime';
 import { veteranTitle } from '../rules/sortie';
 import {
   BASE, DIRECTIONS, habitNames, FX_COLOR, FX_TIME, HEAL_DESC, LEVEL_UP, ROLES, auraOf, autoCardIndex, autoPlace, autoSpend, buyHeal, buyUpgrade, canTrain, cardText, createRun, dugIn, enemyDef, fixed, liftTower, mvp, pickCard, placeProblem, placeTower, placed, previewWave, quitRun,
@@ -33,7 +34,7 @@ const COLORS: Record<Category, string> = {
 };
 
 /** The training sim: pick a squad, then hold the base for as many waves as it can. Only XP comes out of it. */
-export default function TrainingModal({ force, onClose }: { force: Force; onClose: () => void }) {
+export default function TrainingModal({ force, c, onClose }: { force: Force; c?: Campaign; onClose: () => void }) {
   const { state, updateForce } = useStore();
   const trainable = force.units.filter(canTrain);
   const portraits = useMemo(() => Object.fromEntries(force.units.map((u) => [u.id, unitPortrait(u, force)])), [force]);
@@ -66,20 +67,23 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
     if (!r || banked.current || r.wave === 0) return;
     banked.current = true;
     const xp = runXp(r);
-    const gained = r.towers.filter((t) => xp[t.unitId]);
+    const key = offTableKey(c, localDate());
+    const gained: string[] = [];
     const lead = mvp(r);
     let feats: string[] = [];
     updateForce(force.id, (f) => {
-      for (const [id, n] of Object.entries(xp)) {
-        const u = f.units.find((x) => x.id === id);
-        if (u) u.xp += n;
+      for (const t of r.towers) {
+        const u = f.units.find((x) => x.id === t.unitId);
+        if (!u || !xp[t.unitId]) continue;
+        const got = bankOffTableXp(u, xp[t.unitId], key);
+        gained.push(`${t.name} +${got} XP${got < xp[t.unitId] ? ' (off-table limit)' : ''}`);
       }
       if (r.cleared > (f.trainingBest ?? 0)) f.trainingBest = r.cleared;
       feats = awardFeats(f, trainingFeats(r.cleared), r.towers.map((t) => t.unitId), localDate(), uid);
     });
     const led = lead ? `${lead.name} led the way with ${lead.kills} kill${lead.kills === 1 ? '' : 's'}. ` : '';
-    toast(led + (gained.length ? `Training banked: ${gained.map((t) => `${t.name} +${t.xp} XP`).join(', ')}.` : 'Training over. No XP this time.') + (feats.length ? ` ${feats.join('. ')}.` : ''));
-  }, [force.id, updateForce]);
+    toast(led + (gained.length ? `Training banked: ${gained.join(', ')}.` : 'Training over. No XP this time.') + (feats.length ? ` ${feats.join('. ')}.` : ''));
+  }, [force.id, c, updateForce]);
 
   const close = () => {
     const r = runRef.current;
@@ -153,7 +157,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
       >
         <p className="small" style={{ marginTop: 0 }}>
           Hold the base against endless waves. Each wave's direction shows before it starts. Scouts and Ambushers come from the far side.
-          Kills drop credits for upgrades. Each unit still standing earns <b>+{TRAINING.xpPerWave} XP</b> per {TRAINING.xpEvery} waves cleared, up to <b>{TRAINING.xpCap} XP</b> a run.
+          Kills drop credits for upgrades. Each unit still standing earns <b>+{TRAINING.xpPerWave} XP</b> per {TRAINING.xpEvery} waves cleared, up to <b>{TRAINING.xpCap} XP</b> a run, within the limit of <b>{OFF_TABLE_XP.perRound} off-table XP</b> a unit banks each {c ? 'round' : 'week'} from Training and free Sorties.
         </p>
         <p className="muted small">
           Sortie quirks and trinkets count here (not morale). Nothing else carries over: units don't become busy, and a fallen unit is only out of this run. Waves scale with the squad’s points and levels.
@@ -167,7 +171,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
             <input type="checkbox" checked={chosen.includes(u.id)} disabled={!chosen.includes(u.id) && chosen.length >= TRAINING.squadMax} onChange={() => toggle(u.id)} />
             <Portrait unit={u} size={22} />
             <span className="grow">
-              {unitName(u)}{veteranTitle(u) ? <i className="muted">, {veteranTitle(u)}</i> : null} <span className="muted">· {u.category} · level {levelForXp(u.xp)} · {u.points} pts</span>
+              {unitName(u)}{veteranTitle(u) ? <i className="muted">, {veteranTitle(u)}</i> : null} <span className="muted">· {u.category} · level {levelForXp(u.xp)} · {u.points} pts · {offTableLeft(u, offTableKey(c, localDate()))} off-table XP left</span>
               {habitNames(u).length > 0 && <span className="muted"> · from Sorties: {habitNames(u).join(', ')}</span>}
             </span>
           </label>

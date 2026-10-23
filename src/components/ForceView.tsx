@@ -26,7 +26,7 @@ import { nowIso } from '../model/factory';
 import { DetachmentsBox } from './Detachments';
 import { claimableRounds } from '../rules/rounds';
 import { TASK_NAMES, claimGarrisons, freeUnits, garrisonClaims, tasksOf } from '../rules/tasks';
-import { GARRISON, SORTIE, TRAINING } from '../rules/downtimeData';
+import { GARRISON, OFF_TABLE_XP, SORTIE, TRAINING } from '../rules/downtimeData';
 import { canTrain } from '../rules/training';
 import { canSortie } from '../rules/sortie';
 import { RESULT_LABEL, unitName } from '../rules/battle';
@@ -593,16 +593,16 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const trainingRow = (
     <div className="span-all row">
       <span className="grow small">
-        <b>Training sim:</b> hold a base against endless waves with up to {TRAINING.squadMax} units for up to {TRAINING.xpCap} XP each. <span className="muted">Any time, as often as you like. Units don't become busy.{f.trainingBest ? ` Best: ${f.trainingBest} waves.` : ''}</span>
+        <b>Training sim:</b> hold a base against endless waves with up to {TRAINING.squadMax} units for up to {TRAINING.xpCap} XP each. <span className="muted">Any time, as often as you like; a unit banks at most {OFF_TABLE_XP.perRound} XP a {c ? 'round' : 'week'} from Training and free Sorties together. Units don't become busy.{f.trainingBest ? ` Best: ${f.trainingBest} waves.` : ''}</span>
       </span>
       <button disabled={!f.units.some(canTrain)} onClick={() => setTraining(true)}>Train…</button>
-      {training && <TrainingModal force={f} onClose={() => setTraining(false)} />}
+      {training && <TrainingModal force={f} c={c} onClose={() => setTraining(false)} />}
     </div>
   );
   const sortieRow = (
     <div className="span-all row">
       <span className="grow small">
-        <b>Sortie:</b> a party of 3 pushes through Echo fights, camps and shrines to an Echo lord. Free runs earn up to {SORTIE.caps.free.short}–{SORTIE.caps.free.long} XP. A Shard run costs {SORTIE.cost} Umbra Shards, earns up to {SORTIE.caps.shard.long} XP and brings home Supply, RP and up to {SORTIE.haul.maxUs} shards. <span className="muted">{f.sortieBest ? `Furthest: ${f.sortieBest} nodes.` : ''}</span>
+        <b>Sortie:</b> a party of 3 pushes through Echo fights, camps and shrines to an Echo lord. Free runs earn up to {SORTIE.caps.free.short}–{SORTIE.caps.free.long} XP, within the {OFF_TABLE_XP.perRound} off-table XP limit. A Shard run costs {SORTIE.cost} Umbra Shards, earns up to {SORTIE.caps.shard.long} XP and brings home Supply, RP and up to {SORTIE.haul.maxUs} shards. <span className="muted">{f.sortieBest ? `Furthest: ${f.sortieBest} nodes.` : ''}</span>
       </span>
       <button disabled={f.units.filter(canSortie).length < 3} onClick={() => setSortie(true)}>Sortie…</button>
       {sortie && <SortieModal force={f} c={c} onClose={() => setSortie(false)} />}

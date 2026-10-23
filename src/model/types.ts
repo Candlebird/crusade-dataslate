@@ -79,6 +79,8 @@ export interface Unit {
   trinket?: string;
   /** Its Sortie record: runs it came back from standing, and Echo lords slain (rules/sortie.ts veteranTitle). */
   sortieRecord?: { runs: number; lords: number };
+  /** Off-table XP banked from free Sorties and Training, and the round (or week) it was banked in (OFF_TABLE_XP). */
+  offTableXp?: { key: string; n: number };
   relics: Relic[];
   /** Manual BP adjustment (e.g. Heroic Rise +1). */
   bpAdjust: number;

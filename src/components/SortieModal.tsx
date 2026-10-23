@@ -9,7 +9,7 @@ import { unitName } from '../rules/battle';
 import { levelForXp } from '../rules/engine';
 import { echoesBook } from '../rules/echoForce';
 import { raiderPool } from '../rules/raiders';
-import { applySortie, postWeekly, weekBoard } from '../rules/downtime';
+import { applySortie, offTableKey, offTableLeft, postWeekly, weekBoard } from '../rules/downtime';
 import { partyProblem, sortieProblem, sortieScout, startSortie } from '../rules/tasks';
 import { SORTIE, SORTIE_BOONS, type SortieLength, type SortieMarkId, type SortieMode } from '../rules/downtimeData';
 import {
@@ -205,6 +205,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
   const [marks, setMarks] = useState<SortieMarkId[]>([]);
   const [boonsOpen, setBoonsOpen] = useState(false);
   const week = weekKey(localDate());
+  const offKey = offTableKey(c, localDate());
   const story = (state.forces.find((f) => f.id === force.id) ?? force).sortie;
   const runRef = useRef<SortieRun | null>(null);
   const banked = useRef(false);
@@ -234,7 +235,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
     update((s) => {
       const f = s.forces.find((x) => x.id === force.id);
       if (!f) return;
-      text = applySortie(f, r, localDate(), uid);
+      text = applySortie(f, r, localDate(), uid, Math.random, offTableKey(c, localDate()));
       if (r.depth > (f.sortieBest ?? 0)) f.sortieBest = r.depth;
       f.updatedAt = nowIso();
       // A won Shard run in a campaign scouts a sector on the way home.
@@ -358,7 +359,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               <label key={u.id} className="row small" style={{ gap: 6 }}>
                 <input type="checkbox" checked={on} disabled={!on && picked.length >= 3} onChange={() => toggle(u.id)} />
                 <Portrait unit={u} size={22} />
-                <span className="grow">{unitName(u)}{veteranTitle(u) && <span className="sortie-title"> · {veteranTitle(u)}</span>} <span className="muted">· {u.category} · level {levelForXp(u.xp)} · {u.points} pts</span></span>
+                <span className="grow">{unitName(u)}{veteranTitle(u) && <span className="sortie-title"> · {veteranTitle(u)}</span>} <span className="muted">· {u.category} · level {levelForXp(u.xp)} · {u.points} pts{mode === 'free' ? ` · ${offTableLeft(u, offKey)} off-table XP left` : ''}</span></span>
                 {at >= 0 && <span className="sortie-slot-tag">{SLOTS[at]}</span>}
               </label>
             );

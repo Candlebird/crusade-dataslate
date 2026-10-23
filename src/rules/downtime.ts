@@ -1,10 +1,11 @@
 // Downtime between games: Expeditions (a short dice story into the Nexus) and the bookkeeping for solo patrols.
 import type { Campaign, Force, SortieBoardEntry, Unit } from '../model/types';
 import { SCAR_TABLE } from './data';
-import { EXPEDITION, EXPEDITION_SITES, SOLO_PATROL, SORTIE, SORTIE_BOONS, SORTIE_QUIRKS, type ExpeditionCheck, type ExpeditionReward, type ExpeditionSite, type ExpeditionVariant } from './downtimeData';
+import { EXPEDITION, EXPEDITION_SITES, OFF_TABLE_XP, SOLO_PATROL, SORTIE, SORTIE_BOONS, SORTIE_QUIRKS, type ExpeditionCheck, type ExpeditionReward, type ExpeditionSite, type ExpeditionVariant } from './downtimeData';
 import { applyScar, levelForXp } from './engine';
 import { awardFeats, type FeatId } from './feats';
-import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicsOf, runXp, threadDone, tierOf, trinketInfo, unlockedBoons, markHeat, veteranTitle, weeklyScore, type SortieRun } from './sortie';
+import { currentRound } from './nexus';
+import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicsOf, runXp, threadDone, tierOf, trinketInfo, unlockedBoons, markHeat, veteranTitle, weekKey, weeklyScore, type SortieRun } from './sortie';
 
 type Rand = () => number;
 
@@ -205,20 +206,45 @@ export function applyExpedition(force: Force, e: Expedition, date: string, newId
   return summary;
 }
 
+/** What the off-table XP limit counts over: the campaign's round, or outside a campaign the week. */
+export const offTableKey = (c: Campaign | undefined, date: string) => (c ? `round-${currentRound(c)}` : weekKey(date));
+
+/** Off-table XP the unit can still bank in this round (or week). */
+export const offTableLeft = (u: Unit, key: string) =>
+  Math.max(0, OFF_TABLE_XP.perRound - (u.offTableXp?.key === key ? u.offTableXp.n : 0));
+
+/** Bank up to n XP from a free Sortie or a Training run, as far as the off-table limit allows. Returns what it got. */
+export function bankOffTableXp(u: Unit, n: number, key: string): number {
+  const left = offTableLeft(u, key);
+  const got = Math.max(0, Math.min(n, left));
+  u.offTableXp = { key, n: OFF_TABLE_XP.perRound - left + got };
+  u.xp += got;
+  return got;
+}
+
 /**
  * Pay a finished Sortie to the force: the XP (up to the run's cap) to each unit of the party, a Shard run's haul if it
- * got home, and on a Shard run each unit wiped out takes a battle scar or is Lost. Returns a one-line summary.
+ * got home, and on a Shard run each unit wiped out takes a battle scar or is Lost. A free run's XP counts toward the
+ * off-table limit for the round (`key`, from offTableKey). Returns a one-line summary.
  */
-export function applySortie(force: Force, run: SortieRun, date: string, newId: () => string, rand: Rand = Math.random): string {
+export function applySortie(force: Force, run: SortieRun, date: string, newId: () => string, rand: Rand = Math.random, key = weekKey(date)): string {
   const units = run.party.map((m) => force.units.find((x) => x.id === m.unit.id)).filter((u): u is Unit => !!u && u.status !== 'removed');
   if (!units.length) return '';
   const xp = runXp(run);
+  const held: string[] = [];
   for (const m of run.party) {
     const u = units.find((x) => x.id === m.unit.id);
-    if (u) u.xp += memberXp(run, m);
+    if (!u) continue;
+    const want = memberXp(run, m);
+    if (run.mode === 'shard') u.xp += want;
+    else {
+      const got = bankOffTableXp(u, want, key);
+      if (got < want) held.push(`${memberName(m)} +${got}`);
+    }
   }
   const half = run.party.some((m) => !memberUp(m)) ? ` (${Math.floor(xp / 2)} for the units wiped out)` : '';
-  const bits = [`Sortie (${run.mode === 'shard' ? 'Shard' : 'free'}, ${run.length}) in ${regionName(run)} against ${bossOf(run).name} — ${run.party.map(memberName).join(', ')}: ${OUTCOME[run.over ?? 'quit']}, +${xp} XP each${half}`];
+  const limit = held.length ? ` (off-table XP limit: ${held.join(', ')})` : '';
+  const bits = [`Sortie (${run.mode === 'shard' ? 'Shard' : 'free'}, ${run.length}) in ${regionName(run)} against ${bossOf(run).name} — ${run.party.map(memberName).join(', ')}: ${OUTCOME[run.over ?? 'quit']}, +${xp} XP each${half}${limit}`];
   const haul = keepsHaul(run) ? run.haul : { supply: 0, rp: 0, us: 0 };
   if (keepsHaul(run)) {
     const got = [haul.supply ? `${haul.supply} Supply` : '', haul.rp ? `${haul.rp} RP` : '', haul.us ? `${haul.us} Umbra Shard${haul.us > 1 ? 's' : ''}` : ''].filter(Boolean);
