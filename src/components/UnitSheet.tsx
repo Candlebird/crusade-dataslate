@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../model/store';
+import { useCloud } from '../cloud/CloudSync';
 import { uid } from '../model/factory';
 import type { Unit, UnitStatus, Weapon } from '../model/types';
 import {
@@ -40,7 +41,7 @@ import { quirkInfo, trinketInfo, veteranTitle } from '../rules/sortie';
 import { unitBookUrl } from '../armyforge/book';
 import { go, href } from '../route';
 import { EmblemButton } from './Emblem';
-import { defaultPortrait } from '../model/emblem';
+import { FORCE_LAYERS, portraitInForce, randomTop, unitPortrait } from '../model/emblem';
 import { ForceImage } from './ForceView';
 import TablePicker, { type PickEntry, type PickGroup, type Picked } from './TablePicker';
 import { traitMark } from './marks';
@@ -70,6 +71,8 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
   const f = state.forces.find((x) => x.id === forceId);
   const u = f?.units.find((x) => x.id === unitId);
   const { edit } = useEditMode(f);
+  const cloud = useCloud();
+  const theirs = !!f && !!cloud.email && !!f.owner && f.owner !== cloud.email;
   if (!f || !u) return <div className="panel empty">Unit not found. <a href={href.forces()}>Back to forces</a></div>;
 
   const set = (fn: (d: Unit) => void) => updateUnit(f.id, u.id, fn);
@@ -214,10 +217,12 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             <a href={href.forces()}>Forces</a> / <a href={href.force(f.id)}>{f.name}</a> / Unit sheet
           </div>
           <h1 className="with-emblem">
-            <EmblemButton emblem={u.portrait} fallback={defaultPortrait(u)} readOnly={!edit} title="Portrait"
+            <EmblemButton emblem={u.portrait && unitPortrait(u, f)} fallback={portraitInForce(u, f)} readOnly={theirs} title="Portrait"
+              fixedLayers={FORCE_LAYERS} roll={() => portraitInForce(u, f, randomTop(portraitInForce(u, f).slice(0, FORCE_LAYERS)))}
               onChange={(e) => set((d) => void (d.portrait = e))}>
               <p className="muted small" style={{ margin: 0 }}>
-                Stands for the unit in the Training Grounds and on a Sortie.{!edit && ' Turn on edit mode to change it.'}
+                Stands for the unit in the Training Grounds and on a Sortie. Its background and middle come from the force's emblem.
+                {theirs ? ` Only ${f.owner} can change it.` : ' Pick its top layer here.'}
               </p>
             </EmblemButton>
             {u.name || u.unitType || 'Unnamed unit'}</h1>

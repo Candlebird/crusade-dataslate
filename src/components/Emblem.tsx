@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { EmblemLayer, EmblemShape, Unit } from '../model/types';
 import { Modal } from './ui';
+import { useStore } from '../model/store';
 import { EMBLEM_PALETTE, EMBLEM_SHAPES, LAYER_NAMES, LAYER_SCALE, SHAPE_IDS, emblemLayers, randomEmblem, unitPortrait } from '../model/emblem';
 
 /** The emblem's layers as SVG, in a 100 × 100 box; for drawing inside another SVG (the Nexus Map). */
@@ -40,17 +41,21 @@ function ShapeIcon({ shape }: { shape: EmblemShape }) {
   );
 }
 
-/** A unit's portrait: its own, or the default rolled from its id. */
+/** A unit's portrait: on its force's emblem if it's in one, else its own or the default rolled from its id. */
 export function Portrait({ unit, size = 32, title }: { unit: Pick<Unit, 'id' | 'category' | 'portrait'> & { name?: string }; size?: number; title?: string }) {
-  return <EmblemBadge emblem={unitPortrait(unit)} size={size} title={title ?? unit.name ?? 'Portrait'} />;
+  const { state } = useStore();
+  const force = state.forces.find((f) => f.units.some((x) => x.id === unit.id));
+  return <EmblemBadge emblem={unitPortrait(unit, force)} size={size} title={title ?? unit.name ?? 'Portrait'} />;
 }
 
 /**
  * Building an emblem (a force's) or a portrait (a unit's): a shape and a colour for each of the three layers. A portrait
- * has a `fallback` (its default), so it's never empty, and resetting goes back to that.
+ * has a `fallback` (its default), so it's never empty, and resetting goes back to that. The bottom `fixedLayers` can't be
+ * changed (a portrait's come from its force), and `roll` makes the 🎲 Random emblem instead of a wholly random one.
  */
-export function EmblemEditor({ emblem, onChange, readOnly, fallback }: {
+export function EmblemEditor({ emblem, onChange, readOnly, fallback, fixedLayers = 0, roll = () => randomEmblem() }: {
   emblem: unknown; onChange: (e: EmblemLayer[] | undefined) => void; readOnly?: boolean; fallback?: EmblemLayer[];
+  fixedLayers?: number; roll?: () => EmblemLayer[];
 }) {
   const layers = emblemLayers(emblem) ?? fallback;
   if (!layers) {
@@ -70,7 +75,7 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback }: {
       </div>
       {!readOnly && (
         <>
-          {layers.map((l, i) => (
+          {layers.map((l, i) => i >= fixedLayers && (
             <fieldset key={i} className="emblem-layer">
               <legend>{LAYER_NAMES[i]}</legend>
               <div className="emblem-shapes" role="radiogroup" aria-label={`${LAYER_NAMES[i]} shape`}>
@@ -96,7 +101,7 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback }: {
             </fieldset>
           ))}
           <div className="row">
-            <button onClick={() => onChange(randomEmblem())}>🎲 Random</button>
+            <button onClick={() => onChange(roll())}>🎲 Random</button>
             {fallback
               ? <button className="ghost" disabled={!emblemLayers(emblem) || JSON.stringify(emblem) === JSON.stringify(fallback)} onClick={() => onChange(undefined)}>Back to default</button>
               : <button className="ghost" onClick={() => onChange(undefined)}>Remove emblem</button>}
@@ -111,9 +116,9 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback }: {
  * An emblem or portrait that opens its editor in a pop-up when clicked. Read-only, the pop-up just shows it larger;
  * `children` go above the editor (a line on what it's for, or why it can't be changed).
  */
-export function EmblemButton({ emblem, onChange, readOnly, fallback, size = 40, title, children }: {
+export function EmblemButton({ emblem, onChange, readOnly, fallback, fixedLayers, roll, size = 40, title, children }: {
   emblem: unknown; onChange: (e: EmblemLayer[] | undefined) => void; readOnly?: boolean; fallback?: EmblemLayer[];
-  size?: number; title: string; children?: ReactNode;
+  fixedLayers?: number; roll?: () => EmblemLayer[]; size?: number; title: string; children?: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
@@ -127,7 +132,7 @@ export function EmblemButton({ emblem, onChange, readOnly, fallback, size = 40, 
       {open && (
         <Modal title={title} onClose={close} footer={<button className="primary" onClick={close}>Done</button>}>
           {children}
-          <EmblemEditor emblem={emblem} fallback={fallback} readOnly={readOnly} onChange={onChange} />
+          <EmblemEditor emblem={emblem} fallback={fallback} fixedLayers={fixedLayers} roll={roll} readOnly={readOnly} onChange={onChange} />
         </Modal>
       )}
     </>

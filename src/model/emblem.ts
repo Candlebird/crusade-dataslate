@@ -77,8 +77,10 @@ export const defaultEmblem = (forceId: string): EmblemLayer[] => randomEmblem(se
 export const forceEmblem = (f: { id: string; emblem?: unknown }): EmblemLayer[] => emblemLayers(f.emblem) ?? defaultEmblem(f.id);
 
 // ── Unit portraits ────────────────────────────────────────────────────────────
-// The same three stacked shapes stand for a unit in the downtime games (Training Grounds, Sortie). A unit without its
-// own portrait gets one rolled from its id, on a background in its category's colour, so it looks the same everywhere.
+// The same three stacked shapes stand for a unit in the downtime games (Training Grounds, Sortie). A unit in a force
+// wears the force emblem's background and middle layers; only the top layer is its own, rolled from its id (in a colour
+// unlike the force's) until a player picks one. A unit with no force (a raider from an army book) gets a whole portrait
+// rolled from its id, on a background in its category's colour.
 
 /** Background colour of a default portrait, by category. */
 export const CATEGORY_COLORS: Record<Category, string> = {
@@ -106,8 +108,29 @@ export function defaultPortrait(u: Pick<Unit, 'id' | 'category'>): EmblemLayer[]
   return layers;
 }
 
-/** The portrait a unit shows: its own if it has a usable one, else its default. */
-export const unitPortrait = (u: Pick<Unit, 'id' | 'category' | 'portrait'>): EmblemLayer[] => emblemLayers(u.portrait) ?? defaultPortrait(u);
+/** How many layers, from the bottom, a unit's portrait takes from its force's emblem. */
+export const FORCE_LAYERS = 2;
+
+/** A random top layer for a portrait over `under`: a shape in a colour none of the layers beneath use. */
+export function randomTop(under: EmblemLayer[], rand: () => number = Math.random): EmblemLayer {
+  const pick = <T,>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length)];
+  const used = new Set(under.map((l) => l.color.toLowerCase()));
+  const colors = EMBLEM_PALETTE.filter((c) => !used.has(c));
+  return { shape: pick(SHAPE_IDS.filter((s) => s !== 'ring')), color: pick(colors.length ? colors : EMBLEM_PALETTE) };
+}
+
+/** A unit's portrait in its force: the force emblem's lower layers, with `top` (or one rolled from the unit's id). */
+export function portraitInForce(u: Pick<Unit, 'id'>, force: { id: string; emblem?: unknown }, top?: EmblemLayer): EmblemLayer[] {
+  const under = forceEmblem(force).slice(0, FORCE_LAYERS);
+  return [...under, top ?? randomTop(under, seededRand(`top:${u.id}`))];
+}
+
+/** The portrait a unit shows: in a force, the force's lower layers under its own top; else its own, or its default. */
+export function unitPortrait(u: Pick<Unit, 'id' | 'category' | 'portrait'>, force?: { id: string; emblem?: unknown }): EmblemLayer[] {
+  const own = emblemLayers(u.portrait);
+  if (force) return portraitInForce(u, force, own?.[FORCE_LAYERS]);
+  return own ?? defaultPortrait(u);
+}
 
 /** Void Echoes' colours: ash, bruise and ghost-light. */
 const ECHO_PALETTE = ['#2a1f33', '#4b2d5c', '#7d5ba6', '#5fb3b3', '#a9f0e6', '#1b1d22', '#8a8fa0'];

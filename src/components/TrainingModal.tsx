@@ -35,7 +35,7 @@ const COLORS: Record<Category, string> = {
 export default function TrainingModal({ force, onClose }: { force: Force; onClose: () => void }) {
   const { state, updateForce } = useStore();
   const trainable = force.units.filter(canTrain);
-  const portraits = useMemo(() => Object.fromEntries(force.units.map((u) => [u.id, unitPortrait(u)])), [force.units]);
+  const portraits = useMemo(() => Object.fromEntries(force.units.map((u) => [u.id, unitPortrait(u, force)])), [force]);
   const [chosen, setChosen] = useState<string[]>([]);
   const runRef = useRef<TrainingRun | null>(null);
   const powerRef = useRef(0);

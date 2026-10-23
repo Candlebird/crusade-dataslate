@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORY_COLORS, EMBLEM_SHAPES, SHAPE_IDS, defaultEmblem, defaultPortrait, forceEmblem, echoPortrait, emblemLayers, randomEmblem, unitPortrait } from './emblem';
+import { CATEGORY_COLORS, EMBLEM_SHAPES, SHAPE_IDS, defaultEmblem, defaultPortrait, forceEmblem, echoPortrait, emblemLayers, portraitInForce, randomEmblem, randomTop, unitPortrait } from './emblem';
 import { rng } from '../rules/hexmap';
 
 describe('emblemLayers', () => {
@@ -59,6 +59,25 @@ describe('portraits', () => {
     const own = randomEmblem(() => 0.3);
     expect(unitPortrait({ id: 'u1', category: 'Hero', portrait: own })).toBe(own);
     expect(unitPortrait({ id: 'u1', category: 'Hero', portrait: [] as never })).toEqual(defaultPortrait({ id: 'u1', category: 'Hero' }));
+  });
+
+  it("puts a unit's own top layer on its force's emblem", () => {
+    const force = { id: 'f1', emblem: randomEmblem(() => 0.1) };
+    const own = randomEmblem(() => 0.7);
+    const p = unitPortrait({ id: 'u1', category: 'Hero', portrait: own }, force);
+    expect(p.slice(0, 2)).toEqual(force.emblem.slice(0, 2));
+    expect(p[2]).toEqual(own[2]);
+  });
+
+  it("rolls a steady top for a unit in a force, in a colour unlike the force's", () => {
+    const force = { id: 'f1', emblem: randomEmblem(() => 0.4) };
+    const p = unitPortrait({ id: 'u1', category: 'Hero' }, force);
+    expect(unitPortrait({ id: 'u1', category: 'Hero' }, force)).toEqual(p);
+    expect(p).toEqual(portraitInForce({ id: 'u1' }, force));
+    for (let i = 0; i < 50; i++) {
+      const top = randomTop(force.emblem.slice(0, 2));
+      expect([force.emblem[0].color, force.emblem[1].color]).not.toContain(top.color);
+    }
   });
 
   it('draws every Echo of a type alike', () => {
