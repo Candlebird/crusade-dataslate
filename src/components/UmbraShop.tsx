@@ -54,7 +54,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
     if ((item.key === 'manipulation' || item.key === 'relic' || item.key === 'evolution') && !choice) return 'Make a choice.';
     if ((item.key === 'reinforce' || item.key === 'expansion') && !choice) return c && fid ? 'Choose a sector.' : 'Link this force to a campaign faction first.';
     // The sector may have been taken, reinforced or deleted since it was picked.
-    if ((item.key === 'reinforce' || item.key === 'expansion') && !sectorChoices.some((s) => s.id === choice)) return 'That sector is no longer available. Choose another.';
+    if ((item.key === 'reinforce' || item.key === 'expansion') && !sectorChoices.some((s) => s.id === choice)) return "That sector isn't available now. Choose another.";
     return null;
   };
   const why = problem();
@@ -86,7 +86,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
         break;
       case 'strike':
         mutate = (f) => void f.nexus?.pending.push('Organized Strike (+200 Supply Limit when attacking)');
-        outcome = 'Organized Strike ready: +200 Supply Limit for one sector attack. Remove it from Pending once used.';
+        outcome = 'Organized Strike ready: +200 Supply Limit for 1 sector attack. Clear it from Pending once used.';
         break;
       case 'reinforce':
         label += `: ${sector?.name}`;
@@ -94,7 +94,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
           const s = d.sectors.find((x) => x.id === choice);
           if (s) s.reinforced = true;
         };
-        outcome = `${sector?.name} is reinforced. Tell the GM so the campaign file is updated.`;
+        outcome = `${sector?.name} is reinforced. Tell the GM to update the campaign file.`;
         break;
       case 'expansion':
         label += `: ${sector?.name}`;
@@ -102,7 +102,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
           const s = d.sectors.find((x) => x.id === choice);
           if (s) s.owner = fid;
         };
-        outcome = `You take ${sector?.name}. Tell the GM so the campaign file is updated.`;
+        outcome = `You take ${sector?.name}. Tell the GM to update the campaign file.`;
         break;
       case 'relic': {
         const def = RELICS.find((r) => r.name === choice);
@@ -202,7 +202,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
                     <option value="">— choose —</option>
                     {sectorChoices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
-                  <span className="muted small">Changes your copy of the campaign — report it to the GM.</span>
+                  <span className="muted small">Changes only your copy of the campaign. Tell the GM.</span>
                 </label>
               )}
               {result && <div className="span-all panel" style={{ margin: 0 }}><Icon name="l:check" /> {result}</div>}

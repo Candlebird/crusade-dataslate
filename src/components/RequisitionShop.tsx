@@ -45,7 +45,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
   let warning: string | null = null;
   if (unit && sel?.name === 'Heroic Rise' && (unit.category !== 'Infantry' || unit.tough > 1)) warning = 'Heroic Rise is for Tough(1) infantry.';
   if (unit && tier) {
-    if (!relicTierAllowed(tier, unit.xp)) warning = `${tier} relics normally need more XP than ${unitName(unit)} has.`;
+    if (!relicTierAllowed(tier, unit.xp)) warning = `${unitName(unit)} normally lacks the XP for a ${tier} relic.`;
     else if (unit.relics.length >= relicSlots(unit.xp)) warning = `${unitName(unit)} has no free relic slot (${unit.relics.length}/${relicSlots(unit.xp)}).`;
   }
 
@@ -139,7 +139,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
               <p className="span-all muted small" style={{ margin: 0 }}>
                 {NEEDS_UNIT.has(sel.name) || sel.name === 'Increase Supply'
                   ? 'Applied to the force automatically.'
-                  : 'Recorded in the ledger — make the change on the unit sheet yourself.'}
+                  : 'Recorded in the ledger. Make the change on the unit sheet yourself.'}
               </p>
               {sel.name !== 'Increase Supply' && (
                 <label className="field span-all">

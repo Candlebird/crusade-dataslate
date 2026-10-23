@@ -91,7 +91,7 @@ export function projectProblem(s: Sector | undefined, projectId: string, faction
   if (!def) return 'Choose a project.';
   if (s.owner !== factionId || !produces(s)) return 'Projects are worked on your own worlds.';
   const on = activeProject(s);
-  if (on && on.id !== projectId) return `${s.name} already has a project under way (${projectById(on.id)?.name}). One project per world.`;
+  if (on && on.id !== projectId) return `${s.name} already has a project (${projectById(on.id)?.name}). One project per world.`;
   if (def.needsUnfortified && isReinforced(s)) return `${s.name} is already Reinforced.`;
   return null;
 }

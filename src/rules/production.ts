@@ -107,7 +107,7 @@ export function buildBlock(s: Sector, id: string, payer?: Force, c?: Campaign): 
   if (hasBuilding(s, id)) return 'Already built';
   if (b.homeOnly && s.type !== 'home') return 'Only a home sector can build it';
   if (c && !knows(c.factions.find((f) => f.id === s.owner), b)) return 'Not researched yet (see the tech tree)';
-  if (s.construction) return `${buildingById(s.construction.id)?.name ?? 'A building'} is already going up here: one at a time`;
+  if (s.construction) return `${buildingById(s.construction.id)?.name ?? 'A building'} is already being built here: one at a time`;
   if (freeSlots(s, c) <= 0) return `No free slot (${buildingSlots(s, c)})`;
   if ((s.bank ?? 0) < buildCost(b, s, c)) return `Needs ${buildCost(b, s, c)} Materials (${s.bank ?? 0} banked here)`;
   if (b.shards && (payer?.umbraShards ?? 0) < b.shards) return `Needs ${b.shards} Umbra Shard${b.shards === 1 ? '' : 's'}${payer ? ` (${payer.name} has ${payer.umbraShards})` : ' from one of your forces (none loaded here)'}`;

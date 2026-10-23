@@ -48,14 +48,14 @@ export default function DuelsPanel({ c, setC, me, gm }: { c: Campaign; setC: Set
       <span className="muted small">{open.length} duel{open.length === 1 ? '' : 's'} being arranged.</span>
     )}>
       <p className="muted small">
-        Fancy a fight with another player? Challenge their faction to a duel, away from the map, and set what each side puts up.
-        Either of you can change the wagers until the result is in, but any change needs both of you to agree again. Play the
-        battle as usual (<a href={href.tracker()}>Battle</a>, then record it for XP and rewards), and record the duel's result here:
-        the loser's stakes go to the winner. A draw moves nothing.
+        Challenge another faction to a duel away from the map, and set what each side puts up.
+        Either side can change the wagers before the result, but both must agree again. Play it as usual
+        on <a href={href.tracker()}>Battle</a> for XP and rewards, then record the result here.
+        The loser's stakes go to the winner. A draw moves nothing.
       </p>
       {canChallenge && <Challenge c={c} setC={setC} me={me} gm={gm} own={own} />}
       {!duels.length && c.factions.length >= 2 && (
-        <p className="muted small">No duels yet.{canChallenge ? ' Pick a faction to challenge above, then set the wagers.' : ''}</p>
+        <p className="muted small">No duels yet.{canChallenge ? ' Pick a faction above, then set the wagers.' : ''}</p>
       )}
       {open.map((d) => <DuelCard key={d.id} c={c} setC={setC} d={d} me={me} gm={gm} />)}
       {settled.length > 0 && (
@@ -109,7 +109,7 @@ function Challenge({ c, setC, me, gm, own }: { c: Campaign; setC: SetC; me?: str
           {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
       )}
-      {fromFaction && !mineToPick.length && <span className="muted small">Link a force to {factionName(c, fromFaction)} to fight a duel.</span>}
+      {fromFaction && !mineToPick.length && <span className="muted small">Link a force to {factionName(c, fromFaction)} to duel.</span>}
       {mineToPick.length > 1 && (
         <select value={a?.id ?? ''} onChange={(e) => setFromForce(e.target.value)} aria-label="Your force">
           {mineToPick.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
@@ -167,7 +167,7 @@ function DuelCard({ c, setC, d, me, gm }: { c: Campaign; setC: SetC; d: NexusDue
               <div>Puts up: {wagerText(s.wager)}</div>
               {(mine === r || (gm && !mine)) && (s.agreed
                 ? <button className="small" onClick={() => agree(s, false)}>Take back agreement</button>
-                : <button className="primary small" disabled={!s.forceId} title={s.forceId ? undefined : 'Pick a force first: Change wagers'} onClick={() => agree(s, true)}>{mine ? 'Agree' : `Agree for ${sideName(s)}`}</button>)}
+                : <button className="primary small" disabled={!s.forceId} title={s.forceId ? undefined : 'Pick a force first in Change wagers'} onClick={() => agree(s, true)}>{mine ? 'Agree' : `Agree for ${sideName(s)}`}</button>)}
               {issues.length > 0 && <ul className="issues">{issues.map((i) => <li key={i} className="warn">{i} If it loses, it pays what it has.</li>)}</ul>}
             </div>
           );
@@ -187,7 +187,7 @@ function DuelCard({ c, setC, d, me, gm }: { c: Campaign; setC: SetC; d: NexusDue
           <button className="danger" onClick={callOff}>{mine === 'challenged' ? 'Decline' : 'Call off'}</button>
         </div>
       )}
-      {!ready && involved && <p className="muted small">The result can be recorded once both sides agree.</p>}
+      {!ready && involved && <p className="muted small">Both sides must agree before you record the result.</p>}
       {editing && <WagerModal c={c} setC={setC} d={d} me={me} onClose={() => setEditing(false)} />}
     </div>
   );
@@ -204,7 +204,7 @@ function WagerModal({ c, setC, d, me, onClose }: { c: Campaign; setC: SetC; d: N
 
   const save = () => {
     setC((x) => void setWagers(x.duels!.find((y) => y.id === d.id)!, draft, me));
-    toast(roleOf(d, me) ? 'Wagers changed: your opponent needs to agree again.' : 'Wagers changed: both sides need to agree again.');
+    toast(roleOf(d, me) ? 'Wagers changed. Your opponent must agree again.' : 'Wagers changed. Both sides must agree again.');
     onClose();
   };
 

@@ -31,7 +31,7 @@ export function digest(c: Campaign | undefined, myForces: Force[], me?: string):
     out.push({ key: `event:${c.event.id}:${round}`, icon: '✺', text: `Galactic event this round: ${e?.name ?? c.event.id}.`, href: href.campaign() });
   }
   if (c.crisis?.round === round && !c.crisis.result)
-    out.push({ key: `crisis:${round}`, icon: '☄', text: 'A Nexus Crisis must be fought this round: every faction against an Echo Lord.', href: href.campaign('map', c.crisis.sectorId) });
+    out.push({ key: `crisis:${round}`, icon: '☄', text: 'Nexus Crisis this round: all factions against an Echo Lord.', href: href.campaign('map', c.crisis.sectorId) });
 
   const report = c.reports?.[c.reports.length - 1];
   if (report) {
@@ -43,7 +43,7 @@ export function digest(c: Campaign | undefined, myForces: Force[], me?: string):
   }
 
   if (c.gameNight?.round === round && !comingTonight(c).includes(me))
-    out.push({ key: `night:${round}`, icon: '🎲', text: 'Game night is being planned: say whether you are coming.', href: href.campaign('night') });
+    out.push({ key: `night:${round}`, icon: '🎲', text: 'Game night is being planned. Say if you are coming.', href: href.campaign('night') });
 
   for (const j of c.journals ?? []) {
     if (j.factionId !== me) continue;

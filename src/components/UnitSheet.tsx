@@ -61,7 +61,7 @@ type Picker =
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
 
-const UNIQUE_NOTE = 'Unique tables are only rolled on when the game tells you to (a reward, relic or Nexus effect). A normal level-up rolls on the normal tables.';
+const UNIQUE_NOTE = 'Roll on Unique tables only when a reward, relic or Nexus effect says so. A normal level-up uses the normal tables.';
 
 function traitTablesFor(cat: Category): string[] {
   return cat === 'Infantry' ? ['Infantry (Utility)', 'Infantry (Aggressive)'] : [cat];
@@ -132,7 +132,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
         key: `normal:${k}`, label: k, entries: TRAIT_TABLES[k] ?? [], rollable: true,
       }));
       groups.push({ key: 'unique', label: 'Unique', entries: UNIQUE_TRAIT_TABLES[u.category] ?? [], rollable: true, restricted: UNIQUE_NOTE });
-      const locked = access === null ? `The ${u.category} Nexus table is locked — unlock it in Nexus Wars or earn a trait token` : undefined;
+      const locked = access === null ? `${u.category} Nexus table locked. Unlock it in Nexus Wars or earn a trait token.` : undefined;
       groups.push({
         key: 'nexus',
         label: access === 'token' ? 'Nexus (uses a token)' : 'Nexus',
@@ -197,8 +197,8 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
     } else if (picker.kind === 'scar') {
       const result = applyScar(structuredClone(u), { id: uid(), name: p.name });
       set((d) => void applyScar(d, { id: uid(), name: p.name, desc: SCAR_TABLE.find((x) => x.name === p.name)?.desc }));
-      if (result === 'comatose') toast(`${u.name || u.unitType} is comatose and sits out the next game.`);
-      if (result === 'removed') toast(`A 4th scar — ${u.name || u.unitType} is removed from the army.`, 'error');
+      if (result === 'comatose') toast(`${u.name || u.unitType} is comatose and sits out next game.`);
+      if (result === 'removed') toast(`4th scar: ${u.name || u.unitType} is removed from the army.`, 'error');
     } else {
       const def = p.meta as (typeof RELICS)[number] | undefined;
       const tier = def?.tier ?? 'Common';
@@ -224,8 +224,8 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               fixedLayers={FORCE_LAYERS} roll={() => portraitInForce(u, f, randomTop(portraitInForce(u, f).slice(0, FORCE_LAYERS), Math.random, SHAPE_IDS))}
               onChange={(e) => set((d) => void (d.portrait = e))}>
               <p className="muted small" style={{ margin: 0 }}>
-                Stands for the unit in the Training Grounds and on a Sortie. Its background and middle come from the force's emblem.
-                {theirs ? ` Only ${f.owner} can change it.` : ' Pick its top layer here.'}
+                Stands for the unit in Training and on a Sortie. Background and middle come from the force's emblem.
+                {theirs ? ` Only ${f.owner} can change it.` : ' Pick the top layer here.'}
               </p>
             </EmblemButton>
             {u.name || u.unitType || 'Unnamed unit'}</h1>
@@ -267,7 +267,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           <div className="panel-title">
             <h3><Icon name="g:upgrade" /> Level {earned} reached — {pending} upgrade{pending > 1 ? 's' : ''} to pick</h3>
           </div>
-          <p className="muted small" style={{ marginTop: 0 }}>Each level buys one trait, weapon trait or relic. This goes away once every level is spent.</p>
+          <p className="muted small" style={{ marginTop: 0 }}>Each level buys one trait, weapon trait or relic.</p>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <button className="primary" onClick={() => setPicker({ kind: 'trait' })}>Roll a trait</button>
             {u.weapons.length > 0 && (
@@ -491,7 +491,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             ) : null}
             {u.quirks?.length ? (
               <Panel id="unit.quirks" title="Sortie quirks" h={3}>
-                <p className="muted small" style={{ marginTop: 0 }}>Picked up on Sorties; they count on a Sortie and in Training (morale ones only on a Sortie).</p>
+                <p className="muted small" style={{ marginTop: 0 }}>Picked up on Sorties. They apply on Sorties and in Training; morale quirks only on Sorties.</p>
                 {u.quirks.map((id, i) => {
                   const q = quirkInfo(id);
                   return q ? (
@@ -508,7 +508,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             ) : null}
             {u.trinket || f.sortie?.trinkets?.length ? (
               <Panel id="unit.trinket" title="Sortie trinket" h={3}>
-                <p className="muted small" style={{ marginTop: 0 }}>One per unit, found on Sorties; each has a trade-off, and it counts on a Sortie and in Training (not its morale or stress).</p>
+                <p className="muted small" style={{ marginTop: 0 }}>1 per unit, found on Sorties. Each has a trade-off. It applies on Sorties and in Training, except its morale or stress effects.</p>
                 {u.trinket && trinketInfo(u.trinket) && (
                   <div className="list-item">
                     <div className="grow">
@@ -555,7 +555,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             <button
               className="danger"
               onClick={() => {
-                if (!window.confirm(`Delete ${u.name || u.unitType} permanently? (To record a death, set status to Fallen instead.)`)) return;
+                if (!window.confirm(`Delete ${u.name || u.unitType} for good? To record a death, set status to Fallen instead.`)) return;
                 updateForce(f.id, (d) => void (d.units = d.units.filter((x) => x.id !== u.id)));
                 go(href.force(f.id));
               }}
@@ -578,7 +578,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           defaultFree={picker.kind === 'weaponTrait' && !!picker.free}
           intro={picker.kind === 'weaponTrait' && picker.of > 1 && (
             <p className="small">
-              <b>Trait {picker.n} of {picker.of}.</b> <span className="muted">An infantry weapon upgrade gives {picker.of} traits; rolls skip ones the weapon already has.</span>
+              <b>Trait {picker.n} of {picker.of}.</b> <span className="muted">An infantry weapon upgrade gives {picker.of} traits. Rolls skip ones the weapon has.</span>
             </p>
           )}
           onPick={onPick}

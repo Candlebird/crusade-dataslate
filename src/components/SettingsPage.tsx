@@ -60,8 +60,8 @@ export default function SettingsPage() {
             {locked
               ? 'Set by the GM for everyone in the campaign.'
               : cloud.isGm
-                ? 'You are the GM: these apply to every player in the campaign.'
-                : "These apply to everyone viewing forces in this browser. Sign in to use the GM's house rules."}
+                ? "You're the GM: these apply to every player."
+                : "These apply only in this browser. Sign in to use the GM's house rules."}
           </p>
         </Panel>
 
@@ -73,16 +73,16 @@ export default function SettingsPage() {
               <TextField value={s.armyForgeProxy} placeholder={DEFAULT_PROXY || "https://your-worker.workers.dev"} onCommit={(v) => set((d) => void (d.armyForgeProxy = v.trim()))} />
             </label>
             <p className="muted small">
-              Army Forge doesn't let other sites fetch its books, so the app fetches them through a small proxy (proxy/worker.js, a free
-              Cloudflare Worker). {DEFAULT_PROXY ? 'The group proxy is built in; set a URL here only to use a different one.' : 'Paste its URL here.'}
+              Army Forge blocks other sites from fetching its books, so the app uses a small proxy (proxy/worker.js, a free Cloudflare
+              Worker). {DEFAULT_PROXY ? 'The group proxy is built in. Set a URL only to use a different one.' : 'Paste its URL here.'}
             </p>
           </Panel>
 
           <Panel id="settings.data" title="Data">
             <p className="muted small">
               {cloud.email
-                ? 'Your data is kept in this browser and in the campaign database. Export a backup now and then anyway.'
-                : 'Everything is stored in this browser only. Export a backup regularly, especially before clearing browser data.'}
+                ? 'Your data is in this browser and the campaign database. Export a backup now and then anyway.'
+                : 'Data is stored in this browser only. Export a backup regularly, especially before clearing browser data.'}
             </p>
             <div className="row" style={{ margin: '0.5rem 0 0.75rem' }}>
               <button className="primary" onClick={() => exportBackup(state)}>Export backup</button>
@@ -105,14 +105,14 @@ export default function SettingsPage() {
           <div className="panel">
             <div className="panel-title"><h3>Danger zone</h3></div>
             {cloud.email && (
-              <p className="muted small">Sign out first: while you're signed in, these would also delete your forces and the shared books for every player.</p>
+              <p className="muted small">Sign out first. While signed in, these would also delete your forces and the shared books for every player.</p>
             )}
             <div className="row">
               <button
                 className="danger"
                 disabled={!!cloud.email}
                 onClick={() => {
-                  if (!window.confirm('Replace ALL data in this browser with the starter army book (no forces)? Export a backup first if unsure.')) return;
+                  if (!window.confirm('Replace ALL data in this browser with the starter army book (no forces)? Export a backup first.')) return;
                   replaceState(buildSeedState());
                   toast('Reset to the starter data.');
                 }}
@@ -123,7 +123,7 @@ export default function SettingsPage() {
                 className="danger"
                 disabled={!!cloud.email}
                 onClick={() => {
-                  if (!window.confirm('Delete ALL forces and books in this browser? Export a backup first if unsure.')) return;
+                  if (!window.confirm('Delete ALL forces and books in this browser? Export a backup first.')) return;
                   replaceState({ version: 1, forces: [], books: [], settings: structuredClone(s) });
                   toast('All data cleared.');
                 }}

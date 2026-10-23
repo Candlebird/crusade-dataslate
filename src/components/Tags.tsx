@@ -62,7 +62,7 @@ export function DatasheetTags({ book, name }: { book: CatalogBook; name: string 
 export function UnitTags({ unit, editable = true }: { unit: Unit; editable?: boolean }) {
   const { state } = useStore();
   const book = bookOf(unit, state.books);
-  if (!book) return <span className="muted small" title="Tags are kept on army books, and this unit's book isn't imported.">—</span>;
+  if (!book) return <span className="muted small" title="Tags live on army books, and this unit's book isn't imported.">—</span>;
   if (!editable) return <TagChips tags={datasheetTags(book, unit.unitType)} />;
   return <DatasheetTags book={book} name={unit.unitType} />;
 }

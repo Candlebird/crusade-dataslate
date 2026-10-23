@@ -60,7 +60,7 @@ const TEXT = {
   brokenTheirs: ["{holder} broke the {echoes}' mark on {sector}."],
   cutOff: ['The {echoes} massing at {sector} were cut off and scattered.'],
   warded: ['An Echo Ward turned the {echoes} away from {sector}.'],
-  massingYours: ['The {echoes} are massing at {sector}. Stand a detachment there, or win a Battle against them and break the mark, or it falls.'],
+  massingYours: ['The {echoes} are massing at {sector}. Hold it with a detachment, or beat them in a Battle to break the mark, or it falls.'],
   massing: ['The {echoes} are massing at {sector}.'],
   threatUp: ['The {echoes} grow bolder: threat rose to {threat}.'],
   threatDown: ['The {echoes} falter: threat fell to {threat}.'],
@@ -98,7 +98,7 @@ const TEXT = {
     'The defences of {sector} held: {band} limped off, bloodied.',
   ],
   barredYours: ['Your detachment barred {band} at {at}: they never reached {sector}. Now they turn on you: fight them before this round ends, or pay {toll} Materials.'],
-  toll: ['{band} took {paid} Materials off you for barring their road: you never fought them or paid.'],
+  toll: ['{band} took {paid} Materials off you for barring their road. You never fought them or paid.'],
   barredFor: ['{holder} barred {band} at {at}, on the road to your {sector}.'],
   barred: [
     '{holder} barred {band} at {at}, on the road to {sector}.',

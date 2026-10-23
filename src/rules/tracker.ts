@@ -318,7 +318,7 @@ export function nexusNotes(b: TrackedBattle, c: Campaign | undefined, forces: Fo
     const lord = lordById(c.crisis.lord);
     const at = c.sectors.find((s) => s.id === c.crisis!.sectorId);
     if (lord) notes.push(`Nexus Crisis at ${at?.name ?? 'the Voidspawn'}: ${lord.name} leads the ${ECHOES.name} — their most expensive unit. ${lord.desc}`);
-    notes.push(`Destroying ${lord?.name ?? 'the Echo Lord'} is worth +${NEXUS_CRISIS.lordVp} VP (add it as a VP adjustment). Win: every force earns ${NEXUS_CRISIS.winUs} Umbra Shards and the force whose units earned the most XP gets a ${NEXUS_CRISIS.mvpTier} relic.`);
+    notes.push(`Destroying ${lord?.name ?? 'the Echo Lord'} is worth +${NEXUS_CRISIS.lordVp} VP (add as a VP adjustment). Win: every force earns ${NEXUS_CRISIS.winUs} Umbra Shards, and the force with the most unit XP gets a ${NEXUS_CRISIS.mvpTier} relic.`);
   }
   const event = c && activeEvent(c);
   if (event?.battle) notes.push(`Galactic event, ${event.name}: ${event.battle}`);

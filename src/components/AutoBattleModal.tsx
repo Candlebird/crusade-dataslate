@@ -43,7 +43,7 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
   const done = !!result && shown >= result.moves.length;
 
   const close = () => {
-    if (result && !confirmAction('Leave the auto-battle? This run is thrown away and the battle stays as it was.')) return;
+    if (result && !confirmAction('Leave the auto-battle? This run is discarded and the battle stays as it was.')) return;
     onClose();
   };
   const fight = () => {
@@ -67,11 +67,11 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
     body = (
       <>
         <p className="muted small">
-          Each unit gets an <b>Attack</b> (expected wounds a round against a 5-model Defense 4+ unit, shooting / in melee) and a <b>Defense</b> (plain hits it takes
-          to lose a wound), worked out from its Quality, Defense, weapons, weapon rules and traits, upgrades, relics, scars and level. Hover a unit to see why.
-          Then the teams take turns, each unit attacking once a round, for {AUTO_BATTLE.rounds} rounds. A unit brought to half strength, or beaten in melee,
-          takes a Morale test (a Quality test): failing leaves it <b>Shaken</b>, so it can't strike back and spends its next turn rallying.
-          Units start the auto-battle as they are on the tracker.
+          Each unit gets an <b>Attack</b> (expected wounds a round vs a 5-model Defense 4+ unit, shooting / melee) and a <b>Defense</b> (plain hits to lose a wound).
+          Both come from its Quality, Defense, weapons, traits, upgrades, relics, scars and level. Hover a unit to see why.
+          Teams take turns for {AUTO_BATTLE.rounds} rounds, each unit attacking once a round. A unit at half strength, or beaten in melee,
+          takes a Morale (Quality) test. If it fails, it's <b>Shaken</b>: it can't strike back and spends its next turn rallying.
+          Units start as they are on the tracker.
         </p>
         {setup.effects.length > 0 && (
           <div className="small">
@@ -81,7 +81,7 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
         )}
         {odds && (
           <div className="small">
-            <b>Stance and forecast</b> <span className="muted">({AUTO_BATTLE.forecastRuns} simulated runs of this fight for each stance; pick how your side fights)</span>
+            <b>Stance and forecast</b> <span className="muted">({AUTO_BATTLE.forecastRuns} simulated runs per stance. Pick how your side fights.)</span>
             {crusadeTeams.map((t) => (
               <StancePicker key={t} name={crusadeTeams.length > 1 ? teamName(b, t) : undefined} odds={odds[t]!} scars={!onApply}
                 value={stances[t] ?? 'committed'} onChange={(st) => setStances({ ...stances, [t]: st })} />
@@ -133,8 +133,8 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
             <b>{result.winner === 'draw' ? 'A draw.' : `${teamName(b, result.winner)} wins.`}</b>{' '}
             <span className="muted">
               Army lost: {teams.map((t) => `${teamName(b, t)} ${Math.round((result.lost[t] ?? 0) * 100)}%`).join(', ')}.
-              The side that lost the smaller share wins; within {AUTO_BATTLE.drawMargin * 100} points of each other is a draw.
-              {pulled.size > 0 && ` A unit that pulled back counts ${AUTO_BATTLE.withdrawCost * 100}% of what it had left as lost: it gave up the ground.`}
+              The side that lost the smaller share wins. Within {AUTO_BATTLE.drawMargin * 100} points is a draw.
+              {pulled.size > 0 && ` A unit that pulled back counts ${AUTO_BATTLE.withdrawCost * 100}% of what it had left as lost.`}
             </span>
           </p>
         )}
@@ -148,9 +148,9 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
     );
     footer = done ? (
       <>
-        <span className="muted small">{applyNote ?? 'Applying ends the battle with these losses and kill XP; record it for each force as usual.'}</span>
+        <span className="muted small">{applyNote ?? 'Applying ends the battle with these losses and kill XP. Record it for each force as usual.'}</span>
         <span className="spacer" />
-        <button onClick={fight} title="Throw this run away and fight again"><Icon name="g:perspective-dice-six-faces-six" /> Fight again</button>
+        <button onClick={fight} title="Discard this run and fight again"><Icon name="g:perspective-dice-six-faces-six" /> Fight again</button>
         <button className="primary" onClick={apply}><Icon name="l:check" /> Apply result</button>
       </>
     ) : (
@@ -240,7 +240,7 @@ function SideSetup({ b, side, set, fixedAi }: { b: TrackedBattle; side: TrackerS
             <Stepper value={target} step={50} min={50} onChange={setTarget} /> pts
             <button onClick={generate} title={`A random ${ECHOES.name} army up to the target points`}><Icon name="g:perspective-dice-six-faces-six" /> Generate</button>
           </div>
-        ) : !side.units.length && <div className="muted small">Import the {ECHOES.name} book to generate an army, or set it up on the tracker.</div>
+        ) : !side.units.length && <div className="muted small">Import the {ECHOES.name} book to generate an army, or set one up on the tracker.</div>
       ) : (
         <div className="row small">
           <select value={side.forceId ?? ''} onChange={(e) => pick(e.target.value, '')} aria-label={`${side.name}'s force`}>

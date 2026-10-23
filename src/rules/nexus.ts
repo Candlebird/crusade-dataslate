@@ -52,7 +52,7 @@ export function sectorEffect(c: Campaign, e: Pick<CampaignEvent, 'sectorId' | 'w
   if (!s || !e.winner || e.winner === 'ai') return '';
   if (s.type === 'voidspawn') return `${factionName(c, e.winner)} beats back the ${ECHOES.name}. ${s.name} does not change hands.`;
   if (s.type === 'home')
-    return `${factionName(c, e.winner)} wins the home-sector challenge: the winner gains one round of the loser's sector income; the loser forfeits Nexus rewards for that match. ${s.name} does not change hands.`;
+    return `${factionName(c, e.winner)} wins the home-sector challenge: +1 round of the loser's sector income; the loser forfeits that match's Nexus rewards. ${s.name} does not change hands.`;
   return s.owner === e.winner ? `${factionName(c, e.winner)} holds ${s.name}.` : `${factionName(c, e.winner)} takes control of ${s.name}.`;
 }
 
@@ -342,9 +342,9 @@ export function nexusGeneration(
     const loserId = defending ? (opponent && opponent !== factionId ? opponent : challengerOf(c, fought.id, factionId)) : fought.owner;
     const loser = c.factions.find((f) => f.id === loserId);
     if (loser) {
-      notes.push(`${defending ? 'Repelled' : 'Won'} a home-sector challenge against ${loser.name}: you gain one round of their sector income.`);
+      notes.push(`${defending ? 'Repelled' : 'Won'} a home-sector challenge against ${loser.name}: +1 round of their sector income.`);
       for (const s of ownedSectors(c, loser.id)) items.push(...conquestItems(s));
-    } else notes.push('Held your home sector. Log the game with the challenger to claim one round of their sector income.');
+    } else notes.push('Held your home sector. Log the game with the challenger to claim 1 round of their sector income.');
   }
 
   if (!fought && won) {
@@ -352,7 +352,7 @@ export function nexusGeneration(
     notes.push(wins < NEXUS_ROUNDS.assetsMax
       ? `Skirmish win: +1 Strategic Asset for ${factionName(c, factionId)} to spend in this round's Battle (${wins + 1} of ${NEXUS_ROUNDS.assetsMax}).`
       : `Skirmish win: ${factionName(c, factionId)} already has its ${NEXUS_ROUNDS.assetsMax} Strategic Assets this round.`);
-    if (vsAi) notes.push(`A patrol against the ${ECHOES.name}: their threat goes down ${NEXUS_ROUNDS.threatPerPatrolWin} at the round's end.`);
+    if (vsAi) notes.push(`A patrol against the ${ECHOES.name}: their threat drops ${NEXUS_ROUNDS.threatPerPatrolWin} at round end.`);
   }
   items.push({ key: 'matchBonus', kind: 'matchBonus', source: 'Match bonus', us: NEXUS_ROUNDS.matchBonusUs });
   // A Reaver Warlord's force takes more from its wins.
@@ -370,13 +370,13 @@ export function nexusGeneration(
   if (fought?.type === 'archive' && vsAi && won)
     notes.push(fought.rewardClaimed
       ? `${fought.name} has already been plundered.`
-      : `Took ${fought.name}: +1 Archive unlock for ${factionName(c, factionId)}, to research any one building from the tech tree, ignoring its requirements.`);
+      : `Took ${fought.name}: +1 Archive unlock for ${factionName(c, factionId)}: research any 1 building, ignoring requirements.`);
   const guardian = fought && won && vsAi ? slainGuardian(c, factionId, fought) : undefined;
   if (guardian) {
     const relic = guardian.unit.relics[0];
     if (relic) items.push({ key: 'guardian', kind: 'relicSteal', source: `${guardian.name}, guardian of ${fought!.name}: ${relic.name}`, relic: relic.name });
     notes.push(`Slew ${guardian.name}, the ${guardian.tier} guardian of ${fought!.name}${relic
-      ? `. If one of your Heroes (or a Heroic Rise unit) dealt the killing blow and rolled ${GUARDIANS.stealRoll}+, it took ${relic.name}`
+      ? `. If your Hero (or Heroic Rise unit) dealt the killing blow and rolled ${GUARDIANS.stealRoll}+, it took ${relic.name}`
       : ''}.`);
   }
   if (fought && won && vsAi && retookFromEchoes(c, factionId, fought)) {
@@ -395,7 +395,7 @@ function crisisGeneration(c: Campaign, won: boolean, forceId: string | undefined
   if (won) {
     items.push({ key: 'crisis', kind: 'us', source: `Nexus Crisis — ${lord} defeated`, us: NEXUS_CRISIS.winUs });
     if (forceId && mvp === forceId) items.push({ key: 'crisisMvp', kind: 'relic', source: `Nexus Crisis MVP: a ${NEXUS_CRISIS.mvpTier} relic` });
-  } else notes.push(`The Nexus Crisis was lost: the ${ECHOES.name} take each faction's sector nearest ${lord} when the round ends.`);
+  } else notes.push(`The Nexus Crisis was lost: the ${ECHOES.name} take each faction's sector nearest ${lord} at round end.`);
   return { items, notes, round: crisis.round };
 }
 

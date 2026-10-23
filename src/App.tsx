@@ -77,7 +77,7 @@ export default function App() {
         </Suspense>
       </main>
       <Toaster />
-      <footer className="footer">++ Data is kept in this browser, and shared with the other players while you're signed in. ++</footer>
+      <footer className="footer">++ Data lives in this browser and syncs with the group while you're signed in. ++</footer>
     </div>
   );
 }

@@ -46,8 +46,8 @@ export default function MissionLibrary() {
         <div className="row"><button className="primary" onClick={create}>+ New mission</button></div>
       </div>
       <p className="muted small">
-        Built-in missions are read-only here (they live in <code>src/rules/missions.ts</code>) — duplicate one to tweak it.
-        Custom missions are shared with every signed-in player. A running battle keeps the copy it started with.
+        Built-in missions are read-only (<code>src/rules/missions.ts</code>). Duplicate one to tweak it.
+        Custom missions are shared with every signed-in player. A running battle keeps its starting copy.
       </p>
       {missions.map((m) => {
         const custom = !!state.customMissions?.some((x) => x.id === m.id);
@@ -159,7 +159,7 @@ function MissionForm({ m, onChange }: { m: MissionDef; onChange: (m: MissionDef)
       </label>
 
       <div className="field span-all">
-        <span>Tallies <span className="muted small">— anything else worth VP (relics recovered, heroes slain…)</span></span>
+        <span>Tallies <span className="muted small">— other things worth VP (relics, slain heroes…)</span></span>
         {(m.counters ?? []).map((c, i) => (
           <div key={c.id} className="row tally">
             <TextField className="grow" value={c.label} onCommit={(v) => set((d) => void (d.counters![i].label = v))} placeholder="Label" />
@@ -174,7 +174,7 @@ function MissionForm({ m, onChange }: { m: MissionDef; onChange: (m: MissionDef)
       </div>
 
       <div className="field span-all">
-        <span>Special rules <span className="muted small">— set a round to only show it then</span></span>
+        <span>Special rules <span className="muted small">— set a round to show it only then</span></span>
         {(m.rules ?? []).map((r, i) => (
           <div key={i} className="mission-rule">
             <div className="row">

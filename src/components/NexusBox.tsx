@@ -137,7 +137,7 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
           )}
         </>
       )}
-      {e?.nexusRelic && <p className="muted small" style={{ margin: '0.35rem 0 0' }}>Common Nexus relic — take a Rare one only if no Common one is available.</p>}
+      {e?.nexusRelic && <p className="muted small" style={{ margin: '0.35rem 0 0' }}>Common Nexus relic. Take a Rare one only if no Common one is left.</p>}
     </div>
   );
 }

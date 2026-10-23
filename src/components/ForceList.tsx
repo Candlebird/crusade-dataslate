@@ -47,7 +47,7 @@ export default function ForceList() {
             <h3>{local.length === 1 ? '1 force is' : `${local.length} forces are`} only on this device</h3>
             {local.length > 1 && <button className="primary" onClick={() => claim(local.map((f) => f.id))}>Upload all as mine</button>}
           </div>
-          <p className="muted small">Upload your own forces so the other players can see them. Leave copies of other players' forces here.</p>
+          <p className="muted small">Upload your own forces so other players can see them. Don't upload copies of other players' forces.</p>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             {local.map((f) => (
               <button key={f.id} onClick={() => claim([f.id])}>Upload “{f.name}” as mine</button>
@@ -56,7 +56,7 @@ export default function ForceList() {
         </div>
       )}
 
-      {state.forces.length === 0 && <div className="panel empty">No forces yet. Create one, or drop a shared force file below. New here? Follow the <a href={href.guide()}>getting started guide</a>.</div>}
+      {state.forces.length === 0 && <div className="panel empty">No forces yet. Create one or drop a force file below. New here? See the <a href={href.guide()}>getting started guide</a>.</div>}
 
       <div className="grid grid-cards">
         {state.forces.map((f) => {
@@ -92,7 +92,7 @@ export default function ForceList() {
       <div className="panel" style={{ marginTop: '1.5rem' }}>
         <div className="panel-title"><h3>Import</h3></div>
         <Dropzone accept=".json,application/json" onFiles={importFiles}>
-          Drop a <b>.force.json</b> from a teammate, a <b>backup</b>, an <b>Army Forge list</b> (builds a force with full stats), or an <b>Army Forge book</b> JSON here — or click to choose.
+          Drop a <b>.force.json</b>, a <b>backup</b>, an <b>Army Forge list</b> (builds a full force) or an <b>Army Forge book</b> JSON here, or click to choose.
         </Dropzone>
       </div>
     </>

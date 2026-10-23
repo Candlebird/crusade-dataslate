@@ -58,7 +58,7 @@ function CatalogTab({ onAdd, budget }: { onAdd: (u: Unit[]) => void; budget?: nu
   if (!state.books.length)
     return (
       <p className="muted">
-        No army books imported yet. Head to <a href={href.books()}>Army Books</a> to import one from Army Forge.
+        No army books yet. Import one from Army Forge on the <a href={href.books()}>Army Books</a> page.
       </p>
     );
 
@@ -80,7 +80,7 @@ function CatalogTab({ onAdd, budget }: { onAdd: (u: Unit[]) => void; budget?: nu
         {budget !== undefined && (
           <label className="row small" style={{ marginBottom: '0.5rem' }}>
             <input type="checkbox" checked={affordable} onChange={(e) => setAffordable(e.target.checked)} />
-            Only what I can afford ({budget} pts of supply left)
+            Only what I can afford ({budget} pts left)
           </label>
         )}
         {book && <TagFilter tags={tagsIn(Object.values(book.unitTags ?? {}))} value={tagFilter} onChange={setTagFilter} />}
@@ -176,7 +176,7 @@ function TextTab({ onAdd }: { onAdd: (u: Unit[]) => void }) {
   return (
     <>
       <p className="muted small">
-        In Army Forge, open your list → <b>Share as Text</b>, then paste it here. Each unit header line looks like{' '}
+        In Army Forge, open your list → <b>Share as Text</b> and paste it here. Unit lines look like{' '}
         <span className="mono">Force Commander [1] Q3+ D3+ | 65pts | Hero, Tough(3)</span>.
       </p>
       <textarea rows={8} value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste list text…" />
@@ -216,7 +216,7 @@ function BlankTab({ onAdd }: { onAdd: (u: Unit[]) => void }) {
   const [type, setType] = useState('');
   return (
     <>
-      <p className="muted small">Creates an empty unit sheet — fill in its profile, weapons and rules on the next screen.</p>
+      <p className="muted small">Creates an empty unit sheet. Fill in its profile, weapons and rules next.</p>
       <div className="fields">
         <label className="field span-2">Crusade name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
         <label className="field span-2">Datasheet / unit type<input value={type} onChange={(e) => setType(e.target.value)} /></label>

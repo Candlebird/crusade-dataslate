@@ -33,11 +33,11 @@ export default function RoundIncome({ force, c, onClose }: { force: Force; c: Ca
   return (
     <Modal title="Round income" onClose={onClose} wide
       footer={<><span className="muted small grow">{preview.lines[0]}</span><button onClick={onClose}>Cancel</button><button className="primary" disabled={!rounds.length} onClick={claim}>Claim</button></>}>
-      {!rounds.length ? <p className="muted">Nothing to claim: the GM hasn't ended a round since your last claim.</p> : (
+      {!rounds.length ? <p className="muted">Nothing to claim: no round has ended since your last claim.</p> : (
         <>
           <p className="muted small">
             What your sectors paid at the end of {rounds.length === 1 ? `round ${rounds[0].round}` : `rounds ${rounds[0].round}–${rounds[rounds.length - 1].round}`}.
-            Claiming also ends the Nexus tables you unlocked with your last claim.
+            Claiming also ends the Nexus tables your last claim unlocked.
           </p>
           {items.length === 0 && <p className="muted">Your sectors produced nothing those rounds.</p>}
           {items.map((item) => (

@@ -43,7 +43,7 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
   const fight = () => {
     if (!found) return;
     if (done && !confirmAction(`${force.name} already recorded a patrol this round. Fight another anyway?`)) return;
-    if (state.battle && !confirmAction('A battle is already in progress on the Battle page. Replace it with this patrol?')) return;
+    if (state.battle && !confirmAction('A battle is already in progress. Replace it with this patrol?')) return;
     update((s) => void (s.battle = patrolBattle(found.mission, uid(), nowIso(), force, picked, s.settings, found.echoes)));
     onClose();
     go(href.tracker());
@@ -66,12 +66,12 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
     body = (
       <>
         <p className="muted small">
-          Take up to {SOLO_PATROL.points} pts out on patrol. Somewhere out there is a force of the {ECHOES.name}, {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts strong.
-          Once you've seen it, fight it against the AI (units earn participation and kill XP, no RP or reward rolls) or turn back: each unit still gets +{SOLO_PATROL.declineXp} XP for the sighting
-          {linked ? ', but has gone out for this round either way' : ''}.
+          Take up to {SOLO_PATROL.points} pts out to find a {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts force of the {ECHOES.name}.
+          Fight it against the AI for participation and kill XP (no RP or reward rolls), or turn back for +{SOLO_PATROL.declineXp} XP per unit.
+          {linked ? ' Either way, the units have gone out for this round.' : ''}
         </p>
         {done && <p className="small"><span className="tag gold">{force.name} already recorded a patrol this round.</span></p>}
-        {used.length > 0 && <p className="muted small">Each unit takes part in one skirmish, Solo patrol or Expedition a round (the main Battle doesn't count).</p>}
+        {used.length > 0 && <p className="muted small">Each unit gets 1 skirmish, Solo patrol or Expedition a round. The main Battle doesn't count.</p>}
         <div className="mission-pick">
           {active.length === 0 && <span className="muted small">No active units.</span>}
           {active.map((u) => {
@@ -89,14 +89,14 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
             );
           })}
         </div>
-        {!book && <p className="muted small">Load the {ECHOES.name} army book to have their army generated for you, or fill the AI side in by hand.</p>}
+        {!book && <p className="muted small">Load the {ECHOES.name} army book to generate their army, or fill in the AI side by hand.</p>}
       </>
     );
     footer = (
       <>
         <b className="grow">{points} / {SOLO_PATROL.points} pts</b>
         <button onClick={onClose}>Cancel</button>
-        <button className="primary" disabled={!picked.length} onClick={setOut}>Send out the patrol</button>
+        <button className="primary" disabled={!picked.length} onClick={setOut}>Send patrol</button>
       </>
     );
   } else {
@@ -113,7 +113,7 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
           </ul>
         )}
         <p className="muted small">
-          Fight: the battle opens on the Battle page; record it when it's over.
+          Fight: the battle opens on the Battle page. Record it when it's over.
           {' '}Turn back: each unit gets +{SOLO_PATROL.declineXp} XP{linked ? ' and sits out the rest of this round' : ''}.
         </p>
       </>

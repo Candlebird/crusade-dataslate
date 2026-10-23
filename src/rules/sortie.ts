@@ -143,8 +143,8 @@ export interface SortieCombat {
   enemies: SortieSquad[];
   /** Models still to act this round, fastest first. */
   queue: SortieTurn[];
-  /** What the game waits on: a unit's order for the round, or a Hero's (or lone model's) own turn. */
-  need?: 'order' | 'turn';
+  /** What the game waits on: the player to start the round, a unit's order for the round, or a Hero's (or lone model's) own turn. */
+  need?: 'start' | 'order' | 'turn';
   /** The party unit the game waits on. */
   acting?: string;
   /** Each unit's order this round. */
@@ -1378,7 +1378,9 @@ function newRound(run: SortieRun) {
   }
   c.queue = turns.sort((a, b) => b.init - a.init);
   for (const e of c.enemies) e.intent = standing(e) ? intentOf(run, e) : undefined;
-  nextOrder(run);
+  // The round waits on the player, so the turn order and the Echoes' intents can be read first.
+  c.need = 'start';
+  c.acting = undefined;
 }
 
 /** The Echo lord's signature ability, at the start of a round while it stands. */
@@ -1425,15 +1427,6 @@ function signature(run: SortieRun) {
   }
 }
 
-/** Ask for the next unit's order, front to back; once every unit has one, the round runs. */
-function nextOrder(run: SortieRun) {
-  const c = run.combat!;
-  const s = partyLine(c).find((p) => !perTurn(p) && !refusing(c, p) && !c.orders[p.key]);
-  if (!s) return advance(run);
-  c.need = 'order';
-  c.acting = s.key;
-}
-
 /** Run the round on until a player choice is needed or the round ends. */
 function advance(run: SortieRun) {
   const c = run.combat!;
@@ -1448,6 +1441,12 @@ function advance(run: SortieRun) {
       // Its turn begins: a shaken or stunned model just spends it.
       if (lostTurn(run, s, m)) { c.queue.shift(); continue; }
       c.need = 'turn';
+      c.acting = s.key;
+      return;
+    }
+    // A unit gets its order for the round when its first model's turn comes up.
+    if (!s.echo && !c.orders[s.key]) {
+      c.need = 'order';
       c.acting = s.key;
       return;
     }
@@ -1818,7 +1817,7 @@ export function skillTargets(run: SortieRun, skill: SortieSkill): string[] {
 /** Why a skill can't be used on this target now, or null. */
 export function skillProblem(run: SortieRun, id: string, target?: string): string | null {
   const c = run.combat;
-  if (!c || c.over || !c.need) return 'Not your move.';
+  if (!c || c.over || !c.need || c.need === 'start') return 'Not your move.';
   const sk = skillsOf(run, turnModel(run)).find((x) => x.id === id);
   if (!sk) return 'No such skill.';
   if (sk.blocked) return sk.blocked;
@@ -1843,7 +1842,14 @@ export function giveOrder(run: SortieRun, id: string, target?: string) {
   c.orders[s.key] = { skill: id, target };
   const sk = skillsFor(run, s).find((x) => x.id === id)!;
   log(c, `▸ ${s.name}: ${sk.name}${target ? ` on ${squadByKey(c, target)?.name}` : ''}.`, 'info');
-  nextOrder(run);
+  advance(run);
+}
+
+/** Start the round the game is waiting on: turns run fastest first, Echoes included, until a party unit is up. */
+export function startRound(run: SortieRun) {
+  const c = run.combat!;
+  if (c.need !== 'start') throw new Error('The round is already under way.');
+  advance(run);
 }
 
 /** A Hero's or lone model's own turn. */
@@ -2313,6 +2319,7 @@ export function autoChoice(run: SortieRun): { id: string; target?: string } | nu
 export function autoMove(run: SortieRun) {
   const c = run.combat;
   if (!c?.need) return;
+  if (c.need === 'start') return startRound(run);
   const p = autoChoice(run) ?? { id: 'atwill' };
   if (c.need === 'order') giveOrder(run, p.id, p.target);
   else act(run, p.id, p.target);

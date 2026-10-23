@@ -33,13 +33,13 @@ export default function WarRoomPanel({ c }: { c: Campaign }) {
   const shown = forces.find((f) => f.id === picked) ?? mine ?? league[0];
 
   if (forces.length === 0) {
-    return <div className="panel"><p className="muted">No force is fighting in this campaign yet: link one to a faction on its force page.</p></div>;
+    return <div className="panel"><p className="muted">No forces in this campaign yet. Link one to a faction on its force page.</p></div>;
   }
   return (
     <>
       <Panel id="campaign.league" title="War Room">
         <p className="muted small">
-          Every force's record from its battle log (patrols aside). VP and unit lines come from games played on the battle tracker.
+          Each force's record from its battle log, minus patrols. VP and unit lines come from battle tracker games.
         </p>
         <div className="table-wrap">
           <table className="compact">
@@ -103,7 +103,7 @@ function ForceDetail({ s }: { s: ForceStats }) {
 
       <h3>Units</h3>
       {s.units.length === 0
-        ? <p className="muted small">Unit lines come from games played on the battle tracker.</p>
+        ? <p className="muted small">Unit lines come from battle tracker games.</p>
         : (
           <div className="table-wrap">
             <table className="compact">

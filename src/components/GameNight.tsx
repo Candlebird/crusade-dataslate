@@ -44,9 +44,9 @@ export default function GameNightPanel({ c, setC, me, gm }: { c: Campaign; setC:
           </label>
         ))}
         <p className="muted small">
-          {!online ? 'Offline: the attacks from sealed orders appear once you are signed in.'
-            : !current ? 'No sealed orders are open for this campaign: everyone coming plays marauders or skirmishes.'
-            : !revealed ? 'Attacks appear once the GM reveals the orders; until then everyone is down for marauders or skirmishes.'
+          {!online ? 'Offline. Sign in to see attacks from sealed orders.'
+            : !current ? 'No sealed orders open. Everyone coming plays marauders or skirmishes.'
+            : !revealed ? 'Attacks appear once the GM reveals orders. Until then, everyone plays marauders or skirmishes.'
             : `${attacks.length} attack${attacks.length === 1 ? '' : 's'} revealed this round.`}
         </p>
       </Panel>

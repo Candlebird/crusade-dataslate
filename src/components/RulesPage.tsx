@@ -235,7 +235,7 @@ function TraitRules() {
     <>
       <div className="panel">
         <p style={{ marginTop: 0 }}>
-          What a unit can pick when it levels up: a trait from its category's table, or a weapon trait. How levelling works is
+          What a unit can pick on a level up: a trait from its category's table, or a weapon trait. Levelling is explained
           under Upgrades in the <a href={href.rules()}>Crusade rules</a>.
         </p>
         <Toc items={[['t-traits', 'Trait tables'], ['t-unique', 'Unique traits'], ['t-weapons', 'Weapon traits'], ['t-nexus', 'Nexus traits']]} />
@@ -307,7 +307,7 @@ function RelicRules() {
       </Section>
 
       <Section id="x-sortie" title="Sortie relics">
-        <p className="small">One for each Sortie region, brought home by following its story thread to the end and getting back alive (or beating its lord). Any unit of the force that can carry a relic takes it for free.</p>
+        <p className="small">One per Sortie region: follow its story thread to the end and get home alive (or beat its lord). Any unit of the force that can carry a relic takes it for free.</p>
         <RelicCase relics={RELICS.filter((r) => r.sortie)} />
       </Section>
 

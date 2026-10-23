@@ -71,18 +71,18 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
   const status = round && round.campaignId === c.id && <span className="muted small">Round {currentRound(c)} · orders #{round.round}{revealed ? ' · revealed' : ' · open'}</span>;
   // Every state renders in the same collapsible panel.
   const panel = (body: ReactNode) => <Panel id="campaign.orders" title="Sealed orders" extra={status}>{body}</Panel>;
-  if (!online || !cloud.email) return panel(<p className="muted small">Sign in to the campaign to declare sealed attack orders.</p>);
+  if (!online || !cloud.email) return panel(<p className="muted small">Sign in to declare sealed orders.</p>);
   if (round === undefined || !fb) return panel(<p className="muted small">Loading orders…</p>);
 
   const fail = (what: string) => (err: unknown) => toast(`Couldn't ${what}: ${errorText(err)}`, 'error');
   const nextRound = () => (round ? round.round + 1 : 1);
-  const open = () => fb.setRound({ campaignId: c.id, round: nextRound(), revealed: false }).then(() => toast('Orders are open. Players can now declare.'), fail('open the round'));
+  const open = () => fb.setRound({ campaignId: c.id, round: nextRound(), revealed: false }).then(() => toast('Orders open. Players can declare.'), fail('open the round'));
 
   if (!current) {
     return panel(
       <>
         <p className="muted small">
-          Before each game, every detachment picks a sector it can reach to move to or attack, or holds. Nobody sees anyone's picks until the GM reveals them.
+          Before each game, each detachment picks a sector in reach to move to or attack, or holds. Picks stay hidden until the GM reveals them.
         </p>
         {cloud.isGm ? <button className="primary" onClick={open}>Open orders for the next game</button> : <p className="muted small">Waiting for the GM to open orders.</p>}
       </>
@@ -106,7 +106,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
   };
   // Open the next set of orders, ending the campaign round first if the GM says so.
   const openNext = () => {
-    if (!confirmAction('Open orders for the next game? These orders will be hidden again.')) return;
+    if (!confirmAction('Open orders for the next game? These orders are hidden again.')) return;
     const spreads = spreadsAt(nextThreat(c));
     const exposed = echoMarks(c).filter((m) => {
       const s = c.sectors.find((x) => x.id === m.sectorId);
@@ -114,7 +114,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     }).length;
     const take = c.echoMarks?.round === currentRound(c)
       ? `the ${ECHOES.name} take ${exposed} marked sector${exposed === 1 ? '' : 's'} nobody holds` : `the ${ECHOES.name} spread ${spreads} sector${spreads === 1 ? '' : 's'}`;
-    if (confirmAction(`Also end round ${currentRound(c)}? Sector income is fixed for the round and ${take}. Cancel to keep playing this round.`)) endRound();
+    if (confirmAction(`Also end round ${currentRound(c)}? Sector income is fixed and ${take}. Cancel to keep playing this round.`)) endRound();
     open();
   };
   const reveal = () => {
@@ -127,8 +127,8 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     <>
       {!revealed && (
         <>
-          <p className="muted small">Your picks are sealed: only you can see them until the GM reveals the round. You can change them until then.</p>
-          {mine.length === 0 && <p className="muted small">Link one of your forces to a faction to declare orders for it.</p>}
+          <p className="muted small">Your picks are sealed: only you see them, and you can change them, until the GM reveals.</p>
+          {mine.length === 0 && <p className="muted small">Link a force to a faction to declare its orders.</p>}
           {mine.map((f) => {
             const { moves, attacks } = moveTargets(c, f);
             const at = positionOf(c, f);
@@ -212,10 +212,10 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
   const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
   // Off the table: set the attack up on the tracker for its auto-battle; finishing it there logs it like any battle.
   const autoBattle = (a: (typeof attacks)[number]) => {
-    if (state.battle) return toast('A battle is already running on the tracker: finish or discard it first.');
+    if (state.battle) return toast('A battle is already on the tracker. Finish or discard it first.');
     update((s) => void (s.battle = attackBattle(c, a, s.forces, s.books, s.settings)));
     go(href.tracker());
-    toast('Set up on the tracker: press ⚡ Auto-battle, then finish the battle to log the result.');
+    toast('On the tracker: press ⚡ Auto-battle, then finish to log it.');
   };
   if (!attacks.length && !moves.length && !holds.length) return <p className="muted small">Nobody declared this round.</p>;
   return (
@@ -233,7 +233,7 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
       {moves.length > 0 && gm && !moved && (
         <div className="row" style={{ margin: '4px 0 8px' }}>
           <button className="primary" disabled={unsettled > 0} onClick={makeMoves}
-            title={unsettled ? 'Settle the meeting engagements first' : 'Move every detachment whose move is still in reach; attackers move when they win their battle'}>
+            title={unsettled ? 'Settle the meeting engagements first' : 'Move every detachment still in reach. Attackers move when they win their battle'}>
             Move detachments
           </button>
           {unsettled > 0 && <span className="muted small">{unsettled} meeting engagement{unsettled === 1 ? '' : 's'} to settle first</span>}
@@ -257,9 +257,9 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
               <span className="row" style={{ gap: 4 }}>
                 <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}><Icon name="g:crossed-swords" /> Start battle</a>
                 {!block && mine ? (
-                  <button className="small" onClick={() => autoBattle(a)} title="The garrison is small enough to settle on the auto-battle instead of at the table. It can still go wrong."><Icon name="g:power-lightning" /> Overrun</button>
+                  <button className="small" onClick={() => autoBattle(a)} title="The garrison is small enough to auto-battle instead of playing at the table. It can still go wrong."><Icon name="g:power-lightning" /> Overrun</button>
                 ) : gm && sector ? (
-                  <button className="small" onClick={() => autoBattle(a)} title={`GM fallback, for an attack nobody can play at the table (no overrun: ${block})`}><Icon name="g:perspective-dice-six-faces-six" /> Auto-battle</button>
+                  <button className="small" onClick={() => autoBattle(a)} title={`GM fallback for an attack nobody can play at the table (no overrun: ${block})`}><Icon name="g:perspective-dice-six-faces-six" /> Auto-battle</button>
                 ) : null}
               </span>
             )}
@@ -267,7 +267,7 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
         );
       })}
       {holds.map((h) => (
-        <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds{dug(h.forceId) && <span className="tag" style={{ marginLeft: 6 }} title="If its sector is attacked this round, it fights the battle and picks the deployment"><Icon name="g:trench-spade" /> Dug in</span>}</span></div>
+        <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds{dug(h.forceId) && <span className="tag" style={{ marginLeft: 6 }} title="If its sector is attacked this round, it fights and picks the deployment"><Icon name="g:trench-spade" /> Dug in</span>}</span></div>
       ))}
     </>
   );
@@ -298,7 +298,7 @@ function MeetingRow({ c, m, round, gm, who, sectorName }: {
   });
   const settle = (winner: string, how: string, stories: string[] = []) => {
     edit((x) => settleMeeting(x, round, m.key, winner, stories));
-    toast(`${how}: ${winner ? `${who(winner)} wins and takes ${sectorName(m.sectorId)}` : 'a draw, both stay where they were'}.`);
+    toast(`${how}: ${winner ? `${who(winner)} wins and takes ${sectorName(m.sectorId)}` : 'a draw, both stay put'}.`);
   };
   const applyAuto = (r: AutoResult, stories: string[]) => settle(r.winner === 'A' ? m.sides[0] : r.winner === 'B' ? m.sides[1] : '', 'Auto-battle', stories);
   const stories = c.meetings?.round === round ? c.meetings.stories?.[m.key] ?? [] : [];
@@ -337,7 +337,7 @@ function MeetingRow({ c, m, round, gm, who, sectorName }: {
       {auto && (
         <AutoBattleModal b={auto} onClose={() => setAuto(null)} onApply={applyAuto}
           set={(fn) => setAuto((x) => { if (!x) return x; const y = structuredClone(x); fn(y); return y; })}
-          applyNote="The winner takes the hex, the loser falls back to its nearest sector. Losses don't carry over to the forces." />
+          applyNote="The winner takes the hex; the loser falls back to its nearest sector. The forces keep no losses." />
       )}
     </div>
   );

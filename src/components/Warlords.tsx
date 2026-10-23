@@ -21,7 +21,7 @@ export default function WarlordsPanel({ c, setC, faction, gm }: { c: Campaign; s
     if (stale) setC((d) => void syncWarlords(d, state.forces));
   }, [stale]); // eslint-disable-line react-hooks/exhaustive-deps
   const shown = c.factions.filter((f) => !faction || f.id === faction);
-  if (!shown.length) return <div className="panel"><p className="muted">No factions yet. Add them on the Map tab, and each one can name a Warlord here.</p></div>;
+  if (!shown.length) return <div className="panel"><p className="muted">No factions yet. Add them on the Map tab, then name their Warlords here.</p></div>;
   return (
     <Panel id="campaign.warlords" title="Warlords" lead={
       <div className="tech-head">
@@ -62,7 +62,7 @@ function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: Campai
     if (!chosen) return;
     const p = f.path ? undefined : pathPick || undefined;
     if (!f.path && !p) return toast('Pick a Path for the Warlord.');
-    if (!f.path && !confirmAction(`Make ${chosen.unit.name} ${f.name}'s Warlord on the Path of the ${pathById(p)!.name}? Changing the Path later puts the Warlord back to level 1.`)) return;
+    if (!f.path && !confirmAction(`Make ${chosen.unit.name} ${f.name}'s Warlord on the Path of the ${pathById(p)!.name}? Changing Path later resets the Warlord to level 1.`)) return;
     let ok = false;
     setC((d) => {
       // The store's copies of the force and unit, so chooseWarlord can check them.
@@ -74,22 +74,22 @@ function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: Campai
   };
 
   const stepDown = () => {
-    if (!f.warlord || !confirmAction(`${f.warlord.name} stops being ${f.name}'s Warlord? Its perks go, and a new Warlord can be named ${WARLORDS.replaceAfter} round${WARLORDS.replaceAfter === 1 ? '' : 's'} from now.`)) return;
+    if (!f.warlord || !confirmAction(`${f.warlord.name} stops being ${f.name}'s Warlord? Its perks go; a new one can be named in ${WARLORDS.replaceAfter} round${WARLORDS.replaceAfter === 1 ? '' : 's'}.`)) return;
     setC((d) => loseWarlord(d, f.id));
   };
 
   const switchPath = () => {
     const p = pathById(newPath);
-    if (!f.warlord || !p || !confirmAction(`Change ${f.name}'s Path to the ${p.name}? ${f.warlord.name} starts back at level 1 as Warlord (its own XP and level stay), and levels up again with the XP it gains from now on.`)) return;
+    if (!f.warlord || !p || !confirmAction(`Change ${f.name}'s Path to the ${p.name}? ${f.warlord.name} restarts at Warlord level 1 (its own XP and level stay) and levels up with XP gained from now on.`)) return;
     let ok = false;
     setC((d) => void (ok = changePath(d, f.id, p.id, state.forces)));
-    toast(ok ? `${f.name} follows the Path of the ${p.name}.` : `Can't change the Path: ${f.warlord.name}'s force isn't loaded here.`);
+    toast(ok ? `${f.name} follows the Path of the ${p.name}.` : `Can't change Path: ${f.warlord.name}'s force isn't on this device.`);
     setNewPath('');
   };
 
   const revive = () => {
     const who = f.fallenWarlord?.name;
-    if (!confirmAction(who ? `Bring back ${who} as ${f.name}'s Warlord? (If it can't come back, the wait for a new one is lifted.)` : `Lift the wait so ${f.name} can name a Warlord now?`)) return;
+    if (!confirmAction(who ? `Bring back ${who} as ${f.name}'s Warlord? (If it can't, the wait for a new one is lifted.)` : `Lift the wait so ${f.name} can name a Warlord now?`)) return;
     let name: string | undefined;
     setC((d) => void (name = reviveWarlord(d, f.id, state.forces)));
     toast(name ? `${name} is ${f.name}'s Warlord again.` : `${f.name} can name a Warlord now.`);

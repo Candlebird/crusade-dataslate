@@ -5,7 +5,7 @@ import { aiDefended, modifierOf, ratingFor } from '../rules/difficulty';
 export default function SectorDanger({ s, factionId }: { s: Sector; factionId?: string }) {
   const rating = ratingFor(s, factionId);
   if (s.type === 'home') return null;
-  if (rating === undefined) return <p className="small muted">Not rated yet: the GM rates sectors from the Round panel.</p>;
+  if (rating === undefined) return <p className="small muted">Not rated yet. The GM rates sectors from the Round panel.</p>;
   const mods = (s.modifiers ?? []).map(modifierOf).filter((m) => !!m);
   return (
     <div className="small" style={{ margin: '0.5rem 0' }}>

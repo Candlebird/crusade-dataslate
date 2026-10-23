@@ -14,10 +14,10 @@ import {
 import { Modal, confirmAction, toast } from './ui';
 
 const TASK_DESC: Record<Exclude<UnitTaskKind, 'sortie'>, string> = {
-  mentor: `A veteran teaches a lower-level unit of its own category: the pupil gains +${MENTORING.xpPerLevel} XP per mentor level. Both units are busy.`,
-  project: `Work on one of your worlds: add a D${PROJECT_DIE} of progress to its Project (one per world). It pays out when it reaches its goal.`,
-  recon: `Scout a sector up to ${RECON.range} hexes from your sectors and detachments: it and the hexes around it are in sight for ${RECON.rounds} rounds.`,
-  garrison: `Stand guard on one of your worlds. If Marauders raid it, a garrison of at least half the band's Supply throws them back; a smaller one halves the theft. Each unit there earns +${GARRISON.raidXp} XP when a raid comes.`,
+  mentor: `A veteran teaches a lower-level unit of its category. The pupil gains +${MENTORING.xpPerLevel} XP per mentor level. Both units are busy.`,
+  project: `Add D${PROJECT_DIE} progress to a world's Project (1 per world). It pays out at its goal.`,
+  recon: `Scout a sector up to ${RECON.range} hexes from your sectors or detachments. It and its neighbors stay in sight for ${RECON.rounds} rounds.`,
+  garrison: `Guard one of your worlds. A garrison worth at least half a Marauder band's Supply throws it back. A smaller one halves the theft. Each unit earns +${GARRISON.raidXp} XP per raid.`,
 };
 
 /** Set one unit (two for Mentoring) to a downtime task for the round. They're busy and fight in no battle until it ends. */
@@ -57,7 +57,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
     : null;
 
   const busyNames = unit ? [unit, ...(task === 'mentor' && pupil ? [pupil] : [])].map(unitName).join(' and ') : '';
-  const warning = busyNames && `${busyNames} will be busy for the rest of round ${currentRound(c)}: unable to fight in any battle, the round's main Battle included, or go on a patrol or Expedition.`;
+  const warning = busyNames && `${busyNames} can't fight, patrol or go on an Expedition for the rest of round ${currentRound(c)}, including the main Battle.`;
 
   const apply = () => {
     if (problem || !confirmAction(`${warning}\n\nSet ${TASK_NAMES[task]}?`)) return;
@@ -153,7 +153,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
               </select>
             </label>
             {on
-              ? <p className="span-all small" style={{ margin: 0 }}>Under way on {sector!.name}: <b>{on.progress}/{projectById(on.id)?.goal}</b>. One project per world, so this unit works on it.{on.log.length > 0 && <span className="muted"> {on.log.join(' · ')}</span>}</p>
+              ? <p className="span-all small" style={{ margin: 0 }}>Under way on {sector!.name}: <b>{on.progress}/{projectById(on.id)?.goal}</b>. 1 project per world, so this unit works on it.{on.log.length > 0 && <span className="muted"> {on.log.join(' · ')}</span>}</p>
               : def && <p className="span-all muted small" style={{ margin: 0 }}>{def.desc}</p>}
           </>
         )}
@@ -162,7 +162,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
           <label className="field span-all">
             Sector to scout
             <select value={sectorId} onChange={(e) => setSectorId(e.target.value)}>
-              <option value="">{targets.length ? '— choose —' : 'Nothing in range (place sectors on the map)'}</option>
+              <option value="">{targets.length ? '— choose —' : 'Nothing in range: place sectors on the map'}</option>
               {targets.map((s) => <option key={s.id} value={s.id}>{s.name} · sees {reconArea(c, s).length} sectors</option>)}
             </select>
           </label>
@@ -171,7 +171,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
         {task === 'garrison' && sector && (
           <p className="span-all small" style={{ margin: 0 }}>
             {g ? `${garrisonPoints(g)} pts already on guard (${g.units.map((x) => x.name).join(', ')}).` : 'No garrison there yet.'}
-            {unit && <> With {unitName(unit)}: <b>{(g ? garrisonPoints(g) : 0) + unit.points} pts</b>, enough to throw back a band of up to {Math.floor(((g ? garrisonPoints(g) : 0) + unit.points) / GARRISON.holdShare)} Supply.</>}
+            {unit && <> With {unitName(unit)}: <b>{(g ? garrisonPoints(g) : 0) + unit.points} pts</b>, throws back a band of up to {Math.floor(((g ? garrisonPoints(g) : 0) + unit.points) / GARRISON.holdShare)} Supply.</>}
           </p>
         )}
 

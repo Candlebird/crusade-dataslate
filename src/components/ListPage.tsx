@@ -56,7 +56,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
   };
 
   const remove = () => {
-    if (!confirmAction(`Delete the list "${l.name}"? The units themselves are not affected.`)) return;
+    if (!confirmAction(`Delete the list "${l.name}"? Its units stay in the force.`)) return;
     updateForce(f.id, (d) => void (d.lists = (d.lists ?? []).filter((x) => x.id !== l.id)));
     toast(`Deleted "${l.name}".`);
     go(href.force(f.id));
@@ -161,7 +161,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
               </div>
               {l.glossary && !state.coreRules?.length && (
                 <p className="small muted" style={{ marginBottom: 0 }}>
-                  Core rules like Hero and Fearless only get descriptions once you import them on the <a href={href.books()}>Army Books</a> page.
+                  Import core rules on the <a href={href.books()}>Army Books</a> page to print descriptions for rules like Hero and Fearless.
                 </p>
               )}
             </Panel>

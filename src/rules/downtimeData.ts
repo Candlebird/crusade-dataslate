@@ -459,7 +459,7 @@ export const PROJECTS: ProjectDef[] = [
   { id: 'salvage', name: 'Salvage', goal: 4, desc: 'Strip wrecks and old works: +150 Materials into the world\'s bank.', reward: { materials: 150 } },
   { id: 'research', name: 'Research', goal: 6, desc: 'Study what the world holds: +2 Research for the faction.', reward: { research: 2 } },
   { id: 'relic', name: 'Forge a relic', goal: 8, desc: 'A free Common relic, taken in the Requisition shop by the force that finishes it.', reward: { relic: 'Common' } },
-  { id: 'rareRelic', name: 'Forge a rare relic', goal: 18, desc: 'A long work: a free Rare relic, taken in the Requisition shop by the force that finishes it.', reward: { relic: 'Rare' } },
+  { id: 'rareRelic', name: 'Forge a rare relic', goal: 18, desc: 'A free Rare relic, taken in the Requisition shop by the force that finishes it.', reward: { relic: 'Rare' } },
 ];
 
 /**
@@ -622,7 +622,7 @@ export const TRAINING_ENEMIES: Record<TrainingEnemyKind, TrainingEnemyDef> = {
   spitter: { name: 'Spitter', desc: 'Spits hard as it comes on (3 tiles); weak in melee.', hp: 5, speed: 0.9, armor: 0, attacks: 1, quality: 4, ap: 0, gun: { range: 3, attacks: 3, ap: 0 }, cost: 3, from: 2, spawn: 'main', color: '#7fbf6a', size: 0.22, shape: 'pentagon' },
   outrider: { name: 'Outrider', desc: 'Scout: races in from the opposite side as the wave starts, shooting (3 tiles).', hp: 5, speed: 2, armor: 0, attacks: 2, quality: 4, ap: 0, gun: { range: 3, attacks: 1, ap: 0 }, cost: 3, from: 2, spawn: 'scout', color: '#e0a040', size: 0.22, shape: 'chevron' },
   carapace: { name: 'Carapace', desc: 'Armour 1: each hit does 1 less damage. Bring AP. Shoots on the move (4 tiles).', hp: 10, speed: 0.8, armor: 1, attacks: 2, quality: 4, ap: 1, gun: { range: 4, attacks: 2, ap: 0 }, cost: 4, from: 3, spawn: 'main', color: '#6c7a89', size: 0.28, shape: 'hexagon' },
-  mirror: { name: 'Mirrorshell', desc: 'Its mirrored hide turns shots: shooting does less than half its damage, but melee does half again as much. Meet it with blades.', hp: 10, speed: 0.85, armor: 0, attacks: 3, quality: 4, ap: 1, shotMul: 0.4, meleeMul: 1.5, cost: 5, from: 4, spawn: 'main', color: '#a8dce8', size: 0.3, shape: 'shield' },
+  mirror: { name: 'Mirrorshell', desc: 'Mirrored hide: shots do 40% damage, melee 150%. Meet it with blades.', hp: 10, speed: 0.85, armor: 0, attacks: 3, quality: 4, ap: 1, shotMul: 0.4, meleeMul: 1.5, cost: 5, from: 4, spawn: 'main', color: '#a8dce8', size: 0.3, shape: 'shield' },
   stalker: { name: 'Stalker', desc: 'Ambush: appears mid-wave, close in on the opposite side.', hp: 7, speed: 1.3, armor: 0, attacks: 3, quality: 4, ap: 1, cost: 4, from: 3, spawn: 'ambush', color: '#b05cc8', size: 0.24, shape: 'star' },
   brute: { name: 'Brute', desc: 'Slow, huge, and hits hard. Shoots on the move (3 tiles).', hp: 22, speed: 0.6, armor: 0, attacks: 4, quality: 3, ap: 1, gun: { range: 3, attacks: 2, ap: 1 }, cost: 6, from: 4, spawn: 'main', color: '#c0583e', size: 0.34, shape: 'spikes' },
   lord: { name: 'Echo Lord', desc: `Every ${TRAINING.bossEvery}th wave. Armour 1. Shoots on the move (5 tiles).`, hp: 80, speed: 0.5, armor: 1, attacks: 6, quality: 3, ap: 2, gun: { range: 5, attacks: 3, ap: 1 }, cost: 20, from: 1, spawn: 'boss', color: '#e04a6a', size: 0.45, shape: 'crown' },
@@ -932,7 +932,7 @@ export const SORTIE_BOONS: Record<SortieBoonId, {
   adrenal: { curse: true, name: 'Adrenal Surge', text: '+2 initiative for every model, but -1 to every morale test.' },
   hymn: { name: 'Battle Hymn', text: 'The party takes half the stress.' },
   respite: { name: 'Brief Respite', text: 'Every fight won takes 2 more stress off each unit.' },
-  lantern: { name: 'Pathfinder’s Lantern', text: 'Every hidden node on the map shows, and the party sees a step further ahead.' },
+  lantern: { name: 'Pathfinder’s Lantern', text: 'Shows every hidden node on the map, and the party sees a step further ahead.' },
   scavenge: { name: 'Scavenger', text: 'Every fight won adds half again to the haul.', shard: true },
 };
 

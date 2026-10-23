@@ -72,8 +72,8 @@ export default function BooksPage() {
 
       <Panel id="books.add" title="Add an army book">
         <p className="small" style={{ marginTop: 0 }}>
-          On Army Forge, open the army and use <b>Share</b> (or copy the page address), then paste the link here. The book is saved for the
-          whole group, and <b>Refresh</b> pulls in later changes.
+          On Army Forge, open the army, use <b>Share</b> (or copy the address) and paste the link here. The whole group gets the book;
+          <b>Refresh</b> pulls in later changes.
         </p>
         <div className="row">
           <input
@@ -91,14 +91,14 @@ export default function BooksPage() {
         {have && <p className="muted small">"{have.name}" is already imported. Importing again refreshes it.</p>}
         {!proxy && (
           <p className="small" style={{ color: 'var(--warn)' }}>
-            Fetching from Army Forge needs the proxy, which isn't set up yet (see <a href={href.settings()}>Settings</a>). Import by file below instead.
+            Fetching from Army Forge needs the proxy, set up in <a href={href.settings()}>Settings</a>. Until then, import by file below.
           </p>
         )}
         <details style={{ marginTop: '0.75rem' }}>
           <summary className="small">Private book, or the fetch fails? Import by file</summary>
           <p className="muted small">
-            Army Forge only shares a private book with its creator. Make it public or unlisted in the Army Forge book editor, or, while
-            signed in to Army Forge as its creator, save the book's JSON and drop it here.
+            Army Forge only shares a private book with its creator. Make it public or unlisted in its book editor, or sign in as its
+            creator, save the book's JSON and drop it here.
           </p>
           {bookUid && (
             <p>

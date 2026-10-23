@@ -31,13 +31,13 @@ export function JoinPanel() {
     <div className="panel notice">
       {cloud.requested ? (
         <div className="row">
-          <span>You've asked to join the campaign as <b>{cloud.email}</b>. Once the GM accepts, your forces start syncing.</span>
+          <span>Request sent as <b>{cloud.email}</b>. Your forces sync once the GM accepts.</span>
           <span className="spacer" />
           <button disabled={busy} onClick={() => run(cloud.withdrawRequest)}>Cancel request</button>
         </div>
       ) : (
         <div className="row">
-          <span><b>{cloud.email}</b> isn't in the campaign yet. Ask to join, and the GM can let you in.</span>
+          <span><b>{cloud.email}</b> isn't in the campaign yet. Ask the GM to let you in.</span>
           <span className="spacer" />
           <button className="primary" disabled={busy} onClick={() => run(cloud.requestJoin, 'Request sent to the GM.')}>Request to join</button>
           <button className="ghost" onClick={cloud.signOut}>Sign out</button>
@@ -84,7 +84,7 @@ export function PlayersPanel() {
             className="ghost"
             disabled={busy}
             onClick={() => {
-              if (window.confirm(`Remove ${m.email} from the campaign? Their forces stay, but they can't sync until you add them again.`))
+              if (window.confirm(`Remove ${m.email}? Their forces stay, but they can't sync until you re-add them.`))
                 run(() => cloud.removePlayer(m.email), `Removed ${m.email}.`);
             }}
           >
@@ -97,7 +97,7 @@ export function PlayersPanel() {
         <button disabled={busy || !email.trim()} onClick={add}>Add</button>
       </div>
       <p className="muted small" style={{ marginTop: '0.5rem' }}>
-        New players sign in with Google and press <b>Request to join</b>; their request shows up here.
+        New players sign in with Google and press <b>Request to join</b>. Requests show up here.
       </p>
     </div>
   );

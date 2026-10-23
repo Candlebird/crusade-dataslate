@@ -123,7 +123,7 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
                 <span key={i} className="muted small" title="Already had — rerolled"><s>{r} {group.entries[r - 1].name}</s></span>
               ))}
               {rolled != null && <span className="dice-result">{rolled}</span>}
-              {rolled != null && <span><Icon name="l:arrow-right" /> {group.entries[rolled - 1].name}{isOwned(group.entries[rolled - 1]) ? ' (already had — nothing left to reroll into)' : ''}</span>}
+              {rolled != null && <span><Icon name="l:arrow-right" /> {group.entries[rolled - 1].name}{isOwned(group.entries[rolled - 1]) ? ' (already had, nothing new to reroll)' : ''}</span>}
             </div>
           )}
           <div className="pick-list">
@@ -147,7 +147,7 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
       )}
       <label className="field" style={{ marginTop: '0.75rem' }}>
         {customLabel}
-        <input value={custom} placeholder="Type a name to use something not on the table…" onChange={(e) => { setCustom(e.target.value); setSelected(null); }} />
+        <input value={custom} placeholder="Or type a name not on the table…" onChange={(e) => { setCustom(e.target.value); setSelected(null); }} />
       </label>
     </Modal>
   );

@@ -114,7 +114,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
       const mvp = state.forces.find((f) => f.id === cg.mvp);
       toast(cg.result === 'won'
         ? `The Echo Lord is defeated!${mvp ? ` MVP: ${mvp.name}, who takes a ${NEXUS_CRISIS.mvpTier} relic.` : ''} Each side claims its rewards from the battle.`
-        : 'The Echo Lord still stands. Unless the Crisis is won before the round ends, the Echoes take a sector from each faction.');
+        : 'The Echo Lord stands. Win the Crisis before the round ends, or the Echoes take a sector from each faction.');
     }
     go(href.tracker());
   };
@@ -129,7 +129,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
         <div className="row">
           <a className="btn" href={href.missions()}>Mission library</a>
           {!b.ended && <button onClick={() => setAuto(true)} disabled={!!autoBlock}
-            title={autoBlock ? `Play this one at the table (no overrun: ${autoBlock}); the GM can still settle it on the auto-battle` : 'No time to play it out? Let the units fight it out on their stats'}><Icon name="g:power-lightning" /> Auto-battle</button>}
+            title={autoBlock ? `Play this one at the table (no overrun: ${autoBlock}). The GM can still auto-battle it.` : 'Let the units fight it out on their stats'}><Icon name="g:power-lightning" /> Auto-battle</button>}
           {!b.ended && <button className="primary" onClick={() => set((d) => void (d.ended = true))}>End battle</button>}
           <button className="danger" onClick={() => confirmAction('Throw away this battle?') && update((s) => void delete s.battle)}>Discard</button>
         </div>
@@ -138,8 +138,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
       {sector && b.sectorId !== sector.id && (
         <div className="panel">
           <p>
-            You came from the Nexus Wars map to fight over <b>{sector.name}</b>, but this battle is still running.
-            Finish or discard it first, or fight this one over {sector.name}.
+            Another battle is still running. Finish or discard it first, or fight this one over <b>{sector.name}</b>.
           </p>
           <div className="row">
             <button className="primary" onClick={() => { set((d) => void (d.sectorId = sector.id)); go(href.tracker()); }}>Fight this battle over {sector.name}</button>
@@ -150,7 +149,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
 
       {crisis && !b.crisis && (
         <div className="panel">
-          <p>You came to fight the Nexus Crisis, but this battle is still running. Finish or discard it first.</p>
+          <p>Another battle is still running. Finish or discard it before fighting the Nexus Crisis.</p>
         </div>
       )}
 
@@ -193,7 +192,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
           }
         >
           <p className="muted small">
-            Tap a marker to change who holds it at the end of round {b.round}. {objectiveScoring(b.mission)}
+            Tap a marker to set who holds it at the end of round {b.round}. {objectiveScoring(b.mission)}
           </p>
           <div className="markers">
             {(b.control[b.round - 1] ?? []).map((h, i) => (
@@ -260,7 +259,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
             <span className="row">
               <button onClick={() => set((d) => void addSide(d, TEAMS.find((t) => !teamsOf(d).includes(t)) ?? 'A'))}>+ Add player</button>
               <button onClick={() => set((d) => void addSide(d, TEAMS.find((t) => !teamsOf(d).includes(t)) ?? 'A', true))}>+ Add AI</button>
-              <span className="muted small">Put players on the same team to share objectives and VP.</span>
+              <span className="muted small">Teammates share objectives and VP.</span>
             </span>
           </div>
           <div className="field">
@@ -376,7 +375,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
         <div className="row"><a className="btn" href={href.missions()}>Mission library</a></div>
       </div>
       <Panel id="battle.start" title="Start a battle">
-        <p className="muted">Pick who's playing and a mission, then load each side's force on the next screen. The battle is kept on this device until you finish or discard it.</p>
+        <p className="muted">Pick players and a mission, then load each side's force on the next screen. The battle stays on this device until you finish or discard it.</p>
         {c && wantCrisis && !crisis && <p className="small"><span className="tag red">There is no Nexus Crisis this round.</span> <a href={href.tracker()}>Start an ordinary battle</a></p>}
         {c && crisis && (
           <>
@@ -386,11 +385,11 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
               {lordById(crisis.lord)?.desc}
             </p>
             <p className="small">
-              Every faction fights together on team A against the {ECHOES.name}; each faction with a single force has it loaded. Generate the {ECHOES.name}' army
-              to match your points: their most expensive unit is the Lord (+{NEXUS_CRISIS.lordVp} VP for destroying it). When you finish, the result goes into
-              the campaign log. Win and the threat drops; the side whose units earned the most XP is MVP and takes a {NEXUS_CRISIS.mvpTier} relic.
+              Every faction fights together on team A against the {ECHOES.name}. A faction with only 1 force has it loaded.
+              Generate the {ECHOES.name}' army to match your points. Their most expensive unit is the Lord (+{NEXUS_CRISIS.lordVp} VP to destroy it).
+              The result goes into the campaign log. Win and the threat drops. The side whose units earned the most XP is MVP and takes a {NEXUS_CRISIS.mvpTier} relic.
             </p>
-            {crisis.battleId && <p className="small"><span className="tag red">Already fought: {crisis.result}</span> Only the first Crisis battle counts; delete its log entry to fight it again.</p>}
+            {crisis.battleId && <p className="small"><span className="tag red">Already fought: {crisis.result}</span> Only the first Crisis battle counts. Delete its log entry to fight it again.</p>}
           </>
         )}
         {c && sector && (
@@ -398,11 +397,11 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
             <h3>Nexus Wars</h3>
             <p className="small">
               Fighting over <b>{sector.name}</b> <span className="tag">{SECTOR_TYPES[sector.type].label}</span>, held by <b>{factionName(c, sector.owner)}</b>.
-              Team A attacks; everyone else defends. When you finish, the result goes into the campaign log and the map.
+              Team A attacks; everyone else defends. The result goes into the campaign log and the map.
             </p>
             <SectorDanger s={sector} factionId={attacker} />
             {aiDefended(sector) && ratingFor(sector, attacker) !== undefined && (
-              <p className="muted small">The {ECHOES.name} hold it with a {ratingFor(sector, attacker)}-Supply garrison: play <b>1 v AI</b> and generate their army at that size. The modifiers favour the defender.</p>
+              <p className="muted small">The {ECHOES.name} hold it with a {ratingFor(sector, attacker)}-Supply garrison. Play <b>1 v AI</b> and generate their army at that size. Modifiers favour the defender.</p>
             )}
             {homeChallengeBlock(c, sector) && <p className="small"><span className="tag red">{homeChallengeBlock(c, sector)}</span> Check with the GM before playing this one.</p>}
             <label className="field">
@@ -411,11 +410,11 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
                 {c.factions.map((f) => <option key={f.id} value={f.id} disabled={f.id === sector.owner}>{f.name}</option>)}
               </select>
             </label>
-            <p className="muted small">The attacking detachment from the orders, or a faction's only force, is loaded for you. <a href={href.tracker()}>Start an ordinary battle instead</a></p>
+            <p className="muted small">The attacking detachment from the orders, or the faction's only force, loads for you. <a href={href.tracker()}>Start an ordinary battle instead</a></p>
             {sector.owner && sector.owner !== ECHOES.id && (
               <p className="small">
-                <b>{factionName(c, sector.owner)} can't make it?</b> The {ECHOES.name} stand in: play <b>1 v AI</b> and generate their army at your points
-                {isReinforced(sector) ? ` +${NEXUS_REINFORCE_BONUS} (the sector is Reinforced)` : ''}. If they win, {factionName(c, sector.owner)} holds the sector.{' '}
+                <b>{factionName(c, sector.owner)} can't make it?</b> The {ECHOES.name} stand in. Play <b>1 v AI</b> and generate their army at your points
+                {isReinforced(sector) ? ` +${NEXUS_REINFORCE_BONUS} (Reinforced)` : ''}. If they win, {factionName(c, sector.owner)} keeps the sector.{' '}
                 {format.label !== '1 v AI' && <button className="ghost small" onClick={() => choose(FORMATS.find((f) => f.label === '1 v AI')!)}>Use a stand-in</button>}
               </p>
             )}
@@ -433,10 +432,10 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
           <label className="row"><input type="checkbox" checked={withAi} onChange={(e) => { setWithAi(e.target.checked); if (!e.target.checked) setPlayers((n) => Math.max(2, n)); }} />Include AI</label>
           <label className="row"><input type="checkbox" checked={pickForces} onChange={(e) => setPickForces(e.target.checked)} />Random forces</label>
           <label className="row"><input type="checkbox" checked={pickMission} onChange={(e) => setPickMission(e.target.checked)} />Random mission</label>
-          <button onClick={randomize} title="Split the players into random teams (or all against the AI), and roll forces and a mission if ticked"><Icon name="g:perspective-dice-six-faces-six" /> Randomize</button>
+          <button onClick={randomize} title="Split players into random teams (or all vs the AI). Rolls forces and a mission if ticked."><Icon name="g:perspective-dice-six-faces-six" /> Randomize</button>
         </div>
-        {forces.length > 0 && <p className="small">Forces, in side order: {forces.map((f) => { const t = forceTotals(f, state.settings); return `${f.name} (${t.pointsUsed} pts, ${t.bp} BP)`; }).join(', ')}. You can swap them once the battle starts.</p>}
-        <p className="muted small">Teams share objectives and VP. You can add, remove or regroup players once the battle starts.</p>
+        {forces.length > 0 && <p className="small">Forces, in side order: {forces.map((f) => { const t = forceTotals(f, state.settings); return `${f.name} (${t.pointsUsed} pts, ${t.bp} BP)`; }).join(', ')}. Swap them once the battle starts.</p>}
+        <p className="muted small">Teams share objectives and VP. Add, remove or regroup players once the battle starts.</p>
         {groups.map(([group, list]) => (
           <div key={group}>
             <h3>{group}</h3>
@@ -475,10 +474,10 @@ function SoloPatrol({ mission }: { mission?: MissionDef }) {
   return (
     <Panel id="battle.patrol" title="Solo patrol" extra={<span className="tag cyan">Downtime</span>}>
       <p className="muted small">
-        Can't get the group together? Send up to {SOLO_PATROL.points} pts of one force out on patrol ({mission?.name ?? 'the mission picked above'}). It runs into {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts
-        of the {ECHOES.name}: fight them against the AI, or turn back for +{SOLO_PATROL.declineXp} XP each. Units earn participation and kill XP only — no RP or reward rolls.
-        In a campaign, a win counts as a patrol against the {ECHOES.name} and earns a Strategic Asset; each force can record one patrol per campaign round.
-        You can also send a patrol out from the force's page.
+        No group tonight? Send up to {SOLO_PATROL.points} pts of one force on patrol ({mission?.name ?? 'the mission picked above'}). It meets {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts
+        of the {ECHOES.name}: fight them vs the AI, or turn back for +{SOLO_PATROL.declineXp} XP each. Units earn participation and kill XP only, no RP or reward rolls.
+        In a campaign, a win counts as a patrol against the {ECHOES.name} and earns a Strategic Asset. Each force can record 1 patrol per campaign round.
+        You can also send one from the force's page.
       </p>
       <div className="row">
         <select value={forceId} onChange={(e) => setForceId(e.target.value)}>
@@ -506,7 +505,7 @@ function PastBattles() {
   });
   const past = onlyMine ? waiting : all;
   const remove = (x: FinishedBattle) =>
-    confirmAction(`Delete ${x.mission.name} from ${localDate(x.finishedAt)} for the whole group? Rewards already claimed stay in each force's log.`) &&
+    confirmAction(`Delete ${x.mission.name} (${localDate(x.finishedAt)}) for the whole group? Claimed rewards stay in each force's log.`) &&
     update((s) => void (s.battleHistory = s.battleHistory?.filter((y) => y.id !== x.id)));
   return (
     <Panel
@@ -524,8 +523,8 @@ function PastBattles() {
         </span>
       }
     >
-      {!all.length && <p className="muted">No finished battles yet. End a battle, then <b>Finish & save result</b> to keep it here for everyone.</p>}
-      {all.length > 0 && !past.length && <p className="muted">Nothing waiting on you. Every battle your forces played has been claimed.</p>}
+      {!all.length && <p className="muted">No finished battles yet. End a battle, then <b>Finish & save result</b> to share it here.</p>}
+      {all.length > 0 && !past.length && <p className="muted">Nothing waiting on you. All your forces' battles are claimed.</p>}
       {past.map((x) => {
         const sc = score(x);
         const done = claims(x, state.forces);
@@ -587,9 +586,9 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
       <div className="panel-title">
         <h2>{title} · {b.auto ? `auto-battle, ${teams.map((t) => b.auto!.dealt[t] ?? 0).join('–')} pts destroyed` : teams.map((t) => sc[t]!.total).join('–')}</h2>
         <button className="ghost" onClick={() => set((d) => { d.ended = false; delete d.auto; })}
-          title={b.auto ? 'Back to the tracker. The auto-battle result is dropped, but its losses and kill XP stay on the units.' : undefined}>Resume</button>
+          title={b.auto ? 'Back to the tracker. Drops the auto-battle result, but its losses and kill XP stay on the units.' : undefined}>Resume</button>
       </div>
-      <p className="muted small">Record the result in each crusade force's log. The wizard is filled in from this battle: check it, then apply.</p>
+      <p className="muted small">Record the result in each crusade force's log. The wizard is pre-filled from this battle: check it, then apply.</p>
       <div className="row">
         {b.sides.map((s) => {
           if (!s.forceId) return <span key={s.id} className="muted small">{s.name}: no force loaded.</span>;
@@ -602,7 +601,7 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
         <p className="small" style={{ marginTop: '0.75rem' }}>
           <b>Nexus Wars.</b>{' '}
           {'problem' in game
-            ? <span style={{ color: 'var(--warn)' }}>{game.problem} Until then, finishing won't touch the campaign: you can still record it by hand on the Nexus Wars page.</span>
+            ? <span style={{ color: 'var(--warn)' }}>{game.problem} Until then, finishing won't touch the campaign. You can still record it by hand on the Nexus Wars page.</span>
             : <>Finishing adds this to the campaign log: {factionName(c, game.event.attacker)} attacking {factionName(c, game.event.defender)}, {game.event.winner ? `${factionName(c, game.event.winner)} wins` : 'a draw'}. {sectorEffect(c, game.event) || "The sector doesn't change hands."}</>}
         </p>
       )}
@@ -610,17 +609,17 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
         <p className="small" style={{ marginTop: '0.75rem' }}>
           <b>Nexus Crisis.</b>{' '}
           {c.crisis?.battleId
-            ? "The Crisis was already settled by an earlier battle: finishing this one won't change it."
+            ? "An earlier battle already settled the Crisis. This one won't change it."
             : crisis.result === 'won'
               ? <>Finishing marks the Crisis won.{' '}
                 {crisis.mvp
                   ? <>MVP, for the most XP: <b>{state.forces.find((f) => f.id === crisis.mvp)?.name ?? 'a force not on this device'}</b>, who takes a {NEXUS_CRISIS.mvpTier} relic.</>
                   : `No unit earned XP, so there's no MVP.`}</>
-              : `Finishing marks the Crisis lost: when the round ends the ${ECHOES.name} take a sector from each faction.`}
+              : `Finishing marks the Crisis lost. When the round ends, the ${ECHOES.name} take a sector from each faction.`}
         </p>
       )}
       <div className="row" style={{ marginTop: '0.75rem' }}>
-        <span className="muted small">Done? Finishing shares the battle with the group under Past battles, where anyone who hasn't recorded it yet can still claim their rewards.</span>
+        <span className="muted small">Finishing shares the battle under Past battles. Anyone who hasn't recorded it can claim their rewards there.</span>
         <span className="spacer" />
         <button className="primary" onClick={onFinish}><Icon name="l:check" /> Finish & save result</button>
       </div>
@@ -717,7 +716,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
               <div className="row">
                 <Stepper value={target} step={50} min={50} onChange={setTarget} />
                 <span className="small muted">pts</span>
-                <button onClick={generate} title="Build a random army from the Void Echoes book, up to the target points"><Icon name="g:perspective-dice-six-faces-six" /> Generate</button>
+                <button onClick={generate} title="Build a random Void Echoes army up to the target points"><Icon name="g:perspective-dice-six-faces-six" /> Generate</button>
                 {!!garrison && garrison !== target && <button className="ghost small" onClick={() => setTarget(garrison)} title="The sector's difficulty rating">Sector garrison {garrison} pts</button>}
                 {enemies > 0 && enemies !== target && <button className="ghost small" onClick={() => setTarget(enemies)}>Match {enemies} pts{reinforced ? ' (Reinforced)' : ''}</button>}
                 {!!side.roster?.length && <a className="btn" href={href.sideSheet(side.id)}><Icon name="l:file-text" /> Army sheet</a>}
@@ -782,7 +781,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
 
       <h3>Units</h3>
       {side.units.length === 0 && <p className="muted small">Load a crusade force above, or add units by hand.</p>}
-      {side.units.length > 0 && <p className="muted small">XP: 1 per wound of each model a unit destroys (½ per model in 10+ model, 1-wound units). It carries into the record wizard as Kill XP.</p>}
+      {side.units.length > 0 && <p className="muted small">XP: 1 per wound of each model destroyed (½ per model in 10+ model, 1-wound units). It carries into the record wizard as Kill XP.</p>}
       {side.units.length > 0 && (
         <div className="table-wrap">
           <table className="compact stack tracker-units">

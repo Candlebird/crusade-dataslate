@@ -62,12 +62,11 @@ export default function JournalPanel({ c, setC, me, gm }: { c: Campaign; setC: S
       </span>
     )}>
       <p className="muted small">
-        Once a round your Warlord comes to a crossroads, away from the battlefield. Pick how they take it on, answer the
-        complication, and roll the checks: each is a D6 against the Warlord's Quality (Defense for Endurance), and special rules
-        that suit the skill make it easier. A failed check can be re-rolled once for {JOURNAL.rerollCost} Umbra Shards.
-        The more checks pass, the better the endings on offer, but at least one ending always gives nothing, or costs you.
-        Now and then the scene takes a twist (one more check), a rival Warlord crosses your path, or a story thread
-        picks up where an earlier journal left it.
+        Once a round your Warlord comes to a crossroads off the battlefield. Pick an approach, answer the complication
+        and roll the checks: each is a D6 against the Warlord's Quality (Defense for Endurance), easier with fitting special rules.
+        Re-roll a failed check once for {JOURNAL.rerollCost} Umbra Shards. More passes mean better endings, but at least one
+        ending always gives nothing or costs you. Sometimes a twist adds a check, a rival Warlord appears, or an earlier
+        journal's story thread returns.
       </p>
       {dealable.map((f) => (
         <div key={f.id} className="row">
@@ -158,7 +157,7 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
     });
     setBusy(false);
     if (!got) toast('The endings could not be drawn.', 'error');
-    else if (got === 'tables') toast('Claude could not be reached, so the tables chose the endings.');
+    else if (got === 'tables') toast('Claude was unreachable; the tables chose the endings.');
   };
 
   const pick = (i: number) => {
@@ -325,7 +324,7 @@ function Framing({ j, edit, onDone }: { j: CrossroadsJournal; edit: (fn: (x: Cro
           {JOURNAL_COMPLICATIONS.filter((x) => !x.rival || j.rival || x.id === j.complication).map((x) => <option key={x.id} value={x.id}>{journalText(j, x.name)}</option>)}
         </select>
       </div>
-      <TextArea value={j.note ?? ''} rows={2} placeholder="A line of your own to set the scene (the twist stays hidden until the first roll)" onCommit={(note) => set({ note })} />
+      <TextArea value={j.note ?? ''} rows={2} placeholder="Your own line to set the scene (the twist stays hidden until the first roll)" onCommit={(note) => set({ note })} />
       <button className="small" onClick={onDone}>Done</button>
     </div>
   );

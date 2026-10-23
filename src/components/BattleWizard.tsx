@@ -122,8 +122,8 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
 
   const apply = () => {
     const msg = preview.warnings.length
-      ? `There are ${preview.warnings.length} unresolved item(s):\n\n${preview.warnings.join('\n')}\n\nApply anyway?`
-      : `Apply this battle to ${f.name}? This updates XP, scars, RP and Supply.`;
+      ? `${preview.warnings.length} unresolved item(s):\n\n${preview.warnings.join('\n')}\n\nApply anyway?`
+      : `Apply this battle to ${f.name}? It updates XP, scars, RP and Supply.`;
     if (!confirmAction(msg)) return;
     updateForce(f.id, (d) => {
       resolveBattle(d, full, uid);
@@ -173,19 +173,19 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       {source && (
         <p className="panel notice small">
           Filled in from {source.past ? 'past battle' : 'the battle tracker'} <a href={href.tracker()}>{source.battle.mission.name}</a>
-          {source.past && ` (${localDate(source.past)}, as ${source.battle.sides.find((x) => x.id === source.side)?.name})`}. Check the details, then add XP and rewards.
+          {source.past && ` (${localDate(source.past)}, as ${source.battle.sides.find((x) => x.id === source.side)?.name})`}. Check it, then add XP and rewards.
           {' '}<button className="ghost small" onClick={() => setInput(restartInput(initialInput(f, forceTotals(f, state.settings).bp), input, source.battle.crisis ? [] : used))}>Start blank instead</button>
         </p>
       )}
       {source && claimedBy && (
         <p className="panel notice small" style={{ borderColor: 'var(--red)' }}>
-          {source.battle.sides.find((x) => x.id === source.side)?.name}'s rewards from this battle were already claimed by <b>{claimedBy.name}</b>. Applying again records the battle twice.
+          {source.battle.sides.find((x) => x.id === source.side)?.name}'s rewards were already claimed by <b>{claimedBy.name}</b>. Applying again records the battle twice.
         </p>
       )}
 
       {input.patrol && (
         <p className="panel notice small">
-          <span className="tag cyan">Solo patrol</span> A downtime game of up to {SOLO_PATROL.points} pts against the AI: units earn participation and kill XP only — no RP, reward rolls or Marked for Greatness.
+          <span className="tag cyan">Solo patrol</span> A downtime game of up to {SOLO_PATROL.points} pts vs the AI. Units earn participation and kill XP only: no RP, reward rolls or Marked for Greatness.
           {linked && ' A win still counts as a patrol against the Echoes and earns a Strategic Asset.'}
           {linked && f.nexus?.patrolRound === currentRound(campaign!) && <b> {f.name} already recorded a patrol this round.</b>}
         </p>
@@ -252,7 +252,7 @@ function SetupStep({ input, set, campaign }: { input: BattleInput; set: (p: Part
                 </optgroup>
               </select>
               <span className="muted small">
-                {input.sectorId ? "The round's Battle: an attack from the sealed orders." : "Any game away from the map. A win earns a Strategic Asset; against the AI it's also a patrol."}
+                {input.sectorId ? "The round's Battle: an attack from the sealed orders." : "Any game away from the map. A win earns a Strategic Asset, and vs the AI it's also a patrol."}
               </span>
             </label>
           )}
@@ -267,13 +267,13 @@ function SetupStep({ input, set, campaign }: { input: BattleInput; set: (p: Part
           </label>}
           <label className="field span-all">Notes<textarea rows={3} value={input.notes} onChange={(e) => set({ notes: e.target.value })} /></label>
         </div>
-        {input.result === 'draw' && !input.table && <p className="muted small">Draws use the Losers table by default — change it above if your group plays it differently.</p>}
+        {input.result === 'draw' && !input.table && <p className="muted small">Draws use the Losers table by default. Change it above if your group differs.</p>}
         {suffering > 0 && <p className="small"><span className="tag gold">Growth Through Suffering</span> {suffering} roll{suffering > 1 ? 's' : ''} for being {input.oppBp - input.myBp} BP down.</p>}
       </div>
       {input.patrol ? (
         <div className="panel">
           <div className="panel-title"><h2>Solo patrol</h2></div>
-          <p className="muted small">No agendas on a patrol: every unit that took part gains {participationXp(input)} XP, plus its kill XP.</p>
+          <p className="muted small">No agendas on a patrol. Each unit that fought gains {participationXp(input)} XP, plus its kill XP.</p>
         </div>
       ) : <div className="panel">
         <div className="panel-title">
@@ -293,7 +293,7 @@ function SetupStep({ input, set, campaign }: { input: BattleInput; set: (p: Part
             </label>
           );
         })}
-        <p className="muted small">No agendas: every unit that took part gains {participationXp({ ...input, agendas: [] })} XP instead. Record agenda XP per unit on the next step.</p>
+        <p className="muted small">No agendas: each unit that fought gains {participationXp({ ...input, agendas: [] })} XP instead. Record agenda XP per unit on the next step.</p>
       </div>}
     </div>
   );
@@ -328,8 +328,8 @@ function UnitsStep({ units, input, setUnit, used, busy }: { units: Unit[]; input
                   <td className="s-2">
                     <b>{unitName(u)}</b>
                     <div className="muted small">{u.name && u.unitType} {comatose && <span className="tag cyan" title="Sits this battle out; recovers afterwards">Comatose</span>}
-                      {busy.includes(u.id) ? <span className="tag gold" title="On a downtime task this round: it fights in no battle, the main Battle included">Busy on a task</span>
-                        : used.includes(u.id) && <span className="tag gold" title="Each unit takes part in one skirmish, Solo patrol or Expedition a campaign round">Already fought this round</span>}</div>
+                      {busy.includes(u.id) ? <span className="tag gold" title="On a downtime task this round: can't fight, including the main Battle">Busy on a task</span>
+                        : used.includes(u.id) && <span className="tag gold" title="1 skirmish, Solo patrol or Expedition per unit per campaign round">Already fought this round</span>}</div>
                   </td>
                   <td data-label="Destroyed"><input type="checkbox" disabled={!r.in} checked={r.destroyed} onChange={(e) => setUnit(u.id, { destroyed: e.target.checked, death: e.target.checked ? r.death : null })} /></td>
                   <td data-label="Marked"><input type="radio" name="marked" disabled={!r.in || input.patrol} checked={r.marked} onChange={() => setUnit(u.id, { marked: true })} onClick={() => r.marked && setUnit(u.id, { marked: false })} /></td>
@@ -346,10 +346,10 @@ function UnitsStep({ units, input, setUnit, used, busy }: { units: Unit[]; input
       </div>
       <p className="muted small">Total excludes death rolls and table rewards. Comatose units sit out by default and recover once the battle is applied.</p>
       {units.some((u) => used.includes(u.id) && !busy.includes(u.id)) && (
-        <p className="muted small">Each unit takes part in one skirmish, Solo patrol or Expedition a campaign round. Units that already have earn nothing from this one; they are free again when the GM ends the round. The round's main Battle doesn't count: every unit can fight in it.</p>
+        <p className="muted small">Each unit gets 1 skirmish, Solo patrol or Expedition per campaign round. Units that already fought earn nothing here until the GM ends the round. Every unit can still fight the main Battle.</p>
       )}
       {units.some((u) => busy.includes(u.id)) && (
-        <p className="muted small">Units busy on a downtime task (Mentoring, a Project, Recon or Garrison) fight in no battle this round, the main Battle included. They are free again when the GM ends the round.</p>
+        <p className="muted small">Units on a downtime task (Mentoring, Project, Recon, Garrison) can't fight this round, including the main Battle. They're free again when the GM ends the round.</p>
       )}
     </div>
   );
@@ -359,7 +359,7 @@ function UnitsStep({ units, input, setUnit, used, busy }: { units: Unit[]; input
 
 function DeathsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInput; setUnit: (id: string, p: Partial<UnitBattle>) => void }) {
   const dead = units.filter((u) => input.units[u.id].in && input.units[u.id].destroyed);
-  if (!dead.length) return <div className="panel empty">No units were destroyed. Mark them on the Units step if any were.</div>;
+  if (!dead.length) return <div className="panel empty">No units destroyed. Mark any on the Units step.</div>;
   return (
     <div className="panel">
       <div className="panel-title">
@@ -436,7 +436,7 @@ function RewardsStep({ units, input, set, setPick }: {
         <h2>Rewards</h2>
         {!input.patrol && <label className="row small">Agenda RP <Stepper value={input.agendaRp} min={0} onChange={(n) => set({ agendaRp: n })} /></label>}
       </div>
-      <p className="muted small">{input.patrol ? 'Solo patrol: no RP or reward rolls — participation and kill XP only.' : 'Every battle earns 1 RP. Roll on each table below and assign what it gives.'}</p>
+      <p className="muted small">{input.patrol ? 'Solo patrol: participation and kill XP only, no RP or reward rolls.' : 'Every battle earns 1 RP. Roll on each table below and assign the result.'}</p>
       {rows.map((row) => (
         <RewardBox key={row.key} row={row} units={units} input={input} pick={input.rewards[row.key] ?? emptyPick()} setPick={(p) => setPick(row.key, p)} />
       ))}
@@ -515,7 +515,7 @@ function RewardBox({ row, units, input, pick, setPick }: {
       {e?.free && (
         <>
           <UnitSelect label={`${e.free} for`} units={units} value={pick.target} onChange={(target) => setPick({ target })} empty="No units" />
-          <p className="muted small" style={{ margin: '0.35rem 0 0' }}>Added as a reminder — pick the actual {e.free.toLowerCase()} on the unit sheet afterwards.</p>
+          <p className="muted small" style={{ margin: '0.35rem 0 0' }}>Added as a reminder. Pick the {e.free.toLowerCase()} on the unit sheet afterwards.</p>
         </>
       )}
     </div>
@@ -532,7 +532,7 @@ function NexusRewards({ units, input, nexus, setPick }: {
     <div className="panel">
       <div className="panel-title">
         <h2>Nexus Wars</h2>
-        <span className="muted small">Match rewards{input.sectorName ? ` · fought over ${input.sectorName}` : ''} · sector income is claimed each round on the force page</span>
+        <span className="muted small">Match rewards{input.sectorName ? ` · fought over ${input.sectorName}` : ''} · claim sector income each round on the force page</span>
       </div>
       {nexus.notes.map((n, i) => <p key={i} className="small"><span className="tag gold">Note</span> {n}</p>)}
       {nexus.items.length === 0 && <p className="muted small">Nothing generated this match.</p>}

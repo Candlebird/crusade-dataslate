@@ -13,7 +13,7 @@ import { applySortie, postWeekly, weekBoard } from '../rules/downtime';
 import { partyProblem, sortieProblem, sortieScout, startSortie } from '../rules/tasks';
 import { SORTIE, SORTIE_BOONS, type SortieLength, type SortieMarkId, type SortieMode } from '../rules/downtimeData';
 import {
-  active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, act,
+  active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, startRound, act,
   isFort, keepsHaul, leaveCombat, leaveEvent, memberName, memberUp, nextSlots, onField, patchUp, pickBoon, quitRun, distOf, DISTANCES, reachText, reachable, runXp, skillProblem,
   skillTargets, skillsOf, slotOf, SLOTS, turnModel, trinketInfo, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
   ambushOdds, beastInfo, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons,
@@ -153,7 +153,7 @@ function Token({ face, m, current }: { face: React.ReactNode; m: { hp: number; m
 function Stress({ v }: { v?: number }) {
   const n = Math.min(SORTIE.stress.max, v ?? 0);
   return (
-    <span className={`sortie-stress${n >= SORTIE.stress.max * 0.7 ? ' high' : ''}`} title={`Stress ${+n.toFixed(1)}/${SORTIE.stress.max}: when it fills, the unit cracks for a round`}>
+    <span className={`sortie-stress${n >= SORTIE.stress.max * 0.7 ? ' high' : ''}`} title={`Stress ${+n.toFixed(1)}/${SORTIE.stress.max}: when full, the unit cracks for a round`}>
       <span style={{ width: `${(n / SORTIE.stress.max) * 100}%` }} />
     </span>
   );
@@ -318,7 +318,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
     const r = runRef.current;
     if (r && !r.over) {
       const lose = r.mode === 'shard' ? ' The haul is left behind.' : '';
-      if (!confirmAction(`Turn back now? The party keeps the XP it has earned so far.${lose}`)) return;
+      if (!confirmAction(`Turn back now? The party keeps the XP earned so far.${lose}`)) return;
       quitRun(r);
       bank();
     }
@@ -328,7 +328,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
   if (!book) {
     return (
       <Modal title="Sortie" onClose={onClose} footer={<button onClick={onClose}>Close</button>}>
-        <p className="small" style={{ marginTop: 0 }}>A Sortie fights the Void Echoes, so it needs their army book. Import <b>Void Echoes</b> on the Books page first.</p>
+        <p className="small" style={{ marginTop: 0 }}>A Sortie needs the Void Echoes army book. Import <b>Void Echoes</b> on the Books page first.</p>
       </Modal>
     );
   }
@@ -343,13 +343,13 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
         footer={<><button onClick={onClose}>Cancel</button><button className="primary" disabled={!!problem} onClick={begin}>Set out</button></>}
       >
         <p className="small" style={{ marginTop: 0 }}>
-          A party of three sets out across a branching map of Echo fights, camps, shrines and caches, with an Echo lord at the end. The party stands in a line, Front,
-          Middle and Back, and shifts every round: the Middle steps to the Front, the Front falls to the Back, the Back moves up to the Middle (a Fortification always
-          holds the Back). Each Echo squad stands Close, Mid or Far; every slot behind the Front adds a step of distance. Blades and Charges work only from the Front,
-          and guns reach as far as their range allows. Wounds stay between fights.
+          A party of 3 crosses a branching map of Echo fights, camps, shrines and caches to an Echo lord. The party stands Front, Middle and Back,
+          and shifts every round: Middle to Front, Front to Back, Back to Middle. A Fortification always holds the Back. Echo squads stand Close, Mid
+          or Far, and each slot behind the Front adds 1 step of distance. Blades and Charges work only from the Front. Guns reach as far as their range allows.
+          Wounds carry over between fights.
         </p>
         <div className="small" style={{ marginBottom: 4 }}><b>Party</b> <span className="muted">({picked.length}/3)</span></div>
-        {fit.length < 3 && <p className="muted small">A Sortie needs three active units.</p>}
+        {fit.length < 3 && <p className="muted small">A Sortie needs 3 active units.</p>}
         <div className="sortie-pick">
           {fit.map((u) => {
             const at = lineUp(picked.map((id) => force.units.find((x) => x.id === id)!).filter(Boolean)).findIndex((x) => x.id === u.id);
@@ -378,8 +378,8 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
           </div>
           <p className="muted small" style={{ margin: '4px 0 0' }}>
             {mode === 'free'
-              ? 'Any time, as often as you like: XP only, the units aren’t busy, and nothing happens to them if they fall.'
-              : <>Costs {SORTIE.cost} Umbra Shards (you have {force.umbraShards}){c ? ' and is the task for the round of all three units' : ''}. Brings home a haul of Supply, RP and up to {SORTIE.haul.maxUs} Umbra Shards if the party beats the boss or heads home from a camp. Each unit wiped out takes a scar or is left Comatose.</>}
+              ? 'Any time, as often as you like. XP only: units aren’t busy and suffer nothing if they fall.'
+              : <>Costs {SORTIE.cost} Umbra Shards (you have {force.umbraShards}){c ? ' and uses all 3 units’ task for the round' : ''}. Beat the boss or head home from a camp to bring home Supply, RP and up to {SORTIE.haul.maxUs} Umbra Shards. Each unit wiped out takes a scar or is left Comatose.</>}
           </p>
           {problem && picked.length > 0 && <p className="small" style={{ color: 'var(--warn)', margin: '4px 0 0' }}>{problem}</p>}
           <div className="small" style={{ marginTop: 8 }}><b>Road</b></div>
@@ -390,8 +390,8 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
           {weekly ? (
             <>
               <p className="muted small" style={{ margin: '4px 0 0' }}>
-                Every force gets the same region, Echo lord and map this week: a long run at {SORTIE.tiers[SORTIE.weekly.tier].name}, with no grudges or deep regions.
-                Score: {SORTIE.weekly.depth} a node, {SORTIE.weekly.won} a fight won, {SORTIE.weekly.boss} for the lord, {SORTIE.weekly.alive} a unit still standing.
+                Same region, Echo lord and map for every force this week: a long run at {SORTIE.tiers[SORTIE.weekly.tier].name}, no grudges or deep regions.
+                Score: {SORTIE.weekly.depth} per node, {SORTIE.weekly.won} per fight won, {SORTIE.weekly.boss} for the lord, {SORTIE.weekly.alive} per unit standing.
               </p>
               <WeekBoard c={c} week={week} forceId={force.id} recaps={story?.recaps} />
             </>
@@ -424,7 +424,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               <p className="muted small" style={{ margin: '4px 0 0' }}>
                 {tier ? `${SORTIE.tiers.slice(1, tier + 1).map((t) => t.text).join(' ')} XP, its cap and the haul ×${SORTIE.tiers[tier].pay}.` : 'No twists.'}
                 {tier === topTier && topTier < SORTIE.tiers.length - 1 ? ` Win at ${SORTIE.tiers[topTier].name} to unlock ${SORTIE.tiers[topTier + 1].name}.` : ''}
-                {tier === SORTIE.tiers.length - 1 && !topAsc ? ` Win here to unlock Ascension 1, and its first curse.` : ''}
+                {tier === SORTIE.tiers.length - 1 && !topAsc ? ` Win here to unlock Ascension 1 and its first curse.` : ''}
               </p>
               {tier === SORTIE.tiers.length - 1 && topAsc > 0 && (
                 <>
@@ -455,17 +455,17 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
             <p className="small" style={{ margin: '6px 0 0' }}>
               <b>Nemeses:</b>{' '}
               {SORTIE_BOSSES.filter((b) => force.sortie?.nemesis?.[b.id]).map((b) => `${b.name} (${force.sortie!.nemesis![b.id]})`).join(', ')}
-              <span className="muted"> — each waits for you half the time, tougher per grudge, with {SORTIE.nemesis.bounty} RP bounty per grudge.</span>
+              <span className="muted"> — each shows up half the time, tougher per grudge, with a {SORTIE.nemesis.bounty} RP bounty per grudge.</span>
             </p>
           ) : null}
           </>}
           {force.sortieBest ? <p className="muted small" style={{ margin: '6px 0 0' }}>Furthest so far: {force.sortieBest} nodes.</p> : null}
           {topTier === 0 && <p className="muted small" style={{ margin: '6px 0 0' }}>Win a run to unlock {SORTIE.tiers[1].name}: harder runs that pay more.</p>}
-          {c && mode === 'shard' && <p className="muted small" style={{ margin: '6px 0 0' }}>Win a Shard run and the party scouts the nearest unseen sector on the way home.</p>}
+          {c && mode === 'shard' && <p className="muted small" style={{ margin: '6px 0 0' }}>A won Shard run scouts the nearest unseen sector on the way home.</p>}
           {story?.trinkets?.length ? (
             <p className="small" style={{ margin: '6px 0 0' }}>
               <b>Spare trinkets:</b> {story.trinkets.map((t) => trinketInfo(t)?.name ?? t).join(', ')}
-              <span className="muted"> — equip them from a unit’s sheet. They count only on Sorties.</span>
+              <span className="muted"> — equip them from a unit’s sheet. Sorties only.</span>
             </p>
           ) : null}
         </div>
@@ -513,7 +513,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
           </button>
           {boonsOpen && (
             <div className="sortie-bestiary">
-              <p className="muted small" style={{ margin: 0 }}>Runs only offer the boons this force has unlocked; the rest unlock as its runs reach their goals. The weekly challenge offers them all.</p>
+              <p className="muted small" style={{ margin: 0 }}>Runs offer only this force's unlocked boons. Reach a boon's goal to unlock it. The weekly challenge offers all of them.</p>
               {(Object.keys(SORTIE.unlocks) as (keyof typeof SORTIE_BOONS)[]).filter((id) => SORTIE_BOONS[id]).map((id) => {
                 const u = SORTIE.unlocks[id];
                 const have = goalProgress(story, u.goal);
@@ -569,7 +569,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
       onClose={close}
       footer={
         <>
-          <label className="row small" style={{ gap: 4, marginRight: 'auto' }} title="Let the party play itself: it picks its path, its orders, boons and shrine choices.">
+          <label className="row small" style={{ gap: 4, marginRight: 'auto' }} title="The party plays itself: path, orders, boons and shrine choices.">
             <input type="checkbox" checked={auto} disabled={!!run.over} onChange={(e) => setAuto(e.target.checked)} /> Auto
           </label>
           {!run.over && <button onClick={close}>Turn back</button>}
@@ -584,7 +584,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               <MapScreen run={run} onEnter={(n) => doit(() => enterNode(run, book, n))} />
               <div className="sortie-panel">
                 <h3>Formation</h3>
-                <p className="muted small" style={{ marginTop: 0 }}>The line the party starts the next fight in. Only here, between fights, can it be changed.</p>
+                <p className="muted small" style={{ marginTop: 0 }}>The party's starting line for the next fight. You can only change it here, between fights.</p>
                 <LineOrder units={run.party.map((m) => m.unit)} down={run.party.map((m) => !memberUp(m))} onMove={(i, dir) => doit(() => moveMember(run, i, dir))} />
               </div>
             </>
@@ -596,6 +596,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               setSkill={setSkill}
               onUse={(id, target) => doit(() => (run.combat!.need === 'order' ? giveOrder(run, id, target) : act(run, id, target)))}
               onAuto={() => doit(() => autoMove(run))}
+              onStart={() => doit(() => startRound(run))}
               onLeave={() => doit(() => leaveCombat(run))}
             />
           )}
@@ -614,7 +615,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                 {run.offer.patch && (
                   <button className="sortie-boon heal" onClick={() => doit(() => patchUp(run))}>
                     <b>Patch up</b>
-                    <span className="small">Every model in the party mends {Math.round(SORTIE.patch * 100)}% of its wounds, and one fallen model gets back up.</span>
+                    <span className="small">Every model mends {Math.round(SORTIE.patch * 100)}% of its wounds, and 1 fallen model gets back up.</span>
                   </button>
                 )}
               </div>
@@ -628,7 +629,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               {run.scene && <p className="small sortie-scene">{run.scene}</p>}
               <p className="small">Rest here, or call it a day and head home{run.mode === 'shard' ? ' with the haul' : ''}.</p>
               <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-                <button className="primary" onClick={() => doit(() => campRest(run))}>Rest: mend {Math.round(SORTIE.rest * 100)}% and raise {campRaise(run) === 1 ? 'one fallen' : `up to ${campRaise(run)} fallen`}</button>
+                <button className="primary" onClick={() => doit(() => campRest(run))}>Rest: mend {Math.round(SORTIE.rest * 100)}% and raise {campRaise(run) === 1 ? '1 fallen' : `up to ${campRaise(run)} fallen`}</button>
                 <button onClick={() => doit(() => campHome(run))}>Head home</button>
               </div>
             </div>
@@ -638,7 +639,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               <h3><Icon name="g:scales" /> Shop</h3>
               {run.scene && <p className="small sortie-scene">{run.scene}</p>}
               <p className="muted small">
-                Spend the run’s Supply: you have <b>{run.haul.supply}</b>.{run.mode === 'shard' ? ' What you spend here doesn’t come home in the haul.' : ''}
+                Spend the run’s Supply: you have <b>{run.haul.supply}</b>.{run.mode === 'shard' ? ' Supply spent here doesn’t come home.' : ''}
               </p>
               <div className="sortie-boons">
                 {run.shop.boons.map((b, i) => (
@@ -649,7 +650,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                 ))}
                 <button className="sortie-boon heal" disabled={run.shop.healed || run.haul.supply < shopPrice(run, SORTIE.shop.heal)} onClick={() => doit(() => shopHeal(run))}>
                   <b>Field dressings <span className="sortie-price">{run.shop.healed ? 'Sold' : `${shopPrice(run, SORTIE.shop.heal)} Supply`}</span></b>
-                  <span className="small">Every model in the party mends {Math.round(SORTIE.shop.healShare * 100)}% of its wounds.</span>
+                  <span className="small">Every model mends {Math.round(SORTIE.shop.healShare * 100)}% of its wounds.</span>
                 </button>
               </div>
               <button className="primary" onClick={() => doit(() => leaveShop(run))}>Move on</button>
@@ -661,7 +662,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               <p>{run.over === 'won' ? `${bossOf(run).name} is down: the sortie is a success.` : OVER[run.over]}</p>
               <p className="small sortie-scene">{epilogueOf(run)}</p>
               <p className="small">
-                {run.won} fight{run.won === 1 ? '' : 's'} won, {run.depth} node{run.depth === 1 ? '' : 's'} cleared. <b>+{runXp(run)} XP</b> to each unit (cap {cap}){run.party.some((m) => !memberUp(m)) && <>, half that for a unit wiped out</>}.
+                {run.won} fight{run.won === 1 ? '' : 's'} won, {run.depth} node{run.depth === 1 ? '' : 's'} cleared. <b>+{runXp(run)} XP</b> per unit (cap {cap}){run.party.some((m) => !memberUp(m)) && <>, half for a unit wiped out</>}.
                 {run.mode === 'shard' && (keepsHaul(run) ? ` The haul comes home: ${haulText(run)}.` : ' The haul was lost.')}
               </p>
               {summary && <p className="muted small">{summary}</p>}
@@ -802,11 +803,11 @@ function MapScreen({ run, onEnter }: { run: SortieRun; onEnter: (n: SortieNode) 
       {run.row < 0 && <p className="small sortie-scene">{run.deep ? regionOf(run).deep.intro : regionOf(run).intro}</p>}
       <p className="muted small" style={{ marginTop: 0 }}>
         {run.row < 0 ? 'Pick where to start.' : 'Pick the next step.'} {bossOf(run).name} waits at the top.
-        {run.map.some((row) => row.some((n) => n.hidden)) && ` ? is ground the party can’t see yet: it sees ${sightOf(run)} step${sightOf(run) === 1 ? '' : 's'} ahead.`}
+        {run.map.some((row) => row.some((n) => n.hidden)) && ` ? is unseen ground. The party sees ${sightOf(run)} step${sightOf(run) === 1 ? '' : 's'} ahead.`}
         {run.map.some((row) => row.some((n) => n.veiled && n.row > run.row && (n.kind === 'fight' || n.kind === 'elite'))) && (
           ambushOdds(run) > 0
-            ? ` A fight on ground that started hidden has a ${Math.round(ambushOdds(run) * 100)}% chance of an ambush: a scout or the lantern stops it.`
-            : ' A scout or the lantern keeps the party from being ambushed.'
+            ? ` Fights on ground that started hidden have a ${Math.round(ambushOdds(run) * 100)}% ambush chance. A scout or the lantern prevents it.`
+            : ' A scout or the lantern prevents ambushes.'
         )}
         {cursesOf(run).length ? <span className="sortie-cursed"> Ascension {run.ascension}: {cursesOf(run).map((x) => x.name).join(', ')}.</span> : null}
       </p>
@@ -834,7 +835,7 @@ function MapScreen({ run, onEnter }: { run: SortieRun; onEnter: (n: SortieNode) 
               tabIndex={open ? 0 : undefined}
               onKeyDown={open ? (e) => (e.key === 'Enter' || e.key === ' ') && onEnter(n) : undefined}
             >
-              <title>{n.hidden ? 'Unknown: get nearer to see it' : n.kind === 'boss' ? `${bossOf(run).name} (${bossOf(run).unit})` : n.affix ? `${NODE_NAME[n.kind]}: ${SORTIE.affixes[n.affix].name}` : NODE_NAME[n.kind]}</title>
+              <title>{n.hidden ? 'Unknown: get closer to see it' : n.kind === 'boss' ? `${bossOf(run).name} (${bossOf(run).unit})` : n.affix ? `${NODE_NAME[n.kind]}: ${SORTIE.affixes[n.affix].name}` : NODE_NAME[n.kind]}</title>
               <circle r={n.kind === 'boss' ? 21 : 16} />
               {n.hidden ? <text textAnchor="middle" dominantBaseline="central">?</text> : <SvgIcon name={NODE_ICON[n.kind]} x={0} y={0} size={n.kind === 'boss' ? 24 : 18} className="sortie-node-icon" />}
               {n.omen && !n.hidden && (
@@ -886,12 +887,13 @@ function EventScreen({ run, onChoose, onLeave }: { run: SortieRun; onChoose: (i:
 }
 
 /** The fight: the party's line on the left, the Echo squads by distance on the right, the skills below. */
-function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
+function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }: {
   run: SortieRun;
   skill: string | null;
   setSkill: (s: string | null) => void;
   onUse: (id: string, target?: string) => void;
   onAuto: () => void;
+  onStart: () => void;
   onLeave: () => void;
 }) {
   const c = run.combat!;
@@ -936,7 +938,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
   };
 
   const at = me ? SLOTS[slotOf(me)] : '';
-  const who = c.over || !me ? '' : c.need === 'order' ? `Round ${c.round}: give ${me.name} (${at}) its order.` : current ? `Round ${c.round}: ${me.name} (${at}), this model’s turn.` : '';
+  const who = c.over || !me ? '' : c.need === 'order' ? `Round ${c.round}: ${me.name} (${at}) is up. Give its order for the round.` : current ? `Round ${c.round}: ${me.name} (${at}), this model’s turn.` : '';
 
   return (
     <div className="sortie-panel">
@@ -949,7 +951,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
       </div>
       {!c.over && c.queue.length > 0 && (
         <div className="sortie-init" title="Who acts next this round, fastest first">
-          <span className="sortie-init-label">Turn order</span>
+          <span className="sortie-init-label">{c.need === 'start' ? `Round ${c.round} order` : 'Turn order'}</span>
           <div className="sortie-init-row">
             {turns.map((t, i) => {
               const s = squad(t.key);
@@ -957,7 +959,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
               const size = i === 0 ? 36 : 26;
               return (
                 <span key={i} className={`sortie-init-tok${s.echo ? ' echo' : ' mine'}${i === 0 ? ' now' : ''}`} title={`${s.name}${t.n > 1 ? `, ${t.n} turns in a row` : ''}`}>
-                  {i === 0 && <span className="sortie-init-now">Now</span>}
+                  {i === 0 && <span className="sortie-init-now">{c.need === 'start' ? 'First' : 'Now'}</span>}
                   {face(s, size)}
                   {t.n > 1 && <span className="sortie-init-n">×{t.n}</span>}
                   <span className="sortie-init-name">{s.name}</span>
@@ -1007,7 +1009,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
               <Portrait unit={p.unit} size={20} /> {p.name} is out of the fight.
             </div>
           ))}
-          <div className="muted small">Each round the line shifts: Middle to Front, Front to Back, Back to Middle.</div>
+          <div className="muted small">Each round: Middle to Front, Front to Back, Back to Middle.</div>
         </div>
         <div className="sortie-ranks">
           {[1, 2, 3].map((d) => {
@@ -1053,6 +1055,13 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
         <div className="row" style={{ gap: 6, marginTop: 8 }}>
           <b className="grow">{c.over === 'won' ? 'The Echoes are gone.' : c.over === 'broke' ? 'The party breaks and flees.' : 'The party is wiped out.'}</b>
           <button className="primary" onClick={onLeave}>Continue</button>
+        </div>
+      ) : c.need === 'start' ? (
+        <div className="row" style={{ gap: 6, marginTop: 8 }}>
+          <span className="grow small">
+            {c.round === 1 ? 'The Echoes are in sight.' : `Round ${c.round - 1} is over.`} Check the turn order and Echo intents, then start. Each unit takes its order when its turn comes.
+          </span>
+          <button className="primary" onClick={onStart}>Start round {c.round}</button>
         </div>
       ) : (
         <>

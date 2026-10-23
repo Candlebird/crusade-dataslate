@@ -78,15 +78,15 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
   };
 
   const endNow = () => {
-    if (!confirmAction(`End round ${round}? Every faction's sector income for the round is fixed now (players claim it on their force page), `
+    if (!confirmAction(`End round ${round}? Sector income is fixed (players claim it on their force page), `
       + (marked
         ? `the ${ECHOES.name} take ${open.length ? open.join(', ') : 'nothing (the line held everywhere)'}, and their threat goes to ${coming}.`
         : `the ${ECHOES.name}' threat goes to ${coming} and they spread ${spreads} sector${spreads === 1 ? '' : 's'}${grace ? ' (into unclaimed space only)' : ''}.`)
       + (breakers.length ? ` ${breakers.map((f) => f.name).join(', ')} still ha${breakers.length === 1 ? 's' : 've'} a mark to break: it goes to their own marked sector.` : '')
       + (crisis && crisis.result !== 'won' ? ` The Nexus Crisis wasn't won: the ${ECHOES.name} take each faction's sector nearest ${lordById(crisis.lord)?.name ?? 'the Lord'}.` : '')
       + (unspent ? ` ${unspent} unspent Strategic Asset${unspent === 1 ? ' is' : 's are'} lost.` : '')
-      + ' Claimed space hulks drift off and new points of interest appear on the map, and a Galactic Event is rolled for the next round.'
-      + ` Sector difficulty is rescaled to ${range.min}–${range.max} Supply and AI-held sectors roll new modifiers.`)) return;
+      + ' Claimed space hulks drift off, new points of interest appear and a Galactic Event is rolled.'
+      + ` Sectors rescale to ${range.min}–${range.max} Supply; AI-held sectors roll new modifiers.`)) return;
     end();
   };
   const rescale = () => {
@@ -115,7 +115,7 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
 
   return (
     <Panel id="campaign.round" title={`Round ${round}`}
-      extra={gm && <button className="primary" onClick={endNow} title="When everyone has played what they're going to play this round">End round…</button>}>
+      extra={gm && <button className="primary" onClick={endNow} title="When everyone has played this round">End round…</button>}>
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         <span className="tag red" title={`Up ${NEXUS_ROUNDS.threatPerRound} each round, down ${NEXUS_ROUNDS.threatPerWin} per Battle won against them (${NEXUS_ROUNDS.threatPerVoidspawnWin} at a Voidspawn) and ${NEXUS_ROUNDS.threatPerPatrolWin} per patrol (a skirmish won against them)`}>
           <Icon name="g:biohazard" /> {ECHOES.name} threat {threat}/{NEXUS_ROUNDS.threatMax}
@@ -124,12 +124,12 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
           ? <span className="muted">If the round ended now: threat {coming}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>
           : <span className="muted">If the round ended now: threat {coming}, spreading {spreads} sector{spreads === 1 ? '' : 's'}{ahead.size ? ', most likely into the leader\'s space' : ''}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>}
         {gm && !marked && (
-          <button className="small" onClick={markNow} title={`Show where the ${ECHOES.name} will spread when this round ends, so the players can hold the line`}><Icon name="g:hazard-sign" /> Mark their targets</button>
+          <button className="small" onClick={markNow} title={`Show where the ${ECHOES.name} spread at round end, so players can hold the line`}><Icon name="g:hazard-sign" /> Mark their targets</button>
         )}
       </div>
       {marked && (
         <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}
-          title={`Each falls when the round ends, unless a detachment of its own faction (anyone's, if it's unclaimed) stands there, or a faction that won a Battle against the ${ECHOES.name} this round breaks the mark`}>
+          title={`Each falls at round end unless its faction's detachment (anyone's, if unclaimed) stands there, or a faction that won a Battle against the ${ECHOES.name} this round breaks the mark`}>
           <span className="muted"><Icon name="g:hazard-sign" /> The {ECHOES.name} are massing:</span>
           {!marks.length && <span className="muted">nowhere this round.</span>}
           {marks.map(({ s, by, status }) => (
@@ -139,7 +139,7 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
             </span>
           ))}
           {breakers.map((f) => (
-            <span key={f.id} className="tag gold" title={`Won a Battle against the ${ECHOES.name}: break a mark from the sector's panel on the map`}>
+            <span key={f.id} className="tag gold" title={`Won a Battle against the ${ECHOES.name}: break a mark from its sector panel on the map`}>
               {f.name} can break {breaksLeft(c, f.id)}
             </span>
           ))}
@@ -149,10 +149,10 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
         <span className="tag" title={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}, × ${difficultyLevel(c).scale} for ${difficultyLevel(c).name} difficulty; rescaled when the round ends`}>
           Sector difficulty {range.min}–{range.max} Supply
         </span>
-        {gm && <><button className="small" onClick={rescale} title="Rate sectors now against the factions' current Supply (the round's end does this too)">
+        {gm && <><button className="small" onClick={rescale} title="Rate sectors against current faction Supply (round end does this too)">
           {rated ? 'Rescale sectors now' : 'Rate sectors'}
         </button>
-        <label className="row" style={{ gap: '0.35rem' }} title="Scales every sector rating; changing it rescales the sectors now">
+        <label className="row" style={{ gap: '0.35rem' }} title="Scales every sector rating; changing it rescales now">
           <span className="muted">Difficulty</span>
           <select value={difficultyLevel(c).id} onChange={(e) => setDifficulty(e.target.value)}>
             {DIFFICULTY_LEVELS.map((l) => (
@@ -230,7 +230,7 @@ function CrisisRow({ c }: { c: Campaign }) {
         {!crisis.battleId && <a className="btn small" href={href.crisis()}>Start the Crisis battle</a>}
       </div>
       <p style={{ margin: '0.25rem 0 0' }}>
-        {lord?.desc} Every faction fights it together, against the AI, before the round ends.
+        {lord?.desc} All factions fight it together against the AI before round end.
         Win: the threat drops {NEXUS_CRISIS.threatDrop}, each side claims +{NEXUS_CRISIS.winUs} US and the side whose units earned the most XP takes a {NEXUS_CRISIS.mvpTier} relic
         {crisis.mvp ? ` (MVP: ${state.forces.find((f) => f.id === crisis.mvp)?.name ?? 'a force not on this device'})` : ''}.
         {crisis.result !== 'won' && <> Lose, or don't fight it: the threat goes to {NEXUS_ROUNDS.threatMax} and the {ECHOES.name} take {forfeits.length
@@ -251,8 +251,8 @@ function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
   });
   return (
     <div className="small" style={{ marginTop: '0.5rem' }}>
-      <span className="muted" title={`One per skirmish won this round, up to ${NEXUS_ROUNDS.assetsMax}. Spend them in the Battle; unspent ones are lost when the round ends.`}>
-        Strategic Assets, one per skirmish won (up to {NEXUS_ROUNDS.assetsMax}), lost if unspent when the round ends:
+      <span className="muted" title={`One per skirmish won this round, up to ${NEXUS_ROUNDS.assetsMax}. Spend them in the Battle; unspent ones are lost at round end.`}>
+        Strategic Assets (1 per skirmish won, up to {NEXUS_ROUNDS.assetsMax}; lost if unspent at round end):
       </span>
       {c.factions.filter((f) => !only || f.id === only).map((f) => {
         const a = assetsOf(c, f.id);
@@ -262,7 +262,7 @@ function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
             {a.spent.map((u) => (
               <span key={u.id} className="tag gold" title={STRATEGIC_ASSETS.find((x) => x.key === u.asset)?.desc}>
                 {assetName(u.asset)}{u.forceId && `: ${forces.find((d) => d.id === u.forceId)?.name ?? 'a detachment'}`}
-                <button className="ghost icon" aria-label={`Take back ${assetName(u.asset)}`} title="Spent by mistake: take it back"
+                <button className="ghost icon" aria-label={`Take back ${assetName(u.asset)}`} title="Take back a mistaken spend"
                   onClick={() => change((d) => refundAsset(d, u.id))}><Icon name="l:x" /></button>
               </span>
             ))}

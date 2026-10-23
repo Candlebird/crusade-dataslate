@@ -53,7 +53,7 @@ export function interpretJson(data: any): Imported {
   if (Array.isArray(data?.units) && Array.isArray(data?.upgradePackages)) return { kind: 'book', book: normalizeBook(data) };
   if (Array.isArray(data?.rules) && Array.isArray(data?.traits) && !data.units) return { kind: 'coreRules', rules: normalizeCoreRules(data) };
   if (isListSave(data)) return { kind: 'armyList', raw: data };
-  throw new Error('Unrecognized file. Expected a .force.json, a campaign.json, a backup, an Army Forge army book or list, or the Army Forge core rules.');
+  throw new Error('Unrecognized file. Expected a .force.json, campaign.json, backup, or an Army Forge book, list or core rules file.');
 }
 
 /** Army Forge's common rules file (`/api/rules/common/2`). Its official campaign traits are skipped: the house tables cover those. */

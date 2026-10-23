@@ -11,7 +11,7 @@ import { RELICS } from './data';
 import { awardFeats, trainingFeats } from './feats';
 import { raidBand, raiderPool } from './raiders';
 import {
-  gain, act, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, gunReach, keepsHaul, distOf,
+  gain, act, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, startRound, gunReach, keepsHaul, distOf,
   leaveCombat, leaveEvent, moveMember, nextSlots, onField, partyLine, patchUp, pickBoon, reachable, runXp, skillProblem, skillsOf, squadOf,
   trinketInfo, weekKey, weekSeed, weeklyScore, reveal, sightOf, veteranTitle,
   ambushOdds, beastInfo, beastKey, cursesOf, cursed, shopPrice, goalProgress, goalText, lastStanding, rematchTricks, unlockedBoons, markHeat, marked,
@@ -60,6 +60,7 @@ function spam(units: Unit[], seed: number, length: 'short' | 'long' = 'short'): 
     if (run.screen === 'map') enterNode(run, book, pick(reachable(run)));
     else if (run.screen === 'combat') {
       if (c?.over) leaveCombat(run);
+      else if (c?.need === 'start') startRound(run);
       else if (c?.need === 'order') giveOrder(run, 'atwill');
       else act(run, 'atwill');
     } else if (run.screen === 'reward') {
@@ -86,6 +87,7 @@ function spam(units: Unit[], seed: number, length: 'short' | 'long' = 'short'): 
 function fight(units: Unit[], seed: number): SortieRun {
   const run = createRun(units, seed);
   enterNode(run, book, reachable(run)[0]);
+  if (run.combat?.need === 'start') startRound(run);
   return run;
 }
 
@@ -231,7 +233,7 @@ describe('sortie', () => {
       expect(skillProblem(run, 'charge', mid.key)).toBeNull();
       const from = c.log.length;
       giveOrder(run, 'charge', mid.key);
-      // A Hero with a better initiative takes its own turn first, and the round waits on it.
+      // A shaken or stunned model may spend its turn instead.
       if (!c.log.slice(from + 1).some((l) => l.text.startsWith('Berserkers'))) continue;
       expect(distOf(mid)).toBe(1);
       return;

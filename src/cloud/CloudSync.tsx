@@ -142,7 +142,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
           r.path.startsWith('forces/') ? r.owner === me : r.path === CAMPAIGN_PATH || r.path === SETTINGS_PATH ? me === GM_EMAIL : true,
         readOnly: (path) =>
           toast(
-            path.startsWith('forces/') ? "That force belongs to another player, so the change was undone." : 'Only the GM can change that, so the change was undone.',
+            path.startsWith('forces/') ? "That's another player's force. Change undone." : 'Only the GM can change that. Change undone.',
             'error',
           ),
         failed: (path, err) => toast(`Couldn't sync ${path.split('/')[0]}: ${errorText(err)}`, 'error'),
@@ -205,7 +205,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
           console.error(err);
           setStatus('error');
           toast(
-            /permission/i.test(err.message) ? `${me} isn't allowed into the campaign database.` : `Cloud sync stopped: ${err.message}`,
+            /permission/i.test(err.message) ? `${me} can't access the campaign database.` : `Cloud sync stopped: ${err.message}`,
             'error',
           );
         },
@@ -225,7 +225,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
   }, [state]);
 
   const signIn = useCallback(() => {
-    if (!fb) return toast('Still connecting to the campaign. Try again in a moment.', 'error');
+    if (!fb) return toast('Still connecting. Try again in a moment.', 'error');
     fb.signIn().catch((err) => {
       if (!/popup-closed|cancelled-popup/.test(errorText(err))) toast(`Sign-in failed: ${errorText(err)}`, 'error');
     });

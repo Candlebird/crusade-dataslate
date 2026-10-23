@@ -26,7 +26,7 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
     if (via !== 'research' && !confirmAction(`Spend ${via === 'archive' ? 'an Archive unlock' : 'a Blueprint'} to research ${b.name}?`)) return;
     let ok = false;
     setC((d) => void (ok = research(d, f.id, b.id, via)));
-    toast(ok ? `${f.name} researched ${b.icon} ${b.name}: it can be built at any of its sectors.` : researchBlock(f, b.id, via) ?? 'Not researched.');
+    toast(ok ? `${f.name} researched ${b.icon} ${b.name}. Build it at any of its sectors.` : researchBlock(f, b.id, via) ?? 'Not researched.');
   };
 
   return (
@@ -37,20 +37,20 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
     )} lead={
       <div className="tech-head">
         <span className="stat"><b>{f.research ?? 0}</b><span className="muted small">Research</span></span>
-        <span className="stat" title="Earned when each round ends: base, research stations and Nexus Observatories">
+        <span className="stat" title="Earned at round end: base, research stations and Nexus Observatories">
           <b>+{researchRate(c, f.id)}</b><span className="muted small">a round</span>
         </span>
         <span className="stat" title="Guardian loot: research any open tech for free"><b>{f.blueprints ?? 0}</b><span className="muted small">Blueprints</span></span>
         {(f.archives ?? 0) > 0 && (
           <span className="stat" title="From a Lost Archive: research any one tech for free, ignoring its requirements"><b>{f.archives}</b><span className="muted small">Archive unlocks</span></span>
         )}
-        <span className="stat" title="Guardian loot: installed on a planet from its map panel"><b>{f.cores ?? 0}</b><span className="muted small">Building Expansions</span></span>
+        <span className="stat" title="Guardian loot: install on a planet from its map panel"><b>{f.cores ?? 0}</b><span className="muted small">Building Expansions</span></span>
         <span className="stat"><b>{known}/{BUILDINGS.length}</b><span className="muted small">buildings known</span></span>
       </div>
     }>
       <p className="muted small">
         Tier 1 buildings are known from the start. A tier 2 building costs {NEXUS_TECH.cost[2]} Research and tier 3 costs {NEXUS_TECH.cost[3]},
-        once the buildings it needs are known. A researched building can be built at any of {f.name}'s sectors, from the sector's panel on the map.
+        once the buildings it needs are known. Build researched buildings at any of {f.name}'s sectors from the sector's map panel.
       </p>
       <div className="tech-tree" style={{ gridTemplateColumns: `3rem repeat(${TECH_BRANCHES.length}, minmax(10rem, 1fr))` }}>
         <span />
@@ -76,7 +76,7 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
                       <div className="tech-tags">
                         <span className="tag">{b.cost} Materials{b.shards ? ` + ${b.shards} US` : ''}</span>
                         {b.homeOnly && <span className="tag cyan" title="Can only be built at a home">home only</span>}
-                        {b.rule === 'table' && <span className="tag" title="The app doesn't apply this one: remember it at the table">at the table</span>}
+                        {b.rule === 'table' && <span className="tag" title="Not applied by the app: remember it at the table">at the table</span>}
                       </div>
                       {st !== 'known' && !!b.requires?.length && (
                         <div className="muted small">Needs {b.requires.map((r) => (

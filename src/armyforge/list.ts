@@ -33,7 +33,7 @@ export function listToForce(raw: Raw, books: CatalogBook[]): Force {
   for (const lu of raw.list.units as Raw[]) {
     const book = books.find((b) => b.uid === (lu.armyId ?? raw.armyId))!;
     const cu = book.units.find((u) => u.id === lu.id);
-    if (!cu) throw new Error(`"${book.name}" has no datasheet ${lu.id}. Re-import the army book from Army Forge and try again.`);
+    if (!cu) throw new Error(`"${book.name}" has no datasheet ${lu.id}. Re-import the army book from Army Forge.`);
     const sel: Selection = {};
     for (const up of lu.selectedUpgrades ?? []) {
       const key = `${up.upgradeId}:${up.optionId}`;
@@ -77,6 +77,6 @@ export function listToForce(raw: Raw, books: CatalogBook[]): Force {
 
 export class MissingBooksError extends Error {
   constructor(public uids: string[], armyName?: string) {
-    super(`This Army Forge list needs the army book${armyName ? ` "${armyName}"` : ''}. Import it on the Army Books page first, then drop the list again.`);
+    super(`This Army Forge list needs the army book${armyName ? ` "${armyName}"` : ''}. Import it on the Army Books page, then drop the list again.`);
   }
 }

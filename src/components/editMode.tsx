@@ -40,7 +40,7 @@ export function EditModeButton({ f }: { f: Force }) {
       className={edit ? 'primary' : ''}
       aria-pressed={edit}
       onClick={toggle}
-      title={edit ? 'Hide the manual controls again' : 'Show the manual controls, to fix an untracked game or a wrong reward'}
+      title={edit ? 'Hide the manual controls' : 'Show manual controls to fix an untracked game or wrong reward'}
     >
       <Icon name="l:pencil" /> {edit ? 'Editing — done' : 'Edit mode'}
     </button>
@@ -53,7 +53,7 @@ export function EditModeNotice({ f }: { f: Force }) {
   if (!nexus || !edit) return null;
   return (
     <div className="panel notice small">
-      <b>Edit mode is on.</b> <span className="muted">Changes made here skip the Nexus Wars rules: nothing is paid for or checked. Use it to fix mistakes, then switch it off.</span>
+      <b>Edit mode is on.</b> <span className="muted">Changes skip the Nexus Wars rules: nothing is paid for or checked. Fix mistakes, then switch it off.</span>
     </div>
   );
 }

@@ -142,7 +142,7 @@ export async function fetchBook(uid: string, proxy: string): Promise<CatalogBook
   // Army Forge answers 500 for a book only its creator may see.
   if (!res.ok)
     throw new Error(res.status >= 500 || res.status === 404 || res.status === 403
-      ? 'Army Forge would not share this book. It may be private: its creator can make it public or unlisted in the Army Forge book editor'
+      ? "Army Forge won't share this book. It may be private; its creator can make it public or unlisted in the book editor"
       : `Army Forge returned ${res.status}`);
   return normalizeBook(await res.json());
 }

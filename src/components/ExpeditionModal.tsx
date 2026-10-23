@@ -64,8 +64,8 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
     body = (
       <>
         <p className="muted small">
-          Up to {EXPEDITION.squadMax} units head into the Nexus for {EXPEDITION.encounters} encounters. After each one, head home with the haul or press on: deeper pays more, but every failed roll raises the danger of an ambush.
-          {' '}Checks roll 1 to 4 dice. The squad adds +1 to every roll for each unit after the first, and +1 for every {EXPEDITION.levelsPerBonus} levels across the squad (up to +{EXPEDITION.bonusCap}).
+          Up to {EXPEDITION.squadMax} units face {EXPEDITION.encounters} encounters in the Nexus. After each, head home with the haul or press on. Deeper pays more, but each failed roll raises the ambush danger.
+          {' '}Checks roll 1–4 dice. Every roll gets +1 per unit after the first and +1 per {EXPEDITION.levelsPerBonus} squad levels (max +{EXPEDITION.bonusCap}).
         </p>
         <div className="fields">
           <label className="field span-all">
@@ -78,7 +78,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
           <div className="span-all small">
             <div className="muted">Squad ({squad.length}/{EXPEDITION.squadMax}){squad.length > 0 && <> · <b>+{bonus}</b> to every roll</>}</div>
             {units.length === 0 && <span className="muted">No active units.</span>}
-            {used.length > 0 && <div className="muted">Each unit takes part in one skirmish, Solo patrol or Expedition a round (the main Battle doesn't count).</div>}
+            {used.length > 0 && <div className="muted">Each unit gets 1 skirmish, Solo patrol or Expedition a round. The main Battle doesn't count.</div>}
             {units.map((u) => (
               <label key={u.id} className="row">
                 <input type="checkbox" checked={squad.includes(u.id)} disabled={used.includes(u.id) || (!squad.includes(u.id) && squad.length >= EXPEDITION.squadMax)} onChange={() => toggle(u.id)} />
@@ -135,7 +135,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
           <p className="small">
             {e.danger
               ? `Press on and roll a D6: on ${e.danger === 1 ? 'a 1' : e.danger >= 6 ? 'any roll' : `1–${e.danger}`} the squad is ambushed and a unit is scarred or Lost.`
-              : 'No danger yet: pressing on is safe.'}
+              : 'No danger yet. Pressing on is safe.'}
             {' '}Rewards deeper in are worth more.
           </p>
         )}

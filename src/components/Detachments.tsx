@@ -37,7 +37,7 @@ export function DetachmentsBox({ f, c }: { f: Force; c: Campaign }) {
       <div className="row" style={{ marginTop: '0.35rem' }}>
         <span className="grow muted">
           {mine.length < 2
-            ? 'Link another of your forces to this faction to field a detachment: it starts with no Supply.'
+            ? 'Link another force to this faction to field a detachment. It starts with no Supply.'
             : done
               ? `Reorganised this round (round ${currentRound(c)}). Again next round.`
               : `Move Supply, shards and units between them once a round, for ${shards(COST)}.`}
@@ -85,7 +85,7 @@ function ReorganiseModal({ forces, payer, c, onClose }: { forces: Force[]; payer
     <Modal title="Reorganise detachments" onClose={onClose} wide
       footer={<><span className="muted small grow">Costs {shards(COST)}. Once a round for the whole faction.</span><button onClick={onClose}>Cancel</button><button className="primary" disabled={problems.length > 0} onClick={apply}>Reorganise</button></>}>
       <p className="muted small">
-        Share out the faction's Supply Limit and Umbra Shards, and move units between its forces. Units keep their XP, traits, scars and relics.
+        Split the faction's Supply Limit and Umbra Shards and move units between its forces. Units keep their XP, traits, scars and relics.
       </p>
       <div className="table-wrap">
         <table className="stack">

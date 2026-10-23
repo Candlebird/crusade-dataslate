@@ -96,12 +96,12 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         <div className="cols-2">
           <div className="panel">
             <div className="panel-title"><h2>Player</h2></div>
-            <p className="muted">Import the campaign file your GM shared on Drive. Then link your force to its faction on the force page.</p>
+            <p className="muted">Import the campaign file your GM shared on Drive, then link your force to its faction on the force page.</p>
             {importer}
           </div>
           <div className="panel">
             <div className="panel-title"><h2>Game master</h2></div>
-            <p className="muted">Start a campaign, add the factions and sectors, and record sector games as players report them. Export <b>campaign.json</b> to Drive after each change — your copy is the authoritative one.</p>
+            <p className="muted">Start a campaign, add factions and sectors, and record games as players report them. Export <b>campaign.json</b> to Drive after each change — yours is the master copy.</p>
             <button className="primary" onClick={() => update((d) => void (d.campaign = newCampaign()))}>New campaign</button>
           </div>
         </div>
@@ -127,7 +127,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         <button
           className="danger"
           onClick={() => {
-            if (!confirmAction(`Remove "${c.name}" from this browser? Export it first if you are the GM.`)) return;
+            if (!confirmAction(`Remove "${c.name}" from this browser? GM: export it first.`)) return;
             update((d) => {
               d.campaign = undefined;
               for (const f of d.forces) f.nexus = undefined;
@@ -146,7 +146,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
       <>
         <div className="page-head"><div><h1>{c.name}</h1></div></div>
         <div className="panel">
-          <p>Only the GM can open the GM's side of the campaign.</p>
+          <p>Only the GM can open this page.</p>
           <a className="btn" href={href.campaign()}><Icon name="l:arrow-left" /> Back to the campaign</a>
         </div>
       </>
@@ -177,9 +177,9 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         </div>
         <p className="muted small">
           {viewAs === '-'
-            ? <>Link one of your forces to a faction (on its force page) to see the war through its eyes.</>
+            ? <>Link a force to a faction on its force page to see the war through its eyes.</>
             : <>The war as {viewAs ? <b>{factionName(c, viewAs)}</b> : 'the GM'} sees it.</>}
-          {' '}Pick a sector on the map to see what's known of it, and <b>Start a battle here</b>. The full rules are on the <a href={href.rules('nexus')}>Rules</a> page.
+          {' '}Pick a sector to see what's known and <b>Start a battle here</b>. Full rules: <a href={href.rules('nexus')}>Rules</a>.
         </p>
 
         <RoundPanel c={c} gm={false} viewer={fog} />
@@ -194,7 +194,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         )}
         {tab === 'warlord' && (viewAs !== '-'
           ? <WarlordsPanel c={c} setC={setC} faction={viewAs || undefined} gm={canGm} />
-          : <div className="panel"><p className="muted">Link one of your forces to a faction (on its force page) to see your Warlord.</p></div>)}
+          : <div className="panel"><p className="muted">Link a force to a faction on its force page to see your Warlord.</p></div>)}
         {tab === 'duels' && (
           <>
             <DuelsPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />
@@ -215,8 +215,8 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
     let placed: Sector[] = [];
     setC((d) => void (placed = placeGuardians(d, state.books, state.forces, Math.random, uid)));
     toast(placed.length
-      ? `Guardians now watch over ${placed.map((s) => s.name).join(', ')}.`
-      : "No new guardians: every guardable sector has one, or the Void Echoes book isn't imported.");
+      ? `Guardians placed: ${placed.map((s) => s.name).join(', ')}.`
+      : "No new guardians: all are guarded, or Void Echoes isn't imported.");
   };
 
   return (
@@ -228,15 +228,15 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         </div>
         <div className="row">
           <a className="btn" href={href.campaign()}><Icon name="l:arrow-left" /> Player view</a>
-          <button onClick={guard} title="Give every AI-held planet, station, anomaly, void sector and Lost Archive without one a guardian (the round's end does this too)">Place guardians</button>
+          <button onClick={guard} title="Guard every unguarded AI-held planet, station, anomaly, void sector and Lost Archive (round end does this too)">Place guardians</button>
           <button className="primary" onClick={() => exportCampaign(c)}>Export campaign.json</button>
         </div>
       </div>
       <p className="muted small">
-        The GM's campaign.json is authoritative: players import the latest copy and report sector games to the GM.
-        The GM ends each round when the group has played; each player then claims their faction's sector income on their force page, and match rewards come with each battle you record.
-        The full rules are on the <a href={href.rules('nexus')}>Rules</a> page.
-        Pick a sector on the map and <b>Start a battle here</b>: when the battle is finished, its result goes into the log and the map.
+        Your campaign.json is the master copy: players import it and report games to you.
+        End the round once the group has played; players then claim sector income on their force pages. Match rewards come with each recorded battle.
+        Pick a sector and <b>Start a battle here</b>; the result goes into the log and the map.
+        Full rules: <a href={href.rules('nexus')}>Rules</a>.
       </p>
 
       <RoundPanel c={c} />
@@ -384,7 +384,7 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                     <td className="small s-full" data-label="Linked forces here">{linked.map((f) => <a key={f.id} href={href.force(f.id)}>{f.name} </a>)}</td>
                     <td className="s-tail">
                       <button className="ghost icon" aria-label="Remove faction" onClick={() => {
-                        if (!confirmAction(`Remove ${fa.name}? Its sectors become unclaimed and its home sector is deleted.`)) return;
+                        if (!confirmAction(`Remove ${fa.name}? Its sectors go unclaimed and its home is deleted.`)) return;
                         setC((d) => {
                           d.factions = d.factions.filter((x) => x.id !== fa.id);
                           d.sectors = d.sectors.filter((s) => !(s.type === 'home' && s.owner === fa.id));
@@ -411,7 +411,7 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
   const add = () => setC((d) => void d.sectors.push({ id: uid(), name: `Sector ${d.sectors.length + 1}`, type: 'planet', notes: '' }));
   return (
     <Panel id="campaign.sectors" title="Sectors" extra={<button onClick={add}>+ Add sector</button>}>
-      {c.sectors.length === 0 ? <p className="muted small">No sectors yet. Generate a map above, paint sectors onto it, or add them here.</p> : (
+      {c.sectors.length === 0 ? <p className="muted small">No sectors yet. Generate a map above, paint sectors on it, or add them here.</p> : (
         <div className="table-wrap">
           <table className="compact stack">
             <thead><tr><th>Name</th><th>Type</th><th>Benefit</th><th>Controlled by</th><th>Flags</th><th>Lore</th><th /></tr></thead>
@@ -521,7 +521,7 @@ function RecordPanel({ c, setC, preset }: { c: Campaign; setC: SetC; preset: { s
         <span className="spacer" />
         <button className="primary" disabled={!ready} onClick={() => {
           setC((d) => recordSectorGame(d, { id: uid(), ...ev }));
-          toast('Sector game recorded. Export campaign.json to share it.');
+          toast('Game recorded. Export campaign.json to share it.');
           setEv(blank());
         }}>Record</button>
       </div>
@@ -551,7 +551,7 @@ function LogPanel({ c, setC, viewer }: { c: Campaign; setC: SetC; viewer?: strin
             {e.stories?.map((x) => <div key={x} className="muted small"><Icon name="g:quill-ink" /> {x}</div>)}
           </span>
           {!viewer && <button className="ghost icon" aria-label="Delete log entry"
-            title={e.undo ? 'Delete the entry and put the sector back, unless a later game changed it' : 'Delete the entry'}
+            title={e.undo ? 'Delete and restore the sector, unless a later game changed it' : 'Delete the entry'}
             onClick={() => confirmAction(`Delete this ${e.crisis ? 'Nexus Crisis battle' : e.skirmish ? 'skirmish' : `${sectorName(e.sectorId)} ${e.spread ? 'spread' : 'game'}`} from the log?${e.undo ? ` The sector goes back to how the ${e.spread ? 'spread' : 'game'} found it.` : ''}`) && setC((d) => removeSectorGame(d, e.id))}><Icon name="l:x" /></button>}
         </div>
       ))}

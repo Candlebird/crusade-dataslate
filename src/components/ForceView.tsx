@@ -56,7 +56,7 @@ function TransferForce({ f }: { f: Force }) {
       <button
         disabled={busy || cloud.status !== 'synced'}
         onClick={async () => {
-          if (!window.confirm(`Hand "${f.name}" over to ${to}? They become its owner and you can only look at it afterwards.`)) return;
+          if (!window.confirm(`Hand "${f.name}" over to ${to}? They become its owner and you can only view it.`)) return;
           setBusy(true);
           try {
             await cloud.transfer(f.id, to);
@@ -133,7 +133,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
 
       {theirs && (
         <div className="panel notice">
-          This is <b>{f.owner}</b>'s force. You can look and print lists, but changes you make here are undone — only its owner can edit it.
+          <b>{f.owner}</b>'s force. You can view it and print lists, but only they can edit it.
         </div>
       )}
 
@@ -187,7 +187,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
             <TagFilter tags={tagsIn(listed.map((u) => unitTags(u, state.books)))} value={tagFilter} onChange={setTagFilter} />
             {listed.length === 0 ? (
               <div className="empty">
-                No units yet. {edit ? <button onClick={() => setAdding(true)}>+ Add the first one</button> : 'Produce them at your planets in the Nexus Wars panel.'}
+                No units yet. {edit ? <button onClick={() => setAdding(true)}>+ Add the first one</button> : 'Produce them at your planets (Nexus Wars panel).'}
               </div>
             ) : units.length === 0 ? (
               <div className="empty">No units carry all of those tags.</div>
@@ -254,7 +254,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
             }
           >
             {!f.lists?.length ? (
-              <p className="muted small">Pick units for a game and print them with their stats, traits, relics and rules.</p>
+              <p className="muted small">Pick units for a game and print their stats, traits, relics and rules.</p>
             ) : (
               f.lists.map((l) => {
                 const lt = listTotals(f, l, s);
@@ -301,7 +301,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                         <td className="s-full" data-label="Entry"><TextField className="wide" value={e.label} onCommit={(v) => set((d) => void (d.ledger[i].label = v))} /></td>
                         <td className="num" data-label="RP"><input type="number" value={e.rp} onChange={(ev) => set((d) => void (d.ledger[i].rp = Number(ev.target.value) || 0))} /></td>
                         <td className="num" data-label="Supply"><input type="number" step={50} value={e.supply} onChange={(ev) => set((d) => void (d.ledger[i].supply = Number(ev.target.value) || 0))} /></td>
-                        <td className="num small" data-label="US" title="Umbra Shards (history only — the balance is set in Force details)">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
+                        <td className="num small" data-label="US" title="Umbra Shards (history only; set the balance in Force details)">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
                         <td className="s-end"><button className="ghost icon" onClick={() => set((d) => void d.ledger.splice(i, 1))} aria-label="Delete entry"><Icon name="l:x" /></button></td>
                       </tr>
                     ) : (
@@ -326,7 +326,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
             extra={<span className="muted small">{f.wins} win{f.wins === 1 ? '' : 's'} in {f.battles} battle{f.battles === 1 ? '' : 's'}</span>}
           >
             {!f.battleLog?.length ? (
-              <p className="muted small">No battles recorded yet. <a href={href.battle(f.id)}>Record one</a> after your next game.</p>
+              <p className="muted small">No battles yet. <a href={href.battle(f.id)}>Record one</a> after your next game.</p>
             ) : (
               [...f.battleLog].reverse().map((b) => (
                 <details key={b.id} className="list-item" style={{ display: 'block' }}>
@@ -379,7 +379,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
             <button
               className="danger"
               onClick={() => {
-                if (!window.confirm(`Delete "${f.name}" and all its units${f.owner && cloud.email ? ' for every player' : ''}? Export it first if you want a copy.`)) return;
+                if (!window.confirm(`Delete "${f.name}" and all its units${f.owner && cloud.email ? ' for every player' : ''}? Export it first to keep a copy.`)) return;
                 update((d) => void (d.forces = d.forces.filter((x) => x.id !== f.id)));
                 toast(`Deleted ${f.name}.`);
                 go(href.forces());
@@ -424,13 +424,13 @@ function ProductionBox({ f, c }: { f: Force; c: Campaign }) {
   const budget = Math.min(room, site ? Math.floor(bank / (1 - produceDiscount(site, { tough: 0 }))) : 0);
   return (
     <div className="span-all small">
-      <div className="muted" title="Each planet banks Materials every round; spend them to raise units there. Barracks double it, Training Grounds give new units XP.">Production</div>
+      <div className="muted" title="Each planet banks Materials every round. Spend them to raise units there. Barracks double the bank; Training Grounds give new units XP.">Production</div>
       <div className="row">
         <select value={site.id} onChange={(e) => setSite(e.target.value)} aria-label="Where to produce" style={{ minWidth: 0, flex: 1 }}>
           {sites.map((x) => <option key={x.id} value={x.id}>{x.name}: {x.bank ?? 0} Materials banked</option>)}
         </select>
         <button disabled={budget <= 0} onClick={() => setAdding(true)}
-          title={bank <= 0 ? 'Nothing banked here yet: it banks more when the round ends' : room <= 0 ? 'No room under your Supply Limit' : `Up to ${budget} pts`}>
+          title={bank <= 0 ? 'Nothing banked yet. More arrives when the round ends.' : room <= 0 ? 'No room under your Supply Limit' : `Up to ${budget} pts`}>
           Produce units…
         </button>
       </div>
@@ -451,7 +451,7 @@ function ProductionBox({ f, c }: { f: Force; c: Campaign }) {
             });
             setAdding(false);
             const cost = produceCost(site, newUnits);
-            toast(ok ? `Produced ${newUnits.length} unit(s) at ${site.name} for ${cost} Materials.` : `${site.name} has only ${bank} Materials banked; that costs ${cost}.`);
+            toast(ok ? `Produced ${newUnits.length} unit(s) at ${site.name} for ${cost} Materials.` : `Costs ${cost} Materials; ${site.name} has only ${bank}.`);
           }}
         />
       )}
@@ -475,7 +475,7 @@ function HeroOffers({ f, c }: { f: Force; c: Campaign }) {
             <span className="grow">
               <Icon name="g:round-star" /> <b>{o.unit.unitType}</b> <span className="muted">— level {levelForXp(o.unit.xp)}, {o.unit.points} pts{relic ? <>, carrying <b>{relic.name}</b> ({relic.tier})</> : ''}. {o.fee} US; {offerEnds(o) > currentRound(c) ? 'leaves after next round' : 'leaves when this round ends'}.</span>
             </span>
-            <button disabled={!!block} title={block ?? `Hire for ${o.fee} Umbra Shards; they join ${f.name} for good`} onClick={() => {
+            <button disabled={!!block} title={block ?? `Hire for ${o.fee} Umbra Shards. They join ${f.name} for good.`} onClick={() => {
               if (!confirmAction(`Hire ${o.unit.unitType} into ${f.name} for ${o.fee} Umbra Shards?`)) return;
               let hired = false;
               update((d) => {
@@ -485,7 +485,7 @@ function HeroOffers({ f, c }: { f: Force; c: Campaign }) {
                   hired = true;
                 }
               });
-              toast(hired ? `${o.unit.unitType} joins ${f.name}.` : 'The hero could not be hired.');
+              toast(hired ? `${o.unit.unitType} joins ${f.name}.` : "Couldn't hire the hero.");
             }}>Hire</button>
           </div>
         );
@@ -537,7 +537,7 @@ function UnitTasksRow({ f, c, onOpen }: { f: Force; c: Campaign; onOpen: () => v
     <>
       <div className="span-all row">
         <span className="grow small">
-          <b>Unit tasks:</b> set a unit to Mentoring, a Project, Recon or Garrison. <span className="muted">It is busy all round and fights in no battle, the main Battle included.</span>
+          <b>Unit tasks:</b> Mentoring, Project, Recon or Garrison. <span className="muted">The unit is busy all round and can't fight, including the main Battle.</span>
         </span>
         <button disabled={!freeUnits(f, c).length} onClick={onOpen}>Unit task…</button>
       </div>
@@ -552,7 +552,7 @@ function UnitTasksRow({ f, c, onOpen }: { f: Force; c: Campaign; onOpen: () => v
       )}
       {claims.length > 0 && (
         <div className="span-all row">
-          <span className="grow small"><b>Garrison XP:</b> Marauders came against {claims.map((x) => x.sector.name).join(', ')}. +{GARRISON.raidXp} XP to each unit that stood guard.</span>
+          <span className="grow small"><b>Garrison XP:</b> Marauders raided {claims.map((x) => x.sector.name).join(', ')}. +{GARRISON.raidXp} XP to each unit on guard.</span>
           <button className="primary" onClick={claim}>Claim garrison XP</button>
         </div>
       )}
@@ -583,8 +583,8 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
     <div className="span-all row">
       <span className="grow small">
         {expedited
-          ? <span className="muted">Every unit has already fought this round. They are free again when the GM ends the round.</span>
-          : <><b>Solo patrol:</b> send up to {SOLO_PATROL.points} pts out to find a {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts enemy, then fight it or turn back.</>}
+          ? <span className="muted">Every unit has fought this round. They're free again when the GM ends the round.</span>
+          : <><b>Solo patrol:</b> send up to {SOLO_PATROL.points} pts to find a {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts enemy, then fight or turn back.</>}
       </span>
       <button disabled={expedited || !f.units.some((u) => u.status === 'active')} onClick={() => setPatrol(true)}>Patrol…</button>
       {patrol && <PatrolModal force={f} onClose={() => setPatrol(false)} />}
@@ -593,7 +593,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const trainingRow = (
     <div className="span-all row">
       <span className="grow small">
-        <b>Training sim:</b> hold a base against endless waves with up to {TRAINING.squadMax} units for up to {TRAINING.xpCap} XP each. <span className="muted">Any time, as often as you like; no unit becomes busy.{f.trainingBest ? ` Best: ${f.trainingBest} waves.` : ''}</span>
+        <b>Training sim:</b> hold a base against endless waves with up to {TRAINING.squadMax} units for up to {TRAINING.xpCap} XP each. <span className="muted">Any time, as often as you like. Units don't become busy.{f.trainingBest ? ` Best: ${f.trainingBest} waves.` : ''}</span>
       </span>
       <button disabled={!f.units.some(canTrain)} onClick={() => setTraining(true)}>Train…</button>
       {training && <TrainingModal force={f} onClose={() => setTraining(false)} />}
@@ -602,7 +602,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const sortieRow = (
     <div className="span-all row">
       <span className="grow small">
-        <b>Sortie:</b> a party of three sets out through Echo fights, camps and shrines to an Echo lord. Free runs earn up to {SORTIE.caps.free.short}–{SORTIE.caps.free.long} XP; a Shard run costs {SORTIE.cost} Umbra Shards, earns up to {SORTIE.caps.shard.long} XP and brings home Supply, RP and up to {SORTIE.haul.maxUs} shards. <span className="muted">{f.sortieBest ? `Furthest: ${f.sortieBest} nodes.` : ''}</span>
+        <b>Sortie:</b> a party of 3 pushes through Echo fights, camps and shrines to an Echo lord. Free runs earn up to {SORTIE.caps.free.short}–{SORTIE.caps.free.long} XP. A Shard run costs {SORTIE.cost} Umbra Shards, earns up to {SORTIE.caps.shard.long} XP and brings home Supply, RP and up to {SORTIE.haul.maxUs} shards. <span className="muted">{f.sortieBest ? `Furthest: ${f.sortieBest} nodes.` : ''}</span>
       </span>
       <button disabled={f.units.filter(canSortie).length < 3} onClick={() => setSortie(true)}>Sortie…</button>
       {sortie && <SortieModal force={f} c={c} onClose={() => setSortie(false)} />}
@@ -613,7 +613,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
     <Panel id="force.nexus" title="Nexus Wars" h={3} className="nexus-box" extra={<button className="primary" onClick={onShop}>Spend Umbra Shards</button>}>
       {!c ? (
         <>
-          <p className="muted small">No campaign loaded. <a href={href.campaign()}>Import or start one</a> to link this force to a faction.</p>
+          <p className="muted small">No campaign loaded. <a href={href.campaign()}>Import or start one</a> to link a faction.</p>
           {patrolRow}
           {trainingRow}
           {sortieRow}
@@ -627,7 +627,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
               // Joining a faction that already has a force makes this one a detachment: its Supply comes from the others.
               const detachment = !!id && factionForces(state.forces, id).some((x) => x.id !== f.id);
               const zero = detachment && f.startingSupply !== NEXUS_DETACHMENTS.startingSupply;
-              if (zero && !confirmAction(`${factionName(c, id)} already has a force, so ${f.name} becomes a detachment: its Starting Supply goes from ${f.startingSupply} to ${NEXUS_DETACHMENTS.startingSupply}. Give it Supply, shards and units by reorganising the faction's detachments. Link it?`)) return;
+              if (zero && !confirmAction(`${factionName(c, id)} already has a force, so ${f.name} becomes a detachment. Its Starting Supply drops from ${f.startingSupply} to ${NEXUS_DETACHMENTS.startingSupply}; reorganise detachments to give it Supply, shards and units. Link it?`)) return;
               set((d) => {
                 if (!id) d.nexus = undefined;
                 else if (d.nexus) d.nexus.factionId = id;
@@ -639,7 +639,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
               {c.factions.map((x) => <option key={x.id} value={x.id}>{x.name}{x.player ? ` (${x.player})` : ''}</option>)}
             </select>}
           </label>
-          {n && !faction && <p className="span-all small" style={{ color: 'var(--warn)', margin: 0 }}>This faction is not in the loaded campaign.</p>}
+          {n && !faction && <p className="span-all small" style={{ color: 'var(--warn)', margin: 0 }}>This faction isn't in the loaded campaign.</p>}
           {!(n && faction) && patrolRow}
           {!(n && faction) && trainingRow}
           {!(n && faction) && sortieRow}
@@ -657,8 +657,8 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
               <div className="span-all row">
                 <span className="grow small">
                   {expedited
-                    ? <span className="muted">Every unit has already fought this round. They are free again when the GM ends the round.</span>
-                    : <><b>Downtime:</b> send up to three units on an Expedition between games.</>}
+                    ? <span className="muted">Every unit has fought this round. They're free again when the GM ends the round.</span>
+                    : <><b>Downtime:</b> send up to 3 units on an Expedition between games.</>}
                 </span>
                 <button disabled={expedited} onClick={() => setExpedition(true)}>Expedition…</button>
               </div>
@@ -691,7 +691,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
               <div className="span-all small">
                 <span className="muted">Unlocked Nexus tables: </span>
                 {unlockedTables(n).length ? unlockedTables(n).join(', ') : 'none'}
-                {n.tempTables === 'all' || n.tempTables.length ? <span className="muted"> (temporary ones last until your next round income)</span> : null}
+                {n.tempTables === 'all' || n.tempTables.length ? <span className="muted"> (temporary ones last until your next income)</span> : null}
               </div>
               <label className="field span-all">
                 Trait tokens

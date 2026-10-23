@@ -46,10 +46,10 @@ function HexGlyph({ type, x, y }: { type: SectorType; x: number; y: number }) {
 }
 const TOOLS: { key: Tool; label: string; hint: string }[] = [
   { key: 'select', label: 'Select', hint: 'Click a hex to see or edit it' },
-  { key: 'type', label: 'Paint type', hint: 'Click hexes to set their type (creates a sector on empty space)' },
+  { key: 'type', label: 'Paint type', hint: 'Click hexes to set their type (empty space gets a new sector)' },
   { key: 'owner', label: 'Paint owner', hint: 'Click sectors to hand them to a faction' },
-  { key: 'move', label: 'Move', hint: 'Click a sector, then click where it goes (swaps with an occupied hex)' },
-  { key: 'unplace', label: 'Take off map', hint: 'Click sectors to take them off the map (they stay in the sector list)' },
+  { key: 'move', label: 'Move', hint: 'Click a sector, then its new hex (swaps if occupied)' },
+  { key: 'unplace', label: 'Take off map', hint: 'Click sectors to remove them from the map (they stay in the list)' },
 ];
 
 /**
@@ -74,7 +74,7 @@ export default function HexMapPanel({ c, setC, onRecord, gm = true, fog, focus }
     return (
       <div className="panel">
         <div className="panel-title"><h2>Sector map</h2></div>
-        <p className="muted small">Lay the sectors out on a hex map. Generate one from the factions and sectors you have, or start with an empty grid and paint it yourself.</p>
+        <p className="muted small">Generate a hex map from your factions and sectors, or paint an empty grid yourself.</p>
         <div className="row">
           <button className="primary" onClick={() => setGenOpen(true)}>Generate map…</button>
           <button onClick={() => setC((d) => void (d.map = defaultMap(d.factions.length)))}>Empty grid</button>
@@ -290,7 +290,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
           <span className="spacer" />
           <label className="row small">
             View as
-            <select value={viewAs} onChange={(e) => setViewAs(e.target.value)} title="See the map as that faction does: its fog of war, and where its detachments can reach this round">
+            <select value={viewAs} onChange={(e) => setViewAs(e.target.value)} title="See that faction's fog of war and where its detachments can reach this round">
               <option value="">Everything (GM)</option>
               {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
@@ -300,7 +300,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
           </span>
         </div>
         <p className="muted small" style={{ margin: '0.25rem 0' }}>{hint}</p></>}
-        {!gm && viewAs && <p className="muted small" style={{ margin: '0 0 0.25rem' }}>Fog of war: you see what your sectors can see. Dimmed sectors are ones you've seen before; who holds them now is unknown.</p>}
+        {!gm && viewAs && <p className="muted small" style={{ margin: '0 0 0.25rem' }}>Fog of war: you see what your sectors see. Dimmed sectors were seen before; their current holder is unknown.</p>}
 
         <div className="map-wrap">
           <div className="map-view">
@@ -485,7 +485,7 @@ function Uncharted() {
   return (
     <>
       <h3>Uncharted space</h3>
-      <p className="muted small">Beyond your sight: nothing is known of this hex. Take a sector nearby, or raise a Watchtower, to see further.</p>
+      <p className="muted small">Beyond your sight. Take a sector nearby or raise a Watchtower to see further.</p>
     </>
   );
 }
@@ -505,7 +505,7 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
         {s.image && <img className="sector-art" src={s.image} alt="" />}
         <h3 style={{ marginBottom: 0 }}>{s.name}</h3>
         <div className="small"><span className="tag"><Glyph g={GLYPH[s.type]} /> {SECTOR_TYPES[s.type].label}</span><span className="tag">Out of sight</span></div>
-        <p className="small muted">You've seen this sector before, but it's beyond your sight now: who holds it, and what guards it, is unknown.</p>
+        <p className="small muted">Out of sight now: who holds and guards it is unknown.</p>
         {s.notes && <p className="small lore">{s.notes}</p>}
       </>
     );
@@ -547,7 +547,7 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
       {blocked && <p className="small"><span className="tag red">{blocked}</span></p>}
       {running?.sectorId === s.id && <p className="small"><Icon name="g:crossed-swords" /> <a href={href.tracker()}>{running.mission.name}</a> is being fought here, round {running.round}.</p>}
       <div className="row" style={{ marginTop: '0.75rem' }}>
-        <a className="btn primary" href={href.tracker(s.id)} title="Open the battle tracker set up for this sector; finishing the battle updates the map"><Icon name="g:crossed-swords" /> Start a battle here</a>
+        <a className="btn primary" href={href.tracker(s.id)} title="Open the battle tracker for this sector; the result updates the map"><Icon name="g:crossed-swords" /> Start a battle here</a>
         {gm && onRecord && <button onClick={onRecord} title="Log a game you didn't track">Record a game here</button>}
         {gm && <button onClick={onEdit}>Edit</button>}
       </div>
@@ -560,7 +560,7 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
 function headingText(c: Campaign, band: string, h: NonNullable<ReturnType<typeof bandHeading>>) {
   const when = h.rounds <= 1 ? 'when this round ends' : `in ${h.rounds} rounds`;
   return `${band} are after ${factionName(c, h.target.owner)}'s ${h.target.name} (${h.target.bank ?? 0} Materials). They reach it ${when}. `
-    + 'Walls or a detachment there throw them back; any detachment on their road stops them short.';
+    + 'Walls or a detachment there throw them back. Any detachment on their road stops them.';
 }
 
 function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: boolean; viewer: string; setC: SetC }) {
@@ -580,7 +580,7 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
     const e: CampaignEvent = { id: uid(), date: localDate(), sectorId: s.id, attacker: fid, defender: MARAUDER_ID, winner, notes, ...(forceId ? { forceId } : {}), ...(stories.length ? { stories } : {}) };
     recordMarauderGame(d, e, bandId);
     toast(winner === fid ? `${factionName(d, fid)} broke the band${e.loot ? ` and found ${e.loot.name}` : ''}.`
-      : winner ? `The Marauders held${e.toll ? ` and took ${e.toll} Materials` : ''}.` : 'A draw: the band stays, but takes no toll.');
+      : winner ? `The Marauders held${e.toll ? ` and took ${e.toll} Materials` : ''}.` : 'Draw: the band stays but takes no toll.');
   });
   const fight = (bandId: string, won: boolean) => record(bandId, who, won ? who : MARAUDER_ID);
   const pay = (bandId: string, fid: string) => {
@@ -613,12 +613,12 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
               <div className="band-challenge">
                 <span className="tag red"><Icon name="g:crossed-swords" /> Turned on {m.barred.by.map((id) => factionName(c, id)).join(' & ')}</span>{' '}
                 for barring their road at {c.sectors.find((x) => x.id === m.barred!.sectorId)?.name}. Before round {m.barred.round} ends,
-                fight them (win and they're broken, lose and they take {MARAUDERS.lostToll} Materials) or pay {MARAUDERS.toll} Materials.
-                Do neither and they take the {MARAUDERS.toll} anyway.
+                fight them (win: they're broken; lose: they take {MARAUDERS.lostToll} Materials) or pay {MARAUDERS.toll} Materials.
+                Do neither and they take {MARAUDERS.toll} anyway.
                 {m.barred.by.filter((id) => gm || id === viewer).map((id) => (
                   <div key={id} className="row" style={{ marginTop: '0.35rem' }}>
                     <b>{factionName(c, id)}</b>
-                    <button onClick={() => startAuto(m.id, id)} title="Fight it out on the auto-battle: the detachment that barred them against the band"><Icon name="g:power-lightning" /> Auto-battle</button>
+                    <button onClick={() => startAuto(m.id, id)} title="Auto-battle the band with the detachment that barred them"><Icon name="g:power-lightning" /> Auto-battle</button>
                     <button onClick={() => pay(m.id, id)} title={`Pay ${MARAUDERS.toll} Materials from your banks`}>Pay {MARAUDERS.toll}</button>
                   </div>
                 ))}
@@ -629,8 +629,8 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
                 <select value={who} onChange={(e) => setBy(e.target.value)} aria-label="Faction fighting the band">
                   {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
-                <button onClick={() => fight(m.id, true)} title="Log the game: the band is broken and the winner rolls loot">Beat them</button>
-                <button onClick={() => fight(m.id, false)} title="Log the game: the band stays">Lost</button>
+                <button onClick={() => fight(m.id, true)} title="Log a win: the band breaks and the winner rolls loot">Beat them</button>
+                <button onClick={() => fight(m.id, false)} title="Log a loss: the band stays">Lost</button>
               </div>
             )}
           </div>
@@ -641,13 +641,13 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
           <span className="tag red"><Icon name="g:hood" /> {h.target.id === s.id ? 'Coming here' : 'On their road'}</span>{' '}
           {h.target.id === s.id
             ? headingText(c, `${m.name} (${m.strength} Supply)`, h)
-            : `${m.name} (${m.strength} Supply) pass through here on their way to ${h.target.name}. A detachment of any faction standing here bars the road: they halt in front of it and raid nothing, then turn on it (fight them or pay ${MARAUDERS.toll} Materials).`}
+            : `${m.name} (${m.strength} Supply) pass through here toward ${h.target.name}. Any faction's detachment here bars the road: they halt, raid nothing, then turn on it (fight or pay ${MARAUDERS.toll} Materials).`}
         </div>
       ))}
       {auto && (
         <AutoBattleModal b={auto.b} onClose={() => setAuto(null)} onApply={applyAuto}
           set={(fn) => setAuto((a) => { if (!a) return a; const b = structuredClone(a.b); fn(b); return { ...a, b }; })}
-          applyNote="Applying logs the game against the band. Losses don't carry over to the force." />
+          applyNote="Applying logs the game against the band. The force keeps no losses." />
       )}
     </div>
   );
@@ -684,7 +684,7 @@ function DetachmentsHere({ c, s, forces, gm, setC }: { c: Campaign; s: Sector; f
         </p>
       )}
       {gm && elsewhere.length > 0 && (
-        <select value="" aria-label="Move a detachment here" title="Put a detachment here by hand, outside the orders"
+        <select value="" aria-label="Move a detachment here" title="Place a detachment here by hand, outside orders"
           onChange={(e) => { const f = elsewhere.find((x) => x.id === e.target.value); if (f) move(f); }}>
           <option value="">Move a detachment here…</option>
           {elsewhere.map((f) => <option key={f.id} value={f.id}>{detachmentName(c, forces, f)} ({positionOf(c, f)?.name})</option>)}
@@ -745,7 +745,7 @@ function ProductionBox({ s }: { s: Sector }) {
         return (
           <div key={id} className="row" title={x?.desc}>
             <span className="grow">
-              <Glyph g={x?.icon} /> {x?.name ?? id} {x?.rule === 'table' && <span className="tag" title="The app doesn't apply this one: remember it at the table">at the table</span>}{' '}
+              <Glyph g={x?.icon} /> {x?.name ?? id} {x?.rule === 'table' && <span className="tag" title="Not applied by the app: remember it at the table">at the table</span>}{' '}
               <span className="muted">— {x?.desc}</span>
             </span>
             <button className="ghost icon" aria-label={`Tear down ${x?.name ?? id}`} title="Tear down (no refund)"
@@ -757,9 +757,9 @@ function ProductionBox({ s }: { s: Sector }) {
         <div className="row" title={going?.desc}>
           <span className="grow">
             <Icon name="g:crane" /> {going?.name ?? k.id} <span className="tag gold">building</span>{' '}
-            <span className="muted">— finished when round {k.round} ends. Paid {price({ cost: k.supply, shards: k.shards })}.</span>
+            <span className="muted">— done when round {k.round} ends. Paid {price({ cost: k.supply, shards: k.shards })}.</span>
           </span>
-          <button className="ghost" title="Stop building; everything paid comes back"
+          <button className="ghost" title="Stop building for a full refund"
             onClick={() => confirmAction(`Stop building the ${going?.name ?? k.id}? The ${price({ cost: k.supply, shards: k.shards })} paid comes back.`)
               && edit((y, _c, fs) => cancelBuilding(y, fs, today, uid))}>Cancel</button>
         </div>
@@ -775,7 +775,7 @@ function ProductionBox({ s }: { s: Sector }) {
             </select>
             <button className="primary" disabled={!pick || !!block} title={block} onClick={() => {
               edit((y, c, fs) => void build(c, y, pick, fs.find((f) => f.id === payer?.id), today, uid));
-              toast(`${b!.name} started at ${s.name}: finished when the round ends.`);
+              toast(`${b!.name} started at ${s.name}. Done at round end.`);
               setPick('');
             }}>Start</button>
           </div>
@@ -792,11 +792,11 @@ function ProductionBox({ s }: { s: Sector }) {
             </div>
           )}
           {b && <div className={block ? '' : 'muted'}>{block ? <span className="tag red">{block}</span>
-            : <>Costs {buildCost(b, s, c ?? undefined)} of the {s.bank ?? 0} banked Materials{b.shards ? <> and {b.shards} of {payer?.name}'s {payer?.umbraShards} Umbra Shards</> : ''}, now. Finished when the round ends.</>}</div>}
+            : <>Costs {buildCost(b, s, c ?? undefined)} of {s.bank ?? 0} banked Materials{b.shards ? <> and {b.shards} of {payer?.name}'s {payer?.umbraShards} Umbra Shards</> : ''} now. Done when the round ends.</>}</div>}
         </>
       )}
-      {!k && free > 0 && locked > 0 && <div className="muted">{locked} more building{locked === 1 ? '' : 's'} to research in the tech tree (the Research panel).</div>}
-      {!k && free <= 0 && <div className="muted">Every slot is built. Tear one down (<Icon name="l:x" />) to build something else.</div>}
+      {!k && free > 0 && locked > 0 && <div className="muted">{locked} more building{locked === 1 ? '' : 's'} to research in the tech tree.</div>}
+      {!k && free <= 0 && <div className="muted">All slots full. Tear one down (<Icon name="l:x" />) to build something else.</div>}
       {hasBuilding(s, 'exchange') && (
         <div className="row" style={{ marginTop: '0.25rem' }}>
           <span className="grow"><Icon name="l:arrow-left-right" /> Grand Exchange{s.exchanged === (c?.round ?? 1) ? <span className="muted"> — traded this round</span> : <span className="muted"> — once a round, with {payer?.name ?? 'a force'}</span>}</span>
@@ -813,21 +813,21 @@ function ProductionBox({ s }: { s: Sector }) {
       )}
       {s.type === 'planet' && !s.core && (owner?.cores ?? 0) > 0 && (
         <div className="row" style={{ marginTop: '0.25rem' }}>
-          <span className="grow"><Icon name="g:diamonds" /> {owner?.name} has {owner?.cores} Building Expansion{owner?.cores === 1 ? '' : 's'}: install one here for a building slot more, for good.</span>
-          <button disabled={!!coreBlocked} title={coreBlocked} onClick={() => confirmAction(`Install a Building Expansion at ${s.name}? It can't be moved again, and stays if the planet is taken.`)
+          <span className="grow"><Icon name="g:diamonds" /> {owner?.name} has {owner?.cores} Building Expansion{owner?.cores === 1 ? '' : 's'}: install one here for a permanent extra slot.</span>
+          <button disabled={!!coreBlocked} title={coreBlocked} onClick={() => confirmAction(`Install a Building Expansion at ${s.name}? It can't be moved and stays if the planet is taken.`)
             && edit((y, cc) => void installCore(cc, y))}>Install</button>
         </div>
       )}
       <details className="muted" style={{ marginTop: '0.25rem' }}>
         <summary>How building works</summary>
         <ul style={{ margin: '0.25rem 0', paddingLeft: '1.2rem' }}>
-          <li>A sector builds <b>one building at a time</b>. Pay when you start it; it's <b>finished when the round ends</b> and works from the next round.</li>
-          <li>Every building costs banked Materials from this sector. The stronger ones also cost Umbra Shards from one of your forces.</li>
-          <li>Tier 1 buildings are known from the start; the others are researched in the tech tree first. Some can only be built at a home.</li>
-          <li>Buildings marked <i>at the table</i> aren't applied by the app: remember them when you play here.</li>
-          <li>Changed your mind? Cancel before the round ends and everything paid comes back.</li>
-          <li>If the sector is taken, its bank and anything still being built are lost; finished buildings stay, for the new owner.</li>
-          <li>New units are produced here from the force page, paid from the same bank.</li>
+          <li>A sector builds <b>one building at a time</b>. Pay at the start; it's <b>done when the round ends</b> and works from the next round.</li>
+          <li>Buildings cost this sector's banked Materials. Stronger ones also cost Umbra Shards from one of your forces.</li>
+          <li>Tier 1 buildings are known from the start. Research the rest in the tech tree. Some are home-only.</li>
+          <li>The app doesn't apply buildings marked <i>at the table</i>: remember them when you play here.</li>
+          <li>Cancel before the round ends for a full refund.</li>
+          <li>If the sector is taken, its bank and any unfinished building are lost. Finished buildings stay for the new owner.</li>
+          <li>Produce new units here from the force page, paid from the same bank.</li>
         </ul>
       </details>
     </div>
@@ -897,7 +897,7 @@ function SectorEditor({ c, s, setSector, setC, onDone, onDeleted }: {
         <span className="spacer" />
         <button className="ghost" onClick={() => setSector((d) => void (d.q = d.r = undefined))} title="Keeps the sector in the list">Take off map</button>
         <button className="danger" onClick={() => {
-          if (!confirmAction(`Delete ${s.name}? Its log entries stay but will show "Deleted sector".`)) return;
+          if (!confirmAction(`Delete ${s.name}? Its log entries will show "Deleted sector".`)) return;
           setC((d) => void (d.sectors = d.sectors.filter((x) => x.id !== s.id)));
           onDeleted();
         }}>Delete</button>
@@ -959,7 +959,7 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
   const keep = c.sectors.filter((s) => !isStronghold(s)).length;
 
   const run = () => {
-    if (o.replace && keep && !confirmAction(`Replace mode deletes ${keep} sector${keep === 1 ? '' : 's'} (with their lore and art). Continue?`)) return;
+    if (o.replace && keep && !confirmAction(`Replace deletes ${keep} sector${keep === 1 ? '' : 's'}, with their lore and art. Continue?`)) return;
     setC((d) => {
       generateMap(d, o);
       rateSectors(d, forces, rng(o.seed + ':mods'), { reroll: true });
@@ -971,7 +971,7 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
   return (
     <Modal title="Generate sector map" onClose={onClose} wide
       footer={<><span className="muted small grow">{tooSmall ? `${total} sectors won't fit on a ${o.cols}×${o.rows} grid.` : `${total} sectors on a ${o.cols}×${o.rows} grid.`}</span><button onClick={onClose}>Cancel</button><button className="primary" onClick={run}>Generate</button></>}>
-      {c.factions.length === 0 && <p className="small" style={{ color: 'var(--warn)' }}>Add the factions first — each one's home sector is spread across the map.</p>}
+      {c.factions.length === 0 && <p className="small" style={{ color: 'var(--warn)' }}>Add factions first — their home sectors are spread across the map.</p>}
       <div className="cols-2">
         <div className="fields">
           <label className="field">Columns<Stepper value={o.cols} min={3} onChange={(n) => resize(Math.min(n, 30), o.rows)} /></label>
@@ -984,7 +984,7 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
           <label className="field span-all">
             Starting sectors per faction
             <Stepper value={o.startingSectors} min={0} onChange={(n) => set({ startingSectors: n })} />
-            <span className="muted small">Each faction takes its nearest unclaimed sectors (never void sectors).</span>
+            <span className="muted small">Each faction takes its nearest unclaimed sectors (never void).</span>
           </label>
         </div>
         <div className="fields">
@@ -995,7 +995,7 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
             <input type="checkbox" checked={o.replace} onChange={(e) => set({ replace: e.target.checked })} />
             Replace existing sectors (keeps home sectors and Voidspawns)
           </label>
-          {!o.replace && <p className="span-all muted small" style={{ margin: 0 }}>Existing sectors stay where they are and count toward the totals; only the gaps are filled.</p>}
+          {!o.replace && <p className="span-all muted small" style={{ margin: 0 }}>Existing sectors stay and count toward the totals. Only gaps are filled.</p>}
         </div>
       </div>
     </Modal>
@@ -1018,8 +1018,8 @@ const MAP_EXPORT_CSS = `
   .band-road { fill: none; stroke: #e05a4a; stroke-width: 2px; stroke-dasharray: 5 4; opacity: 0.85; }
 `;
 
-const MARK_TIP = `The ${ECHOES.name} are massing here. It falls when the round ends unless a detachment of yours stands here `
-  + `or someone wins a Battle against the ${ECHOES.name} and breaks the mark.`;
+const MARK_TIP = `The ${ECHOES.name} are massing here. It falls at round end unless your detachment stands here `
+  + `or someone breaks the mark by winning a Battle against the ${ECHOES.name}.`;
 
 /** A sector the Echoes have marked: who's holding the line, and a way to break the mark with a Battle won against them. */
 function EchoMarkTag({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: boolean; viewer: string; setC: SetC }) {
@@ -1044,7 +1044,7 @@ function EchoMarkTag({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
     </span>
     {!held.length && can.map((f) => (
       <button key={f.id} className="small" onClick={() => breakIt(f.id)}
-        title={`${f.name} won a Battle against the ${ECHOES.name} this round: spend it to keep them out of ${s.name}`}>
+        title={`Spend ${f.name}'s Battle win against the ${ECHOES.name} this round to keep them out of ${s.name}`}>
         Break this mark{gm && can.length > 1 ? ` (${f.name})` : ''}
       </button>
     ))}
@@ -1064,7 +1064,7 @@ function SpreadButton({ c, setC }: { c: Campaign; setC: SetC }) {
   };
   return (
     <button onClick={spread} disabled={!options.length}
-      title={options.length ? `Spread into one of ${options.length} neighbouring sector${options.length === 1 ? '' : 's'} at random` : 'No sector next to their territory to spread into'}>
+      title={options.length ? `Spread into one of ${options.length} neighbouring sector${options.length === 1 ? '' : 's'} at random` : 'No neighbouring sector to spread into'}>
       <Icon name="g:biohazard" /> {ECHOES.name} spread
     </button>
   );

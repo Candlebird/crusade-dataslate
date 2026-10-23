@@ -60,7 +60,7 @@ export function listIssues(f: Force, l: ArmyList, s: Settings): Issue[] {
   const lim = l.pointsLimit;
   if (t.points > lim) out.push({ level: 'error', text: `Over the ${lim} pt limit by ${t.points - lim} pts.` });
   for (const u of us) {
-    if (u.status === 'removed') out.push({ level: 'error', text: `${label(u)} has fallen (removed from the Order of Battle).` });
+    if (u.status === 'removed') out.push({ level: 'error', text: `${label(u)} has fallen (off the Order of Battle).` });
     if (u.status === 'comatose') out.push({ level: 'warn', text: `${label(u)} is comatose and must sit out the next game.` });
   }
   // Standard OPR army composition guidelines; warnings only, groups may ignore them.

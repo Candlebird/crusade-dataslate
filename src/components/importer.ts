@@ -49,10 +49,10 @@ export function useImporter() {
             books = [...books, ...fetched];
             update((d) => void d.forces.push(force));
             forces = [...forces, force];
-            toast(`Force "${force.name}" created from the Army Forge list (${force.units.length} units, ${force.units.reduce((n, u) => n + u.points, 0)} pts).`);
+            toast(`Created "${force.name}" from the Army Forge list (${force.units.length} units, ${force.units.reduce((n, u) => n + u.points, 0)} pts).`);
           } else if (got.kind === 'coreRules') {
             update((d) => void (d.coreRules = got.rules));
-            toast(`Core rules imported (${got.rules.length} rules). List glossaries will now include them.`);
+            toast(`Core rules imported (${got.rules.length} rules). List glossaries now include them.`);
           } else if (got.kind === 'force') {
             const existing = forces.find((f) => f.id === got.force.id);
             if (existing) {
@@ -75,7 +75,7 @@ export function useImporter() {
             if (cur && !window.confirm(
               cur.id === got.campaign.id
                 ? `Replace your copy of "${cur.name}" with this file (updated ${localDate(got.campaign.updatedAt)})?`
-                : `Replace the campaign "${cur.name}" with "${got.campaign.name}"? Forces linked to the old campaign's factions will need re-linking.`,
+                : `Replace the campaign "${cur.name}" with "${got.campaign.name}"? Forces linked to its factions must be re-linked.`,
             )) continue;
             update((d) => void (d.campaign = got.campaign));
             toast(`Campaign "${got.campaign.name}" loaded (${got.campaign.sectors.length} sectors).`);

@@ -84,7 +84,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
   const close = () => {
     const r = runRef.current;
     if (r && r.phase !== 'over' && r.wave > 0) {
-      if (!confirmAction('End this training run? Units keep the XP they have earned so far.')) return;
+      if (!confirmAction('End this training run? Units keep the XP earned so far.')) return;
       quitRun(r);
     }
     bank();
@@ -152,11 +152,11 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
         footer={<><button onClick={onClose}>Cancel</button><button className="primary" disabled={!chosen.length} onClick={begin}>Start training</button></>}
       >
         <p className="small" style={{ marginTop: 0 }}>
-          Hold the base against endless waves. Each wave favours a direction, shown before it starts. Scouts and Ambushers come from the far side.
-          Kills drop credits for upgrades. Every unit still standing earns <b>+{TRAINING.xpPerWave} XP</b> every {TRAINING.xpEvery} waves cleared, up to <b>{TRAINING.xpCap} XP</b> a run.
+          Hold the base against endless waves. Each wave's direction shows before it starts. Scouts and Ambushers come from the far side.
+          Kills drop credits for upgrades. Each unit still standing earns <b>+{TRAINING.xpPerWave} XP</b> per {TRAINING.xpEvery} waves cleared, up to <b>{TRAINING.xpCap} XP</b> a run.
         </p>
         <p className="muted small">
-          Quirks and trinkets from Sorties count here too (not morale). Nothing else carries over: no unit becomes busy, and one that falls is only out of this run. Waves scale with the squad’s points and levels.
+          Sortie quirks and trinkets count here (not morale). Nothing else carries over: units don't become busy, and a fallen unit is only out of this run. Waves scale with the squad’s points and levels.
           {force.trainingBest ? ` Best so far: ${force.trainingBest} waves.` : ''}
         </p>
         <FeatList force={force} where="training" />
@@ -242,7 +242,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
             {setup && run.offer && <button className="primary" onClick={() => setPeek(false)}>Pick a card</button>}
             {setup && !run.offer && <button className="primary" disabled={!!startProblem(run)} onClick={go}>Start wave {run.wave + 1}</button>}
             {run.phase !== 'over' && (
-              <button className={auto ? 'primary' : ''} title="Let the squad play itself: it takes the rarest card, fills the map toward the next wave, and spends credits on whoever is lowest." onClick={() => setAuto(!auto)}>
+              <button className={auto ? 'primary' : ''} title="The squad plays itself: takes the rarest card, fills the map toward the next wave, and spends credits on whoever is lowest." onClick={() => setAuto(!auto)}>
                 Auto
               </button>
             )}
@@ -264,7 +264,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
             <span>Credits <b style={{ color: 'var(--gold)' }}>{Math.floor(run.credits)}</b></span>
           </div>
 
-          <div style={{ margin: '8px 0 4px' }}><b>Squad</b> <span className="muted">· tap one, then a tile{setup ? '' : ' (between waves, or one that can redeploy)'}</span></div>
+          <div style={{ margin: '8px 0 4px' }}><b>Squad</b> <span className="muted">· tap one, then a tile{setup ? '' : ' (between waves, or a unit that can redeploy)'}</span></div>
           {run.towers.map((t) => (
             <button
               key={t.unitId}
@@ -305,7 +305,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
               </div>
               <div className="muted">Level up: {LEVEL_UP} Heal: {HEAL_DESC}</div>
               {setup && selected.x >= 0 && !fixed(run, selected) && <button style={{ marginTop: 4 }} onClick={lift}>Back to the bench</button>}
-              {setup && fixed(run, selected) && <div className="muted">Dug into its position: it can’t move again.</div>}
+              {setup && fixed(run, selected) && <div className="muted">Dug in: it can’t move again.</div>}
             </div>
           )}
 

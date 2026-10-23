@@ -29,9 +29,9 @@ export default function GuidePage() {
 
       <div className="panel">
         <p style={{ margin: 0 }}>
-          New to the Dataslate? This guide takes you from an Army Forge list to a crusade force, then shows how to keep it up to date and
-          collect rewards from battles. If the group plays together, use <b>Sign in</b> in the top bar first and ask to join. The GM
-          accepts you on the Settings page, and after that your forces and battles are shared with the other players.
+          New here? This guide turns your Army Forge list into a crusade force and shows how to claim battle rewards. First, press{' '}
+          <b>Sign in</b> in the top bar and press <b>Request to join</b>. Once the GM accepts you, your forces and battles are shared
+          with the group.
         </p>
         <nav className="guide-toc small">
           <a href="#guide-books" onClick={jump}>1 · Import an army book</a>
@@ -43,119 +43,112 @@ export default function GuidePage() {
 
       <Panel id="guide.books" domId="guide-books" title="1 · Import an army book">
         <p className="muted small" style={{ marginTop: 0 }}>
-          The army book is your faction's catalog of datasheets, rules and spells. The app needs it before it can build your units with full
-          stats. A book only has to be imported once, by anyone, and then the whole group has it.
+          Your faction's datasheets, rules and spells. The app needs it to build your units. One import by anyone covers the whole group.
         </p>
         <Step n={1} title="Copy the book's link from Army Forge" where="army-forge.onepagerules.com">
-          <p>Open your army on Army Forge, then use <b>Share</b> or copy the address from the browser's address bar.</p>
+          <p>Open your army on Army Forge and use <b>Share</b>, or copy the address bar.</p>
         </Step>
         <Step n={2} title="Paste it on the Army Books page" where={<a href={href.books()}>Army Books</a>}>
           <p>
-            Paste the link into <b>Add an army book</b> and press <b>Import</b>. It shows up under <b>Imported books</b>, where you can
-            open <b>Browse</b> to look through its units, rules and spells.
+            Paste the link into <b>Add an army book</b> and press <b>Import</b>. It appears under <b>Imported books</b>. Press{' '}
+            <b>Browse</b> to see its units, rules and spells.
           </p>
         </Step>
         <Step n={3} title="Keep it current">
           <p>
-            When OPR updates the book, press <b>Refresh</b> next to it. Your tags are kept. While you're on this page, press
-            <b> Fetch core rules</b> once so printed lists explain the core rules like AP and Tough.
+            When OPR updates the book, press <b>Refresh</b>. Your tags are kept. Also press <b>Fetch core rules</b> once, so printed
+            lists explain rules like AP and Tough.
           </p>
           <p className="small muted">
-            Import failing? The book may be private. Make it public or unlisted in the Army Forge book editor, or open <b>Private book, or
-            the fetch fails?</b> and drop the book's JSON file there.
+            Import failing? The book may be private. Make it public or unlisted on Army Forge, or drop its JSON file under{' '}
+            <b>Private book, or the fetch fails?</b>
           </p>
         </Step>
       </Panel>
 
       <Panel id="guide.import" domId="guide-force" title="2 · Import your force from Army Forge">
         <p className="muted small" style={{ marginTop: 0 }}>
-          If you've already built your list on Army Forge, you don't have to enter it again. Importing it creates a crusade force with every
-          unit, upgrade and weapon filled in, plus a matching battle list ready to print.
+          No need to re-enter your list. Importing creates a crusade force with every unit, upgrade and weapon filled in, plus a battle
+          list ready to print.
         </p>
         <Step n={1} title="Export the list from Army Forge" where="army-forge.onepagerules.com">
           <p>
-            Open your saved list, open its menu, and <b>export</b> it. Army Forge saves a <code>.json</code> file to your computer.
+            Open your saved list's menu and <b>export</b> it. Army Forge saves a <code>.json</code> file.
           </p>
         </Step>
         <Step n={2} title="Drop the file on the Forces page" where={<a href={href.forces()}>Forces</a>}>
           <p>
-            Scroll down to <b>Import</b> and drag the <code>.json</code> file onto the box, or click the box to pick the file. A new force
-            card appears with your units and points.
+            Under <b>Import</b>, drop the <code>.json</code> file on the box, or click the box to pick it. Your new force card appears.
           </p>
           <p className="small muted">
-            If you get an error about a missing army book, do part 1 first. Lists that mix armies need every book they use.
+            Missing army book error? Do part 1 first. Mixed-army lists need every book they use.
           </p>
         </Step>
         <Step n={3} title="Upload it as yours">
           <p>
-            While you're signed in, a newly imported force is only on your device. Press <b>Upload “…” as mine</b> in the notice at the top
-            of the Forces page so the group can see it and only you can edit it.
+            A new import is only on your device. Press <b>Upload “…” as mine</b> at the top of the Forces page. The group can then see
+            it, and only you can edit it.
           </p>
         </Step>
       </Panel>
 
       <Panel id="guide.edit" domId="guide-edit" title="3 · Edit your force">
-        <p className="muted small" style={{ marginTop: 0 }}>Click a force card on the <a href={href.forces()}>Forces</a> page to open its Order of Battle.</p>
+        <p className="muted small" style={{ marginTop: 0 }}>Click a force card on <a href={href.forces()}>Forces</a> to open its Order of Battle.</p>
         <Step n={1} title="Force details" where="Right-hand panel">
           <p>
-            Rename the force, set the faction, player and starting supply, add a picture, and write its lore. Changes save as soon as you
-            click away from a field.
+            Set the name, faction, player, starting supply, picture and lore. Changes save when you leave a field.
           </p>
         </Step>
         <Step n={2} title="Add units" where="+ Add unit">
           <p>
-            Choose <b>From army book</b> to pick a datasheet and its upgrades, which fills in stats and points for you. You can also paste
-            list text or start from a blank sheet. Tick <b>Only what I can afford</b> to see only units that fit your remaining Supply.
+            <b>From army book</b> fills in stats and points from a datasheet and its upgrades. You can also paste list text or start
+            blank. Tick <b>Only what I can afford</b> to hide units that don't fit your remaining Supply.
           </p>
         </Step>
         <Step n={3} title="Edit a unit" where="Click a unit row">
           <p>
-            Each unit opens on its own sheet. Give it a crusade name, adjust its stats, add XP, and add traits, relics and battle scars.
-            Use the status menu at the top to mark it <b>Comatose</b> or <b>Fallen</b>. Fallen units are hidden from the Order of Battle
-            unless you tick <b>Show … fallen</b>.
+            Give it a crusade name, adjust stats, and add XP, traits, relics and battle scars. Mark it <b>Comatose</b> or{' '}
+            <b>Fallen</b> from the status menu. Fallen units are hidden unless you tick <b>Show … fallen</b>.
           </p>
         </Step>
         <Step n={4} title="Spend requisition" where="Requisition ledger">
           <p>
-            Use <b>Requisition…</b> to buy upgrades with RP, or <b>Increase supply</b> to trade 1 RP for more points. Every change is logged,
-            and you can edit or delete entries.
+            <b>Requisition…</b> buys upgrades with RP. <b>Increase supply</b> trades 1 RP for more points. Every entry is logged, and
+            you can edit or delete it.
           </p>
         </Step>
         <Step n={5} title="Build a battle list" where="Battle lists">
-          <p>Press <b>+ New list</b> to pick the units for a game and print them with their stats, traits, relics and rules.</p>
+          <p>Press <b>+ New list</b>, pick units for a game, and print them with stats, traits, relics and rules.</p>
         </Step>
       </Panel>
 
       <Panel id="guide.claim" domId="guide-claim" title="4 · Claim rewards from past battles">
         <p className="muted small" style={{ marginTop: 0 }}>
-          When a game run in the battle tracker is finished, it's shared with the whole group. Each player then claims their own XP, RP and
-          rewards from it, whenever they get to it.
+          Finished tracker games are shared with the group. Each player claims their own XP, RP and rewards whenever they like.
         </p>
         <p className="muted small">
-          No time to play? Press <b><Icon name="g:power-lightning" /> Auto-battle</b> on a running battle. Each side picks its force (the other player picks their own, or the AI
-          generates one), and every unit gets an Attack and Defense from its Quality, Defense, weapons, traits, upgrades, relics, scars and
-          level. The units then take turns attacking for 4 rounds; the team that destroys the most points wins (close is a draw). A unit brought
-          to half strength, or beaten in melee, takes a Morale test and may be Shaken, losing its next turn. A battle over a Nexus sector also
-          uses the sector's modifiers (Entrenched, Fanatical Garrison, Minefields and the rest), plus an Ion Storm if one is raging that round. Apply the
-          result and claim it like any other battle: losses and kill XP carry over.
+          No time to play? Press <b><Icon name="g:power-lightning" /> Auto-battle</b> on a running battle. Each player picks their
+          force, or the AI generates one. Each unit's Attack and Defense come from its Quality, Defense, weapons, traits, upgrades,
+          relics, scars and level. Units trade attacks for 4 rounds. Most points destroyed wins; a close result is a draw. A unit at
+          half strength, or beaten in melee, tests Morale and may be Shaken, losing its next turn. Nexus sector fights add the sector's
+          modifiers, plus any Ion Storm that round. Apply and claim it like any battle: losses and kill XP carry over.
         </p>
         <Step n={1} title="Open Past battles" where={<a href={href.tracker()}>Battle</a>}>
-          <p>Scroll to the <b>Past battles</b> panel at the bottom of the Battle page.</p>
+          <p>The <b>Past battles</b> panel is at the bottom of the Battle page.</p>
         </Step>
         <Step n={2} title="Show only the battles waiting on you">
           <p>
-            Tick <b>Only waiting on me</b>. This hides everything except battles your forces played in and haven't claimed yet. The panel
-            title shows how many there are.
+            Tick <b>Only waiting on me</b> to see only battles your forces haven't claimed yet. The panel title shows the count.
           </p>
         </Step>
         <Step n={3} title="Claim the rewards">
           <p>
-            Press <b>Claim rewards</b> next to your side. The post-battle wizard opens with the result, mission and units already filled in.
-            Check them, record deaths, roll your rewards, and apply. The side then shows <span className="tag green"><Icon name="l:check" /> claimed</span>.
+            Press <b>Claim rewards</b> next to your side. The post-battle wizard opens with the result, mission and units filled in.
+            Check them, record deaths, roll rewards, and apply. Your side then shows <span className="tag green"><Icon name="l:check" /> claimed</span>.
           </p>
           <p className="small muted">
-            If a side shows <b>Claim as…</b>, no force was loaded for it during the game. Pick the force you played with from the menu.
-            Battles you've already claimed are listed in that force's <b>Battle log</b>.
+            See <b>Claim as…</b>? No force was loaded for that side, so pick the force you played. Claimed battles are listed in the
+            force's <b>Battle log</b>.
           </p>
         </Step>
       </Panel>
