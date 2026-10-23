@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../model/store';
 import { useCloud } from '../cloud/CloudSync';
 import { exportForce, readImageAsDataUrl } from '../model/io';
@@ -36,7 +36,8 @@ import { TagFilter, UnitTags } from './Tags';
 import { Panel, Stepper, TextArea, TextField, XpBar, confirmAction, toast } from './ui';
 import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
 import { localDate } from '../model/date';
-import { EmblemBadge, EmblemEditor } from './Emblem';
+import { EmblemButton } from './Emblem';
+import { defaultEmblem, emblemLayers } from '../model/emblem';
 
 /** Hands the force to another player on the campaign, e.g. when you've been looking after their army. */
 function TransferForce({ f }: { f: Force }) {
@@ -82,6 +83,12 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const f = state.forces.find((x) => x.id === forceId);
   const { edit } = useEditMode(f);
+  const theirs = !!f && !!cloud.email && !!f.owner && f.owner !== cloud.email;
+  // A force without an emblem (an old save or an imported file) gets its default one, so it shows on the Nexus Map too.
+  const needsEmblem = !!f && !theirs && !emblemLayers(f.emblem);
+  useEffect(() => {
+    if (needsEmblem) updateForce(forceId, (d) => void (d.emblem = defaultEmblem(forceId)));
+  }, [needsEmblem, forceId, updateForce]);
   if (!f) return <div className="panel empty">Force not found. <a href={href.forces()}>Back to forces</a></div>;
 
   const s = state.settings;
@@ -91,7 +98,6 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const listed = f.units.filter((u) => showRemoved || u.status !== 'removed');
   const units = listed.filter((u) => matchesTags(unitTags(u, state.books), tagFilter));
   const removedCount = f.units.filter((u) => u.status === 'removed').length;
-  const theirs = !!cloud.email && !!f.owner && f.owner !== cloud.email;
   const levelling = f.units.filter((u) => pendingLevels(u) > 0);
 
   const addLedger = (label: string, rp: number, supply: number) =>
@@ -102,7 +108,15 @@ export default function ForceView({ forceId }: { forceId: string }) {
       <div className="page-head">
         <div>
           <div className="crumbs"><a href={href.forces()}>Forces</a> / Order of Battle</div>
-          <h1 className="with-emblem"><EmblemBadge emblem={f.emblem} size={40} />{f.name}</h1>
+          <h1 className="with-emblem">
+            <EmblemButton emblem={f.emblem} fallback={defaultEmblem(f.id)} readOnly={theirs} title="Emblem"
+              onChange={(e) => set((d) => void (d.emblem = e ?? defaultEmblem(f.id)))}>
+              <p className="muted small" style={{ margin: 0 }}>
+                {theirs ? `Only ${f.owner} can change this force's emblem.` : 'Stands for the force on the Nexus Map.'}
+              </p>
+            </EmblemButton>
+            {f.name}
+          </h1>
         </div>
         <div className="row">
           {armyUrl && <a className="btn" href={armyUrl} target="_blank" rel="noreferrer">Army Forge ↗</a>}
@@ -356,9 +370,6 @@ export default function ForceView({ forceId }: { forceId: string }) {
               )}
               <label className="field span-all">Description / lore<TextArea rows={5} value={f.description} onCommit={(v) => set((d) => void (d.description = v))} /></label>
             </div>
-          </Panel>
-          <Panel id="force.emblem" title="Emblem" h={3} collapsed lead={<EmblemBadge emblem={f.emblem} size={48} />}>
-            <EmblemEditor emblem={f.emblem} readOnly={theirs} onChange={(e) => set((d) => void (d.emblem = e))} />
           </Panel>
           <NexusPanel f={f} onShop={() => setUmbra(true)} />
           {theirs ? null : <div className="panel">

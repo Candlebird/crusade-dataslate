@@ -39,7 +39,7 @@ import { unitName } from '../rules/battle';
 import { quirkInfo, trinketInfo, veteranTitle } from '../rules/sortie';
 import { unitBookUrl } from '../armyforge/book';
 import { go, href } from '../route';
-import { EmblemEditor, Portrait } from './Emblem';
+import { EmblemButton } from './Emblem';
 import { defaultPortrait } from '../model/emblem';
 import { ForceImage } from './ForceView';
 import TablePicker, { type PickEntry, type PickGroup, type Picked } from './TablePicker';
@@ -213,7 +213,14 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           <div className="crumbs">
             <a href={href.forces()}>Forces</a> / <a href={href.force(f.id)}>{f.name}</a> / Unit sheet
           </div>
-          <h1 className="with-emblem"><Portrait unit={u} size={40} />{u.name || u.unitType || 'Unnamed unit'}</h1>
+          <h1 className="with-emblem">
+            <EmblemButton emblem={u.portrait} fallback={defaultPortrait(u)} readOnly={!edit} title="Portrait"
+              onChange={(e) => set((d) => void (d.portrait = e))}>
+              <p className="muted small" style={{ margin: 0 }}>
+                Stands for the unit in the Training Grounds and on a Sortie.{!edit && ' Turn on edit mode to change it.'}
+              </p>
+            </EmblemButton>
+            {u.name || u.unitType || 'Unnamed unit'}</h1>
           <div className="muted">
             {u.name && u.unitType}
             {u.name && u.bookName && ' · '}
@@ -531,10 +538,6 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           </div>
           <Panel id="unit.validation" title="Validation" h={3}>
             <Issues issues={issues} />
-          </Panel>
-          <Panel id="unit.portrait" title="Portrait" h={3} collapsed lead={<Portrait unit={u} size={48} />}>
-            <p className="muted small" style={{ margin: 0 }}>Stands for the unit in the Training Grounds and on a Sortie.</p>
-            <EmblemEditor emblem={u.portrait} fallback={defaultPortrait(u)} readOnly={!edit} onChange={(e) => set((d) => void (d.portrait = e))} />
           </Panel>
           <Panel id="unit.notes" title="Notes" h={3}>
             <TextArea rows={6} value={u.notes} placeholder="Background, honours, grudges…" onCommit={(v) => set((d) => void (d.notes = v))} />

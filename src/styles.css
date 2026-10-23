@@ -430,6 +430,11 @@ table.compact .stepper input { width: 2.6rem; }
 .map-legend { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-top: 0.5rem; }
 .emblem { flex: none; vertical-align: middle; }
 .with-emblem { display: flex; align-items: center; gap: 0.5rem; }
+.emblem-button { position: relative; flex: none; padding: 0; min-height: 0; border: 1px solid transparent; border-radius: var(--radius); background: none; line-height: 0; cursor: pointer; }
+.emblem-button:hover:not(:disabled), .emblem-button:focus-visible { border-color: var(--gold); }
+.emblem-button-hint { position: absolute; right: -6px; bottom: -6px; padding: 2px 3px; font-size: 0.65rem; line-height: 1; color: var(--gold); background: var(--panel); border: 1px solid var(--line); border-radius: 50%; opacity: 0; transition: opacity 0.15s; }
+.emblem-button:hover .emblem-button-hint, .emblem-button:focus-visible .emblem-button-hint { opacity: 1; }
+@media (hover: none) { .emblem-button-hint { opacity: 1; } }
 .tag .emblem { margin-right: 0.15rem; vertical-align: -2px; }
 .emblem-editor { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.75rem; }
 .emblem-preview { display: flex; align-items: flex-end; gap: 1rem; padding: 0.75rem; background: #07080b; border: 1px solid var(--line); border-radius: var(--radius); }

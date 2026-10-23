@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CATEGORY_COLORS, EMBLEM_SHAPES, SHAPE_IDS, defaultPortrait, echoPortrait, emblemLayers, randomEmblem, unitPortrait } from './emblem';
+import { CATEGORY_COLORS, EMBLEM_SHAPES, SHAPE_IDS, defaultEmblem, defaultPortrait, forceEmblem, echoPortrait, emblemLayers, randomEmblem, unitPortrait } from './emblem';
 import { rng } from '../rules/hexmap';
 
 describe('emblemLayers', () => {
@@ -64,5 +64,15 @@ describe('portraits', () => {
   it('draws every Echo of a type alike', () => {
     expect(echoPortrait('Void Hound')).toEqual(echoPortrait('Void Hound'));
     expect(emblemLayers(echoPortrait('Void Hound'))).toBeDefined();
+  });
+});
+
+describe('forceEmblem', () => {
+  it("is the force's own emblem if it has one, else a default that's the same every time for that force", () => {
+    const own = randomEmblem(rng('own'));
+    expect(forceEmblem({ id: 'f1', emblem: own })).toBe(own);
+    expect(emblemLayers(forceEmblem({ id: 'f1' }))).toBeDefined();
+    expect(forceEmblem({ id: 'f1' })).toEqual(defaultEmblem('f1'));
+    expect(defaultEmblem('f1')).not.toEqual(defaultEmblem('f2'));
   });
 });

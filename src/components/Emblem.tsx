@@ -1,4 +1,6 @@
+import { useState, type ReactNode } from 'react';
 import type { EmblemLayer, EmblemShape, Unit } from '../model/types';
+import { Modal } from './ui';
 import { EMBLEM_PALETTE, EMBLEM_SHAPES, LAYER_NAMES, LAYER_SCALE, SHAPE_IDS, emblemLayers, randomEmblem, unitPortrait } from '../model/emblem';
 
 /** The emblem's layers as SVG, in a 100 × 100 box; for drawing inside another SVG (the Nexus Map). */
@@ -96,12 +98,39 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback }: {
           <div className="row">
             <button onClick={() => onChange(randomEmblem())}>🎲 Random</button>
             {fallback
-              ? <button className="ghost" disabled={!emblemLayers(emblem)} onClick={() => onChange(undefined)}>Back to default</button>
+              ? <button className="ghost" disabled={!emblemLayers(emblem) || JSON.stringify(emblem) === JSON.stringify(fallback)} onClick={() => onChange(undefined)}>Back to default</button>
               : <button className="ghost" onClick={() => onChange(undefined)}>Remove emblem</button>}
           </div>
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * An emblem or portrait that opens its editor in a pop-up when clicked. Read-only, the pop-up just shows it larger;
+ * `children` go above the editor (a line on what it's for, or why it can't be changed).
+ */
+export function EmblemButton({ emblem, onChange, readOnly, fallback, size = 40, title, children }: {
+  emblem: unknown; onChange: (e: EmblemLayer[] | undefined) => void; readOnly?: boolean; fallback?: EmblemLayer[];
+  size?: number; title: string; children?: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const close = () => setOpen(false);
+  return (
+    <>
+      <button type="button" className="emblem-button" title={readOnly ? title : `Edit ${title.toLowerCase()}`} aria-label={readOnly ? title : `Edit ${title.toLowerCase()}`}
+        onClick={() => setOpen(true)}>
+        <EmblemBadge emblem={emblemLayers(emblem) ?? fallback} size={size} />
+        {!readOnly && <span className="emblem-button-hint" aria-hidden>✎</span>}
+      </button>
+      {open && (
+        <Modal title={title} onClose={close} footer={<button className="primary" onClick={close}>Done</button>}>
+          {children}
+          <EmblemEditor emblem={emblem} fallback={fallback} readOnly={readOnly} onChange={onChange} />
+        </Modal>
+      )}
+    </>
   );
 }
 

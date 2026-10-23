@@ -7,6 +7,7 @@ import { Dropzone } from './ui';
 import { useImporter } from './importer';
 import { useCloud } from '../cloud/CloudSync';
 import { EmblemBadge } from './Emblem';
+import { forceEmblem } from '../model/emblem';
 import SinceLastLooked from './SinceLastLooked';
 
 export default function ForceList() {
@@ -63,7 +64,7 @@ export default function ForceList() {
           return (
             <a key={f.id} className="card" href={href.force(f.id)}>
               {f.image && <img src={f.image} alt="" style={{ width: '100%', height: 110, objectFit: 'cover', marginBottom: 8 }} />}
-              <h3 className="with-emblem"><EmblemBadge emblem={f.emblem} size={28} />{f.name}</h3>
+              <h3 className="with-emblem"><EmblemBadge emblem={forceEmblem(f)} size={28} />{f.name}</h3>
               {cloud.email && f.owner && f.owner !== cloud.email && <div className="tag">{f.owner.split('@')[0]}'s force</div>}
               {levelling > 0 && (!cloud.email || !f.owner || f.owner === cloud.email) && (
                 <div className="tag gold">⬆ {levelling} unit{levelling > 1 ? 's' : ''} to level up</div>

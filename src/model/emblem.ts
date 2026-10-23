@@ -70,6 +70,12 @@ export function randomEmblem(rand: () => number = Math.random): EmblemLayer[] {
   ];
 }
 
+/** A force's default emblem, rolled from its id so it's the same on every device until someone saves it. */
+export const defaultEmblem = (forceId: string): EmblemLayer[] => randomEmblem(seededRand(`force:${forceId}`));
+
+/** The emblem a force shows: its own if it has a usable one, else its default. */
+export const forceEmblem = (f: { id: string; emblem?: unknown }): EmblemLayer[] => emblemLayers(f.emblem) ?? defaultEmblem(f.id);
+
 // ── Unit portraits ────────────────────────────────────────────────────────────
 // The same three stacked shapes stand for a unit in the downtime games (Training Grounds, Sortie). A unit without its
 // own portrait gets one rolled from its id, on a background in its category's colour, so it looks the same everywhere.
