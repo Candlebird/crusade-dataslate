@@ -761,6 +761,8 @@ export const SORTIE = {
   /** An Echo lord that wipes out or turns back a party is remembered: it turns up again `odds` of the time, a share
    * tougher per grudge level (up to `max`), and slaying it pays `bounty` RP per level. */
   nemesis: { odds: 0.5, tough: 0.2, max: 3, bounty: 1 },
+  /** An Echo lord's own (Legendary) relic comes home with a win that slays it on tier `lordTier` or harder. */
+  relics: { lordTier: 3 },
   /** Difficulty tiers, unlocked one at a time by winning a run at the hardest one open. Each adds its twist to those
    * before it, and multiplies the XP (cap included) and the haul by `pay`. */
   tiers: [

@@ -614,9 +614,31 @@ export function veteranTitle(u: Unit): string | undefined {
   return [runs, lord].filter(Boolean).join(', ') || undefined;
 }
 
-/** The relic a finished thread brings home, if the party gets home (or wins). */
-export const relicOf = (run: SortieRun): RelicDef | undefined =>
-  threadDone(run) && (run.over === 'won' || run.over === 'home') ? RELICS.find((r) => r.sortie === run.region) : undefined;
+/**
+ * What a run earns toward Sortie relics (RelicDef.sortie), if the party gets home or wins: a finished thread its
+ * region's relic, and a win the deep region's, a flawless win's, a full grudge settled's and the lord's own on a high tier.
+ */
+export function relicKeysOf(run: SortieRun): string[] {
+  if (run.over !== 'won' && run.over !== 'home') return [];
+  const keys: string[] = threadDone(run) ? [run.region] : [];
+  if (run.over !== 'won') return keys;
+  if (run.party.every(memberUp)) keys.push('flawless');
+  if (run.deep) keys.push(`deep:${run.region}`);
+  if (run.bossDown && (run.nemesis ?? 0) >= SORTIE.nemesis.max) keys.push('nemesis');
+  if (run.bossDown && (run.tier ?? 0) >= SORTIE.relics.lordTier) keys.push(`lord:${run.boss}`);
+  return keys;
+}
+/** The relics a run brings home (each force takes each one once). */
+export const relicsOf = (run: SortieRun): RelicDef[] => relicKeysOf(run).flatMap((k) => RELICS.filter((r) => r.sortie === k));
+/** How a Sortie relic is earned, in words. */
+export function relicSource(key: string): string {
+  const [kind, id] = key.split(':');
+  if (kind === 'flawless') return 'Win a run with no unit wiped out.';
+  if (kind === 'nemesis') return `Win a run by slaying an Echo lord with a full grudge (${SORTIE.nemesis.max}).`;
+  if (kind === 'deep') return `Win a run in ${SORTIE_REGIONS.find((r) => r.id === id)?.deep.name ?? id}.`;
+  if (kind === 'lord') return `Win a run by slaying ${SORTIE_BOSSES.find((b) => b.id === id)?.name ?? id} on ${SORTIE.tiers[SORTIE.relics.lordTier].name} or harder.`;
+  return `Finish the story of ${SORTIE_REGIONS.find((r) => r.id === kind)?.name ?? kind} and get home.`;
+}
 /** RP for slaying a nemesis, paid on any run. */
 export const bountyOf = (run: SortieRun) => (run.bossDown && run.nemesis ? run.nemesis * SORTIE.nemesis.bounty : 0);
 

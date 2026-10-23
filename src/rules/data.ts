@@ -271,7 +271,11 @@ export interface RelicDef {
   note?: string;
   desc?: string;
   nexus?: boolean;
-  /** Brought home from a Sortie by finishing this region's story thread (sortieStory.ts), and only then. */
+  /**
+   * Brought home from a Sortie, once, and only then (relicKeysOf in sortie.ts): a region id for finishing its story
+   * thread, `deep:<region>` for winning its deep version, `lord:<boss>` for slaying that Echo lord on a high tier,
+   * `flawless` for a win with no unit wiped out, `nemesis` for slaying a lord with a full grudge.
+   */
   sortie?: string;
 }
 
@@ -287,6 +291,10 @@ export const RELICS: RelicDef[] = [
   { name: 'Dark Age Grenade Belt', tier: 'Common', profile: '12", A1, AP(1), Blast(6), Limited' },
   { name: 'Dark Age Jump Pack', tier: 'Common', desc: 'This model and its unit get Flying.' },
   { name: 'Temporal Displacer Gauntlet', tier: 'Common', desc: 'Once per activation, pick one enemy unit within 12". On a 4+ it gets -1 to hit rolls until the end of the round.' },
+  { name: 'Refractor Field', tier: 'Common', desc: 'This model and its unit get +1 to Defense rolls against shooting from over 12" away.' },
+  { name: 'Master-crafted Sidearm', tier: 'Common', profile: '12", A2, AP(2), Reliable' },
+  { name: 'Auspex Array', tier: 'Common', desc: "This model's unit ignores cover when shooting. Enemy units can't be deployed by Ambush within 12\" of this model." },
+  { name: 'Combat Stimm Injector', tier: 'Common', desc: 'Once per game, when activated, this model and its unit get +1 to hit rolls in melee and move +2" until the end of the round.' },
   { name: 'Nanite Infusion Injector', tier: 'Common', desc: 'When activated, remove 1 wound from this model or a friendly unit within 3". This can bring back a killed model that does not have Tough.' },
   { name: 'Dimensional Anchor', tier: 'Rare', desc: `Once per round, when activated, pick one enemy unit within 18", which must take a morale test. If it fails, it can't move until the end of the round.` },
   { name: 'Ethereal Capacitor', tier: 'Rare', desc: 'This model and its unit ignore wounds on a 6+. If they already ignore wounds on a 6+ (like Protected), they do so on a 5+ instead.' },
@@ -299,6 +307,7 @@ export const RELICS: RelicDef[] = [
   { name: 'Mobius Repeater', tier: 'Rare', desc: "When this model's attacks destroy their target, leftover wounds carry over to one other enemy unit within 6\" of it." },
   { name: 'Null-field Disruptor', tier: 'Rare', desc: 'Enemy units within 9" get -1 to hit rolls.' },
   { name: 'Vortex Grenade', tier: 'Rare', profile: '12", A1, AP(4), Deadly(3), Blast(3), Limited' },
+  { name: 'Ancestral Storm Maul', tier: 'Rare', profile: 'Melee, A3, AP(4), Deadly(3)' },
   { name: 'Chrono-Phase Blade', tier: 'Legendary', profile: 'Melee, A4, AP(4), Temporal Rift' },
   { name: 'Soulforge Glaive', tier: 'Legendary', profile: 'Melee, A4, AP(3), Soul Harvest' },
   { name: 'Nanite Hive Field', tier: 'Legendary', desc: 'Once per game, when activated, this model and up to D3 friendly units within 9" each remove 3 wounds and get Regeneration until the end of the round. Units that already have Regeneration ignore wounds on a 4+ instead.' },
@@ -311,6 +320,19 @@ export const RELICS: RelicDef[] = [
   { name: 'Singing Splinter', tier: 'Common', sortie: 'glass', desc: "Enemy units get -1 to hit rolls when they shoot at this model's unit from over 12\" away." },
   { name: 'Bell of Severance', tier: 'Common', sortie: 'monastery', desc: "Once per game, when activated, pick one enemy unit within 18\". It can't cast spells or use auras until the end of the round." },
   { name: "Halvar's Firing Key", tier: 'Common', sortie: 'wreck', desc: "Once per game, when this model's unit shoots, one of its weapons gets AP(+2) and Ignores Cover for that attack." },
+  { name: 'Unbroken Oath-Seal', tier: 'Common', sortie: 'flawless', desc: "Once per game, when this model's unit takes its last wound, roll one die. On a 4+ one model stays on the table with 1 wound left." },
+  { name: 'Korvane Guard Standard', tier: 'Rare', sortie: 'deep:ashfields', desc: 'Friendly units within 6" get +1 to morale tests. Once per game, when activated, this model and its unit get +1 to hit rolls until the end of the round.' },
+  { name: 'Furnace-Heart Lance', tier: 'Rare', sortie: 'deep:foundry', profile: '18", A2, AP(3), Blast(3)' },
+  { name: 'Mirrorglass Mantle', tier: 'Rare', sortie: 'deep:glass', desc: "Once per round, when this model's unit is shot at, roll one die. On a 5+ the shooting unit takes the hits instead." },
+  { name: "Abbot's Last Psalm", tier: 'Rare', sortie: 'deep:monastery', desc: 'When an enemy spell targets this model or a friendly unit within 12", roll one die. On a 4+ the spell has no effect.' },
+  { name: 'Wreck-Core Reactor', tier: 'Rare', sortie: 'deep:wreck', desc: "When activated, pick one: this model and its unit move +3\" this activation, or this unit's ranged weapons get AP(+1) this activation." },
+  { name: 'Grudgebreaker', tier: 'Rare', sortie: 'nemesis', profile: 'Melee, A3, AP(1), Deadly(3), Bane' },
+  { name: 'Red Harvest Cleaver', tier: 'Legendary', sortie: 'lord:butcher', profile: 'Melee, A4, AP(3), Mounting Rage' },
+  { name: 'The Carrion Crown', tier: 'Legendary', sortie: 'lord:horror', desc: 'This model and its unit get Flying. After this unit charges, each enemy unit within 3" takes D3 hits with AP(1).' },
+  { name: 'Choir-Throat Torc', tier: 'Legendary', sortie: 'lord:screecher', desc: 'Once per round, when activated, every enemy unit within 12" gets -1 to hit rolls until the end of the round.' },
+  { name: 'Heart of the Blind Mountain', tier: 'Legendary', sortie: 'lord:behemoth', desc: 'This model gets Tough(+3). Once per round, when activated, every enemy unit within 6" takes 3 hits with AP(1).' },
+  { name: "Vashkar's Dread Mask", tier: 'Legendary', sortie: 'lord:terror', desc: 'Enemy units within 12" get -1 to morale tests. Once per game, when activated, every enemy unit within 12" must take a morale test.' },
+  { name: 'The Hollow Crown', tier: 'Legendary', sortie: 'lord:ascended', note: 'Casters only', desc: 'Gets Caster(+2). Once per round, after this model casts a spell, it may cast the same spell again, at the same or another target.' },
   { name: 'Shadesplinter Cloak', tier: 'Common', nexus: true, desc: 'After this model and its unit use an Advance action, they count as being in cover.' },
   { name: 'Umbra Echo Plating', tier: 'Common', nexus: true, desc: "Once per round, when this model's unit takes wounds, ignore D3 of them." },
   { name: 'Warp-infusion', tier: 'Common', nexus: true, desc: 'Pick one non-relic melee weapon, which gets Quake.' },
@@ -320,6 +342,7 @@ export const RELICS: RelicDef[] = [
   { name: 'Phase-Step Harness', tier: 'Common', nexus: true, desc: 'This model and its unit move +2" when using Rush or Charge actions.' },
   { name: 'Shadow Veil Emitter', tier: 'Common', nexus: true, desc: 'This model and its unit get Stealth.' },
   { name: 'Whispering Shard', tier: 'Common', nexus: true, note: 'Casters only', desc: 'Once per round, when this model fails a casting roll, it may re-roll it.' },
+  { name: 'Void Lantern', tier: 'Common', nexus: true, desc: "Enemy units within 9\" lose Stealth, and this model's unit ignores cover when shooting at them." },
   { name: 'Blackstone Shard Amulet', tier: 'Rare', nexus: true, desc: "This model's unit can't be targeted or affected by spells, and can't cast spells." },
   { name: 'Ancient Quantum Shielding', tier: 'Rare', nexus: true, desc: "When this model's unit blocks melee hits, the attacking unit takes 1 wound for each unmodified Defense result of 6." },
   { name: 'Umbra Claw', tier: 'Rare', profile: 'Melee, A5, AP(2), Bane', nexus: true },
@@ -335,6 +358,7 @@ export const RELIC_WEAPON_RULES: TableEntry[] = [
   { name: 'Beam', desc: 'On unmodified results of 6 to hit, this weapon deals 2 extra hits (only the original hit counts as a 6 for special rules).' },
   { name: 'Temporal Rift', desc: 'Each time this weapon wounds a target, roll one die. On a 5+, at the end of that melee the target is moved to a random quarter of the table, over 9" away from enemy units.' },
   { name: 'Soul Harvest', desc: 'Each time this weapon kills an enemy model in melee, remove 1 wound from the bearer, and this weapon gets +1 attack for the rest of the game.' },
+  { name: 'Mounting Rage', desc: 'Gets +1 attack in the second round of the game, +2 in the third and +3 from the fourth on.' },
   { name: 'Black Hole', desc: 'If this weapon hits, roll one die for each model in the target unit. On a 5+ that model is killed, whatever its Tough value.' },
 ];
 

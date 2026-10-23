@@ -11,7 +11,7 @@ import { RELICS } from './data';
 import { awardFeats, trainingFeats } from './feats';
 import { raidBand, raiderPool } from './raiders';
 import {
-  gain, act, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, startRound, gunReach, keepsHaul, distOf,
+  gain, act, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicKeysOf, relicsOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, startRound, gunReach, keepsHaul, distOf,
   leaveCombat, leaveEvent, moveMember, nextSlots, onField, partyLine, patchUp, pickBoon, reachable, runXp, skillProblem, skillsOf, squadOf,
   trinketInfo, weekKey, weekSeed, weeklyScore, reveal, sightOf, veteranTitle,
   ambushOdds, beastInfo, beastKey, cursesOf, cursed, shopPrice, goalProgress, goalText, lastStanding, rematchTricks, unlockedBoons, markHeat, marked,
@@ -533,12 +533,26 @@ describe('sortie story persistence', () => {
     run.event = { id: 'ash-charges' };
     eventChoose(run, 0);
     expect(threadDone(run)).toBe(true);
-    expect(relicOf(run)).toBeUndefined();
+    expect(relicsOf(run)).toEqual([]);
     run.over = 'fell';
-    expect(relicOf(run)).toBeUndefined();
+    expect(relicsOf(run)).toEqual([]);
     run.over = 'home';
-    expect(relicOf(run)).toBe(RELICS.find((r) => r.sortie === 'ashfields'));
+    expect(relicsOf(run)).toEqual([RELICS.find((r) => r.sortie === 'ashfields')]);
     expect(SORTIE_REGIONS.every((r) => RELICS.some((x) => x.sortie === r.id))).toBe(true);
+  });
+
+  it('brings home deep, flawless, nemesis and lord relics from a win', () => {
+    const run = createRun(PARTIES.line(), 5);
+    Object.assign(run, { region: 'glass', deep: true, over: 'won', bossDown: true, boss: 'terror', nemesis: SORTIE.nemesis.max, tier: SORTIE.relics.lordTier });
+    expect(relicKeysOf(run)).toEqual(['flawless', 'deep:glass', 'nemesis', 'lord:terror']);
+    expect(relicsOf(run).map((r) => r.tier)).toEqual(['Common', 'Rare', 'Rare', 'Legendary']);
+    run.tier = SORTIE.relics.lordTier - 1;
+    run.over = 'home';
+    expect(relicKeysOf(run)).toEqual([]);
+    // Every region's deep version and every lord has one, and every key is earnable.
+    expect(SORTIE_REGIONS.every((r) => RELICS.some((x) => x.sortie === `deep:${r.id}`))).toBe(true);
+    expect(SORTIE_BOSSES.every((b) => RELICS.some((x) => x.sortie === `lord:${b.id}` && x.tier === 'Legendary'))).toBe(true);
+    expect(new Set(RELICS.filter((r) => r.sortie).map((r) => r.sortie)).size).toBe(RELICS.filter((r) => r.sortie).length);
   });
 
   it('carries grudges, deep regions and relics between runs', () => {
@@ -567,11 +581,11 @@ describe('sortie story persistence', () => {
     expect(f.ledger.filter((l) => !l.label.startsWith('Feat')).reduce((t, l) => t + (l.rp ?? 0), 0) - rp).toBe(bountyOf(revenge));
     expect(f.feats?.sortieNemesis).toBe('2026-01-01');
     expect(f.sortie!.deep).toEqual(['wreck']);
-    expect(f.sortie!.relics).toEqual(['wreck']);
+    expect(f.sortie!.relics).toEqual(['wreck', 'flawless', 'nemesis']);
 
     // A relic comes home once.
     applySortie(f, revenge, '2026-01-01', id);
-    expect(f.sortie!.relics).toEqual(['wreck']);
+    expect(f.sortie!.relics).toEqual(['wreck', 'flawless', 'nemesis']);
     expect(f.sortie!.deep).toEqual(['wreck']);
   });
 

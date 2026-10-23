@@ -4,7 +4,7 @@ import { SCAR_TABLE } from './data';
 import { EXPEDITION, EXPEDITION_SITES, SOLO_PATROL, SORTIE, SORTIE_BOONS, SORTIE_QUIRKS, type ExpeditionCheck, type ExpeditionReward, type ExpeditionSite, type ExpeditionVariant } from './downtimeData';
 import { applyScar, levelForXp } from './engine';
 import { awardFeats, type FeatId } from './feats';
-import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicOf, runXp, threadDone, tierOf, trinketInfo, unlockedBoons, markHeat, veteranTitle, weeklyScore, type SortieRun } from './sortie';
+import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicsOf, runXp, threadDone, tierOf, trinketInfo, unlockedBoons, markHeat, veteranTitle, weeklyScore, type SortieRun } from './sortie';
 
 type Rand = () => number;
 
@@ -267,9 +267,9 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
     story.deep = [...(story.deep ?? []), run.region];
     bits.push(`unlocked ${regionOf(run).deep.name}`);
   }
-  const relic = relicOf(run);
-  if (relic && !story.relics?.includes(run.region)) {
-    story.relics = [...(story.relics ?? []), run.region];
+  for (const relic of relicsOf(run)) {
+    if (story.relics?.includes(relic.sortie!)) continue;
+    story.relics = [...(story.relics ?? []), relic.sortie!];
     bits.push(`brought home ${relic.name} (free for a unit that can carry a relic)`);
   }
   // Quirks: a unit still standing deep in may pick up a good habit, one wiped out a bad one.

@@ -1,4 +1,4 @@
-import type { MouseEvent, ReactNode } from 'react';
+import { useState, type MouseEvent, type ReactNode } from 'react';
 import { href, type RulesSub } from '../route';
 import { useStore } from '../model/store';
 import {
@@ -12,6 +12,7 @@ import {
 import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
 import { EXPEDITION_SITES } from '../rules/downtimeData';
 import { rewardText } from '../rules/downtime';
+import { relicSource } from '../rules/sortie';
 import { relicHolderText, relicHolders } from '../rules/engine';
 import { Panel } from './ui';
 import { IconText } from './Icon';
@@ -70,7 +71,7 @@ function Rolls({ title, entries }: { title: string; entries: { text: string }[] 
 }
 
 /** Relics as a display case: a card per relic, grouped by tier, with who carries it. */
-function RelicCase({ relics }: { relics: RelicDef[] }) {
+function RelicCase({ relics, source }: { relics: RelicDef[]; source?: (r: RelicDef) => string }) {
   const { state } = useStore();
   const held = relicHolders(state.forces, state.campaign);
   return (
@@ -89,6 +90,7 @@ function RelicCase({ relics }: { relics: RelicDef[] }) {
                     {r.profile && <div className="relic-profile mono small">{r.profile}</div>}
                     {r.desc && <p className="small">{r.desc}</p>}
                     {r.note && <p className="small muted">{r.note}</p>}
+                    {source && <p className="small muted">{source(r)}</p>}
                     <div className="relic-held small">
                       {by.length
                         ? <>Carried by {by.map((h, i) => <span key={i}>{i ? ', ' : ''}<a href={href.unit(h.forceId, h.unitId)}>{relicHolderText(h)}</a></span>)}</>
@@ -266,7 +268,42 @@ function TraitRules() {
   );
 }
 
+const RELIC_PAGES = [
+  ['rules', 'Rules'],
+  ['crusade', 'Crusade Relics'],
+  ['nexus', 'Nexus Relics'],
+  ['sortie', 'Sortie Relics'],
+] as const;
+type RelicPage = (typeof RELIC_PAGES)[number][0];
+
+/** The relics page, split into the rules and one case per kind of relic. */
 function RelicRules() {
+  const [page, setPage] = useState<RelicPage>('rules');
+  return (
+    <>
+      <div className="seg" style={{ marginBottom: '1rem' }}>
+        {RELIC_PAGES.map(([id, label]) => <button key={id} className={page === id ? 'on' : ''} onClick={() => setPage(id)}>{label}</button>)}
+      </div>
+      {page === 'crusade' ? (
+        <Section id="x-crusade" title="Crusade relics">
+          <RelicCase relics={RELICS.filter((r) => !r.nexus && !r.sortie)} />
+        </Section>
+      ) : page === 'nexus' ? (
+        <Section id="x-nexus" title="Nexus relics">
+          <Prose lines={CRUSADE_TEXT.nexusRelics} />
+          <RelicCase relics={RELICS.filter((r) => r.nexus)} />
+        </Section>
+      ) : page === 'sortie' ? (
+        <Section id="x-sortie" title="Sortie relics">
+          <p className="small">Brought home from Sorties, each once per force: a region's story finished, its deep version won, a flawless win, a full grudge settled, and every Echo lord slain on a high tier. Any unit of the force that can carry a relic takes it for free.</p>
+          <RelicCase relics={RELICS.filter((r) => r.sortie)} source={(r) => relicSource(r.sortie!)} />
+        </Section>
+      ) : <RelicBasics />}
+    </>
+  );
+}
+
+function RelicBasics() {
   return (
     <>
       <div className="panel">
@@ -294,22 +331,7 @@ function RelicRules() {
             </tbody>
           </table>
         </div>
-        <Toc items={[['x-crusade', 'Crusade relics'], ['x-nexus', 'Nexus relics'], ['x-sortie', 'Sortie relics'], ['x-rules', 'Relic weapon rules']]} />
       </div>
-
-      <Section id="x-crusade" title="Crusade relics">
-        <RelicCase relics={RELICS.filter((r) => !r.nexus && !r.sortie)} />
-      </Section>
-
-      <Section id="x-nexus" title="Nexus relics">
-        <Prose lines={CRUSADE_TEXT.nexusRelics} />
-        <RelicCase relics={RELICS.filter((r) => r.nexus)} />
-      </Section>
-
-      <Section id="x-sortie" title="Sortie relics">
-        <p className="small">One per Sortie region: follow its story thread to the end and get home alive (or beat its lord). Any unit of the force that can carry a relic takes it for free.</p>
-        <RelicCase relics={RELICS.filter((r) => r.sortie)} />
-      </Section>
 
       <Section id="x-rules" title="Relic weapon rules">
         <Entries entries={RELIC_WEAPON_RULES} />
