@@ -65,7 +65,7 @@ export function underdogBonus(c: Campaign): Record<string, number> {
   const counts = sectorCounts(c);
   const top = Math.max(0, ...Object.values(counts));
   const out: Record<string, number> = {};
-  for (const [id, n] of Object.entries(counts)) out[id] = Math.min(NEXUS_ROUNDS.underdogMax, Math.floor((top - n) / NEXUS_ROUNDS.underdogStep));
+  for (const [id, n] of Object.entries(counts)) out[id] = NEXUS_ROUNDS.underdogUs * Math.min(NEXUS_ROUNDS.underdogMax, Math.floor((top - n) / NEXUS_ROUNDS.underdogStep));
   return out;
 }
 
@@ -315,7 +315,7 @@ export function resolveRoundIncome(
       case 'supply': addSupply(src, item.supply ?? 0); break;
       case 'shardRoll':
         if (!pick.roll) out.warnings.push(`${src}: not rolled yet.`);
-        else if (pick.roll >= NEXUS_ROUNDS.shardMineRoll) addUs(`${src} (rolled ${pick.roll})`, 1);
+        else if (pick.roll >= NEXUS_ROUNDS.shardMineRoll) addUs(`${src} (rolled ${pick.roll})`, NEXUS_ROUNDS.shardMineUs);
         else out.lines.push(`${src}: rolled ${pick.roll} — no shard.`);
         break;
       case 'research':

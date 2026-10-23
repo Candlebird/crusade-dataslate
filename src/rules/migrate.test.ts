@@ -59,4 +59,13 @@ describe('migrateForce', () => {
     expect(migrateForce(once)).toBe(once);
     expect(newForce().rulesVersion).toBe(RULES_VERSION);
   });
+
+  it('triples Umbra Shards from before version 4, once', () => {
+    const f = newForce('Balanced');
+    f.rulesVersion = 3;
+    f.umbraShards = 2;
+    const once = migrateForce(f);
+    expect(once.umbraShards).toBe(6);
+    expect(migrateForce(once).umbraShards).toBe(6);
+  });
 });

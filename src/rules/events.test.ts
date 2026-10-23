@@ -57,7 +57,7 @@ describe('Galactic Events', () => {
     setEvent(rush, 'shardRush');
     endRound(rush, () => 0.5, '2026-10-20');
     expect(rush.rounds![rush.rounds!.length - 1].event).toBe('shardRush');
-    expect(roundIncomeItems(rush, 'A', rush.rounds![rush.rounds!.length - 1]).some((x) => x.source === 'Round 4 — Shard Rush' && x.us === 1)).toBe(true);
+    expect(roundIncomeItems(rush, 'A', rush.rounds![rush.rounds!.length - 1]).some((x) => x.source === 'Round 4 — Shard Rush' && x.us === 3)).toBe(true);
   });
 
   it('rolls the next round\'s event when a round ends', () => {

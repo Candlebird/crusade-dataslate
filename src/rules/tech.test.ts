@@ -128,7 +128,7 @@ describe('buildings', () => {
     s.buildings = ['exchange'];
     s.bank = PRODUCTION.exchange.materials;
     expect(exchange(c, s, 'buyShard', f)).toBe(true);
-    expect([s.bank, f.umbraShards, f.ledger[f.ledger.length - 1]?.us]).toEqual([0, 1, 1]);
+    expect([s.bank, f.umbraShards, f.ledger[f.ledger.length - 1]?.us]).toEqual([0, 3, 3]);
     expect(exchangeBlock(c, s, 'sellShard', f)).toMatch(/this round/);
     c.round = 2;
     expect(exchange(c, s, 'sellShard', f)).toBe(true);
@@ -142,7 +142,7 @@ describe('buildings', () => {
     const items = incomeItems(s);
     const medicae = items.find((i) => i.kind === 'medicae')!;
     expect(nexusEntry(medicae, undefined)?.removeScar).toBe(true);
-    expect(items.find((i) => i.source.includes('Umbral Spire'))?.us).toBe(1);
+    expect(items.find((i) => i.source.includes('Umbral Spire'))?.us).toBe(3);
   });
 });
 

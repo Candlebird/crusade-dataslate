@@ -590,7 +590,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const sortieRow = (
     <div className="span-all row">
       <span className="grow small">
-        <b>Sortie:</b> a party of three sets out through Echo fights, camps and shrines to an Echo lord. Free runs earn up to {SORTIE.caps.free.short}–{SORTIE.caps.free.long} XP; a Shard run costs 1 Umbra Shard, earns up to {SORTIE.caps.shard.long} XP and brings home Supply and RP. <span className="muted">{f.sortieBest ? `Furthest: ${f.sortieBest} nodes.` : ''}</span>
+        <b>Sortie:</b> a party of three sets out through Echo fights, camps and shrines to an Echo lord. Free runs earn up to {SORTIE.caps.free.short}–{SORTIE.caps.free.long} XP; a Shard run costs {SORTIE.cost} Umbra Shards, earns up to {SORTIE.caps.shard.long} XP and brings home Supply, RP and up to {SORTIE.haul.maxUs} shards. <span className="muted">{f.sortieBest ? `Furthest: ${f.sortieBest} nodes.` : ''}</span>
       </span>
       <button disabled={f.units.filter(canSortie).length < 3} onClick={() => setSortie(true)}>Sortie…</button>
       {sortie && <SortieModal force={f} c={c} onClose={() => setSortie(false)} />}

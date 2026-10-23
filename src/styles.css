@@ -869,6 +869,20 @@ fieldset.fields:disabled { opacity: 0.6; }
 .sortie-token.routed { opacity: 0.45; }
 .sortie-mark { font-size: 0.7rem; color: var(--warn); line-height: 1; }
 .sortie-status { color: var(--cyan); }
+.sortie-raider { color: var(--warn); display: block; }
+.sortie-field { position: relative; }
+.sortie-fx { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 3; }
+.sortie-trail { stroke-width: 2.5; stroke-linecap: round; opacity: 0; animation: sortie-trail 0.95s ease-out both; }
+.sortie-trail.mine { stroke: #e8c55a; filter: drop-shadow(0 0 3px rgba(232, 197, 90, 0.8)); }
+.sortie-trail.foe { stroke: #e0533f; filter: drop-shadow(0 0 3px rgba(224, 83, 63, 0.8)); }
+.sortie-trail.melee { stroke-width: 5; stroke-dasharray: 2 7; }
+.sortie-trail.miss { stroke-width: 1.5; stroke-dasharray: 4 5; }
+.sortie-dmg { position: absolute; z-index: 4; transform: translate(-50%, -50%); pointer-events: none; font-weight: 700; font-size: 1.15rem; text-shadow: 0 1px 2px #000, 0 0 6px #000; opacity: 0; animation: sortie-dmg 0.95s ease-out both; }
+.sortie-dmg.mine { color: #ffd76a; }
+.sortie-dmg.foe { color: #ff6b57; }
+.sortie-dmg.miss { color: var(--muted); font-size: 0.8rem; font-weight: 600; }
+@keyframes sortie-trail { 0% { opacity: 0; } 8% { opacity: 1; } 55% { opacity: 0.9; } 100% { opacity: 0; } }
+@keyframes sortie-dmg { 0% { opacity: 0; transform: translate(-50%, -30%) scale(0.6); } 12% { opacity: 1; transform: translate(-50%, -60%) scale(1.25); } 30% { transform: translate(-50%, -80%) scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -190%); } }
 
 .sortie-map { display: block; width: 100%; max-width: 380px; margin: 0 auto; }
 .sortie-map line { stroke: var(--line-2); stroke-width: 2; }
@@ -970,6 +984,10 @@ button.sortie-echo:disabled { cursor: default; opacity: 1; }
 .sortie-stress.high span { background: var(--warn); }
 .sortie-cracked { color: var(--warn); font-weight: 600; }
 .sortie-stand { color: var(--gold); font-weight: 600; }
+.feat-list { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 3px; }
+.feat-list li { display: flex; gap: 6px; align-items: baseline; }
+.feat-list .feat-reward { color: var(--gold); white-space: nowrap; }
+.feat-list .feat-done { opacity: 0.7; }
 .sortie-scar { border: 1px solid var(--warn); color: var(--warn); border-radius: 999px; padding: 0 6px; font-size: 0.75rem; }
 .sortie-omen circle { fill: var(--gold); stroke: var(--bg); stroke-width: 1.5; }
 .sortie-omen text { font-size: 8px; fill: var(--bg); }

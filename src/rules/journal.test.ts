@@ -156,8 +156,8 @@ describe('crossroads journal', () => {
     pickOption(c, 'j2', 1, fs, '2026-10-22');
     expect(c.threat).toBe(4);
     expect(journalsOwed(c, fs[0]).map((x) => x.id)).toEqual(['j2']);
-    expect(payJournal(k, fs[0], '2026-10-22', ids())).toMatch(/\+5 Umbra Shards/);
-    expect(fs[0].umbraShards).toBe(8);
+    expect(payJournal(k, fs[0], '2026-10-22', ids())).toMatch(/\+15 Umbra Shards/);
+    expect(fs[0].umbraShards).toBe(18);
     expect(payJournal(k, fs[0], '2026-10-22', ids())).toBeUndefined();
 
     // A wound: the scar drawn when offered.

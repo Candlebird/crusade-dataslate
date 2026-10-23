@@ -110,12 +110,12 @@ describe('nexus resolution', () => {
     const { f, input, id } = setup();
     input.nexusPicks = { void: { roll: 2, choice: '', target: '', alloc: { a: 6 } } }; // void 2: 6 XP + 1 US
     const out = resolveBattle(f, input, id);
-    expect(out.us).toBe(2); // match bonus 1 + void 1
-    expect(f.umbraShards).toBe(2);
+    expect(out.us).toBe(6); // match bonus 3 + void 3
+    expect(f.umbraShards).toBe(6);
     expect(f.units[0].xp).toBe(3 + 6);
     expect(f.nexus!.tempTables).toEqual(['Hero']); // round unlocks last until the next round income
     expect(f.nexus!.pending).toEqual(['Organized Strike']);
-    expect(f.ledger.filter((l) => l.us).map((l) => l.us)).toEqual([1, 1]);
+    expect(f.ledger.filter((l) => l.us).map((l) => l.us)).toEqual([3, 3]);
     expect(f.battleLog![0].sectorName).toBe('Hulk');
     expect(out.warnings).toEqual([]);
   });
@@ -124,10 +124,10 @@ describe('nexus resolution', () => {
     const { f, input, id } = setup();
     input.nexus = nexusGeneration(campaign(), 'A', '', 'win', false);
     for (let i = 0; i < 3; i++) resolveBattle(f, input, id);
-    expect(f.umbraShards).toBe(2);
+    expect(f.umbraShards).toBe(6);
     input.nexus = { ...input.nexus, round: 2 };
     resolveBattle(f, input, id);
-    expect(f.umbraShards).toBe(3);
+    expect(f.umbraShards).toBe(9);
   });
 
   it('adds an AI special table roll for an Echo bounty', () => {

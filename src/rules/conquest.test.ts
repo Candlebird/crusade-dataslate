@@ -81,7 +81,7 @@ describe('planet production', () => {
     expect(sector(c, 'pA').bank).toBe(PRODUCTION.perRound);
     expect(sector(c, 'near').bank).toBeUndefined();
     sector(c, 'pA').bank = 600;
-    expect(build(c, sector(c, 'pA'), 'barracks', force('A', 1000, 5))).toBe(true);
+    expect(build(c, sector(c, 'pA'), 'barracks', force('A', 1000, 15))).toBe(true);
     expect(sector(c, 'pA').bank).toBe(350);
     accrueProduction(c); // still going up: the old rate
     expect(sector(c, 'pA').bank).toBe(350 + PRODUCTION.perRound);
@@ -99,14 +99,14 @@ describe('planet production', () => {
     const f = force('A', 1000, 1);
     expect(buildBlock(s, 'walls', f)).toMatch(/200 Materials/);
     s.bank = 1000;
-    expect(buildBlock(s, 'walls', f)).toMatch(/2 Umbra Shards/);
-    f.umbraShards = 3;
+    expect(buildBlock(s, 'walls', f)).toMatch(/6 Umbra Shards/);
+    f.umbraShards = 9;
     expect(build(c, s, 'walls', f)).toBe(true);
-    expect([s.bank, f.umbraShards, isReinforced(s), freeSlots(s)]).toEqual([800, 1, false, 1]);
+    expect([s.bank, f.umbraShards, isReinforced(s), freeSlots(s)]).toEqual([800, 3, false, 1]);
     expect(buildBlock(s, 'depot', f)).toMatch(/one at a time/);
     // Cancelling gives everything back.
     cancelBuilding(s, [f]);
-    expect([s.bank, f.umbraShards, s.construction]).toEqual([1000, 3, undefined]);
+    expect([s.bank, f.umbraShards, s.construction]).toEqual([1000, 9, undefined]);
     build(c, s, 'walls', f);
     expect(finishConstruction(c).map((x) => x.building)).toEqual(['walls']);
     expect(isReinforced(s)).toBe(true);

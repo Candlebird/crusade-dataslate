@@ -2,7 +2,8 @@ import type { Unit } from '../model/types';
 import type { Category, RelicTier } from './data';
 import { fighter, type Gun } from './autoBattle';
 import { levelForXp } from './engine';
-import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyKind } from './downtimeData';
+import { SORTIE_QUIRKS, SORTIE_TRINKETS, TRAINING, TRAINING_ENEMIES, type SortieTrinket, type TrainingEnemyDef, type TrainingEnemyKind } from './downtimeData';
+import { pickRaiders, raiderName, type Raider } from './raiders';
 import { unitName } from './battle';
 import { abilitiesOf, describe, type AuraStat, type Effect, type Status } from './abilities';
 
@@ -80,6 +81,10 @@ export interface TrainingTower {
   taken: number;
   /** XP earned this run. */
   xp: number;
+  /** Its Sortie habits here: initiative (quirks and trinket) as attack speed, Jumpy and Short-sighted. */
+  init: number;
+  jumpy: boolean;
+  myopic: boolean;
 }
 
 /** One effect of one ability, with its own timer. */
@@ -112,6 +117,8 @@ export interface TrainingEnemy {
   bleedBy?: string;
   /** A veteran (a big squad draws them): tougher, and +1 to hit and AP. */
   vet?: boolean;
+  /** A Marauder: its index in the run's raiders, whose profile it fights with. */
+  mk?: number;
 }
 
 interface Spawn {
@@ -123,6 +130,14 @@ interface Spawn {
   hp: number;
   credits: number;
   vet?: boolean;
+  mk?: number;
+}
+
+/** A squad out of another army in the app, made over into an enemy profile. */
+export interface TrainingRaider {
+  /** "Rifle Squad (Battle Brothers, of the Iron Hand)". */
+  name: string;
+  def: TrainingEnemyDef;
 }
 
 /** A shot or blow, drawn for a moment. */
@@ -151,6 +166,8 @@ export const FX_TIME = { shot: 0.15, melee: 0.3, save: 0.45, heal: 0.5, bolt: 0.
 export const FX_COLOR = { heal: '#6fdc6f', bolt: '#c08cff', shield: '#5ab0ff', blast: '#ff9a4a', field: '#b98cff' };
 
 export interface TrainingRun {
+  /** Marauders this run can meet, out of the other armies. */
+  raiders?: TrainingRaider[];
   /** Random state: the same seed and the same moves play out the same. */
   rng: number;
   phase: 'setup' | 'wave' | 'over';
@@ -202,18 +219,46 @@ export function squadPower(units: Unit[]): number {
   return units.reduce((n, u) => n + u.points * (1 + TRAINING.levelPower * levelForXp(u.xp)), 0);
 }
 
+/**
+ * What a unit's Sortie quirks and trinket do here (morale and stress don't: Training has neither). Hits and Defense as
+ * on a Sortie; wounds a model on a Sortie (Tough x3) are a third of a Tough here; initiative is attack speed.
+ */
+export function habitsOf(u: Unit) {
+  const q = new Set(u.quirks ?? []);
+  const k: Partial<SortieTrinket> = (u.trinket && SORTIE_TRINKETS[u.trinket]) || {};
+  const n = (id: string) => (q.has(id) ? 1 : 0);
+  return {
+    shoot: n('eagle') + (k.shoot ?? 0),
+    melee: n('brute') - n('clumsy') + (k.melee ?? 0),
+    def: k.def ?? 0,
+    wounds: 2 * (n('hardy') - n('frail')) + (k.hp ?? 0),
+    init: n('quick') + (k.init ?? 0),
+    jumpy: q.has('jumpy'),
+    myopic: q.has('myopic'),
+  };
+}
+
+/** The Sortie quirks (not morale or region ones) and trinket a unit brings to Training, by name. */
+export const habitNames = (u: Unit): string[] => [
+  ...(u.quirks ?? []).filter((id) => SORTIE_QUIRKS[id] && id !== 'steady' && id !== 'shaky').map((id) => SORTIE_QUIRKS[id].name),
+  ...(u.trinket && SORTIE_TRINKETS[u.trinket] ? [SORTIE_TRINKETS[u.trinket].name] : []),
+];
+
 /** A unit as a tower. */
 export function towerOf(u: Unit): TrainingTower {
   const size = Math.max(1, u.size);
   const tough = Math.max(1, u.tough || 1);
   const f = fighter(u, { id: u.id, name: unitName(u), wounds: size * tough, maxWounds: size * tough, points: u.points }, 'train', 'A');
-  const maxHp = Math.max(1, Math.round(size * tough * TRAINING.toughMul * f.defBonus)) * (u.category === 'Fortification' ? TRAINING.fortificationHp : 1);
+  const h = habitsOf(u);
+  const perModel = Math.max(1, tough * f.defBonus + h.wounds / 3);
+  const maxHp = Math.max(1, Math.round(size * perModel * TRAINING.toughMul)) * (u.category === 'Fortification' ? TRAINING.fortificationHp : 1);
   return {
     unitId: u.id, name: unitName(u), category: u.category, level: levelForXp(u.xp), x: -1, y: -1, placedAt: 0,
-    hp: maxHp, maxHp, size, tough: maxHp / size, quality: f.quality, defense: f.defense, defMod: f.defMod, fortified: f.fortified,
-    ignore: f.ignore, evasive: f.evasive, impact: f.impact, hitShoot: f.hitShoot, hitMelee: f.hitMelee, atkBonus: f.atkBonus,
+    hp: maxHp, maxHp, size, tough: maxHp / size, quality: f.quality, defense: f.defense, defMod: f.defMod + h.def, fortified: f.fortified,
+    ignore: f.ignore, evasive: f.evasive, impact: f.impact, hitShoot: f.hitShoot + h.shoot, hitMelee: f.hitMelee + h.melee, atkBonus: f.atkBonus,
     guns: f.guns.map((g) => ({ ...g, cd: 0, pending: 0, gap: 0, next: 0 })), skills: skillsOf(u), shield: 0, frenzy: 0, frenzyMul: 1,
     boost: { hit: 0, save: 0, rate: 0, range: 0 }, revived: false, up: 0, dead: false, kills: 0, dealt: 0, saved: 0, taken: 0, xp: 0,
+    init: h.init, jumpy: h.jumpy, myopic: h.myopic,
   };
 }
 
@@ -233,13 +278,51 @@ const woundsHp = (n: number) => n * TRAINING.toughMul;
 /** Redeploys it has left this wave. */
 export const redeploys = (t: TrainingTower) => skills(t, 'redeploy').reduce((n, s) => n + s.uses, 0);
 
-export function createRun(units: Unit[], seed: number): TrainingRun {
+/** An enemy's (or a planned spawn's) profile: a Marauder's own, or its kind's. */
+export const enemyDef = (run: TrainingRun, x: { kind: TrainingEnemyKind; mk?: number }): TrainingEnemyDef =>
+  (x.mk !== undefined && run.raiders?.[x.mk]?.def) || TRAINING_ENEMIES[x.kind];
+
+const clampN = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, Math.round(n)));
+
+/** One model of a raiding squad as an enemy: its Tough as wounds, its weapons and rules as attacks, speed and role. */
+export function raiderDef(m: Raider): TrainingEnemyDef {
+  const u = m.unit;
+  const size = Math.max(1, u.size);
+  const tough = Math.max(1, u.tough || 1);
+  const f = fighter(u, { id: u.id, name: unitName(u), wounds: size * tough, maxWounds: size * tough, points: u.points }, 'raid', 'B');
+  const has = (r: string) => [...(u.rules ?? []), ...(u.upgrades ?? []).map((x) => x.name)].some((x) => x.toLowerCase().startsWith(r.toLowerCase()));
+  const melee = f.guns.filter((g) => g.melee);
+  const shoot = f.guns.filter((g) => !g.melee);
+  const per = (gs: Gun[]) => gs.reduce((n, g) => n + g.attacks, 0) / size;
+  const apOf = (gs: Gun[]) => clampN(Math.max(0, ...gs.map((g) => g.ap)), 0, 2);
+  const hp = clampN(2 + 3 * tough, 5, 28);
+  const armor = f.defense <= 2 ? 1 : 0;
+  const attacks = clampN(per(melee), 1, 6);
+  const ap = apOf(melee);
+  const far = Math.max(0, ...shoot.map((g) => g.range));
+  const gun = far ? { range: clampN(far / TRAINING.inchesPerTile, 2, 6), attacks: clampN(per(shoot), 1, 3), ap: apOf(shoot) } : undefined;
+  const speed = has('Fast') || has('Flying') ? 1.6 : has('Slow') || tough >= 6 ? 0.6 : 1;
+  const spawn = has('Scout') ? 'scout' : has('Ambush') ? 'ambush' : 'main';
+  const shape = spawn === 'scout' ? 'chevron' : spawn === 'ambush' ? 'star' : armor ? 'hexagon' : tough >= 6 ? 'spikes' : gun && gun.attacks >= attacks ? 'diamond' : 'dart';
+  const cost = clampN(0.75 * (hp / 3.5 + 0.3 * attacks + 0.3 * (gun?.attacks ?? 0) + armor + 0.5 * ap), 1, 8);
+  return {
+    name: unitName(u), desc: `Marauder out of ${m.faction}${m.force ? `, of ${m.force}` : ''}.`, hp, speed, armor, attacks,
+    quality: clampN(f.quality, 2, 6), ap, ...(gun ? { gun } : {}), cost, from: 1, spawn, color: '#e8743b', size: 0.2 + 0.03 * Math.min(tough, 6), shape,
+  };
+}
+
+/** `raiders`: who might come raiding (rules/raiders.ts); the run picks a few. */
+export function createRun(units: Unit[], seed: number, raiders?: Raider[]): TrainingRun {
   const run: TrainingRun = {
     rng: seed | 0, phase: 'setup', wave: 0, cleared: 0, dir: 0, baseHp: TRAINING.baseHp, credits: 0,
     towers: units.slice(0, TRAINING.squadMax).map(towerOf), enemies: [], queue: [], t: 0, nextId: 1, fx: [], log: [], cover: [], cards: [], bounty: 1,
   };
   run.dir = Math.floor(rand(run) * 8);
   run.cover = layCover(run);
+  if (raiders?.length) {
+    const picked = pickRaiders(raiders, TRAINING.raiders.pick, () => rand(run));
+    if (picked.length) run.raiders = picked.map((m) => ({ name: raiderName(m), def: raiderDef(m) }));
+  }
   return run;
 }
 
@@ -430,10 +513,23 @@ export function planWave(run: TrainingRun, power: number, wave: number): Spawn[]
   const bossMul = clamp(power / TRAINING.bossPower, 0.4, 2);
   const vets = vetShare(power);
   budget = Math.min(budget, cap) * TRAINING.enemyCount;
-  const kinds: TrainingEnemyKind[] = [];
+  const kinds: { kind: TrainingEnemyKind; mk?: number }[] = [];
   if (wave % TRAINING.bossEvery === 0) {
-    kinds.push('lord');
+    kinds.push({ kind: 'lord' });
     budget -= TRAINING_ENEMIES.lord.cost;
+  }
+  // Marauders: now and then, half a wave comes out of another army.
+  const raiders = run.raiders;
+  if (raiders?.length && wave >= TRAINING.raiders.from && rand(run) < TRAINING.raiders.odds) {
+    let share = budget * TRAINING.raiders.share;
+    for (let guard = 0; guard < 200; guard++) {
+      const fits = raiders.map((_, i) => i).filter((i) => raiders[i].def.cost <= share);
+      if (!fits.length) break;
+      const mk = pick(run, fits);
+      kinds.push({ kind: 'drone', mk });
+      share -= raiders[mk].def.cost;
+      budget -= raiders[mk].def.cost;
+    }
   }
   const pool = (Object.keys(TRAINING_ENEMIES) as TrainingEnemyKind[]).filter((k) => TRAINING_ENEMIES[k].spawn !== 'boss' && TRAINING_ENEMIES[k].from <= wave);
   for (let guard = 0; guard < 500; guard++) {
@@ -442,19 +538,19 @@ export function planWave(run: TrainingRun, power: number, wave: number): Spawn[]
     const k = pick(run, fits);
     // Flankers are rarer: one try in two, they give way to the main wave.
     if (TRAINING_ENEMIES[k].spawn !== 'main' && rand(run) < 0.5) continue;
-    kinds.push(k);
+    kinds.push({ kind: k });
     budget -= TRAINING_ENEMIES[k].cost;
   }
-  if (!kinds.length) kinds.push('swarm');
+  if (!kinds.length) kinds.push({ kind: 'swarm' });
 
   const window = Math.min(30, 6 + kinds.length * 0.5);
-  const totalCost = kinds.reduce((n, k) => n + TRAINING_ENEMIES[k].cost, 0);
+  const totalCost = kinds.reduce((n, k) => n + enemyDef(run, k).cost, 0);
   const pool$ = waveCredits(wave, run.towers.length);
   const main = run.dir * 45;
   const back = main + 180;
   const spread = (lo: number, hi: number) => lo + rand(run) * (hi - lo);
-  return kinds.map((kind) => {
-    const def = TRAINING_ENEMIES[kind];
+  return kinds.map(({ kind, mk }) => {
+    const def = enemyDef(run, { kind, mk });
     let at: number;
     let p: { x: number; y: number };
     if (def.spawn === 'scout') {
@@ -473,7 +569,7 @@ export function planWave(run: TrainingRun, power: number, wave: number): Spawn[]
     }
     const vet = def.spawn !== 'boss' && rand(run) < vets;
     const hp = def.hp * TRAINING.enemyHp * hpMul * (def.spawn === 'boss' ? bossMul : 1) * (vet ? TRAINING.vet.hp : 1);
-    return { kind, at, x: p.x, y: p.y, hp, credits: (pool$ * def.cost) / totalCost, ...(vet ? { vet } : {}) };
+    return { kind, at, x: p.x, y: p.y, hp, credits: (pool$ * def.cost) / totalCost, ...(vet ? { vet } : {}), ...(mk !== undefined ? { mk } : {}) };
   }).sort((a, b) => a.at - b.at);
 }
 
@@ -515,7 +611,7 @@ export function startWave(run: TrainingRun, power: number) {
     t.shield = 0;
     t.frenzy = 0;
   }
-  const flank = run.queue.filter((s) => TRAINING_ENEMIES[s.kind].spawn === 'scout' || TRAINING_ENEMIES[s.kind].spawn === 'ambush').length;
+  const flank = run.queue.filter((s) => enemyDef(run, s).spawn === 'scout' || enemyDef(run, s).spawn === 'ambush').length;
   const vets = run.queue.filter((s) => s.vet).length;
   run.log.push(`Wave ${run.wave}: ${run.queue.length} enemies from the ${DIRECTIONS[run.dir]}${flank ? `, ${flank} on the far side` : ''}${vets ? `, ${vets} of them veterans` : ''}.`);
 }
@@ -543,7 +639,7 @@ type Harm = 'shot' | 'melee' | 'other';
  */
 function hurt(run: TrainingRun, t: TrainingTower, e: TrainingEnemy, dmg: number, how: Harm, hit = true) {
   if (e.hp <= 0) return;
-  const def = TRAINING_ENEMIES[e.kind];
+  const def = enemyDef(run, e);
   const mul = how === 'shot' ? def.shotMul ?? 1 : how === 'melee' ? def.meleeMul ?? 1 : 1;
   const before = e.hp;
   e.hp -= (dmg + (hit && e.status.mark ? TRAINING.markDmg : 0)) * mul;
@@ -576,7 +672,7 @@ function afflict(run: TrainingRun, t: TrainingTower, e: TrainingEnemy, status: S
     e.x = clamp(e.x + ((e.x - BASE.x) / d) * TRAINING.knock, 0.3, TRAINING.mapSize - 0.3);
     e.y = clamp(e.y + ((e.y - BASE.y) / d) * TRAINING.knock, 0.3, TRAINING.mapSize - 0.3);
   } else if (status === 'execute') {
-    if (TRAINING_ENEMIES[e.kind].spawn !== 'boss' && e.hp < e.maxHp * TRAINING.executeAt) hurt(run, t, e, e.hp, 'other', false);
+    if (enemyDef(run, e).spawn !== 'boss' && e.hp < e.maxHp * TRAINING.executeAt) hurt(run, t, e, e.hp, 'other', false);
   } else {
     e.status[status] = Math.max(e.status[status] ?? 0, TRAINING.status[status]);
     if (status === 'bleed') e.bleedBy = t.unitId;
@@ -602,7 +698,9 @@ function fire(run: TrainingRun, t: TrainingTower, g: TrainingGun, aura: number, 
   // A shot over cover is at -2 to hit (Reliable or not); a blow in melee isn't.
   const crossed = g.melee ? [] : coverCrossed(run, c.x, c.y, target.x, target.y);
   const cover = crossed.length ? TRAINING.cover.hit : 0;
-  const p = g.reliable ? hitChance(2, cover) : hitChance(t.quality, g.hitMod + (g.melee ? t.hitMelee : t.hitShoot) + aura + t.boost.hit + cover);
+  // Short-sighted: -1 to hit at the far end of a gun's reach.
+  const far = !g.melee && t.myopic && dist(c.x, c.y, target.x, target.y) > reach(t, g) * TRAINING.habits.myopicFrom ? -1 : 0;
+  const p = g.reliable ? hitChance(2, cover) : hitChance(t.quality, g.hitMod + (g.melee ? t.hitMelee : t.hitShoot) + aura + t.boost.hit + cover + far);
   const r = rand(run);
   // Each shot comes from somewhere across the unit's tile, as if from one of its models; a miss lands off to one side
   // of the target, or now and then on the cover that stopped it. Where is only for show, so it doesn't touch the run's dice.
@@ -620,7 +718,7 @@ function fire(run: TrainingRun, t: TrainingTower, g: TrainingGun, aura: number, 
   const live = t.skills.length ? t.skills.filter((s) => carried(s, g)) : [];
   const sixes = six ? ofKind(live, 'sixes').map((s) => s.effect) : [];
   // Deadly(X) sets the damage of a hit; AP and upgrades add to it, armour takes off (Rending 6s ignore it).
-  const armour = six && (g.rending || sixes.some((e) => e.rend)) ? 0 : TRAINING_ENEMIES[target.kind].armor;
+  const armour = six && (g.rending || sixes.some((e) => e.rend)) ? 0 : enemyDef(run, target).armor;
   const raw = Math.max(1, g.deadly) + g.ap + levelDmg(t, g) - armour + (six && t.category === 'Elite' ? 1 : 0) + sixes.reduce((n, e) => n + (e.dmg ?? 0), 0);
   const dmg = Math.max(0.5, raw) * t.atkBonus;
   const how = g.melee ? 'melee' : 'shot';
@@ -630,7 +728,7 @@ function fire(run: TrainingRun, t: TrainingTower, g: TrainingGun, aura: number, 
     run.enemies
       .filter((o) => o !== target && o.hp > 0 && dist(o.x, o.y, target.x, target.y) <= TRAINING.blastRadius)
       .slice(0, g.blast - 1)
-      .forEach((o) => hurt(run, t, o, Math.max(0.5, raw - TRAINING_ENEMIES[o.kind].armor + armour) * t.atkBonus, how));
+      .forEach((o) => hurt(run, t, o, Math.max(0.5, raw - enemyDef(run, o).armor + armour) * t.atkBonus, how));
   }
   for (const s of ofKind(live, 'onHit')) if (rand(run) < s.effect.chance) afflict(run, t, target, s.effect.status);
   if (!extra && sixes.some((e) => e.again)) fire(run, t, g, aura, true);
@@ -639,7 +737,7 @@ function fire(run: TrainingRun, t: TrainingTower, g: TrainingGun, aura: number, 
 
 /** An enemy's attacks on a unit: wounds they deal. */
 function strike(run: TrainingRun, e: TrainingEnemy, t: TrainingTower, w: { attacks: number; ap: number; ranged: boolean; cover?: boolean }): number {
-  const def = TRAINING_ENEMIES[e.kind];
+  const def = enemyDef(run, e);
   const ap = Math.max(0, w.ap + vetBy(e, 'ap') - (t.fortified ? 1 : 0));
   const save = saveChance(t.defense, ap, t.defMod + (dugIn(run, t) ? 1 : 0) + t.boost.save);
   let wounds = 0;
@@ -674,7 +772,7 @@ const dazed = (e: TrainingEnemy) => (e.status.daze ? 1 : 0);
 
 /** An enemy's attacks on the base: each hit is a point of damage. */
 function strikeBase(run: TrainingRun, e: TrainingEnemy): number {
-  const def = TRAINING_ENEMIES[e.kind];
+  const def = enemyDef(run, e);
   let n = 0;
   for (let i = 0; i < def.attacks; i++) if (rand(run) < hitChance(def.quality, vetBy(e, 'hit') - dazed(e))) n += 1;
   return n;
@@ -785,7 +883,7 @@ function abilities(run: TrainingRun, t: TrainingTower, towers: TrainingTower[], 
       for (let i = 0; i < e.hits; i++) {
         if (rand(run) >= p) continue;
         landed += 1;
-        const hit = (o: TrainingEnemy) => hurt(run, t, o, Math.max(0.5, 1 + e.ap + t.up - TRAINING_ENEMIES[o.kind].armor) * t.atkBonus, 'shot');
+        const hit = (o: TrainingEnemy) => hurt(run, t, o, Math.max(0.5, 1 + e.ap + t.up - enemyDef(run, o).armor) * t.atkBonus, 'shot');
         hit(target);
         if (e.radius) run.enemies.filter((o) => o !== target && o.hp > 0 && dist(o.x, o.y, target.x, target.y) <= e.radius!).forEach(hit);
       }
@@ -803,10 +901,12 @@ function abilities(run: TrainingRun, t: TrainingTower, towers: TrainingTower[], 
   }
 }
 
-/** How fast a unit attacks: upgrades, a frenzy, a last stand at half strength and allies' rate auras. */
-function speedOf(t: TrainingTower): number {
+/** How fast a unit attacks: upgrades, a frenzy, a last stand at half strength, allies' rate auras and its initiative. */
+function speedOf(run: TrainingRun, t: TrainingTower): number {
   const last = t.hp <= t.maxHp / 2 ? skills(t, 'lastStand').reduce((m, s) => m * s.effect.mul, 1) : 1;
-  return (1 + TRAINING.ratePerLevel * t.up) * (t.frenzy > 0 ? t.frenzyMul : 1) * last * (1 + t.boost.rate);
+  const H = TRAINING.habits;
+  const habit = Math.max(0.5, 1 + H.rate * (t.init ?? 0)) * (t.jumpy && run.t < H.jumpySecs ? H.jumpyMul : 1);
+  return (1 + TRAINING.ratePerLevel * t.up) * (t.frenzy > 0 ? t.frenzyMul : 1) * last * (1 + t.boost.rate) * habit;
 }
 
 /** Wear statuses down; a bleed hurts as it goes, credited to whoever caused it. */
@@ -830,7 +930,7 @@ export function step(run: TrainingRun, dt: number) {
 
   while (run.queue.length && run.queue[0].at <= run.t) {
     const s = run.queue.shift()!;
-    run.enemies.push({ id: run.nextId++, kind: s.kind, x: s.x, y: s.y, hp: s.hp, maxHp: s.hp, cd: TRAINING.enemyEvery * 0.5, gcd: TRAINING.enemyShootEvery * rand(run), credits: s.credits, status: {}, ...(s.vet ? { vet: true } : {}) });
+    run.enemies.push({ id: run.nextId++, kind: s.kind, x: s.x, y: s.y, hp: s.hp, maxHp: s.hp, cd: TRAINING.enemyEvery * 0.5, gcd: TRAINING.enemyShootEvery * rand(run), credits: s.credits, status: {}, ...(s.vet ? { vet: true } : {}), ...(s.mk !== undefined ? { mk: s.mk } : {}) });
   }
 
   const towers = run.towers.filter(placed);
@@ -839,7 +939,7 @@ export function step(run: TrainingRun, dt: number) {
   for (const t of towers) {
     const aura = heroes.some((h) => dist(h.x, h.y, t.x, t.y) <= auraOf(h)) ? 1 : 0;
     if (t.skills.length) abilities(run, t, towers, aura, dt);
-    const speed = speedOf(t);
+    const speed = speedOf(run, t);
     for (const g of t.guns) {
       g.cd -= dt;
       // A volley's shots go one after another over the first part of the wait before the next.
@@ -863,7 +963,7 @@ export function step(run: TrainingRun, dt: number) {
     tick(run, e, dt);
     // Stunned: it does nothing at all, its clocks included.
     if (e.hp <= 0 || e.status.stun) continue;
-    const def = TRAINING_ENEMIES[e.kind];
+    const def = enemyDef(run, e);
     const foe = engaged(run, e);
     const toBase = dist(e.x, e.y, BASE.x, BASE.y);
     const atBase = toBase <= BASE.radius + def.size + 0.15;

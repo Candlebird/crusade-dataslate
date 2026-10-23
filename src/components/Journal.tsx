@@ -63,7 +63,7 @@ export default function JournalPanel({ c, setC, me, gm }: { c: Campaign; setC: S
       <p className="muted small">
         Once a round your Warlord comes to a crossroads, away from the battlefield. Pick how they take it on, answer the
         complication, and roll the checks: each is a D6 against the Warlord's Quality (Defense for Endurance), and special rules
-        that suit the skill make it easier. A failed check can be re-rolled once for {JOURNAL.rerollCost} Umbra Shard.
+        that suit the skill make it easier. A failed check can be re-rolled once for {JOURNAL.rerollCost} Umbra Shards.
         The more checks pass, the better the endings on offer, but at least one ending always gives nothing, or costs you.
         Now and then the scene takes a twist (one more check), a rival Warlord crosses your path, or a story thread
         picks up where an earlier journal left it.
@@ -131,7 +131,7 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
   const target = (skill: JournalSkillId, penalty = 0) => (u ? checkTarget(u, skill, level, penalty) : 0);
 
   const reroll = (which: JournalCheck) => {
-    if (!force || force.umbraShards < JOURNAL.rerollCost) return toast(`A re-roll costs ${JOURNAL.rerollCost} Umbra Shard.`, 'error');
+    if (!force || force.umbraShards < JOURNAL.rerollCost) return toast(`A re-roll costs ${JOURNAL.rerollCost} Umbra Shards.`, 'error');
     let ok = false;
     edit((x) => void (ok = rerollCheck(x, which, Math.random)));
     if (!ok) return;

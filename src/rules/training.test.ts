@@ -1,10 +1,13 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { normalizeBook } from '../armyforge/book';
+import { raiderPool } from './raiders';
 import type { Unit, Weapon } from '../model/types';
 import type { Effect } from './abilities';
 import { newUnit } from '../model/factory';
 import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyKind } from './downtimeData';
 import {
-  BASE, CARDS, autoCardIndex, autoPlace, autoSpend, buyHeal, buyUpgrade, cardText, coverCrossed, createRun, healCost, mvp, pickCard, startProblem, levelDmg, liftTower, placeTower, placed, reach, planWave, previewWave, squadPower, startWave, step, upgradeCost, waveCredits, type TrainingRun, type TrainingTower,
+  BASE, CARDS, habitNames, habitsOf, towerOf, autoCardIndex, autoPlace, autoSpend, buyHeal, buyUpgrade, cardText, coverCrossed, createRun, healCost, mvp, pickCard, startProblem, levelDmg, liftTower, placeTower, placed, raiderDef, reach, planWave, previewWave, squadPower, startWave, step, upgradeCost, waveCredits, type TrainingRun, type TrainingTower,
 } from './training';
 
 // Training sim (tower defense).
@@ -398,5 +401,66 @@ describe('training', () => {
     const median = results[10];
     expect(median).toBeGreaterThanOrEqual(9);
     expect(median).toBeLessThanOrEqual(15);
+  });
+});
+
+describe('training marauders out of the other armies', () => {
+  const other = normalizeBook(JSON.parse(readFileSync('armies/shadow-stalkers.aof.json', 'utf8')));
+  const pool = raiderPool([other], []);
+
+  it('makes every raider a sane enemy profile', () => {
+    for (const m of pool) {
+      const d = raiderDef(m);
+      expect(d.hp).toBeGreaterThanOrEqual(5);
+      expect(d.cost).toBeGreaterThanOrEqual(1);
+      expect(d.cost).toBeLessThanOrEqual(8);
+      expect(d.attacks).toBeGreaterThanOrEqual(1);
+      expect(d.desc).toContain(other.name);
+    }
+  });
+
+  it('sends some waves of marauders, which fight to the end, and none without a pool', () => {
+    expect(createRun(squad(), 3).raiders).toBeUndefined();
+    let raided = 0;
+    for (let seed = 1; seed < 12; seed++) {
+      const run = createRun(squad(), seed, pool);
+      expect(run.raiders!.length).toBeGreaterThan(0);
+      for (let w = 3; w < 12; w++) if (planWave({ ...run }, squadPower(squad()), w).some((s) => s.mk !== undefined)) raided++;
+    }
+    expect(raided).toBeGreaterThan(5);
+    const run = createRun(squad(), 5, pool);
+    placeAll(run);
+    for (let w = 0; w < 6 && run.phase !== 'over'; w++) {
+      startWave(run, squadPower(squad()));
+      for (let i = 0; i < 4000 && run.phase === 'wave'; i++) step(run, 0.1);
+      expect(run.enemies.every((e) => Number.isFinite(e.hp))).toBe(true);
+    }
+  });
+});
+
+describe('Sortie habits in Training', () => {
+  it('quirks and a trinket shape the tower; morale ones do nothing', () => {
+    const base = squad()[0];
+    const plain = towerOf(base);
+    const vet = towerOf({ ...base, quirks: ['eagle', 'hardy', 'steady', 'quick'], trinket: 'plate' });
+    expect(vet.hitShoot).toBe(plain.hitShoot + 1);
+    expect(vet.hitMelee).toBe(plain.hitMelee);
+    expect(vet.defMod).toBe(plain.defMod + 1);
+    expect(vet.maxHp).toBeGreaterThan(plain.maxHp);
+    // Quick +1, the plate -1.
+    expect(vet.init).toBe(0);
+    expect(habitNames({ ...base, quirks: ['eagle', 'steady', 'native:x'], trinket: 'plate' })).toEqual(['Eagle-eyed', 'Salvaged Plate']);
+  });
+
+  it('a frail unit never drops below one wound a model', () => {
+    const u = { ...squad()[0], tough: 1, quirks: ['frail'], trinket: 'totem' };
+    expect(habitsOf(u).wounds).toBe(-4);
+    expect(towerOf(u).maxHp).toBeGreaterThanOrEqual(u.size * TRAINING.toughMul);
+  });
+
+  it('jumpy and short-sighted carry over as flags', () => {
+    const t = towerOf({ ...squad()[1], quirks: ['jumpy', 'myopic'] });
+    expect(t.jumpy).toBe(true);
+    expect(t.myopic).toBe(true);
   });
 });

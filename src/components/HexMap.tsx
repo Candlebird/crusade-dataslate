@@ -695,7 +695,7 @@ function ProductionBox({ s }: { s: Sector }) {
       {hasBuilding(s, 'exchange') && (
         <div className="row" style={{ marginTop: '0.25rem' }}>
           <span className="grow">⇄ Grand Exchange{s.exchanged === (c?.round ?? 1) ? <span className="muted"> — traded this round</span> : <span className="muted"> — once a round, with {payer?.name ?? 'a force'}</span>}</span>
-          {([['buyShard', `${X.materials} Materials → 1 US`], ['sellShard', `1 US → ${X.back} Materials`]] as [ExchangeTrade, string][]).map(([t, label]) => (
+          {([['buyShard', `${X.materials} Materials → ${X.shards} US`], ['sellShard', `${X.shards} US → ${X.back} Materials`]] as [ExchangeTrade, string][]).map(([t, label]) => (
             <button key={t} disabled={!!trade1(t)} title={trade1(t)} onClick={() => {
               edit((y, cc, fs) => {
                 const f = fs.find((x) => x.id === payer?.id);

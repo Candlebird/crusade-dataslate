@@ -200,7 +200,7 @@ export function exchangeBlock(c: Campaign, s: Sector, trade: ExchangeTrade, f?: 
   if (s.exchanged === (c.round ?? 1)) return 'Already traded this round';
   if (!f) return 'Needs one of your forces to hold the shards';
   if (trade === 'buyShard' && (s.bank ?? 0) < X.materials) return `Needs ${X.materials} Materials (${s.bank ?? 0} banked)`;
-  if (trade === 'sellShard' && f.umbraShards < 1) return `${f.name} has no Umbra Shards`;
+  if (trade === 'sellShard' && f.umbraShards < X.shards) return `${f.name} needs ${X.shards} Umbra Shards`;
   return undefined;
 }
 
@@ -210,8 +210,8 @@ export function exchange(c: Campaign, s: Sector, trade: ExchangeTrade, f: Force,
   const X = PRODUCTION.exchange;
   const buy = trade === 'buyShard';
   s.bank = buy ? (s.bank ?? 0) - X.materials : Math.max(s.bank ?? 0, Math.min(bankCap(s, c), (s.bank ?? 0) + X.back));
-  f.umbraShards += buy ? 1 : -1;
-  f.ledger.push({ id: newId(), date, label: `Nexus — Grand Exchange at ${s.name}`, rp: 0, supply: 0, us: buy ? 1 : -1 });
+  f.umbraShards += buy ? X.shards : -X.shards;
+  f.ledger.push({ id: newId(), date, label: `Nexus — Grand Exchange at ${s.name}`, rp: 0, supply: 0, us: buy ? X.shards : -X.shards });
   s.exchanged = c.round ?? 1;
   return true;
 }

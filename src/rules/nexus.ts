@@ -240,7 +240,7 @@ export function incomeItems(s: Sector, prefix = ''): NexusItem[] {
   if (hasBuilding(s, 'refinery')) out.push({ key: `${key}:refinery`, kind: 'shardRoll', source: `${place}: Shard Refinery` });
   if (hasBuilding(s, 'depot')) out.push({ key: `${key}:depot`, kind: 'supply', source: `${place}: Supply Depot`, supply: PRODUCTION.depotSupply });
   if (hasBuilding(s, 'medicae')) out.push({ key: `${key}:medicae`, kind: 'medicae', source: `${place}: Medicae Ward` });
-  if (hasBuilding(s, 'spire')) out.push({ key: `${key}:spire`, kind: 'us', source: `${place}: Umbral Spire`, us: 1 });
+  if (hasBuilding(s, 'spire')) out.push({ key: `${key}:spire`, kind: 'us', source: `${place}: Umbral Spire`, us: 3 });
   return out;
 }
 
@@ -249,7 +249,7 @@ function benefitItems(s: Sector, prefix: string): NexusItem[] {
   const b = benefitOf(s);
   const source = `${prefix ? 'Conquest — ' : ''}${s.name}${b ? `: ${b.name}` : ''}`;
   switch (s.type === 'home' || s.type === 'planet' ? s.benefit : s.type) {
-    case 'largeShardMine': return [{ key, kind: 'us', source, us: 1 }];
+    case 'largeShardMine': return [{ key, kind: 'us', source, us: 3 }];
     case 'biomassPool': return [{ key, kind: 'supply', source, supply: 100 }];
     case 'shardMine': return [{ key, kind: 'shardRoll', source }];
     case 'fertileLand': return [{ key, kind: 'supply', source, supply: 50 }];

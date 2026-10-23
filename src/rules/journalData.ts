@@ -19,7 +19,7 @@ export const JOURNAL = {
   /** A Warlord of this level or higher gets +1 on Command checks. */
   commandLevel: 3,
   /** Umbra Shards to re-roll a check (once per check). */
-  rerollCost: 1,
+  rerollCost: 3,
   /** The best reward tier a scenario can earn with no successes (the tier cap is the successes, but at least this). */
   minTier: 1,
   /** How many finished journals the campaign keeps. */
@@ -225,7 +225,7 @@ export function effectValue(e: JournalEffect): number {
     case 'archives': return e.n * 5;
     case 'threat': return -1.5 * e.n;
     case 'reveal': return e.n / 3;
-    case 'shards': return e.n;
+    case 'shards': return e.n / 3;
     case 'xp': return e.n / 2;
     case 'relic': return { Common: 2.5, Rare: 4, Legendary: 7 }[e.tier] ?? 0;
     case 'scar': return -2.5;

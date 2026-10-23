@@ -38,14 +38,14 @@ describe('detachments', () => {
   });
 
   it('moves Supply, shards and units between forces for the cost, conserving the totals', () => {
-    const main = force('Main', 'A', 1000, 3);
+    const main = force('Main', 'A', 1000, 5);
     const det = force('Vanguard', 'A', 0, 0);
     const u = newUnit({ name: 'Tank', points: 200 });
     const hero = newUnit({ name: 'Hero', points: 100 });
     main.units.push(u, hero);
     main.lists = [{ id: 'l', name: 'L', unitIds: [u.id, hero.id], joins: { [hero.id]: u.id } } as never];
     const plan = reorganisePlan([main, det]);
-    expect(reorganiseProblems([main, det], plan)).toEqual(['Umbra Shards add up to 3; they must add up to 2.']);
+    expect(reorganiseProblems([main, det], plan)).toEqual(['Umbra Shards add up to 5; they must add up to 2.']);
     plan.supply = { [main.id]: 600, [det.id]: 400 };
     plan.us = { [main.id]: 1, [det.id]: 1 };
     plan.units = { [u.id]: det.id };
@@ -58,15 +58,15 @@ describe('detachments', () => {
     expect(det.units.map((x) => x.name)).toEqual(['Tank']);
     expect(main.lists![0]).toMatchObject({ unitIds: [hero.id], joins: {} });
     expect([main.nexus!.reorganisedRound, det.nexus!.reorganisedRound]).toEqual([2, 2]);
-    expect(main.ledger[main.ledger.length - 1]).toMatchObject({ label: 'Nexus — Detachments reorganised', supply: -400, us: -2 });
+    expect(main.ledger[main.ledger.length - 1]).toMatchObject({ label: 'Nexus — Detachments reorganised', supply: -400, us: -4 });
   });
 
   it("refuses a plan that doesn't add up, or a faction that can't pay", () => {
     const main = force('Main', 'A', 1000, 0);
     const det = force('Vanguard', 'A', 0, 0);
     const plan = reorganisePlan([main, det]);
-    expect(reorganise([main, det], plan, 1, 'd', id)).toEqual([expect.stringContaining('costs 1 Umbra Shard; the faction has 0')]);
-    main.umbraShards = 1;
+    expect(reorganise([main, det], plan, 1, 'd', id)).toEqual([expect.stringContaining('costs 3 Umbra Shards; the faction has 0')]);
+    main.umbraShards = 3;
     plan.us = { [main.id]: 0, [det.id]: 0 };
     plan.supply = { [main.id]: 1000, [det.id]: 100 };
     expect(reorganiseProblems([main, det], plan)).toEqual(['Supply adds up to 1100; it must add up to 1000.']);
@@ -75,7 +75,7 @@ describe('detachments', () => {
 
   it('is once a round for the whole faction', () => {
     const c = campaign();
-    const main = force('Main', 'A', 1000, 1);
+    const main = force('Main', 'A', 1000, 3);
     const det = force('Vanguard', 'A', 0, 0);
     const other = force('Other', 'B', 1000, 0);
     expect(reorganisedThisRound(c, [main, det, other], 'A')).toBe(false);

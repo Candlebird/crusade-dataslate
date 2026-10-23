@@ -72,9 +72,9 @@ export interface Unit {
   xp: number;
   upgrades: Upgrade[];
   scars: Scar[];
-  /** Habits picked up on Sorties, good and bad (rules/sortie.ts quirkInfo); they only count on a Sortie. */
+  /** Habits picked up on Sorties, good and bad (rules/sortie.ts quirkInfo); they count on a Sortie and in Training. */
   quirks?: string[];
-  /** The Sortie trinket it carries (SORTIE_TRINKETS, downtimeData.ts); it only counts on a Sortie. */
+  /** The Sortie trinket it carries (SORTIE_TRINKETS, downtimeData.ts); it counts on a Sortie and in Training. */
   trinket?: string;
   /** Its Sortie record: runs it came back from standing, and Echo lords slain (rules/sortie.ts veteranTitle). */
   sortieRecord?: { runs: number; lords: number };
@@ -298,6 +298,8 @@ export interface Force {
   lists?: ArmyList[];
   /** Most waves cleared in one training run (rules/training.ts). */
   trainingBest?: number;
+  /** Feats earned, by id, with the date (rules/feats.ts): each pays once. */
+  feats?: Record<string, string>;
   /** Furthest any unit got on one Sortie: nodes cleared (rules/sortie.ts). */
   sortieBest?: number;
   /** What the force's Sorties are remembered for (rules/sortie.ts). */

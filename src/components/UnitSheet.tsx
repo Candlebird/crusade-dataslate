@@ -475,7 +475,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             ) : null}
             {u.quirks?.length ? (
               <Panel id="unit.quirks" title="Sortie quirks" h={3}>
-                <p className="muted small" style={{ marginTop: 0 }}>Picked up on Sorties; they only count on a Sortie.</p>
+                <p className="muted small" style={{ marginTop: 0 }}>Picked up on Sorties; they count on a Sortie and in Training (morale ones only on a Sortie).</p>
                 {u.quirks.map((id, i) => {
                   const q = quirkInfo(id);
                   return q ? (
@@ -492,7 +492,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             ) : null}
             {u.trinket || f.sortie?.trinkets?.length ? (
               <Panel id="unit.trinket" title="Sortie trinket" h={3}>
-                <p className="muted small" style={{ marginTop: 0 }}>One per unit, found on Sorties; each has a trade-off, and it only counts on a Sortie.</p>
+                <p className="muted small" style={{ marginTop: 0 }}>One per unit, found on Sorties; each has a trade-off, and it counts on a Sortie and in Training (not its morale or stress).</p>
                 {u.trinket && trinketInfo(u.trinket) && (
                   <div className="list-item">
                     <div className="grow">

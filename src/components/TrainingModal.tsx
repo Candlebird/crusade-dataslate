@@ -5,13 +5,19 @@ import { unitPortrait } from '../model/emblem';
 import type { Category } from '../rules/data';
 import { unitName } from '../rules/battle';
 import { levelForXp } from '../rules/engine';
-import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyKind, type TrainingEnemyShape } from '../rules/downtimeData';
+import { TRAINING, type TrainingEnemyDef, type TrainingEnemyShape } from '../rules/downtimeData';
+import { raiderPool } from '../rules/raiders';
+import { veteranTitle } from '../rules/sortie';
 import {
-  BASE, DIRECTIONS, FX_COLOR, FX_TIME, HEAL_DESC, LEVEL_UP, ROLES, auraOf, autoCardIndex, autoPlace, autoSpend, buyHeal, buyUpgrade, canTrain, cardText, createRun, dugIn, fixed, liftTower, mvp, pickCard, placeProblem, placeTower, placed, previewWave, quitRun,
+  BASE, DIRECTIONS, habitNames, FX_COLOR, FX_TIME, HEAL_DESC, LEVEL_UP, ROLES, auraOf, autoCardIndex, autoPlace, autoSpend, buyHeal, buyUpgrade, canTrain, cardText, createRun, dugIn, enemyDef, fixed, liftTower, mvp, pickCard, placeProblem, placeTower, placed, previewWave, quitRun,
   reach, runXp, squadPower, startProblem, startWave, step, healCost, healProblem, levelDmg, upgradeCost, upgradeProblem, type TrainingDraw, type TrainingEnemy, type TrainingFx, type TrainingRun, type TrainingSkill,
 } from '../rules/training';
 import { describe } from '../rules/abilities';
 import { Modal, confirmAction, toast } from './ui';
+import { FeatList } from './Feats';
+import { uid } from '../model/factory';
+import { localDate } from '../model/date';
+import { awardFeats, trainingFeats } from '../rules/feats';
 import { EmblemBadge, Portrait, drawEmblem } from './Emblem';
 
 const STEP = 0.05;
@@ -27,7 +33,7 @@ const COLORS: Record<Category, string> = {
 
 /** The training sim: pick a squad, then hold the base for as many waves as it can. Only XP comes out of it. */
 export default function TrainingModal({ force, onClose }: { force: Force; onClose: () => void }) {
-  const { updateForce } = useStore();
+  const { state, updateForce } = useStore();
   const trainable = force.units.filter(canTrain);
   const portraits = useMemo(() => Object.fromEntries(force.units.map((u) => [u.id, unitPortrait(u)])), [force.units]);
   const [chosen, setChosen] = useState<string[]>([]);
@@ -46,7 +52,7 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
 
   const begin = () => {
     const units = trainable.filter((u) => chosen.includes(u.id));
-    runRef.current = createRun(units, Math.floor(Math.random() * 2 ** 31));
+    runRef.current = createRun(units, Math.floor(Math.random() * 2 ** 31), raiderPool(state.books, state.forces, force));
     powerRef.current = squadPower(units);
     banked.current = false;
     setSel(runRef.current.towers[0]?.unitId ?? null);
@@ -61,15 +67,17 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
     const xp = runXp(r);
     const gained = r.towers.filter((t) => xp[t.unitId]);
     const lead = mvp(r);
+    let feats: string[] = [];
     updateForce(force.id, (f) => {
       for (const [id, n] of Object.entries(xp)) {
         const u = f.units.find((x) => x.id === id);
         if (u) u.xp += n;
       }
       if (r.cleared > (f.trainingBest ?? 0)) f.trainingBest = r.cleared;
+      feats = awardFeats(f, trainingFeats(r.cleared), r.towers.map((t) => t.unitId), localDate(), uid);
     });
     const led = lead ? `${lead.name} led the way with ${lead.kills} kill${lead.kills === 1 ? '' : 's'}. ` : '';
-    toast(led + (gained.length ? `Training banked: ${gained.map((t) => `${t.name} +${t.xp} XP`).join(', ')}.` : 'Training over. No XP this time.'));
+    toast(led + (gained.length ? `Training banked: ${gained.map((t) => `${t.name} +${t.xp} XP`).join(', ')}.` : 'Training over. No XP this time.') + (feats.length ? ` ${feats.join('. ')}.` : ''));
   }, [force.id, updateForce]);
 
   const close = () => {
@@ -147,16 +155,20 @@ export default function TrainingModal({ force, onClose }: { force: Force; onClos
           Kills drop credits for upgrades. Every unit still standing earns <b>+{TRAINING.xpPerWave} XP</b> every {TRAINING.xpEvery} waves cleared, up to <b>{TRAINING.xpCap} XP</b> a run.
         </p>
         <p className="muted small">
-          Nothing else carries over: no unit becomes busy, and one that falls is only out of this run. Waves scale with the squad’s points and levels.
+          Quirks and trinkets from Sorties count here too (not morale). Nothing else carries over: no unit becomes busy, and one that falls is only out of this run. Waves scale with the squad’s points and levels.
           {force.trainingBest ? ` Best so far: ${force.trainingBest} waves.` : ''}
         </p>
+        <FeatList force={force} where="training" />
         <div className="small" style={{ marginBottom: 4 }}><b>Squad</b> ({chosen.length}/{TRAINING.squadMax})</div>
         {!trainable.length && <p className="muted small">No active units to train.</p>}
         {trainable.map((u) => (
           <label key={u.id} className="row small" style={{ gap: 6 }}>
             <input type="checkbox" checked={chosen.includes(u.id)} disabled={!chosen.includes(u.id) && chosen.length >= TRAINING.squadMax} onChange={() => toggle(u.id)} />
             <Portrait unit={u} size={22} />
-            <span className="grow">{unitName(u)} <span className="muted">· {u.category} · level {levelForXp(u.xp)} · {u.points} pts</span></span>
+            <span className="grow">
+              {unitName(u)}{veteranTitle(u) ? <i className="muted">, {veteranTitle(u)}</i> : null} <span className="muted">· {u.category} · level {levelForXp(u.xp)} · {u.points} pts</span>
+              {habitNames(u).length > 0 && <span className="muted"> · from Sorties: {habitNames(u).join(', ')}</span>}
+            </span>
           </label>
         ))}
       </Modal>
@@ -425,7 +437,7 @@ function draw(cv: HTMLCanvasElement | null, run: TrainingRun, sel: string | null
 
   // Enemies.
   for (const e of run.enemies) {
-    const d = TRAINING_ENEMIES[e.kind];
+    const d = enemyDef(run, e);
     enemyShape(ctx, d.shape, e.x * s, e.y * s, d.size * s, Math.atan2(BASE.y - e.y, BASE.x - e.x), d.color, e.vet);
     const tint = statusTint(e);
     if (tint) { ctx.strokeStyle = tint; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(e.x * s, e.y * s, d.size * s + 3, 0, Math.PI * 2); ctx.stroke(); }
@@ -538,19 +550,20 @@ function RunSummary({ run }: { run: TrainingRun }) {
 /** An enemy's outline, by role, turned to face the way it's heading (toward the base). A veteran's is edged in gold. */
 /** What the next wave sends, one icon a kind with a count; hover for what it is. */
 function WavePreview({ run, power }: { run: TrainingRun; power: number }) {
-  const groups = new Map<TrainingEnemyKind, { n: number; vets: number; hp: number }>();
+  const groups = new Map<string, { def: TrainingEnemyDef; n: number; vets: number; hp: number }>();
   for (const s of previewWave(run, power)) {
-    const g = groups.get(s.kind) ?? { n: 0, vets: 0, hp: 0 };
+    const key = `${s.kind}:${s.mk ?? ''}`;
+    const g = groups.get(key) ?? { def: enemyDef(run, s), n: 0, vets: 0, hp: 0 };
     g.n += 1;
     if (s.vet) g.vets += 1;
     else g.hp = s.hp;
-    groups.set(s.kind, g);
+    groups.set(key, g);
   }
   return (
     <span className="row" style={{ gap: 8, flexWrap: 'wrap' }} aria-label="Next wave's enemies">
-      {[...groups].map(([kind, g]) => (
-        <span key={kind} title={enemyRundown(kind, g)} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'help' }}>
-          <EnemyIcon kind={kind} vet={g.vets > 0} />
+      {[...groups].map(([key, g]) => (
+        <span key={key} title={enemyRundown(g.def, g)} style={{ display: 'inline-flex', alignItems: 'center', gap: 2, cursor: 'help' }}>
+          <EnemyIcon def={g.def} vet={g.vets > 0} />
           <span className="small">×{g.n}</span>
         </span>
       ))}
@@ -558,21 +571,19 @@ function WavePreview({ run, power }: { run: TrainingRun; power: number }) {
   );
 }
 
-function EnemyIcon({ kind, vet }: { kind: TrainingEnemyKind; vet: boolean }) {
+function EnemyIcon({ def, vet }: { def: TrainingEnemyDef; vet: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');
     if (!ctx) return;
-    const def = TRAINING_ENEMIES[kind];
     ctx.clearRect(0, 0, 48, 48);
     enemyShape(ctx, def.shape, 24, 24, 13, 0, def.color, vet);
-  }, [kind, vet]);
+  }, [def, vet]);
   return <canvas ref={ref} width={48} height={48} style={{ width: 24, height: 24 }} />;
 }
 
 /** A hover rundown of an enemy kind: what it does, its numbers this wave, and how many come as veterans. */
-function enemyRundown(kind: TrainingEnemyKind, g: { n: number; vets: number; hp: number }): string {
-  const d = TRAINING_ENEMIES[kind];
+function enemyRundown(d: TrainingEnemyDef, g: { n: number; vets: number; hp: number }): string {
   const hp = Math.round(g.hp || (d.hp * TRAINING.enemyHp));
   const lines = [
     `${d.name} ×${g.n}: ${d.desc}`,

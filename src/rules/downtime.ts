@@ -3,6 +3,7 @@ import type { Campaign, Force, SortieBoardEntry, Unit } from '../model/types';
 import { SCAR_TABLE } from './data';
 import { EXPEDITION, EXPEDITION_SITES, SOLO_PATROL, SORTIE, SORTIE_BOONS, SORTIE_QUIRKS, type ExpeditionCheck, type ExpeditionReward, type ExpeditionSite, type ExpeditionVariant } from './downtimeData';
 import { applyScar, levelForXp } from './engine';
+import { awardFeats, type FeatId } from './feats';
 import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicOf, runXp, threadDone, tierOf, trinketInfo, unlockedBoons, markHeat, veteranTitle, weeklyScore, type SortieRun } from './sortie';
 
 type Rand = () => number;
@@ -252,6 +253,7 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
   if (run.over === 'won' && run.party.every(memberUp)) stats.flawless++;
   stats.deepest = Math.max(stats.deepest, run.depth);
   const grudge = { ...story.nemesis };
+  const grudgeBefore = grudge[run.boss] ?? 0;
   const bounty = bountyOf(run);
   if (run.lordWon) {
     grudge[run.boss] = Math.min(SORTIE.nemesis.max, (grudge[run.boss] ?? 0) + 1);
@@ -338,6 +340,18 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
     story.trinkets = [...(story.trinkets ?? []), ...found];
     bits.push(`found ${found.map((t) => trinketInfo(t)?.name ?? t).join(', ')}`);
   }
+  // Feats: the hardest runs pay a real reward, once per force.
+  const won = run.over === 'won';
+  const top = won && tierOf(run) === SORTIE.tiers.length - 1;
+  const feats: FeatId[] = [
+    ...(top ? ['sortieTop' as const] : []),
+    ...(top && run.party.every(memberUp) ? ['sortieFlawless' as const] : []),
+    ...(top && asc >= 4 ? ['sortieAsc4' as const] : []),
+    ...(top && asc >= SORTIE.ascension.curses.length ? ['sortieAsc8' as const] : []),
+    ...(run.bossDown && heat >= 6 ? ['sortieHeat' as const] : []),
+    ...(run.bossDown && grudgeBefore >= SORTIE.nemesis.max ? ['sortieNemesis' as const] : []),
+  ];
+  bits.push(...awardFeats(force, feats, run.party.map((m) => m.unit.id), date, newId));
   const summary = bits.join('; ');
   // A recap of the run, to look back on from the force.
   story.recaps = [{
@@ -347,7 +361,7 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
     ...(run.weekly ? { weekly: run.weekly, score: weeklyScore(run) } : {}),
   }, ...(story.recaps ?? [])].slice(0, SORTIE.recaps);
   // The Shard paid at the start (startSortie) shows here, net of any brought home.
-  const us = haul.us - (run.mode === 'shard' ? 1 : 0);
+  const us = haul.us - (run.mode === 'shard' ? SORTIE.cost : 0);
   force.ledger.push({ id: newId(), date, label: summary, rp: haul.rp + bounty, supply: haul.supply, ...(us ? { us } : {}) });
   return summary;
 }

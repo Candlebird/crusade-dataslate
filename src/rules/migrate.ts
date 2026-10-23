@@ -2,7 +2,7 @@ import type { Force, Unit } from '../model/types';
 import { RELICS, SCAR_TABLE } from './data';
 
 /** Bump when saved names need migrating again. Forces without a version predate the 2026 rules update. */
-export const RULES_VERSION = 3;
+export const RULES_VERSION = 4;
 
 /** Homebrew names that now match an official OPR rule (or were reworded). */
 const UNIT_RENAMES: Record<string, string> = {
@@ -71,12 +71,14 @@ function syncRelics(u: Unit): Unit {
   };
 }
 
-/** Bring a saved force's trait, relic and scar names up to the current rules. */
+/** Bring a saved force's trait, relic and scar names, and its Umbra Shards, up to the current rules. */
 export function migrateForce(f: Force): Force {
   const version = f.rulesVersion ?? 1;
   if (version >= RULES_VERSION) return f;
   let units = f.units;
   if (version < 2) units = units.map(migrateUnit);
   if (version < 3) units = units.map(syncRelics);
-  return { ...f, rulesVersion: RULES_VERSION, units };
+  // Version 4 tripled every Umbra Shard cost and gain, so balances triple too.
+  const umbraShards = version < 4 ? (f.umbraShards ?? 0) * 3 : f.umbraShards;
+  return { ...f, rulesVersion: RULES_VERSION, units, umbraShards };
 }

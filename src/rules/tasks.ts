@@ -1,6 +1,6 @@
 import type { Campaign, Force, Sector, SectorGarrison, Unit, UnitTaskKind } from '../model/types';
 import { unitName } from './battle';
-import { GARRISON, MENTORING, PROJECT_DIE, PROJECTS, RECON, type ProjectDef } from './downtimeData';
+import { GARRISON, MENTORING, PROJECT_DIE, PROJECTS, RECON, SORTIE, type ProjectDef } from './downtimeData';
 import { levelForXp } from './engine';
 import { explore, rememberedBy, visibleTo } from './fog';
 import { hexDistance, isPlaced, type Rand } from './hexmap';
@@ -278,17 +278,17 @@ export function partyProblem(units: (Unit | undefined)[]): string | null {
 export function sortieProblem(f: Force, c: Campaign | undefined, units: (Unit | undefined)[]): string | null {
   const why = partyProblem(units);
   if (why) return why;
-  if (f.umbraShards < 1) return 'A Shard Sortie costs 1 Umbra Shard.';
+  if (f.umbraShards < SORTIE.cost) return `A Shard Sortie costs ${SORTIE.cost} Umbra Shards.`;
   const busy = c && units.find((u) => !freeUnits(f, c).some((x) => x.id === u!.id));
   if (busy) return `${unitName(busy)} is busy or already fought this round.`;
   return null;
 }
 
-/** Pay the Umbra Shard for a Shard Sortie; in a Nexus campaign all three units are busy for the round. */
+/** Pay the Umbra Shards for a Shard Sortie; in a Nexus campaign all three units are busy for the round. */
 export function startSortie(f: Force, c: Campaign | undefined, unitIds: string[]) {
   const units = unitIds.map((id) => f.units.find((x) => x.id === id));
   const why = sortieProblem(f, c, units);
   if (why) throw new Error(why);
-  f.umbraShards -= 1;
+  f.umbraShards -= SORTIE.cost;
   if (c) setBusy(f, c, unitIds, 'sortie');
 }

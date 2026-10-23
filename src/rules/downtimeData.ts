@@ -87,7 +87,7 @@ const LEAVE: ExpeditionChoice = { label: 'Leave it be', reward: {}, win: 'The sq
 export const EXPEDITION_SITES: ExpeditionSite[] = [
   {
     id: 'hulk', name: 'Derelict Space Hulk', desc: 'A dead ship drifting through the Nexus. Salvage and old relics, if the dark lets you keep them.',
-    finish: { text: 'Deep in the hulk the squad finds a sealed reliquary, still humming.', reward: { us: 1 } },
+    finish: { text: 'Deep in the hulk the squad finds a sealed reliquary, still humming.', reward: { us: 3 } },
     encounters: [
       { id: 'reactor', variants: [
         v('Humming reactor', 'A reactor still hums behind a cracked bulkhead.',
@@ -138,7 +138,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
           LEAVE),
         v("Mutineers' bridge", 'Barricades, bones and scratched tallies: the crew fought over this bridge.',
           ch('Search the barricades', 'easy', { supply: 25 }, 'The mutineers stockpiled well.', 'A tripwire is still live.'),
-          ch("Find the mutineers' cache", 'heroic', { us: 1, rp: 1 }, "Under the captain's chair: a pouch of shards.", 'The chair was booby-trapped.'),
+          ch("Find the mutineers' cache", 'heroic', { us: 3, rp: 1 }, "Under the captain's chair: a pouch of shards.", 'The chair was booby-trapped.'),
           LEAVE),
       ] },
       { id: 'cryo', variants: [
@@ -188,15 +188,15 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
       ] },
       { id: 'crystal', variants: [
         v('Singing crystals', 'Shards of solid light ring like bells.',
-          ch('Harvest a shard', 'hard', { us: 1 }, 'A perfect Umbra shard comes away in their hands.', 'The song turns into a shriek.'),
+          ch('Harvest a shard', 'hard', { us: 3 }, 'A perfect Umbra shard comes away in their hands.', 'The song turns into a shriek.'),
           ch('Listen to the song', 'easy', { xp: 1 }, 'Something in it makes them sharper.', 'They lose hours to it.'),
           LEAVE),
         v('Crystal forest', 'Towers of glass rise out of nothing, humming in harmony.',
-          ch('Climb to the singing heart', 'heroic', { us: 1, rp: 1 }, 'At the top, a shard hums in their hands.', 'The tower sings them off it.'),
+          ch('Climb to the singing heart', 'heroic', { us: 3, rp: 1 }, 'At the top, a shard hums in their hands.', 'The tower sings them off it.'),
           ch('Chip off the smaller ones', 'easy', { supply: 25 }, 'Pretty, and they sell.', 'The forest shatters around them.'),
           LEAVE),
         v('Bleeding light', 'Light leaks from cracks in the air and pools like water.',
-          ch('Bottle it', 'hard', { us: 1 }, 'It sets into a shard inside the jar.', 'The jar cracks and the light burns.'),
+          ch('Bottle it', 'hard', { us: 3 }, 'It sets into a shard inside the jar.', 'The jar cracks and the light burns.'),
           ch('Bathe in it', 'medium', { xp: 2 }, 'They come out seeing further.', 'It leaves them dizzy and half-blind.'),
           LEAVE),
       ] },
@@ -214,19 +214,19 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
       { id: 'whisper', variants: [
         v('Whispers', 'A voice offers each of them what they want most.',
           ch('Refuse it, together', 'easy', { xp: 1 }, 'Their resolve hardens.', 'One of them listened.'),
-          ch('Bargain with it', 'hard', { us: 1 }, 'It pays in shards, and asks nothing yet.', 'It takes its price at once.')),
+          ch('Bargain with it', 'hard', { us: 3 }, 'It pays in shards, and asks nothing yet.', 'It takes its price at once.')),
         v('The merchant', 'A smiling figure in a coat of stars lays out wares on nothing at all.',
           ch('Trade fairly', 'easy', { supply: 25 }, 'The merchant is, for once, honest.', 'They pay twice what it was worth.'),
-          ch('Steal from the stall', 'hard', { us: 1 }, 'They get away with a shard.', 'The merchant always gets paid.'),
+          ch('Steal from the stall', 'hard', { us: 3 }, 'They get away with a shard.', 'The merchant always gets paid.'),
           LEAVE),
         v('Song in the dark', 'A lullaby the squad half-remembers drifts out of nowhere.',
-          ch('Follow it to its source', 'hard', { us: 1 }, 'A shard, singing to itself.', 'The source sings back.'),
+          ch('Follow it to its source', 'hard', { us: 3 }, 'A shard, singing to itself.', 'The source sings back.'),
           ch('Sing along', 'easy', { xp: 1 }, 'Old memories, and new strength.', 'They cannot stop singing.'),
           ch('Block their ears', 'safe', {}, 'The song fades behind them.', 'The song gets in anyway.')),
       ] },
       { id: 'door', variants: [
         v('A door in nothing', 'A plain wooden door stands in the void. It is unlocked.',
-          ch('Open it', 'hard', { us: 1 }, 'Behind it: a quiet room, and a shard on the table.', 'Behind it: something that follows them out.'),
+          ch('Open it', 'hard', { us: 3 }, 'Behind it: a quiet room, and a shard on the table.', 'Behind it: something that follows them out.'),
           ch('Knock first', 'easy', { xp: 1 }, 'Something knocks back, politely. They feel braver for it.', 'Something knocks back, hard.'),
           LEAVE),
         v('The iron gate', "A gate of black iron, carved with the squad's own names.",
@@ -238,7 +238,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
       ] },
       { id: 'drift', variants: [
         v('Drift of wrecks', 'Ships from a dozen ages hang still, tangled together.',
-          ch('Board the oldest', 'hard', { us: 1 }, 'Its hold is full of old shards.', 'Its crew is still aboard.'),
+          ch('Board the oldest', 'hard', { us: 3 }, 'Its hold is full of old shards.', 'Its crew is still aboard.'),
           ch('Salvage the newest', 'easy', { supply: 25 }, 'Fresh parts, barely scorched.', 'It breaks apart around them.')),
         v('Lost patrol', 'A patrol of their own faction drifts past, still in formation, decades too late.',
           ch('Recover their orders', 'medium', { rp: 1 }, 'The orders were never delivered. Now they are.', 'The orders are for a war long over.'),
@@ -300,13 +300,13 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
           ch('Mask up and push on', 'easy', { xp: 1 }, 'They come through coughing, but tougher.', 'The masks clog.'),
           ch('Shelter in the rocks', 'safe', {}, 'The cloud rolls past.', 'The spores find the cracks.')),
         v('Earthquake', 'The ground opens in a long, grinding crack.',
-          ch('Climb down into the crack', 'hard', { us: 1 }, 'Deep in the stone: a seam of shards.', 'The ground closes again.'),
+          ch('Climb down into the crack', 'hard', { us: 3 }, 'Deep in the stone: a seam of shards.', 'The ground closes again.'),
           ch('Jump the gap', 'easy', { xp: 1 }, 'One by one they make it across.', 'One of them falls short.'),
           ch('Go the long way round', 'safe', {}, 'A long walk, but a safe one.', 'The long way crumbles too.')),
       ] },
       { id: 'caves', variants: [
         v('Glowing caves', 'Blue fungus lights a cave system running deep into the hills.',
-          ch('Go deep', 'heroic', { us: 1, rp: 1 }, 'At the bottom, the glow comes from a shard.', 'The tunnels branch and branch.'),
+          ch('Go deep', 'heroic', { us: 3, rp: 1 }, 'At the bottom, the glow comes from a shard.', 'The tunnels branch and branch.'),
           ch('Harvest the fungus', 'easy', { supply: 25 }, 'It glows, it heals, it sells.', 'It is poisonous.'),
           LEAVE),
         v('Echoing caves', 'Every word they say comes back a moment too late, in the wrong voice.',
@@ -321,7 +321,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
           ch('Recover the cargo', 'medium', { supply: 25 }, 'The cargo is intact.', 'The fuel tanks go up.'),
           ch('Search for survivors', 'easy', { xp: 1 }, 'One survivor, and a grateful one.', 'Nobody survived, and something has been eating.')),
         v('Alien wreck', 'Something not built by human hands lies broken in a crater.',
-          ch('Pry out its power core', 'hard', { us: 1 }, 'The core is a single great shard.', 'The core discharges.'),
+          ch('Pry out its power core', 'hard', { us: 3 }, 'The core is a single great shard.', 'The core discharges.'),
           ch('Study the hull', 'medium', { rp: 1 }, 'The metal is unlike anything they know.', 'The hull is still warm, and still awake.'),
           LEAVE),
         v('Burning freighter', 'A freighter came down hours ago. Its hold is on fire.',
@@ -332,7 +332,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
   },
   {
     id: 'fringe', name: 'Voidspawn Fringe', desc: 'The edge of Echo space. The richest pickings, and the Echoes notice who takes them.',
-    finish: { text: 'The squad comes back with an Echo nest-core: the Void Echoes will feel this.', reward: { us: 1, rp: 1 } },
+    finish: { text: 'The squad comes back with an Echo nest-core: the Void Echoes will feel this.', reward: { us: 3, rp: 1 } },
     encounters: [
       { id: 'scouts', variants: [
         v('Echo scouts', 'A pack of Void Echoes is moving through the dust.',
@@ -343,19 +343,19 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
           ch('Turn the trap on it', 'heroic', { xp: 4 }, 'The hunter becomes the hunted.', 'It was waiting for that.'),
           ch('Lose it in the dust', 'easy', {}, 'The trail goes cold.', 'It finds them again.')),
         v('Wounded Echo', 'A wounded Echo crawls through the dust, leaking light.',
-          ch('Harvest its light', 'hard', { us: 1 }, 'The light sets into a shard.', 'The light goes out, and others come to see why.'),
+          ch('Harvest its light', 'hard', { us: 3 }, 'The light sets into a shard.', 'The light goes out, and others come to see why.'),
           ch('Follow its trail', 'medium', { rp: 1 }, 'It leads them to a gathering ground.', 'It leads them into a trap.'),
           ch('Finish it', 'easy', { xp: 1 }, 'A clean kill.', 'It was only pretending.')),
       ] },
       { id: 'shardfield', variants: [
         v('Shard field', 'Umbra shards grow here like crystals of frost.',
-          ch('Mine as much as you can carry', 'hard', { us: 1 }, 'Their packs are heavy with shards.', 'The field wakes up.'),
+          ch('Mine as much as you can carry', 'hard', { us: 3 }, 'Their packs are heavy with shards.', 'The field wakes up.'),
           ch('Take a few and go', 'easy', { supply: 25 }, 'Small shards, but they trade well.', 'Even a few was too many.')),
         v('Shard storm', 'Wind whips shards through the air like shrapnel.',
-          ch('Catch them as they fly', 'hard', { us: 1 }, 'Bloodied hands, but full ones.', 'The storm cuts them up.'),
+          ch('Catch them as they fly', 'hard', { us: 3 }, 'Bloodied hands, but full ones.', 'The storm cuts them up.'),
           ch('Shelter and collect what lands', 'easy', { supply: 25 }, 'A careful harvest.', 'The shelter collapses.')),
         v('Shard monolith', 'A single shard, tall as a tower, pulses like a heart.',
-          ch('Chip off a piece', 'heroic', { us: 1, rp: 1 }, 'A piece breaks free, warm in their hands.', 'The monolith flares.'),
+          ch('Chip off a piece', 'heroic', { us: 3, rp: 1 }, 'A piece breaks free, warm in their hands.', 'The monolith flares.'),
           ch('Study its pulse', 'medium', { rp: 1 }, 'The pulse matches the Echoes. That is worth knowing.', 'The pulse starts to match theirs.'),
           LEAVE),
       ] },
@@ -367,14 +367,14 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
           ch('Find the sealed crates', 'hard', { supply: 25, rp: 1 }, 'Sealed tight, and worth it.', 'The seals were broken.'),
           ch('Burn the rot out', 'medium', { supply: 25 }, 'What survives the fire is clean.', 'The rot spreads faster than the fire.')),
         v('Last stand', 'The outpost fell, but its defenders took plenty of Echoes with them.',
-          ch('Find what they died guarding', 'hard', { us: 1 }, 'A strongbox of shards.', 'Whatever it was is gone, and something else is here.'),
+          ch('Find what they died guarding', 'hard', { us: 3 }, 'A strongbox of shards.', 'Whatever it was is gone, and something else is here.'),
           ch('Take their weapons', 'medium', { supply: 25 }, 'The dead pass their guns to the living.', 'The guns are void-touched.'),
           ch('Recover their tags', 'easy', { xp: 1 }, 'Their names go home.', 'The Echoes left a guard.')),
       ] },
       { id: 'void', variants: [
         v('Hungry void', 'The ground itself starts pulling them down.',
           ch('Run for it', 'easy', {}, 'They make it out.', 'Not everyone runs fast enough.'),
-          ch('Take a sample', 'hard', { us: 1 }, 'A jar of living void, worth its weight in shards.', 'The void takes the jar, and more.')),
+          ch('Take a sample', 'hard', { us: 3 }, 'A jar of living void, worth its weight in shards.', 'The void takes the jar, and more.')),
         v('Void tide', 'Darkness rolls in like a tide, swallowing the stars one by one.',
           ch('Stand in it and endure', 'heroic', { xp: 4 }, 'They come out the other side, changed and hard.', 'The dark keeps something.'),
           ch('Outrun it', 'easy', {}, 'The tide falls short of them.', 'The tide comes in faster.')),
@@ -387,7 +387,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
           ch('Answer it', 'medium', { xp: 1, supply: 25 }, 'A lost squad, saved, and grateful.', 'It was bait.'),
           ch('Track the signal from a distance', 'easy', { rp: 1 }, 'The Echoes are using it as a lure. Good to know.', 'The signal tracks them back.')),
         v('Echo lure', 'A beacon sings in a voice the squad knows, calling them by name.',
-          ch('Rewire it against the Echoes', 'hard', { us: 1 }, 'The Echoes come to it, and leave their shards behind.', 'The Echoes come to it, and to the squad.'),
+          ch('Rewire it against the Echoes', 'hard', { us: 3 }, 'The Echoes come to it, and leave their shards behind.', 'The Echoes come to it, and to the squad.'),
           ch('Smash it', 'easy', { xp: 1 }, 'The voice stops mid-word.', 'The voice calls louder.'),
           LEAVE),
         v('Dead relay', 'A dark relay station, its antennae bent toward Echo space.',
@@ -399,10 +399,10 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
           ch('Put them to rest', 'medium', { xp: 2 }, 'It is grim work, and it makes them grim.', 'The husks fight back.'),
           ch('Sneak between them', 'easy', {}, 'Not one head turns.', 'Every head turns.')),
         v('Husk procession', 'Husks march in a long line toward the heart of the fringe.',
-          ch('Join the line in disguise', 'heroic', { rp: 1, us: 1 }, 'They walk into the nest, and out again with its secrets.', 'The husks know their own.'),
+          ch('Join the line in disguise', 'heroic', { rp: 1, us: 3 }, 'They walk into the nest, and out again with its secrets.', 'The husks know their own.'),
           ch('Thin the line from cover', 'easy', { xp: 1 }, 'Shot by shot, the line gets shorter.', 'The line turns toward the shots.')),
         v('Husk of a hero', "Among the husks stands one in your faction's colours: a hero everyone knows.",
-          ch('Take back their relic blade', 'hard', { us: 1 }, 'The blade glows with trapped shards.', 'The hero will not let go.'),
+          ch('Take back their relic blade', 'hard', { us: 3 }, 'The blade glows with trapped shards.', 'The hero will not let go.'),
           ch('Give them peace', 'medium', { xp: 2 }, 'The hero falls, and the squad salutes.', 'The hero still fights like one.'),
           LEAVE),
       ] },
@@ -572,6 +572,12 @@ export const TRAINING = {
   executeAt: 0.25,
   /** A field's slow or daze lingers this many seconds after an enemy leaves it. */
   fieldLinger: 0.5,
+  /** Marauders: squads out of the other armies in the app. A run draws `pick` of them; from wave `from`, a wave has
+   *  `odds` of sending them, as `share` of its budget. */
+  raiders: { pick: 6, from: 3, odds: 0.3, share: 0.5 },
+  /** Sortie quirks and trinkets count here too: each point of initiative attacks this much faster; Jumpy attacks at
+   *  `jumpyMul` for the first `jumpySecs` of a wave; Short-sighted is -1 to hit past `myopicFrom` of a gun's reach. */
+  habits: { rate: 0.1, jumpySecs: 5, jumpyMul: 0.6, myopicFrom: 2 / 3 },
 };
 
 export type TrainingEnemyKind = 'swarm' | 'drone' | 'carapace' | 'mirror' | 'spitter' | 'outrider' | 'stalker' | 'brute' | 'lord';
@@ -627,7 +633,7 @@ export const TRAINING_ENEMIES: Record<TrainingEnemyKind, TrainingEnemyDef> = {
  * with the Void Echoes, camps, shrines and caches. Fights are turn based: the party stands in a line of front, middle
  * and back (a Fortification always at the back) that turns every round, the Echo squads stand at Close, Mid or Far
  * range (several can share one), and every model on both sides acts on its own initiative. A free run earns XP only; a
- * Shard run costs an Umbra Shard and all three units' downtime task, earns more XP and brings home a haul, but each
+ * Shard run costs Umbra Shards and all three units' downtime task, earns more XP and brings home a haul, but each
  * unit wiped out takes a scar. The logic is in sortie.ts; the game is components/SortieModal.tsx.
  */
 /** Sortie quirks, each with its opposite: picking one up drops the other. The region ones are `native:<region>` and
@@ -645,7 +651,7 @@ export const SORTIE_QUIRKS: Record<string, { name: string; text: string; good: b
   frail: { name: 'Frail', text: '-2 wounds on each model.', good: false, foe: 'hardy' },
 };
 
-/** Sortie trinkets: each with a gain and a cost, one to a unit, and they only count on a Sortie. `init`, `morale`,
+/** Sortie trinkets: each with a gain and a cost, one to a unit; they count on a Sortie and in Training. `init`, `morale`,
  * `melee`, `shoot` and `def` add to initiative, morale tests, hitting and Defense; `hp` to each model's wounds; `stress`
  * multiplies the stress the unit takes. */
 export interface SortieTrinket {
@@ -683,12 +689,16 @@ export const SORTIE = {
   /** A Shard run's haul for each fight won and cache found. Falling loses it; heading home from a camp keeps it. */
   haul: {
     fight: { supply: 5 },
-    elite: { supply: 10, rp: 1 },
-    boss: { supply: 15, rp: 1 },
+    elite: { supply: 10, rp: 1, us: 1 },
+    boss: { supply: 15, rp: 1, us: 2 },
     cache: { supply: 5 },
-    /** The boss of a long run drops an Umbra Shard this often. */
+    /** The boss of a long run drops one more Umbra Shard this often. */
     longShard: 0.5,
+    /** The most Umbra Shards a run can bring home: one more than it cost. */
+    maxUs: 4,
   },
+  /** Umbra Shards a Shard run costs. */
+  cost: 3,
   /** Every model's wounds are its Tough times this. */
   hpMul: 3,
   /**
@@ -791,6 +801,9 @@ export const SORTIE = {
   /** Ambushes: stepping onto a fight that started hidden, the Echoes may strike first (`init` more initiative in the
    * first round), `odds` of the time. A scout in the party, or the lantern, stops it. */
   ambush: { odds: 0.25, init: 10 },
+  /** Marauders (rules/raiders.ts): a run picks `pick` squads out of the other armies in the app; a plain or elite fight
+   * is a band of them `odds` of the time, `ambush` of the time when it's an ambush. Never the lord's fight. */
+  raiders: { pick: 6, odds: 0.15, ambush: 0.5 },
   /** Last stands: a party unit knocked down to its last model (or a lone model to a third of its wounds) may stand
    * fast, `odds` of the time and once a fight: for this round and the next it hits at +1, makes `mul` times the
    * attacks and takes no morale tests. */

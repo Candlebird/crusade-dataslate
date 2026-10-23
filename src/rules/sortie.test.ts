@@ -8,8 +8,10 @@ import { partyProblem, sortieProblem, startSortie } from './tasks';
 import { SORTIE, SORTIE_BOONS } from './downtimeData';
 import { SORTIE_BOSSES, SORTIE_REGIONS } from './sortieStory';
 import { RELICS } from './data';
+import { awardFeats, trainingFeats } from './feats';
+import { raidBand, raiderPool } from './raiders';
 import {
-  act, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, gunReach, keepsHaul, distOf,
+  gain, act, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, gunReach, keepsHaul, distOf,
   leaveCombat, leaveEvent, moveMember, nextSlots, onField, partyLine, patchUp, pickBoon, reachable, runXp, skillProblem, skillsOf, squadOf,
   trinketInfo, weekKey, weekSeed, weeklyScore, reveal, sightOf, veteranTitle,
   ambushOdds, beastInfo, beastKey, cursesOf, cursed, shopPrice, goalProgress, goalText, lastStanding, rematchTricks, unlockedBoons, markHeat, marked,
@@ -397,7 +399,7 @@ describe('sortie', () => {
     const party = PARTIES.line();
     f.units.push(...party);
     const ids = party.map((u) => u.id);
-    f.umbraShards = 1;
+    f.umbraShards = SORTIE.cost;
     expect(sortieProblem(f, undefined, party)).toBeNull();
     startSortie(f, undefined, ids);
     expect(f.umbraShards).toBe(0);
@@ -550,7 +552,8 @@ describe('sortie story persistence', () => {
     applySortie(f, revenge, '2026-01-01', id);
     expect(bountyOf(revenge)).toBe(SORTIE.nemesis.max * SORTIE.nemesis.bounty);
     expect(f.sortie!.nemesis).toEqual({});
-    expect(f.ledger.reduce((t, l) => t + (l.rp ?? 0), 0) - rp).toBe(bountyOf(revenge));
+    expect(f.ledger.filter((l) => !l.label.startsWith('Feat')).reduce((t, l) => t + (l.rp ?? 0), 0) - rp).toBe(bountyOf(revenge));
+    expect(f.feats?.sortieNemesis).toBe('2026-01-01');
     expect(f.sortie!.deep).toEqual(['wreck']);
     expect(f.sortie!.relics).toEqual(['wreck']);
 
@@ -1128,5 +1131,94 @@ describe('sortie pact marks, battle scars and lord omens', () => {
     const run = Object.assign(createRun(party, 2, 'free', 'short', { marks: ['proud', 'bleed'] }), { over: 'won' as const, bossDown: true });
     applySortie(f, run, '2026-10-22', () => `id${n++}`, () => 0.99);
     expect(f.sortie!.bestiary!['lord:' + run.boss].mark).toBe(3);
+  });
+});
+
+describe('sortie umbra shards', () => {
+  it('costs a Shard run its fee, and caps the shard haul', () => {
+    const f = newForce();
+    const party = PARTIES.line();
+    f.units.push(...party);
+    f.umbraShards = SORTIE.cost - 1;
+    expect(sortieProblem(f, undefined, party)).toMatch(/Umbra Shard/);
+    const run = createRun(party, 3);
+    gain(run, SORTIE.haul.boss);
+    gain(run, SORTIE.haul.boss);
+    gain(run, SORTIE.haul.elite);
+    expect(run.haul.us).toBe(SORTIE.haul.maxUs);
+    expect(SORTIE.haul.maxUs - SORTIE.cost).toBe(1);
+  });
+});
+
+describe('feats', () => {
+  it('pays the hardest Sortie wins once per force', () => {
+    const party = PARTIES.line();
+    const f = newForce();
+    f.units.push(...party);
+    const shards = f.umbraShards;
+    let n = 0;
+    const top = SORTIE.tiers.length - 1;
+    const run = () => Object.assign(createRun(party, 2, 'free', 'short', { tier: top, ascension: 4 }), { over: 'won' as const, bossDown: true });
+    const xp = party[0].xp;
+    const text = applySortie(f, run(), '2026-10-22', () => `id${n++}`, () => 0.99);
+    expect(text).toContain('Feat — Peak of the Road');
+    expect(text).toContain('Feat — Ascendant');
+    expect(Object.keys(f.feats!).sort()).toEqual(['sortieAsc4', 'sortieFlawless', 'sortieTop']);
+    expect(f.umbraShards - shards).toBe(3);
+    expect(f.units[0].xp - xp).toBeGreaterThanOrEqual(2);
+    expect(applySortie(f, run(), '2026-10-23', () => `id${n++}`, () => 0.99)).not.toContain('Feat');
+  });
+
+  it('pays training feats by waves cleared', () => {
+    expect(trainingFeats(19)).toEqual([]);
+    expect(trainingFeats(26)).toEqual(['train20', 'train25']);
+    const f = newForce();
+    const u = newUnit({ name: 'A' });
+    f.units.push(u);
+    const lines = awardFeats(f, trainingFeats(30), [u.id], '2026-10-22', () => 'x');
+    expect(lines).toHaveLength(3);
+    expect([u.xp, f.umbraShards]).toEqual([1, 3]);
+    expect(f.ledger.reduce((s, l) => s + l.rp, 0)).toBe(6);
+    expect(awardFeats(f, trainingFeats(30), [u.id], '2026-10-22', () => 'x')).toEqual([]);
+  });
+});
+
+describe('sortie marauders out of the other armies', () => {
+  const other = normalizeBook(JSON.parse(readFileSync('armies/shadow-stalkers.aof.json', 'utf8')));
+  const rival = newForce();
+  rival.name = 'The Iron Hand';
+  rival.units.push(...PARTIES.line());
+
+  it('builds a pool from other forces and books, never the Echoes or the force itself', () => {
+    const own = newForce();
+    own.units.push(...PARTIES.line());
+    const pool = raiderPool([book, other], [own, rival], own);
+    expect(pool.length).toBeGreaterThan(rival.units.length);
+    expect(pool.some((m) => m.force === 'The Iron Hand')).toBe(true);
+    expect(pool.some((m) => m.faction === other.name)).toBe(true);
+    expect(pool.every((m) => m.faction !== book.name && m.force !== own.name)).toBe(true);
+  });
+
+  it('trims a band to the budget, and meets it in fights instead of the Echoes', () => {
+    const pool = raiderPool([book, other], [rival]);
+    const band = raidBand(pool, 200, SORTIE.squads, () => 0.5);
+    expect(band.length).toBeGreaterThan(0);
+    expect(band.length).toBeLessThanOrEqual(SORTIE.squads);
+    const run = createRun(PARTIES.line(), 3, 'free', 'short', { raiders: pool });
+    expect(run.raiders!.length).toBeGreaterThan(0);
+    startCombat(run, book, 'fight', undefined, false, true);
+    expect(run.combat!.enemies.every((e) => e.raider)).toBe(true);
+    expect(run.combat!.log.some((l) => l.text.startsWith('Marauders:'))).toBe(true);
+    for (let i = 0; i < 3000 && run.combat && !run.combat.over; i++) autoStep(run, book);
+    expect(run.combat!.over).toBeDefined();
+    const boss = createRun(PARTIES.line(), 3, 'free', 'short', { raiders: pool });
+    startCombat(boss, book, 'boss', undefined, false, true);
+    expect(boss.combat!.enemies.some((e) => e.raider)).toBe(false);
+  });
+
+  it('keeps the weekly free of them, and runs without a pool as before', () => {
+    const pool = raiderPool([book, other], [rival]);
+    expect(createRun(PARTIES.line(), 3, 'free', 'long', { weekly: '2026-W43', raiders: pool }).raiders).toBeUndefined();
+    expect(createRun(PARTIES.line(), 3).raiders).toBeUndefined();
   });
 });

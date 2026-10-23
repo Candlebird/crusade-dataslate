@@ -2,11 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import { localDate } from '../model/date';
+import { FeatList } from './Feats';
 import type { Campaign, Force, SortieRecap, Unit } from '../model/types';
 import { echoPortrait } from '../model/emblem';
 import { unitName } from '../rules/battle';
 import { levelForXp } from '../rules/engine';
 import { echoesBook } from '../rules/echoForce';
+import { raiderPool } from '../rules/raiders';
 import { applySortie, postWeekly, weekBoard } from '../rules/downtime';
 import { partyProblem, sortieProblem, sortieScout, startSortie } from '../rules/tasks';
 import { SORTIE, SORTIE_BOONS, type SortieLength, type SortieMarkId, type SortieMode } from '../rules/downtimeData';
@@ -15,7 +17,7 @@ import {
   isFort, keepsHaul, leaveCombat, leaveEvent, memberName, memberUp, nextSlots, onField, patchUp, pickBoon, quitRun, distOf, DISTANCES, reachText, reachable, runXp, skillProblem,
   skillTargets, skillsOf, slotOf, SLOTS, turnModel, trinketInfo, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
   ambushOdds, beastInfo, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons,
-  type SortieIntentKind, type SortieModel, type SortieNode, type SortieNodeKind, type SortieRun, type SortieSkill, type SortieSkillKind, type SortieSquad,
+  type SortieFx, type SortieIntentKind, type SortieModel, type SortieNode, type SortieNodeKind, type SortieRun, type SortieSkill, type SortieSkillKind, type SortieSquad,
 } from '../rules/sortie';
 import { SORTIE_BOSSES, SORTIE_REGIONS } from '../rules/sortieStory';
 import { Modal, confirmAction, toast } from './ui';
@@ -40,6 +42,78 @@ const OVER: Record<NonNullable<SortieRun['over']>, string> = {
   quit: 'The party turned back.',
 };
 const AUTO_STEP = 380;
+/** How long a blow's trail and number stay up, and the gap between blows that land together (ms). */
+const BLOW_MS = 950;
+const BLOW_GAP = 120;
+
+interface Blow extends SortieFx { x1: number; y1: number; x2: number; y2: number; delay: number; stack: number }
+
+/** Trails from striker to struck, with the wounds dealt floating over the target, for each new blow in the fight. */
+function Blows({ fx, field }: { fx?: SortieFx[]; field: React.RefObject<HTMLDivElement | null> }) {
+  const seen = useRef(fx?.[fx.length - 1]?.n ?? 0);
+  const [shown, setShown] = useState<Blow[]>([]);
+  const timers = useRef<number[]>([]);
+  // Where each card stood last time: a squad the blow destroyed is already gone from the field.
+  const last = useRef(new Map<string, { x: number; y: number }>());
+  useEffect(() => () => timers.current.forEach(clearTimeout), []);
+  useEffect(() => {
+    const el = field.current;
+    if (!el) return;
+    const box = el.getBoundingClientRect();
+    const now = new Map<string, { x: number; y: number }>();
+    el.querySelectorAll<HTMLElement>('[data-sq]').forEach((x) => {
+      const r = x.getBoundingClientRect();
+      now.set(x.dataset.sq!, { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 });
+    });
+    const before = last.current;
+    last.current = now;
+    const mid = (key: string) => now.get(key) ?? before.get(key);
+    // A new fight counts its blows from the start again.
+    if ((fx?.[fx.length - 1]?.n ?? 0) < seen.current) seen.current = 0;
+    const fresh = (fx ?? []).filter((f) => f.n > seen.current);
+    if (!fresh.length) return;
+    seen.current = fresh[fresh.length - 1].n;
+    const add: Blow[] = [];
+    // Numbers landing on the same squad stack up rather than overlap.
+    const onto = new Map<string, number>();
+    fresh.forEach((f, i) => {
+      const a = mid(f.from);
+      const b = mid(f.to);
+      const stack = onto.get(f.to) ?? 0;
+      onto.set(f.to, stack + 1);
+      if (a && b) add.push({ ...f, x1: a.x, y1: a.y, x2: b.x, y2: b.y, delay: i * BLOW_GAP, stack });
+    });
+    if (!add.length) return;
+    setShown((xs) => [...xs, ...add]);
+    const done = new Set(add.map((x) => x.n));
+    timers.current.push(window.setTimeout(() => setShown((xs) => xs.filter((x) => !done.has(x.n))), BLOW_MS + add[add.length - 1].delay));
+  });
+  if (!shown.length) return null;
+  return (
+    <>
+      <svg className="sortie-fx" aria-hidden="true">
+        {shown.map((f) => (
+          <line
+            key={f.n}
+            x1={f.x1} y1={f.y1} x2={f.x2} y2={f.y2}
+            className={`sortie-trail${f.mine ? ' mine' : ' foe'}${f.melee ? ' melee' : ''}${f.dmg ? '' : ' miss'}`}
+            style={{ animationDelay: `${f.delay}ms` }}
+          />
+        ))}
+      </svg>
+      {shown.map((f) => (
+        <span
+          key={f.n}
+          className={`sortie-dmg${f.mine ? ' mine' : ' foe'}${f.dmg ? '' : ' miss'}`}
+          style={{ left: f.x2, top: f.y2 - f.stack * 22, animationDelay: `${f.delay}ms` }}
+          aria-hidden="true"
+        >
+          {f.dmg ? `-${f.dmg}` : f.hits ? 'saved' : 'miss'}
+        </span>
+      ))}
+    </>
+  );
+}
 const ATTACKS: SortieSkillKind[] = ['weapon', 'atwill', 'charge'];
 
 /** One model's wounds: pips when there are few, a bar when there are many. */
@@ -229,6 +303,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
         tier,
         ascension: tier === SORTIE.tiers.length - 1 ? asc : 0,
         marks: (story?.stats?.wins ?? 0) > 0 ? marks : [],
+        raiders: raiderPool(state.books, state.forces, force),
       });
     setRecapOpen(null);
     banked.current = false;
@@ -296,12 +371,12 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
           <div className="small"><b>Kind of run</b></div>
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
             <button className={mode === 'free' ? 'primary' : ''} onClick={() => setMode('free')}>Free</button>
-            <button className={mode === 'shard' ? 'primary' : ''} onClick={() => setMode('shard')}>Shard run (1 Umbra Shard)</button>
+            <button className={mode === 'shard' ? 'primary' : ''} onClick={() => setMode('shard')}>Shard run ({SORTIE.cost} Umbra Shards)</button>
           </div>
           <p className="muted small" style={{ margin: '4px 0 0' }}>
             {mode === 'free'
               ? 'Any time, as often as you like: XP only, the units aren’t busy, and nothing happens to them if they fall.'
-              : <>Costs 1 Umbra Shard (you have {force.umbraShards}){c ? ' and is the task for the round of all three units' : ''}. Brings home a haul of Supply and RP if the party beats the boss or heads home from a camp. Each unit wiped out takes a scar or is left Comatose.</>}
+              : <>Costs {SORTIE.cost} Umbra Shards (you have {force.umbraShards}){c ? ' and is the task for the round of all three units' : ''}. Brings home a haul of Supply, RP and up to {SORTIE.haul.maxUs} Umbra Shards if the party beats the boss or heads home from a camp. Each unit wiped out takes a scar or is left Comatose.</>}
           </p>
           {problem && picked.length > 0 && <p className="small" style={{ color: 'var(--warn)', margin: '4px 0 0' }}>{problem}</p>}
           <div className="small" style={{ marginTop: 8 }}><b>Road</b></div>
@@ -453,6 +528,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
             </div>
           )}
         </div>
+        <FeatList force={force} where="sortie" />
         {story?.bestiary && Object.keys(story.bestiary).length ? (
           <div className="sortie-choice">
             <button className="ghost small sortie-recap-row" onClick={() => setBestiaryOpen(!bestiaryOpen)}>
@@ -816,6 +892,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
   onLeave: () => void;
 }) {
   const c = run.combat!;
+  const fieldRef = useRef<HTMLDivElement>(null);
   const me = actingSquad(run);
   // Auto only helps a squad whose models carry different weapons; elsewhere it's for testing.
   const mixed = !!me && new Set(active(me).map((m) => m.guns.map((g) => g.name).sort().join('|'))).size > 1;
@@ -825,7 +902,8 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
   const targets = chosen ? skillTargets(run, chosen) : [];
   const field = onField(c);
   const waiting = c.enemies.filter((e) => e.arrives && active(e).length);
-  const echoFace = (e: SortieSquad, size: number) => <EmblemBadge emblem={echoPortrait(e.name)} size={size} title={e.name} />;
+  // Marauders wear their own emblems: one out of another force is known on sight.
+  const echoFace = (e: SortieSquad, size: number) => (e.raider ? <Portrait unit={e.unit} size={size} /> : <EmblemBadge emblem={echoPortrait(e.name)} size={size} title={e.name} />);
   const squad = (key: string) => c.party.find((p) => p.key === key) ?? c.enemies.find((e) => e.key === key);
   const face = (s: SortieSquad, size: number) => (s.echo ? echoFace(s, size) : <Portrait unit={s.unit} size={size} />);
   const out = c.party.filter((p) => p.slot === undefined);
@@ -886,13 +964,14 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
           </div>
         </div>
       )}
-      <div className="sortie-field">
+      <div className="sortie-field" ref={fieldRef}>
+        <Blows fx={c.fx} field={fieldRef} />
         <div className="sortie-party">
           {SLOTS.map((name, i) => {
             const p = c.party.find((x) => x.slot === i);
             const next = p ? nextSlots(c)[p.key] : undefined;
             return (
-              <div key={name} className={`sortie-slot${p && p === me ? ' acting' : ''}${p ? '' : ' vacant'}`}>
+              <div key={name} data-sq={p?.key} className={`sortie-slot${p && p === me ? ' acting' : ''}${p ? '' : ' vacant'}`}>
                 <div className="sortie-band-head">{name}{i ? <span className="muted"> · +{i} distance</span> : <span className="muted"> · melee</span>}</div>
                 {!p && <div className="muted small sortie-band-none">Empty</div>}
                 {p && (
@@ -940,6 +1019,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
                   return (
                     <button
                       key={e.key}
+                      data-sq={e.key}
                       className={`sortie-echo${can ? ' target' : ''}${chosen && !can ? ' out' : ''}`}
                       disabled={!chosen}
                       onClick={() => target(e)}
@@ -947,6 +1027,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onLeave }: {
                       {echoFace(e, 30)}
                       <span className="sortie-echo-body">
                         <span className="small"><b>{e.name}</b>{e.hero ? ' (Hero)' : ''} <span className="muted">Q{e.quality}+ D{e.defense}+</span></span>
+                        {e.raider && <span className="small sortie-raider">Marauder · {e.raider}</span>}
                         <span className="sortie-models">{e.models.map((m, i) => <Token key={i} face={null} m={m} />)}</span>
                         {statusesOf(e, c.round).length > 0 && <span className="small sortie-status">{statusesOf(e, c.round).join(', ')}</span>}
                       </span>

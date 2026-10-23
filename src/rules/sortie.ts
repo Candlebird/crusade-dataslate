@@ -14,6 +14,7 @@ import {
 } from './downtimeData';
 import { SORTIE_BOSSES, SORTIE_LORE, SORTIE_LORE_DEFAULT, SORTIE_REGIONS, SORTIE_STAND, SORTIE_VOICE, type SortieBoss, type SortieRegion, type SortieRegionId, type SortieVoiceKind } from './sortieStory';
 import { RELICS, type RelicDef } from './data';
+import { pickRaiders, raidBand, type Raider } from './raiders';
 
 // Sortie: a party of three units sets out across a branching map, Darkest Dungeon style. Fights are turn based. The
 // party stands in a line of three slots, front, middle and back (a Fortification always at the back), and every round
@@ -48,6 +49,8 @@ export interface SortieSquad {
   name: string;
   unit: Unit;
   echo: boolean;
+  /** A Marauder (rules/raiders.ts): who it is and whose army it's from, for its card. */
+  raider?: string;
   models: SortieModel[];
   quality: number;
   defense: number;
@@ -167,7 +170,13 @@ export interface SortieCombat {
   ambush?: boolean;
   /** Already counted into the run's bestiary tally. */
   tallied?: boolean;
+  /** The latest blows, for the view's trails and damage numbers (newest last). */
+  fx?: SortieFx[];
+  fxSeq?: number;
 }
+
+/** One blow: who struck whom, and how hard. */
+export interface SortieFx { n: number; from: string; to: string; hits: number; dmg: number; melee: boolean; mine: boolean }
 
 export type SortieNodeKind = 'fight' | 'elite' | 'camp' | 'shrine' | 'cache' | 'shop' | 'boss';
 export interface SortieNode {
@@ -206,6 +215,8 @@ export interface SortieMember {
 
 export interface SortieRun {
   rng: number;
+  /** Marauders from the other armies in the app this run may meet (rules/raiders.ts). */
+  raiders?: Raider[];
   /** The Ascension level past the top tier: its first that many curses (SORTIE.ascension) are on. */
   ascension?: number;
   /** Echoes met this run, for the force's bestiary: fights met in and squads slain, by name (or 'lord:<id>'). */
@@ -378,7 +389,7 @@ export function createRun(
   units: Unit[], seed: number, mode: SortieMode = 'free', length: SortieLength = 'short',
   opts: {
     nemesis?: Record<string, number>; deep?: string[]; tier?: number; weekly?: string; ascension?: number; slain?: Record<string, number>; boons?: string[];
-    marks?: SortieMarkId[];
+    marks?: SortieMarkId[]; raiders?: Raider[];
   } = {},
 ): SortieRun {
   const line = [...units.filter((u) => !isFort(u)), ...units.filter(isFort)];
@@ -474,6 +485,11 @@ export function createRun(
   if (run.weekly) note(run, `The weekly challenge (${run.weekly}): every force faces this same road this week.`, 'info');
   if (tier) note(run, `${SORTIE.tiers[tier].name}: ${SORTIE.tiers.slice(1, tier + 1).map((t) => t.text).join(' ')}`, 'bad');
   if (asc) note(run, `Ascension ${asc}: ${cursesOf(run).map((x) => x.text).join(' ')}`, 'bad');
+  // Marauders from the other armies roam the road (not on the weekly, which every force must face alike).
+  if (opts.raiders?.length && !run.weekly) {
+    run.raiders = pickRaiders(opts.raiders, SORTIE.raiders.pick, () => rand(run));
+    note(run, `Marauders out of ${listText([...new Set(run.raiders.map((m) => m.faction))])} roam this road.`, 'bad');
+  }
   return run;
 }
 
@@ -504,7 +520,7 @@ export function sigsOf(run: SortieRun): SortieBoss['sig'][] {
   return [...(run.foreseen ? [] : [bossOf(run).sig]), ...(extra ? [extra] : [])];
 }
 
-// --- Quirks: habits a unit picks up on runs, which only count on a Sortie ---------------------------------------------
+// --- Quirks: habits a unit picks up on runs, which count on a Sortie (and some in Training) -----------------------
 
 /** A quirk's name, text and kind; a region one reads `native:<region>` or `haunted:<region>`. */
 export function quirkInfo(id: string): { name: string; text: string; good: boolean; foe: string } | undefined {
@@ -762,7 +778,9 @@ export function enterNode(run: SortieRun, book: CatalogBook, node: SortieNode) {
   if (node.kind === 'shrine') run.scene = voiceLine(run, 'event') || undefined;
   if (node.kind === 'fight' || node.kind === 'elite') {
     const odds = node.veiled ? ambushOdds(run) : 0;
-    return startCombat(run, book, node.kind, node.affix, odds > 0 && rand(run) < odds);
+    const ambush = odds > 0 && rand(run) < odds;
+    const raid = !!run.raiders?.length && rand(run) < (ambush ? SORTIE.raiders.ambush : SORTIE.raiders.odds);
+    return startCombat(run, book, node.kind, node.affix, ambush, raid);
   }
   if (node.kind === 'boss') return startCombat(run, book, node.kind, node.affix);
   if (node.kind === 'camp') return void (run.screen = 'camp');
@@ -809,10 +827,10 @@ function onward(run: SortieRun) {
 }
 
 /** Add to the haul: Supply to spend at shops on any run; only a Shard run brings it home. */
-function gain(run: SortieRun, h: Partial<SortieHaul>) {
+export function gain(run: SortieRun, h: Partial<SortieHaul>) {
   run.haul.supply += h.supply ?? 0;
   run.haul.rp += h.rp ?? 0;
-  run.haul.us += h.us ?? 0;
+  run.haul.us = Math.min(SORTIE.haul.maxUs, run.haul.us + (h.us ?? 0));
 }
 
 // --- Rewards, camps and shrines ----------------------------------------------------------------------------------
@@ -1209,10 +1227,12 @@ export function moveMember(run: SortieRun, i: number, dir: -1 | 1): boolean {
   return true;
 }
 
-export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFightKind, affix?: SortieAffix, ambush = false) {
+export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFightKind, affix?: SortieAffix, ambush = false, raid = false) {
   const budget = fightBudget(run, book, kind);
   const boss = kind === 'boss' ? bossOf(run) : undefined;
-  const echoes = echoSquads(book, budget, kind, () => rand(run), boss?.unit);
+  // Marauders: a band out of the other armies in the app instead of the Echoes (never the lord's fight).
+  const band = raid && kind !== 'boss' && run.raiders?.length ? raidBand(run.raiders, budget, SORTIE.squads, () => rand(run)) : [];
+  const echoes = band.length ? band.map((b) => b.unit) : echoSquads(book, budget, kind, () => rand(run), boss?.unit);
   const party = run.party.map((mem, i) => {
     const s = squadOf(mem.unit, `p${i}`, { extraTough: run.tough + (mem.scars?.includes('survivor') ? SORTIE.hpMul : 0) });
     if (mem.scars?.includes('headhunter')) s.atkBonus *= SORTIE.scars.headhunter.mul!;
@@ -1223,6 +1243,7 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
   });
   const enemies = echoes.map((u, i) => {
     const s = squadOf(u, `e${i}`, { echo: true });
+    if (band[i]) s.raider = `${band[i].raider.faction}${band[i].raider.force ? `, of ${band[i].raider.force}` : ''}`;
     if (hasRule(u.rules, 'Ambush')) s.arrives = 2;
     if (marked(run, 'fierce')) s.atkBonus *= SORTIE.marks.fierce;
     return s;
@@ -1283,10 +1304,14 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
     }
     log(c, `${SORTIE.affixes[affix].name}: ${SORTIE.affixes[affix].text}`, 'bad');
   }
-  log(c, `${boss ? boss.name : fightTitle[kind]}: ${enemies.map((e) => `${e.models.length > 1 ? `${e.models.length} ` : ''}${e.name}${e.arrives ? ' (in ambush)' : ''}`).join(', ')}.`, 'info');
+  log(c, `${boss ? boss.name : band.length ? 'Marauders' : fightTitle[kind]}: ${enemies.map((e) => `${e.models.length > 1 ? `${e.models.length} ` : ''}${e.name}${e.arrives ? ' (in ambush)' : ''}`).join(', ')}.`, 'info');
+  for (const b of band.filter((x, i) => x.raider.force && band.findIndex((y) => y.raider === x.raider) === i)) {
+    log(c, `That's ${unitName(b.unit)} out of ${b.raider.force}'s army! Gone raiding, it seems.`, 'bad');
+  }
+  if (band.length) note(run, `Marauders: ${listText([...new Set(band.map((b) => `${unitName(b.unit)} (${b.raider.faction})`))])}.`, 'bad');
   if (ambush) {
     c.ambush = true;
-    log(c, 'Ambush! The Echoes were waiting, and strike first this round.', 'bad');
+    log(c, `Ambush! The ${band.length ? 'Marauders' : 'Echoes'} were waiting, and strike first this round.`, 'bad');
     note(run, `Ambushed by ${listText([...new Set(enemies.map((e) => e.name))])}.`, 'bad');
   }
   if (has(run, 'banner')) for (const p of partyLine(c)) p.shield = active(p).length;
@@ -1635,6 +1660,8 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
   const kills = before - alive(def).length;
   const label = a.label ? ` (${a.label})` : '';
   log(c, `${att.name}${label} → ${def.name}: ${hits} hit${hits === 1 ? '' : 's'}, ${dealt} wound${dealt === 1 ? '' : 's'}${kills > 0 ? `, ${kills} ${def.echo ? 'Echo' : 'model'}${kills === 1 ? '' : def.echo ? 'es' : 's'} down` : ''}.`, mine ? (dealt ? 'good' : 'info') : dealt ? 'bad' : 'info');
+  c.fxSeq = (c.fxSeq ?? 0) + 1;
+  c.fx = [...(c.fx ?? []), { n: c.fxSeq, from: att.key, to: def.key, hits, dmg: dealt, melee: !!a.melee, mine }].slice(-12);
   if (dealt) procs(run, att, def, a.melee, dealt);
   if (a.melee) {
     att.engaged = def.engaged = c.round;
@@ -2205,7 +2232,7 @@ function tally(run: SortieRun, c: SortieCombat) {
   const met = (run.met ??= {});
   const seen = new Set<string>();
   for (const e of c.enemies) {
-    if (e.arrives) continue;
+    if (e.arrives || e.raider) continue;
     const k = beastKey(run, c, e);
     const b = (met[k] ??= { met: 0, slain: 0 });
     if (!seen.has(k)) b.met++;

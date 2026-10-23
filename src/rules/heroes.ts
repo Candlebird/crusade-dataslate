@@ -88,7 +88,7 @@ export function rollOffers(
     const hall = c.sectors.some((s) => s.owner === f.id && hasBuilding(s, 'mercHall'));
     if (offers.some((o) => o.factionId === f.id) || (!hall && rand() >= HERO_OFFERS.chance)) continue;
     const hero = rollHero(books, forces, f.id, taken, rand, newId);
-    if (hero) fresh.push({ id: newId(), factionId: f.id, round, ...hero, fee: hall ? Math.max(1, hero.fee - HERO_OFFERS.hallDiscount) : hero.fee });
+    if (hero) fresh.push({ id: newId(), factionId: f.id, round, ...hero, fee: hall ? Math.max(HERO_OFFERS.fee.base, hero.fee - HERO_OFFERS.hallDiscount) : hero.fee });
   }
   c.offers = [...offers, ...fresh];
   if (!c.offers.length) delete c.offers;
