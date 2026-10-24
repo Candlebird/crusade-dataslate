@@ -2,6 +2,7 @@ import type { Unit } from '../../model/types';
 import { levelForXp } from '../engine';
 import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { pieceById } from './board';
+import { luckCap, mendPerk, thrifty } from './drill';
 import { creditMul } from './nexus';
 import type { Enemy, TrainingRun, UnitTower } from './types';
 
@@ -53,14 +54,18 @@ export function applyLevel(t: UnitTower): boolean {
   return true;
 }
 
-/** The next luck level's cost, or null at the top. */
-export const luckCost = (run: TrainingRun): number | null => TRAINING.shards.luckCost[run.luck] ?? null;
+/** The next luck level's cost (less with the Drill Honours thrift perk), or null at the top. */
+export function luckCost(run: TrainingRun): number | null {
+  const c = TRAINING.shards.luckCost[run.luck];
+  return c === undefined ? null : thrifty(run, c);
+}
 
 /** Why luck can't go up now, or null. */
 export function luckProblem(run: TrainingRun): string | null {
   if (run.phase !== 'build') return 'Luck is bought between waves.';
   const c = luckCost(run);
   if (c === null) return 'Luck is at its best.';
+  if (run.luck >= luckCap(run)) return `Luck ${run.luck + 1} needs a Drill Honour.`;
   if (run.credits < c) return 'Not enough credits.';
   return null;
 }
@@ -84,12 +89,12 @@ export function mendProblem(run: TrainingRun): string | null {
   return null;
 }
 
-/** +TRAINING.mend.hp base HP, never above TRAINING.baseHp. Throws on a problem. */
+/** +TRAINING.mend.hp base HP (more with the Drill Honours mend perk), never above TRAINING.baseHp. Throws on a problem. */
 export function buyMend(run: TrainingRun): void {
   const why = mendProblem(run);
   if (why) throw new Error(why);
   run.credits -= mendCost(run);
-  run.baseHp = Math.min(TRAINING.baseHp, run.baseHp + TRAINING.mend.hp);
+  run.baseHp = Math.min(TRAINING.baseHp, run.baseHp + TRAINING.mend.hp + mendPerk(run));
   run.mends++;
 }
 

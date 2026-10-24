@@ -4,8 +4,8 @@ import type { SavedRun, TrainingRun } from './types';
 
 export const saveKey = (forceId: string) => `trainingRun:${forceId}`;
 
-/** The save format this version reads (5: names, records and titles); older saves are dropped (staleSave). */
-export const SAVE_VERSION = 5;
+/** The save format this version reads (6: Drill Honours and the Weekly Siege); older saves are dropped (staleSave). */
+export const SAVE_VERSION = 6;
 
 /** The run as JSON; shots and blows on screen are left behind. */
 export function serialize(run: TrainingRun): string {

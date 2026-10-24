@@ -2,6 +2,7 @@ import type { RelicTier } from '../data';
 import { describe, type Effect } from '../abilities';
 import { TRAINING } from '../downtimeData';
 import { routeOf, unitTowers } from './board';
+import { cardOpen, perkOf, rerollsOf } from './drill';
 import { applyLevel, levelCost } from './economy';
 import { pick, rand } from './rng';
 import { isTrinketCard, takeTrinket, trinketCardText, trinketOffer } from './trinkets';
@@ -89,8 +90,8 @@ const RANK: Record<RelicTier, number> = { Common: 0, Rare: 1, Legendary: 2 };
 export function drawCards(run: TrainingRun): CardDraw[] {
   const units = unitTowers(run);
   const out: CardDraw[] = [];
-  const fits = (c: TrainingCard) => !out.some((d) => d.id === c.id) && (!c.unit || units.some(c.unit));
-  for (let i = 0; i < C.offer; i++) {
+  const fits = (c: TrainingCard) => cardOpen(run, c.id) && !out.some((d) => d.id === c.id) && (!c.unit || units.some(c.unit));
+  for (let i = 0; i < C.offer + perkOf(run, 'offer'); i++) {
     const r = rand(run);
     const want: RelicTier = r < C.odds.Legendary ? 'Legendary' : r < C.odds.Legendary + C.odds.Rare ? 'Rare' : 'Common';
     // A rarity with nothing left that fits falls back a step.
@@ -140,3 +141,25 @@ export function pickCard(run: TrainingRun, i: number): void {
 /** The card auto play takes: the rarest, the first of those. */
 export const autoCardIndex = (run: TrainingRun): number =>
   (run.offer ?? []).reduce((best, d, i, xs) => (RANK[d.rarity] > RANK[xs[best].rarity] ? i : best), 0);
+
+/** Re-draws of the card offer left this run (the Drill Honours reroll perk). */
+export const rerollsLeft = (run: TrainingRun): number => Math.max(0, rerollsOf(run) - (run.rerolls ?? 0));
+
+/** Why the card offer can't be re-drawn, or null. */
+export function rerollProblem(run: TrainingRun): string | null {
+  if (!run.offer?.length) return 'No cards on offer.';
+  if (rerollsOf(run) === 0) return 'Re-draws need a Drill Honour.';
+  if (rerollsLeft(run) === 0) return 'No re-draws left this run.';
+  return null;
+}
+
+/** Re-draw the offer's boss cards (a trinket card on offer stays). Throws on a problem. */
+export function rerollCards(run: TrainingRun): void {
+  const why = rerollProblem(run);
+  if (why) throw new Error(why);
+  const kept = run.offer!.filter(isTrinketCard);
+  run.rerolls = (run.rerolls ?? 0) + 1;
+  const d = [...drawCards(run), ...kept];
+  run.offer = d.length ? d : run.offer;
+  run.log.push('The card offer is re-drawn.');
+}

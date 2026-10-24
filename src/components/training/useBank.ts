@@ -2,20 +2,25 @@ import { useCallback, useRef } from 'react';
 import { useStore } from '../../model/store';
 import type { Campaign, Force } from '../../model/types';
 import { localDate } from '../../model/date';
-import { uid } from '../../model/factory';
+import { nowIso, uid } from '../../model/factory';
 import { bankOffTableXp, offTableKey } from '../../rules/downtime';
 import { awardFeats, trainingFeats } from '../../rules/feats';
-import { bankHonours, bankShared, lordsSlain, mvp, takeXp, type TrainingRun } from '../../rules/training';
+import { weekKey } from '../../rules/sortie';
+import {
+  bankDrill, bankHonours, bankShared, drillNews, lordsSlain, mvp, postSiege, settleSieges, siegeScore, takeXp, type TrainingRun,
+} from '../../rules/training';
 import { toast } from '../ui';
+import { siegeWinLine } from './useSiegeSettle';
 
 // Paying a run out to the force: XP as it lands (within the off-table limit), then at the end the best score, feats,
-// who led the defence, records, titles and tales (records.ts bankHonours), and the Sortie layer (shared.ts bankShared).
+// who led the defence, records, titles and tales (records.ts bankHonours), the Sortie layer (shared.ts bankShared), the
+// Drill Honours (drillBank.ts) and, for a Weekly Siege in a campaign, its board (siegeBoard.ts postSiege).
 
 /** XP a unit earned this session, and what the off-table limit let it bank. */
 interface Gain { name: string; earned: number; got: number }
 
 export function useBank(force: Force, c?: Campaign) {
-  const { updateForce } = useStore();
+  const { update, updateForce } = useStore();
   const gains = useRef<Record<string, Gain>>({});
   const done = useRef(false);
 
@@ -50,7 +55,10 @@ export function useBank(force: Force, c?: Campaign) {
     let feats: string[] = [];
     let shared: string[] = [];
     let honours: string[] = [];
+    let drill: string[] = [];
     updateForce(force.id, (f) => {
+      // The Drill counts first: an old force's start from its units' records, before this run joins them.
+      const before = bankDrill(f, run);
       // Before the best moves: a new best is a highlight. Tales carry the campaign round, for the chronicle.
       const round = f.nexus?.factionId && c ? c.round ?? 1 : undefined;
       honours = bankHonours(f, run, localDate(), uid, round);
@@ -58,12 +66,24 @@ export function useBank(force: Force, c?: Campaign) {
       feats = awardFeats(f, trainingFeats(run.cleared, lordsSlain(run)), run.crafted, localDate(), uid);
       // Quirks, the trinket, the bestiary and a slain nemesis go to the Sortie side with the XP.
       shared = bankShared(f, run);
+      drill = drillNews(f, run, before);
     });
+    if (run.siege) drill = [`Weekly Siege ${run.siege}: wave ${siegeScore(run)}`, ...drill];
+    if (c && run.siege) {
+      update((s) => {
+        const cc = s.campaign;
+        const f = s.forces.find((x) => x.id === force.id);
+        if (!cc || !f) return;
+        cc.siegeBoard = postSiege(cc, f, run, localDate());
+        drill.push(...settleSieges(cc, weekKey(localDate()), localDate()).map((w) => siegeWinLine(cc, w)));
+        cc.updatedAt = nowIso();
+      });
+    }
     const got = Object.values(gains.current).filter((g) => g.earned > 0);
     const led = lead && lead.kills > 0 ? `${lead.name} led the defence with ${lead.kills} kill${lead.kills === 1 ? '' : 's'}. ` : '';
     const xp = got.length ? `XP banked: ${got.map((g) => `${g.name} +${g.got}`).join(', ')}.` : 'No XP this time.';
-    toast(`${led}${run.cleared} wave${run.cleared === 1 ? '' : 's'} cleared. ${xp}${feats.length ? ` ${feats.join('. ')}.` : ''}${honours.length ? ` ${honours.join('. ')}.` : ''}${shared.length ? ` ${shared.join('. ')}.` : ''}`);
-  }, [force.id, c, updateForce, bankXp]);
+    toast(`${led}${run.cleared} wave${run.cleared === 1 ? '' : 's'} cleared. ${xp}${feats.length ? ` ${feats.join('. ')}.` : ''}${honours.length ? ` ${honours.join('. ')}.` : ''}${shared.length ? ` ${shared.join('. ')}.` : ''}${drill.length ? ` ${drill.join('. ')}.` : ''}`);
+  }, [force.id, c, update, updateForce, bankXp]);
 
   /** A new run: forget the last one's tally. */
   const reset = useCallback(() => {

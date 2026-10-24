@@ -12,22 +12,28 @@ import { nemesisPlan, nemesisTick, pickNemesis } from './nemesis';
 import { nexusStart } from './nexus';
 import { rollGains, watchBosses } from './quirks';
 import { planWave, runCover, spawnDue, walk } from './waves';
-import type { RunNexus, ShardPiece, TrainingRun, UnitTower } from './types';
+import { purseOf } from './drill';
+import type { RunDrill, RunNexus, ShardPiece, TrainingRun, UnitTower } from './types';
 
 // A run's life: create, build-phase actions, waves, step(), XP, the end.
 
 /** A new run for a force: recipes for every unit that can train, cover, credits, and the first draft drawn ('build').
  *  `story`: the force's Sortie record, for its nemesis (nemesis.ts). `nexus`: its campaign's (nexus.ts nexusOf), which
- *  can change the starting credits, base HP and cover. */
-export function createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus): TrainingRun {
+ *  can change the starting credits, base HP and cover. `opts.drill`: what the force's Drill Honours open (drill.ts
+ *  drillOf; none = everything); `opts.siege`: the Weekly Siege's week (siege.ts), whose seed gives the cover and drafts. */
+export function createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus,
+  opts: { drill?: RunDrill; siege?: string } = {}): TrainingRun {
   const force = units.filter(canTrain);
   const run: TrainingRun = {
-    v: 5, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
+    v: 6, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
     power: force.reduce((n, u) => n + u.points, 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
     mends: 0, leaked: 0, nextId: 1, pieces: [], draft: { step: 'done', hand: [], placed: [] }, recipes: recipesFor(force),
     crafted: [], enemies: [], queue: [], cover: [], cards: [], mods: { bounty: 1, holdMul: 1, regrabAdd: 0 }, banked: {},
     fx: [], log: [],
   };
+  if (opts.drill) run.drill = JSON.parse(JSON.stringify(opts.drill)) as RunDrill;
+  if (opts.siege) run.siege = opts.siege;
+  run.credits += purseOf(run);
   const nemesis = pickNemesis(story);
   if (nemesis) run.nemesis = nemesis;
   if (nexus) run.nexus = JSON.parse(JSON.stringify(nexus)) as RunNexus;

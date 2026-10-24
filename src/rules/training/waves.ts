@@ -4,6 +4,7 @@ import { BASE, dist, mapOf } from './board';
 import { LEGS, N, WAYPOINTS, centre, heading, mapFor, route, type MapState } from './map';
 import { budgetMul } from './nexus';
 import { pick, rand, randInt, shuffle, type Rng } from './rng';
+import { waveDice } from './siege';
 import { noteMet } from './tally';
 import type { Enemy, SpawnPlan, Tile, TrainingRun } from './types';
 
@@ -100,11 +101,11 @@ function spawnPlan(r: Rng, kind: TrainingEnemyKind, at: number, w: number, hpMul
 /** Wave `w`'s spawns, sorted by time, rolling `r`: the Nexus's budget and affixes on them (nexus.ts, affixes.ts). */
 const nexusWave = (r: Rng, run: TrainingRun, w: number) => affixPlan(r, run, planFor(r, run.power * budgetMul(run), w));
 
-/** Wave `w`'s spawns, sorted by time (rolls the run's dice). */
-export const planWave = (run: TrainingRun, w: number): SpawnPlan[] => nexusWave(run, run, w);
+/** Wave `w`'s spawns, sorted by time (rolls the run's dice; a siege's own for the wave). */
+export const planWave = (run: TrainingRun, w: number): SpawnPlan[] => nexusWave(waveDice(run, w, run), run, w);
 
 /** The next wave as startWave will plan it, without touching the run (rolls on a copy of the dice). */
-export const previewWave = (run: TrainingRun): SpawnPlan[] => nexusWave({ rng: run.rng }, run, run.wave + 1);
+export const previewWave = (run: TrainingRun): SpawnPlan[] => nexusWave(waveDice(run, run.wave + 1, { rng: run.rng }), run, run.wave + 1);
 
 /** A wave's spawns grouped by kind, for the preview: how many, how many veterans, a plain one's wounds, and if they fly. */
 export interface PreviewGroup {

@@ -22,6 +22,7 @@ import { hasPerk, syncWarlords } from './warlords';
 import { localDate } from '../model/date';
 import { claimBounties, holdBounties, refreshBounties } from './bounties';
 import { BOUNTY } from './nexusData';
+import { siegeAssets } from './training/siegeBoard';
 import type { FinishedBattle } from './tracker';
 
 // Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
@@ -108,10 +109,11 @@ export function nextThreat(c: Campaign) {
 export const skirmishWins = (c: Campaign, factionId: string) =>
   c.log.filter((e) => e.skirmish && e.winner === factionId && (e.round ?? 1) === currentRound(c)).length;
 
-/** Strategic Assets a faction has this round: earned (one per skirmish win, capped), spent, and left. */
+/** Strategic Assets a faction has this round: earned (one per skirmish win or Weekly Siege won, capped), spent, and left. */
 export function assetsOf(c: Campaign, factionId: string) {
   // A Strategium gives one more, won skirmish or not, and so does a Warmaster Warlord's Strategist.
-  const earned = Math.min(NEXUS_ROUNDS.assetsMax, skirmishWins(c, factionId)) + Math.min(1, buildingsHeld(c, factionId, 'strategium'))
+  const won = skirmishWins(c, factionId) + siegeAssets(c, factionId);
+  const earned = Math.min(NEXUS_ROUNDS.assetsMax, won) + Math.min(1, buildingsHeld(c, factionId, 'strategium'))
     + (hasPerk(c, factionId, 'strategist') ? WARLORDS.assets : 0);
   const spent = (c.assetsSpent ?? []).filter((a) => a.factionId === factionId && a.round === currentRound(c));
   return { earned, spent, left: Math.max(0, earned - spent.length) };

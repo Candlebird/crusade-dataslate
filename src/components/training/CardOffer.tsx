@@ -1,5 +1,7 @@
 import type { EmblemLayer } from '../../model/types';
-import { autoCardIndex, cardText, isTrinketCard, unitTowers, type CardDraw, type TrainingRun } from '../../rules/training';
+import {
+  autoCardIndex, cardText, isTrinketCard, rerollProblem, rerollsLeft, rerollsOf, unitTowers, type CardDraw, type TrainingRun,
+} from '../../rules/training';
 import { TRAINING } from '../../rules/downtimeData';
 import { EmblemBadge } from '../Emblem';
 
@@ -17,11 +19,13 @@ export interface CardOfferProps {
   onPick: (i: number) => void;
   /** Hide the offer for a look at the field. */
   onPeek: () => void;
+  /** Re-draw the boss cards (the Drill Honours reroll perk); shown only when the run has re-draws. */
+  onReroll?: () => void;
 }
 
 /** The cards on offer after a boss falls: they rise up one after another, and glow by rarity. A trinket card (a Sortie
  *  trinket the unit keeps) is tagged as one. */
-export function CardOffer({ run, offer, portraits, auto, onPick, onPeek }: CardOfferProps) {
+export function CardOffer({ run, offer, portraits, auto, onPick, onPeek, onReroll }: CardOfferProps) {
   const best = autoCardIndex(run);
   const top = offer.some((d) => d.rarity === 'Legendary') ? 'legendary' : offer.some((d) => d.rarity === 'Rare') ? 'rare' : 'common';
   const units = unitTowers(run);
@@ -38,7 +42,7 @@ export function CardOffer({ run, offer, portraits, auto, onPick, onPeek }: CardO
           const face = unit && portraits?.[unit.unitId];
           return (
             <button
-              key={i}
+              key={`${run.rerolls ?? 0}:${i}`}
               className={`training-card ${d.rarity.toLowerCase()}${auto && i === best ? ' chosen' : ''}`}
               style={{ animationDelay: `${0.15 + i * 0.18}s` }}
               disabled={auto}
@@ -53,7 +57,16 @@ export function CardOffer({ run, offer, portraits, auto, onPick, onPeek }: CardO
           );
         })}
       </div>
-      {auto ? <div className="muted small">Auto takes the rarest card…</div> : <button className="small" onClick={onPeek}>Look at the field first</button>}
+      {auto ? <div className="muted small">Auto takes the rarest card…</div> : (
+        <div className="row" style={{ gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button className="small" onClick={onPeek}>Look at the field first</button>
+          {onReroll && rerollsOf(run) > 0 && (
+            <button className="small" disabled={!!rerollProblem(run)} title={rerollProblem(run) ?? undefined} onClick={onReroll}>
+              Re-draw ({rerollsLeft(run)} left)
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

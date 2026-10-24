@@ -314,6 +314,48 @@ export interface SortieBoardEntry {
   date: string;
 }
 
+/** A force's Drill Honour counts over every Training run (rules/training/drillBank.ts bankDrill). */
+export interface DrillStats {
+  runs: number;
+  kills: number;
+  /** Bosses slain: generic lords, real Echo Lords and the nemesis. */
+  bosses: number;
+  /** Real Echo Lords and the nemesis slain. */
+  lords: number;
+  /** The longest clean start (waves with nothing through). */
+  clean: number;
+  /** The most units crafted in one run. */
+  crafted: number;
+  /** Weekly Sieges entered (weeks), and this week's best. */
+  sieges: number;
+  siege?: { week: string; best: number };
+}
+
+/** A force's best Weekly Siege of a week, on the campaign's board (rules/training/siegeBoard.ts postSiege). */
+export interface SiegeBoardEntry {
+  week: string;
+  forceId: string;
+  force: string;
+  player: string;
+  factionId?: string;
+  /** The wave reached, and waves cleared. */
+  score: number;
+  cleared: number;
+  date: string;
+}
+
+/** A settled week's Weekly Siege winner: one Strategic Asset for its faction in `round` (siegeBoard.ts settleSieges). */
+export interface SiegeWin {
+  week: string;
+  forceId: string;
+  force: string;
+  player: string;
+  factionId?: string;
+  score: number;
+  round: number;
+  date: string;
+}
+
 export interface Force {
   id: string;
   name: string;
@@ -341,6 +383,8 @@ export interface Force {
   trainingBest?: number;
   /** Training highlights, newest first (rules/training/tales.ts; TRAINING.records.keep). */
   tales?: ForceTale[];
+  /** Drill Honour counts (rules/training/drillBank.ts): what unlocks luck, cards and perks in Training. */
+  drill?: DrillStats;
   /** Feats earned, by id, with the date (rules/feats.ts): each pays once. */
   feats?: Record<string, string>;
   /** Furthest any unit got on one Sortie: nodes cleared (rules/sortie.ts). */
@@ -697,6 +741,9 @@ export interface Campaign {
   journals?: CrossroadsJournal[];
   /** The weekly Sortie challenge: each force's best run of the last few weeks (rules/downtime.ts postWeekly). */
   sortieBoard?: SortieBoardEntry[];
+  /** The Weekly Siege: each force's best Training siege of the last few weeks, and the settled winners (rules/training/siegeBoard.ts). */
+  siegeBoard?: SiegeBoardEntry[];
+  siegeWins?: SiegeWin[];
   /** Who's coming to the next game night (rules/gameNight.ts). */
   gameNight?: GameNight;
   /** The GM's Bounty Board: BOUNTY.slots bounties any faction can claim (rules/bounties.ts). */

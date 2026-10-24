@@ -1,5 +1,7 @@
 import { SHARD_TYPES, TRAINING, type ShardType } from '../downtimeData';
-import { hitChance, pick, saveChance, weighted } from './rng';
+import { hitChance, pick, saveChance, weighted, type Rng } from './rng';
+import { perkOf } from './drill';
+import { draftDice } from './siege';
 import { pieceById, placeProblem } from './board';
 import { nexusStart } from './nexus';
 import type { Grade, KeepOption, Piece, RubblePiece, ShardPiece, Tile, TowerGun, TrainingRun } from './types';
@@ -15,20 +17,21 @@ const TOP: Grade = 5;
 /** "Cracked" … "Pristine". */
 export const gradeName = (g: Grade): string => TRAINING.shards.grades[g - 1];
 
-/** A grade by the odds for the run's luck level. */
-export function rollGrade(run: TrainingRun): Grade {
+/** A grade by the odds for the run's luck level (`r`: the dice, default the run's). */
+export function rollGrade(run: TrainingRun, r: Rng = run): Grade {
   const odds = TRAINING.shards.odds[Math.max(0, Math.min(TRAINING.shards.odds.length - 1, run.luck))];
-  return (weighted(run, odds) + 1) as Grade;
+  return (weighted(r, odds) + 1) as Grade;
 }
 
-/** Shards a draft draws: TRAINING.shards.draw, and more in a Shard Rush (nexus.ts). */
-export const drawSize = (run: TrainingRun) => TRAINING.shards.draw + nexusStart(run).draw;
+/** Shards a draft draws: TRAINING.shards.draw, more in a Shard Rush (nexus.ts), and the Drill Honours draw perk. */
+export const drawSize = (run: TrainingRun) => TRAINING.shards.draw + nexusStart(run).draw + perkOf(run, 'draw');
 
-/** Start the build phase's draft: draw drawSize Shards into run.draft.hand, step 'place'. */
+/** Start the build phase's draft: draw drawSize Shards into run.draft.hand, step 'place' (a siege's from the week's dice). */
 export function drawDraft(run: TrainingRun): void {
+  const r = draftDice(run);
   const hand = Array.from({ length: drawSize(run) }, () => {
-    const type = pick(run, SHARD_KINDS);
-    return { type, grade: rollGrade(run) };
+    const type = pick(r, SHARD_KINDS);
+    return { type, grade: rollGrade(run, r) };
   });
   run.draft = { step: 'place', hand, placed: [] };
 }

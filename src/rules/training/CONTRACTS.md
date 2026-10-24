@@ -43,6 +43,11 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | Enemy.surge | affixes.ts (onEchoDeath sets it, affixTick wears it) |
 | Unit.trainingRecord, Force.tales | records.bankHonours |
 | Unit.titles (stored ids, oldest first), Unit.title (the one shown; '-' none; unset the latest) | titles.earnTitles (records.bankHonours, downtime.applySortie); titles.pickTitle (UnitSheet via UnitRecord) |
+| run.drill (luck cap, open boss cards, perks: a JSON copy of drill.drillOf(force) at create), run.siege (the ISO week) | run.ts via createRun opts (the UI's freshRun passes drill, or siege for a Weekly Siege; bots pass either or none) |
+| run.rerolls (card offers re-drawn) | cards.rerollCards |
+| run.drilled (earned: goal indexes reached so far, set by drillNews) | drillBank.bankDrill (once, from useBank.finish, before bankHonours) |
+| Force.drill (DrillStats: runs, kills, bosses, lords, clean, crafted, sieges, siege {week, best}) | drillBank.bankDrill (seeded from the units' trainingRecords the first time, via drill.drillStats) |
+| Campaign.siegeBoard (each force's best a week, last TRAINING.siege.weeks weeks), Campaign.siegeWins (settled weeks, last TRAINING.siege.keep) | siegeBoard.postSiege (useBank.finish), siegeBoard.settleSieges (useBank.finish, useSiegeSettle on Training open and the RoundPanel assets row) |
 | Force.sortie.bestiary (incl. SortieBeast.drill), Unit.quirks / trinket, sortie.trinkets, sortie.bled | shared.ts (bankShared, bestiary.bankBeasts) on finish; sortie.ts / downtime.applySortie as before; applySortie clears bled[lord] once a Sortie meets it |
 
 ## run.step(dt) call order
@@ -105,7 +110,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 ### shards.ts
 - `shardValue(g: Grade): number` (done) — 2^(g-1).
 - `gradeName(g: Grade): string`
-- `rollGrade(run): Grade` — by TRAINING.shards.odds[run.luck].
+- `rollGrade(run, r: Rng = run): Grade` — by TRAINING.shards.odds[run.luck], on the dice given (drawDraft passes siege.draftDice).
 - `drawDraft(run): void` — run.draft = { step: 'place', hand: draw× DrawnShard, placed: [] }.
 - `shardPiece(id, at: Tile, type: ShardType, grade: Grade, draft: boolean): ShardPiece` — guns/Quality from SHARD_TYPES × value.
 - `placeDraftProblem(run, i, x, y): string | null` — build phase, step 'place', hand[i] exists, board.placeProblem.
@@ -125,8 +130,8 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `levelCost(t: UnitTower): number` — max(base, base × points/perPoints) × growth^up.
 - `levelProblem(run, id): string | null`, `buyLevel(run, id): void`
 - `applyLevel(t: UnitTower): boolean` — +1 up, +1 tough (others read `up` for dmg/rate/range); false at cap.
-- `luckCost(run): number | null`, `luckProblem(run): string | null`, `buyLuck(run): void`
-- `mendCost(run): number`, `mendProblem(run): string | null`, `buyMend(run): void` — +mend.hp, cap baseHp; run.mends++.
+- `luckCost(run): number | null` (less the Thrift perk), `luckProblem(run): string | null` (also refused at drill.luckCap), `buyLuck(run): void`
+- `mendCost(run): number`, `mendProblem(run): string | null`, `buyMend(run): void` — +mend.hp (+ the Field mending perk), cap baseHp; run.mends++.
 - `killCredits(e: Enemy): number` — max(1, round(cost × perCost)).
 - `payKill(run, e: Enemy): void` — run.credits += killCredits × run.mods.bounty.
 - `waveCredits(run): number` — wave + perWave × run.wave, + noLeak if run.leaked === 0.
@@ -223,6 +228,17 @@ Numbers in `TRAINING.titles` (each `{name, n}`, Unbowed also `scars`) and `TRAIN
 - Chronicle: chronicle.`chronicle(c, viewer?, forces = [])` adds kind 'training' (🎖) entries for tales with a round, from forces linked to the campaign's factions (a viewer sees only its own).
 - UI: training/RunHonours.tsx (record table, titles, tales in RunSummary once over), training/UnitRecord.tsx (title picker, records, the title list, tales on UnitSheet).
 
+### Drill Honours and the Weekly Siege (F5): drill.ts, drillBank.ts, siege.ts, siegeBoard.ts
+Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, perks, 20 goals `{goal, n, unlock}`) and `TRAINING.siege` (weeks on the board, wins kept). Types `DrillGoal`, `DrillPerk`, `DrillUnlock` in downtimeData.ts; `DrillStats`, `SiegeBoardEntry`, `SiegeWin` in model/types.ts; `RunDrill {luck, cards, perks}` in types.ts.
+- drill.ts (pure): `DRILL_GOALS`, `blankDrill()`, `drillStats(f)` (Force.drill, else seeded from the units' trainingRecords), `drillProgress(f, goal)` (best wave, titles and lore from the force; the rest from DrillStats), `goalReached(f, i)`, `drillEarned(f): number[]`,
+  `drillFrom(earned): RunDrill`, `drillOf(f)`; on a run (no run.drill = all open, no perks): `luckCap`, `cardOpen(run, id)`, `perkOf(run, p)`, `purseOf`, `thrifty(run, cost)`, `mendPerk`, `rerollsOf`; `drillGoalText(goal, n)`, `unlockText(u): {name, text}`.
+- drillBank.ts: `statsAfter(st, run)` (kills from pieces; bosses = generic, nemesis and real lords slain; lords = real lords + nemesis; clean and crafted the best; a siege counts once a week and keeps that week's best),
+  `drillPreview(f, run)` (goals reached once this run banks; RunSummary), `bankDrill(f, run): number[] | null` (once via run.drilled; returns the goals reached before), `drillNews(f, run, before): string[]` (after every other bank, so best, titles and lore count; sets run.drilled.earned).
+- siege.ts (types only): `isSiege`, `siegeDice(run, 'draft' | 'wave', w)` (seed salted by wave: never moves run.rng), `draftDice(run)`, `waveDice(run, w, own)`, `siegeScore(run)` = max(wave, cleared). The cover and first draft come from the week's seed; later drafts and every wave from these dice, so every force meets the same ones (scaled by its points) however it plays.
+- siegeBoard.ts (pure, no engine imports): `weekSettled`, `postSiege(c, force, run, date)` (a force's best a week, refused once settled), `siegeRanking(board, week)` (score, then cleared, then earliest), `weeksDue(c, nowWeek)`, `settleSieges(c, nowWeek, date): SiegeWin[]` (mutates c: winner of each past week, round = c.round),
+  `siegeAssets(c, factionId)` (wins settled this round; rounds.assetsOf adds them to skirmish wins within NEXUS_ROUNDS.assetsMax), `lastSiegeWin(c?)`.
+- UI: training/freshRun.ts (`freshRun(force, c, siege)`: a drill run with story and Nexus, or a siege on the week's seed), training/useSiegeSettle.ts (`thisWeek()`, `useSiegeSettle(c)`), training/DrillTrack.tsx, training/SiegePanel.tsx; StartScreen toggles Your own / Weekly Siege; CardOffer's Re-draw; useBank.finish banks the drill, posts the siege and settles.
+
 ### trinkets.ts
 - `TRINKET_CARD`, `isTrinketCard(d)`, `trinketDice(run)` (its own dice from seed and wave: never moves run.rng).
 - `trinketOffer(run)` — each boss kill at trinkets.odds until one is offered (then never again); to the crafted unit with most kills and none, else spares. `trinketCardText`, `takeTrinket`.
@@ -234,7 +250,7 @@ Numbers in `TRAINING.titles` (each `{name, n}`, Unbowed also `scars`) and `TRAIN
 
 ### waves.ts
 - `isFlyWave(w)`, `isBossWave(w)`, `isFlyBossWave(w): boolean`
-- `planWave(run, w: number): SpawnPlan[]` — via `nexusWave`: planFor(power × nexus.budgetMul) then affixes.affixPlan; budget base × (power/perPoints) × growth^(w-1); flyers; boss + escorts; scouts at pad scoutAt (scoutHp); ambush hp; hp ×hpGrowth past hpFrom; staggered by gap; sorted by `at`.
+- `planWave(run, w: number): SpawnPlan[]` — on siege.waveDice (a siege's own dice for wave w, else the run's); via `nexusWave`: planFor(power × nexus.budgetMul) then affixes.affixPlan; budget base × (power/perPoints) × growth^(w-1); flyers; boss + escorts; scouts at pad scoutAt (scoutHp); ambush hp; hp ×hpGrowth past hpFrom; staggered by gap; sorted by `at`.
 - `previewWave(run): SpawnPlan[]` — planWave(run.wave + 1) on a copy of the dice.
 - `layCover(r: Rng, n: number, route: Tile[]): Tile[]` — n patches, onRoute share centred on route cells, clear of pads/base/spawn.
 - `spawnDue(run): void` — queue entries with at ≤ run.t → enemies (id run.nextId++).
@@ -249,7 +265,8 @@ Numbers in `TRAINING.titles` (each `{name, n}`, Unbowed also `scars`) and `TRAIN
 
 ### cards.ts
 - `interface TrainingCard { id; name; rarity; text; unit?(t); apply(run, t?) }`, `CARDS: TrainingCard[]`
-- `drawCards(run): CardDraw[]`, `cardById(id)`
+- `drawCards(run): CardDraw[]` (only drill.cardOpen cards; offer + the Wider choice perk), `cardById(id)`
+- `rerollsLeft(run)`, `rerollProblem(run)`, `rerollCards(run)` — the Second thoughts perk: re-draw the offer (a trinket card stays), run.rerolls++.
 - `offerCards(run): void` — sets run.offer unless one is on offer; trinkets.trinketOffer may add a 4th (trinket) card. cardText / pickCard branch on isTrinketCard.
 - `cardText(run, d: CardDraw): { name; text }`
 - `pickCard(run, i: number): void` — apply, push to run.cards, clear offer, log.
@@ -259,10 +276,10 @@ Numbers in `TRAINING.titles` (each `{name, n}`, Unbowed also `scars`) and `TRAIN
 - `saveKey(forceId): string` (done) — `trainingRun:<forceId>`.
 - `serialize(run): string`, `deserialize(s: string): TrainingRun | null` — JSON; null on bad/old version. fx may be dropped.
 - `saveRun(run): void`, `loadRun(forceId): SavedRun | null` (null for a run already 'over'), `clearSave(forceId): void` — localStorage wrapped in try/catch.
-- `SAVE_VERSION` (5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
+- `SAVE_VERSION` (6: Drill Honours and the Weekly Siege; 5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
 
 ### run.ts
-- `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus): TrainingRun` — run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
+- `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus, opts: { drill?: RunDrill; siege?: string } = {}): TrainingRun` — run.drill = a copy of opts.drill (unset: everything open), credits + drill.purseOf; run.siege = opts.siege (the UI then passes no story, nexus or drill, and seed = sortie.weekSeed(week)); run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
 - `startProblem(run): string | null` — build phase, draft step 'done', no card offer pending.
 - `startWave(run): void` — wave++, phase 'wave', t 0, leaked 0, queue = lords.lordPlan(run, nemesis.nemesisPlan(run, waves.planWave(...))); gun clocks reset.
 - `step(run, dt): void` — see the order above.
@@ -284,10 +301,10 @@ Numbers in `TRAINING.titles` (each `{name, n}`, Unbowed also `scars`) and `TRAIN
 ### bot.ts (test-only; not in index.ts)
 - `interface MazeSpot { n; x; y }`
 - `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (recipe progress, then grade), craft when ready (unit on the used Shard nearest the route), spend (levels cheapest first, then luck, mend when low), pick card 0.
-- `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt?; nexus? }): TrainingRun`
+- `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt?; nexus?; drill?; siege? }): TrainingRun`
 
 ### nexusTest.ts (test-only; not in index.ts)
 - `guardian(name, tier, rules?)`, `campaign(threat, guardians?, o?)` — a round-2 campaign for the Nexus tests.
 
 ### index.ts
-Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared, nexus, lordPick, lords, affixes, titles, records, tales (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).
+Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared, nexus, lordPick, lords, affixes, titles, records, tales, drill, drillBank, siege, siegeBoard (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).

@@ -17,6 +17,7 @@ import { Panel, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
 import { breaksLeft, echoMarks, holders } from '../rules/voidspawn';
 import { Icon } from './Icon';
+import { useSiegeSettle } from './training/useSiegeSettle';
 
 /** End the current round on a copy of the campaign (the spread is random, so it's rolled once, here) and store the result. */
 export function useEndRound() {
@@ -241,9 +242,11 @@ function CrisisRow({ c }: { c: Campaign }) {
   );
 }
 
-/** Each faction's Strategic Assets this round (one per skirmish won), and spending them on the Battle. Only one faction's, with only. */
+/** Each faction's Strategic Assets this round (one per skirmish or Weekly Siege won), and spending them on the Battle.
+ *  Only one faction's, with only. Finished siege weeks are settled first. */
 function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
   const { state: { forces }, update } = useStore();
+  useSiegeSettle(c);
   const change = (fn: (d: Campaign) => void) => update((s) => {
     if (!s.campaign) return;
     fn(s.campaign);
@@ -251,8 +254,8 @@ function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
   });
   return (
     <div className="small" style={{ marginTop: '0.5rem' }}>
-      <span className="muted" title={`One per skirmish won this round, up to ${NEXUS_ROUNDS.assetsMax}. Spend them in the Battle; unspent ones are lost at round end.`}>
-        Strategic Assets (1 per skirmish won, up to {NEXUS_ROUNDS.assetsMax}; lost if unspent at round end):
+      <span className="muted" title={`One per skirmish won this round, and one per Weekly Siege won (Training), up to ${NEXUS_ROUNDS.assetsMax} in all. Spend them in the Battle; unspent ones are lost at round end.`}>
+        Strategic Assets (1 per skirmish or Weekly Siege won, up to {NEXUS_ROUNDS.assetsMax}; lost if unspent at round end):
       </span>
       {c.factions.filter((f) => !only || f.id === only).map((f) => {
         const a = assetsOf(c, f.id);

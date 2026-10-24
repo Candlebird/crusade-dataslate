@@ -847,6 +847,56 @@ export const TRAINING = {
    * a real lord slain, the nemesis slain, a title earned; one each), and the force keeps its last `keep`.
    */
   records: { tales: 3, keep: 30 },
+  /**
+   * Drill Honours (F5, training/drill.ts): a force's season-long unlock track. A new force buys luck up to
+   * `luckAtStart` and draws boss cards only from `cardsAtStart`; each goal reached (in any order)
+   * unlocks a luck level, a card group, or a level of a small run perk. Perks, a level each: `purse` more starting
+   * credits, `mend` more HP a base mend, `reroll` card offers re-drawn a run, `thrift` off the price of luck (a share),
+   * `offer` more cards on offer, `draw` more Shards a draft; thrift never takes more than `thriftMax` off. Goals count
+   * over every run (drill.ts goalText).
+   */
+  drill: {
+    luckAtStart: 2,
+    cardsAtStart: ['aim', 'whet', 'grip', 'walls', 'supply', 'rapid', 'promote', 'ramparts', 'heroes'],
+    groups: {
+      fieldcraft: { name: 'Fieldcraft cards', cards: ['sandbags', 'spotter', 'bounty'] },
+      hold: { name: 'Hold-fast cards', cards: ['nets', 'thirst', 'chains', 'line'] },
+      support: { name: 'Support cards', cards: ['medic', 'drill', 'banner'] },
+      fury: { name: 'Fury cards', cards: ['trance', 'uplink'] },
+    } as Record<string, { name: string; cards: string[] }>,
+    perks: { purse: 10, mend: 2, reroll: 1, thrift: 0.1, offer: 1, draw: 1 },
+    thriftMax: 0.9,
+    goals: [
+      { goal: 'runs', n: 1, unlock: { cards: 'fieldcraft' } },
+      { goal: 'best', n: 5, unlock: { perk: 'purse' } },
+      { goal: 'kills', n: 250, unlock: { cards: 'hold' } },
+      { goal: 'bosses', n: 3, unlock: { luck: 3 } },
+      { goal: 'runs', n: 4, unlock: { perk: 'reroll' } },
+      { goal: 'best', n: 10, unlock: { perk: 'mend' } },
+      { goal: 'clean', n: 5, unlock: { cards: 'support' } },
+      { goal: 'lords', n: 1, unlock: { perk: 'purse' } },
+      { goal: 'kills', n: 1000, unlock: { perk: 'thrift' } },
+      { goal: 'best', n: 15, unlock: { luck: 4 } },
+      { goal: 'crafted', n: 6, unlock: { cards: 'fury' } },
+      { goal: 'bosses', n: 12, unlock: { perk: 'mend' } },
+      { goal: 'titles', n: 2, unlock: { perk: 'reroll' } },
+      { goal: 'runs', n: 10, unlock: { perk: 'purse' } },
+      { goal: 'sieges', n: 3, unlock: { perk: 'thrift' } },
+      { goal: 'lore', n: 6, unlock: { perk: 'offer' } },
+      { goal: 'clean', n: 12, unlock: { perk: 'mend' } },
+      { goal: 'kills', n: 4000, unlock: { perk: 'purse' } },
+      { goal: 'lords', n: 4, unlock: { perk: 'thrift' } },
+      { goal: 'best', n: 25, unlock: { perk: 'draw' } },
+    ] as { goal: DrillGoal; n: number; unlock: DrillUnlock }[],
+  },
+  /**
+   * The Weekly Siege (F5, training/siege.ts, siegeBoard.ts): one seed a week (the Sortie weekly's), the same cover,
+   * drafts and waves for every force (waves still scaled by its points), every luck level and card open, no perks,
+   * nemesis or Nexus. Score: the wave reached. A campaign's board keeps each force's best for the last `weeks` weeks;
+   * the week's top score wins its faction one Strategic Asset (within NEXUS_ROUNDS.assetsMax) in the round it is
+   * settled, and the last `keep` winners are kept.
+   */
+  siege: { weeks: 4, keep: 12 },
   /** A force's power (squadPower, which Sorties scale by too): its points, with each veteran level adding this share. */
   levelPower: 0.05,
   /** Legacy: only the old rules text and force page read these, until their rework. Nothing in the run uses them. */
@@ -855,6 +905,13 @@ export const TRAINING = {
   meleeDmgPerLevel: 2,
   heal: { share: 0, cost: 0 },
 };
+
+/** What a Drill Honour counts (training/drill.ts drillProgress). */
+export type DrillGoal = 'runs' | 'best' | 'kills' | 'bosses' | 'lords' | 'clean' | 'crafted' | 'titles' | 'lore' | 'sieges';
+/** A small run option a Drill Honour unlocks a level of (TRAINING.drill.perks). */
+export type DrillPerk = 'purse' | 'mend' | 'reroll' | 'thrift' | 'offer' | 'draw';
+/** What a Drill Honour unlocks: a luck level, a card group (TRAINING.drill.groups) or a perk level. */
+export type DrillUnlock = { luck: number } | { cards: string } | { perk: DrillPerk };
 
 export type ShardType = 'assault' | 'firepower' | 'breach' | 'blast' | 'bulwark' | 'swift' | 'command' | 'vigor';
 

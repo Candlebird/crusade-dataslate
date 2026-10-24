@@ -1,7 +1,7 @@
 import type { EmblemLayer } from '../../model/types';
 import { TRAINING } from '../../rules/downtimeData';
 import {
-  buyLevel, buyLuck, buyMend, levelCost, levelProblem, luckCost, luckProblem, mendCost, mendProblem, unitTowers,
+  buyLevel, buyLuck, buyMend, levelCost, levelProblem, luckCap, luckCost, luckProblem, mendCost, mendProblem, unitTowers,
   type TrainingRun, type UnitTower,
 } from '../../rules/training';
 import { EmblemBadge } from '../Emblem';
@@ -41,7 +41,8 @@ export function ShopPanel({ run, portraits, sel, onSelect, onChange }: ShopPanel
       <div className="training-shop-row">
         <Icon name="g:sparkles" />
         <span className="grow" title={nextOdds ? `Next: ${oddsText(nextOdds)}` : undefined}>
-          Luck {run.luck}/{TRAINING.shards.luckCost.length}
+          Luck {run.luck}/{luckCap(run)}
+          {luckCap(run) < TRAINING.shards.luckCost.length && <span className="muted" title="Drill Honours open more"> (of {TRAINING.shards.luckCost.length})</span>}
           <span className="muted"> · {oddsText(TRAINING.shards.odds[run.luck])}</span>
         </span>
         <BuyButton cost={luck} why={luckProblem(run)} label="Luck" onBuy={() => act(() => buyLuck(run), onChange)} />

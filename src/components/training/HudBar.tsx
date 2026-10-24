@@ -1,5 +1,5 @@
 import { TRAINING } from '../../rules/downtimeData';
-import { eventInfo, lordLine, nemesisTricks, nexusLines, nextLord, startProblem, type TrainingRun } from '../../rules/training';
+import { eventInfo, lordLine, luckCap, nemesisTricks, nexusLines, nextLord, startProblem, type TrainingRun } from '../../rules/training';
 import { Icon } from '../Icon';
 
 export type Speed = 1 | 2 | 4;
@@ -39,9 +39,14 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
       <span className="training-hud-stat" title="Credits: for levels, luck and mending the base">
         <Icon name="g:two-coins" /> <b style={{ color: 'var(--gold)' }}>{Math.floor(run.credits)}</b>
       </span>
-      <span className="training-hud-stat" title="Luck: better Shard grades in each draft">
-        <Icon name="g:sparkles" /> {run.luck}/{TRAINING.shards.luckCost.length}
+      <span className="training-hud-stat" title={`Luck: better Shard grades in each draft (up to ${luckCap(run)} this run)`}>
+        <Icon name="g:sparkles" /> {run.luck}/{luckCap(run)}
       </span>
+      {run.siege && (
+        <span className="training-hud-stat" title="The Weekly Siege: the week's map, drafts and waves for every force; score is the wave reached">
+          <Icon name="g:castle" /> Siege <span className="muted">· {run.siege}</span>
+        </span>
+      )}
       {run.nexus && <NexusStat run={run} />}
       {run.nemesis && !run.nemesis.slain && run.wave <= TRAINING.shared.nemesis.wave && (
         <span

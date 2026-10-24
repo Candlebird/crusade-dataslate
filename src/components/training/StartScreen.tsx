@@ -6,6 +6,8 @@ import { OFF_TABLE_XP, TRAINING } from '../../rules/downtimeData';
 import { offTableKey, offTableLeft } from '../../rules/downtime';
 import { canTrain, nexusLines, nexusOf, pickNemesis, type SavedRun } from '../../rules/training';
 import { FeatList } from '../Feats';
+import { DrillTrack } from './DrillTrack';
+import { SiegePanel } from './SiegePanel';
 import { Portrait } from '../Emblem';
 
 export interface StartScreenProps {
@@ -15,11 +17,15 @@ export interface StartScreenProps {
   saved: SavedRun | null;
   /** An older version's saved run was dropped on opening (say so, once). */
   cleared?: boolean;
+  /** The next run is this week's Weekly Siege (and the toggle that picks it). */
+  siege?: boolean;
+  onSiege?: (siege: boolean) => void;
+  week?: string;
 }
 
 /** Before a run: what Training is, what the campaign's Nexus brings to it, the units that can be crafted, and the saved
  *  run if there is one. */
-export function StartScreen({ force, c, saved, cleared }: StartScreenProps) {
+export function StartScreen({ force, c, saved, cleared, siege, onSiege, week = '' }: StartScreenProps) {
   const key = offTableKey(c, localDate());
   const units = force.units.filter(canTrain);
   return (
@@ -43,11 +49,20 @@ export function StartScreen({ force, c, saved, cleared }: StartScreenProps) {
       {cleared && !saved && <p className="small training-cleared">Training was updated; your saved run was cleared.</p>}
       {saved && (
         <p className="small">
-          <b>Saved run:</b> {saved.run.cleared} wave{saved.run.cleared === 1 ? '' : 's'} cleared, base {saved.run.baseHp}/{TRAINING.baseHp}, {saved.run.crafted.length} unit{saved.run.crafted.length === 1 ? '' : 's'} crafted
+          <b>Saved {saved.run.siege ? `Weekly Siege (${saved.run.siege})` : 'run'}:</b> {saved.run.cleared} wave{saved.run.cleared === 1 ? '' : 's'} cleared, base {saved.run.baseHp}/{TRAINING.baseHp}, {saved.run.crafted.length} unit{saved.run.crafted.length === 1 ? '' : 's'} crafted
           {saved.savedAt ? <span className="muted"> · {new Date(saved.savedAt).toLocaleString()}</span> : null}.
         </p>
       )}
-      <NexusBrief force={force} c={c} />
+      {onSiege && (
+        <div className="row" style={{ gap: 6, flexWrap: 'wrap', margin: '6px 0' }}>
+          <button className={!siege ? 'primary' : ''} onClick={() => onSiege(false)}>Your own</button>
+          <button className={siege ? 'primary' : ''} onClick={() => onSiege(true)}>Weekly Siege ({week})</button>
+        </div>
+      )}
+      {siege ? <SiegePanel force={force} c={c} week={week} /> : <>
+        <NexusBrief force={force} c={c} />
+        <DrillTrack force={force} />
+      </>}
       <FeatList force={force} where="training" />
       <div className="small" style={{ marginBottom: 4 }}><b>Units</b> <span className="muted">· each has a recipe</span></div>
       {!units.length && <p className="muted small">No active units to train.</p>}

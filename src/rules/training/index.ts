@@ -27,3 +27,7 @@ export * from './affixes';
 export * from './titles';
 export * from './records';
 export * from './tales';
+export * from './drill';
+export * from './drillBank';
+export * from './siege';
+export * from './siegeBoard';

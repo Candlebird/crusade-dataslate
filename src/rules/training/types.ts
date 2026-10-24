@@ -1,7 +1,7 @@
 import type { Category, RelicTier } from '../data';
 import type { Gun } from '../autoBattle';
 import type { AuraStat, Effect, Status } from '../abilities';
-import type { ShardType, TrainingEnemyKind } from '../downtimeData';
+import type { DrillPerk, ShardType, TrainingEnemyKind } from '../downtimeData';
 import type { Tile } from './map';
 import type { LordState, RunNexus } from './nexusTypes';
 import type { ForceTale, TrainingRecord } from '../../model/types';
@@ -340,9 +340,17 @@ export interface RunHonours {
   best: boolean;
 }
 
+/** What the force's Drill Honours open for a run (drill.ts drillOf): the luck cap, the boss cards that can be drawn,
+ *  and perk levels. A run without one (bots, the Weekly Siege) has everything open and no perks. */
+export interface RunDrill {
+  luck: number;
+  cards: string[];
+  perks: Partial<Record<DrillPerk, number>>;
+}
+
 export interface TrainingRun {
   /** Save format version (save.ts SAVE_VERSION). */
-  v: 5;
+  v: 6;
   forceId: string;
   seed: number;
   /** mulberry32 state: the same seed and the same moves play out the same. */
@@ -397,11 +405,19 @@ export interface TrainingRun {
   clean?: number;
   /** Records, titles and tales the run handed the force (F4, records.ts bankHonours), once. */
   honours?: RunHonours;
+  /** Drill Honours (F5, drill.ts): what this run may use; none = everything, no perks. */
+  drill?: RunDrill;
+  /** The Weekly Siege it is (an ISO week, siege.ts): the week's seeded cover, drafts and waves. */
+  siege?: string;
+  /** Card offers re-drawn this run (cards.ts rerollCards). */
+  rerolls?: number;
+  /** The Drill Honours this run earned, banked into the force once (drillBank.ts bankDrill). */
+  drilled?: { earned: number[] };
 }
 
 /** What a saved run looks like on disk (save.ts). */
 export interface SavedRun {
-  v: 5;
+  v: 6;
   savedAt: string;
   run: TrainingRun;
 }

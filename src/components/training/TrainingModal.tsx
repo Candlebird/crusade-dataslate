@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Force } from '../../model/types';
 import { unitPortrait } from '../../model/emblem';
 import {
-  ackStale, cardText, nexusOf, clearRubble, clearSave, createRun, loadRun, pickCard, pieceAt, pieceById, placeDraft, quitRun, saveRun, staleSave, startWave,
+  ackStale, cardText, clearRubble, clearSave, loadRun, pickCard, rerollCards, pieceAt, pieceById, placeDraft, quitRun, saveRun, staleSave, startWave,
   type Phase, type SavedRun, type Tile, type TrainingRun,
 } from '../../rules/training';
 import { Modal, confirmAction, toast } from '../ui';
@@ -20,8 +20,8 @@ import { StartScreen } from './StartScreen';
 import { WaveStatus } from './WavePreview';
 import { useBank } from './useBank';
 import { useRunLoop } from './useRunLoop';
-
-const newSeed = () => Math.floor(Math.random() * 2 ** 31);
+import { freshRun } from './freshRun';
+import { thisWeek, useSiegeSettle } from './useSiegeSettle';
 
 /**
  * The Training sim: draft Shards into a maze, craft units from them and hold the base against endless waves. The run
@@ -34,6 +34,9 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   const [cleared] = useState(() => staleSave(force.id));
   useEffect(() => ackStale(force.id), [force.id]);
   const [saved, setSaved] = useState<SavedRun | null>(() => loadRun(force.id));
+  // The next run is this week's Weekly Siege; the campaign's finished weeks are settled on opening.
+  const [siege, setSiege] = useState(false);
+  useSiegeSettle(c);
   const [run, setRun] = useState<TrainingRun | null>(null);
   const [, setTick] = useState(0);
   const [speed, setSpeed] = useState<Speed>(1);
@@ -81,7 +84,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
       bank.reset();
       end(saved.run);
     }
-    begin(createRun(force.id, force.units, newSeed(), force.sortie, nexusOf(c)));
+    begin(freshRun(force, c, siege));
   };
 
   const onPhase = (r: TrainingRun, _was: Phase) => {
@@ -113,9 +116,9 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
       <Modal title="Training sim" onClose={onClose} footer={<>
         <button onClick={onClose}>Cancel</button>
         {saved && <button className="primary" onClick={() => begin(saved.run)}>Resume</button>}
-        <button className={saved ? '' : 'primary'} disabled={!force.units.length} onClick={newRun}>New run</button>
+        <button className={saved ? '' : 'primary'} disabled={!force.units.length} onClick={newRun}>{siege ? 'Start the siege' : 'New run'}</button>
       </>}>
-        <StartScreen force={force} c={c} saved={saved} cleared={cleared} />
+        <StartScreen force={force} c={c} saved={saved} cleared={cleared} siege={siege} onSiege={setSiege} week={thisWeek()} />
       </Modal>
     );
   }
@@ -171,7 +174,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     act(() => pickCard(run, i), refresh);
     setPeek(false);
   };
-  const again = () => begin(createRun(force.id, force.units, newSeed(), force.sortie, nexusOf(c)));
+  const again = () => begin(freshRun(force, c, !!run.siege));
   /** Start (or cancel) a craft; the floating piece card makes way for the craft banner. */
   const craftMode = (cr: Crafting | null) => {
     setCrafting(cr);
@@ -201,7 +204,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
                 <div className="training-over-card">
                   <RunSummary run={run} best={best.current} force={force} />
                   <div className="training-over-actions">
-                    <button onClick={again}>Train again</button>
+                    <button onClick={again}>{run.siege ? 'Siege again' : 'Train again'}</button>
                     <button className="primary" onClick={onClose}>Done</button>
                   </div>
                 </div>
@@ -230,7 +233,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
           </div>
         </div>
       </div>
-      {build && run.offer && !peek && <CardOffer run={run} offer={run.offer} portraits={portraits} onPick={take} onPeek={() => setPeek(true)} />}
+      {build && run.offer && !peek && <CardOffer run={run} offer={run.offer} portraits={portraits} onPick={take} onPeek={() => setPeek(true)} onReroll={() => act(() => rerollCards(run), refresh)} />}
     </Modal>
   );
 }

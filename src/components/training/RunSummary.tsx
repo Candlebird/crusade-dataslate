@@ -1,4 +1,6 @@
-import { mvp, runXp, sharedPreview, towers, unitTowers, type TrainingRun } from '../../rules/training';
+import {
+  DRILL_GOALS, drillPreview, mvp, runXp, sharedPreview, siegeScore, towers, unlockText, unitTowers, type TrainingRun,
+} from '../../rules/training';
 import type { Force } from '../../model/types';
 import { Icon } from '../Icon';
 import { RunHonoursView } from './RunHonours';
@@ -13,7 +15,7 @@ export interface RunSummaryProps {
 
 /** How the run went: waves cleared, and each crafted unit's kills, damage, levels and XP (the standout starred), with
  *  the kept Shards as one row; then records, titles and tales, and what it hands the Sortie side (quirks, trinket,
- *  nemesis, bestiary). */
+ *  nemesis, bestiary), the Drill Honours earned, and a Weekly Siege's score. */
 export function RunSummary({ run, best, force }: RunSummaryProps) {
   const lead = mvp(run);
   const xp = runXp(run);
@@ -22,6 +24,7 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
   const n = (x: number) => Math.round(x);
   const record = best !== undefined && run.cleared > best;
   const shared = run.phase === 'over' ? sharedPreview(run) : [];
+  const drill = force && run.phase === 'over' ? drillPreview(force, run) : [];
   return (
     <div className="training-summary small">
       <div style={{ marginBottom: 4 }}>
@@ -29,6 +32,7 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
         {record && <span style={{ color: 'var(--gold)' }}> · a new best</span>}
         {lead && lead.kills > 0 && <span className="muted"> · {lead.name} led the defence</span>}
       </div>
+      {run.siege && <div style={{ marginBottom: 4 }}>Weekly Siege {run.siege}: <b>wave {siegeScore(run)}</b> <span className="muted">· your best this week counts</span></div>}
       {!units.length && <div className="muted">No unit was crafted this run.</div>}
       {(units.length > 0 || shards.length > 0) && (
         <table>
@@ -63,6 +67,14 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
           {shared.map((l, i) => (
             <li key={i} style={{ color: l.good ? 'var(--green)' : 'var(--red)' }}>{l.text}</li>
           ))}
+        </ul>
+      )}
+      {drill.length > 0 && (
+        <ul className="training-shared">
+          {drill.map((i) => {
+            const u = unlockText(DRILL_GOALS[i].unlock);
+            return <li key={i} style={{ color: 'var(--gold)' }}>Drill Honour: {u.name}. {u.text}</li>;
+          })}
         </ul>
       )}
     </div>
