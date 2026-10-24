@@ -5,6 +5,7 @@ import { EmblemBadge } from '../Emblem';
 import { Icon } from '../Icon';
 import { act } from './act';
 import { countable, recipeProgress } from './recipeView';
+import { RecordBadges } from './RecordBadges';
 import { ShardBadge } from './ShardBadge';
 
 /** A craft under way: the recipe chosen, waiting for a tap on one of the Shards it uses (where the unit will stand). */
@@ -56,7 +57,7 @@ export function RecipeBook({ run, units, portraits, crafting, onCraft }: RecipeB
           uses={ready.get(r.unitId)}
           active={crafting?.unitId === r.unitId}
           onCraft={onCraft}
-          known={units.some((u) => u.id === r.unitId)}
+          unit={units.find((u) => u.id === r.unitId)}
         />
       ))}
       {done.length > 0 && (
@@ -68,7 +69,7 @@ export function RecipeBook({ run, units, portraits, crafting, onCraft }: RecipeB
   );
 }
 
-function RecipeRow({ run, recipe, portrait, progress, uses, active, onCraft, known }: {
+function RecipeRow({ run, recipe, portrait, progress, uses, active, onCraft, unit }: {
   run: TrainingRun;
   recipe: Recipe;
   portrait?: EmblemLayer[];
@@ -76,8 +77,10 @@ function RecipeRow({ run, recipe, portrait, progress, uses, active, onCraft, kno
   uses?: number[];
   active: boolean;
   onCraft: (c: Crafting | null) => void;
-  known: boolean;
+  /** The unit (its datasheet, and its record's badges); a craft needs it. */
+  unit?: Unit;
 }) {
+  const known = !!unit;
   const met = progress.filter(Boolean).length;
   // A ready recipe may still be refused (draft not all placed): say why on the button.
   const why = uses ? craftProblem(run, recipe.unitId, uses, uses[0]) : 'Not all its Shards are on the map.';
@@ -93,6 +96,7 @@ function RecipeRow({ run, recipe, portrait, progress, uses, active, onCraft, kno
             </span>
           ))}
         </span>
+        {unit && <RecordBadges unit={unit} />}
       </span>
       {/* Crafting: the banner over the map has the one Cancel. */}
       {uses && active && <span className="training-recipe-crafting">Crafting…</span>}

@@ -7,7 +7,7 @@ import { botBuild, playRun } from './bot';
 import { rand } from './rng';
 import { startWave, step } from './run';
 import type { TrainingRun } from './types';
-import { clearSave, deserialize, loadRun, saveKey, saveRun, serialize } from './save';
+import { ackStale, clearSave, deserialize, loadRun, SAVE_VERSION, saveKey, saveRun, serialize, staleSave } from './save';
 import { blankRun } from './testRun';
 
 // Saving and resuming a run.
@@ -85,12 +85,31 @@ describe('localStorage', () => {
     expect(loadRun('f')).toBeNull();
   });
 
+  it('drops a save from an older version, saying so (staleSave) until the note is shown (ackStale), and never loads it', () => {
+    const s = fakeStorage();
+    vi.stubGlobal('localStorage', s);
+    s.setItem(saveKey('f'), JSON.stringify({ v: SAVE_VERSION - 1, savedAt: 'x', run: { ...blankRun(), v: SAVE_VERSION - 1 } }));
+    expect(loadRun('f')).toBeNull();
+    expect(staleSave('f')).toBe(true);
+    expect(s.m.has(saveKey('f'))).toBe(false);
+    // A second render before the note is shown still says so; after it, never again.
+    expect(staleSave('f')).toBe(true);
+    ackStale('f');
+    expect(staleSave('f')).toBe(false);
+    s.setItem(saveKey('f'), 'not json');
+    expect(staleSave('f')).toBe(true);
+    saveRun(blankRun());
+    expect(staleSave('f')).toBe(false);
+    expect(loadRun('f')).not.toBeNull();
+  });
+
   it('shrugs off storage that throws or is missing', () => {
     const bad = { getItem: () => { throw new Error('x'); }, setItem: () => { throw new Error('x'); }, removeItem: () => { throw new Error('x'); } };
     vi.stubGlobal('localStorage', bad);
     expect(() => saveRun(blankRun())).not.toThrow();
     expect(loadRun('f')).toBeNull();
     expect(() => clearSave('f')).not.toThrow();
+    expect(staleSave('f')).toBe(false);
     vi.stubGlobal('localStorage', undefined);
     expect(() => saveRun(blankRun())).not.toThrow();
     expect(loadRun('f')).toBeNull();

@@ -13,10 +13,12 @@ export interface StartScreenProps {
   c?: Campaign;
   /** The force's saved run, if any. */
   saved: SavedRun | null;
+  /** An older version's saved run was dropped on opening (say so, once). */
+  cleared?: boolean;
 }
 
 /** Before a run: what Training is, the units that can be crafted, and the saved run if there is one. */
-export function StartScreen({ force, c, saved }: StartScreenProps) {
+export function StartScreen({ force, c, saved, cleared }: StartScreenProps) {
   const key = offTableKey(c, localDate());
   const units = force.units.filter(canTrain);
   return (
@@ -37,6 +39,7 @@ export function StartScreen({ force, c, saved }: StartScreenProps) {
         </div>
         <RouteThumb />
       </div>
+      {cleared && !saved && <p className="small training-cleared">Training was updated; your saved run was cleared.</p>}
       {saved && (
         <p className="small">
           <b>Saved run:</b> {saved.run.cleared} wave{saved.run.cleared === 1 ? '' : 's'} cleared, base {saved.run.baseHp}/{TRAINING.baseHp}, {saved.run.crafted.length} unit{saved.run.crafted.length === 1 ? '' : 's'} crafted

@@ -5,6 +5,7 @@ import { abilities, auras, fireAll, holds, reap, tickEnemies } from './combat';
 import { waveCredits } from './economy';
 import { canTrain, recipesFor, recipeUses, unitTower } from './recipes';
 import { crumbleDraft, drawDraft, toRubble } from './shards';
+import { relics, resetSockets } from './relics';
 import { planWave, runCover, spawnDue, walk } from './waves';
 import type { ShardPiece, TrainingRun, UnitTower } from './types';
 
@@ -14,7 +15,7 @@ import type { ShardPiece, TrainingRun, UnitTower } from './types';
 export function createRun(forceId: string, units: Unit[], seed: number): TrainingRun {
   const force = units.filter(canTrain);
   const run: TrainingRun = {
-    v: 1, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
+    v: 2, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
     power: force.reduce((n, u) => n + u.points, 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
     mends: 0, leaked: 0, nextId: 1, pieces: [], draft: { step: 'done', hand: [], placed: [] }, recipes: recipesFor(force),
     crafted: [], enemies: [], queue: [], cover: [], cards: [], mods: { bounty: 1, holdMul: 1, regrabAdd: 0 }, banked: {},
@@ -47,9 +48,11 @@ export function startWave(run: TrainingRun): void {
     if (p.kind === 'rubble') continue;
     p.guns.forEach((g) => Object.assign(g, { cd: 0, pending: 0, next: 0 }));
     p.dmgBoost = { mul: 0, left: 0 };
+    p.rush = undefined;
     if (p.kind === 'unit') {
       p.skills.forEach((s) => { s.cd = 0; });
-      Object.assign(p, { frenzy: 0, frenzyMul: 1, holding: undefined, holdLeft: 0 });
+      Object.assign(p, { frenzy: 0, frenzyMul: 1, holding: undefined, holdLeft: 0, brace: 0 });
+      resetSockets(p);
     }
   }
   const flank = run.queue.filter((s) => s.leg > 0).length;
@@ -65,6 +68,7 @@ export function step(run: TrainingRun, dt: number): void {
   spawnDue(run);
   auras(run, dt);
   abilities(run, dt);
+  relics(run, dt);
   holds(run, dt);
   fireAll(run, dt);
   tickEnemies(run, dt);

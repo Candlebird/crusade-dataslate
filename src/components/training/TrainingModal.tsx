@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Force } from '../../model/types';
 import { unitPortrait } from '../../model/emblem';
 import {
-  cardText, clearRubble, clearSave, createRun, loadRun, pickCard, pieceAt, pieceById, placeDraft, quitRun, saveRun, startWave,
+  ackStale, cardText, clearRubble, clearSave, createRun, loadRun, pickCard, pieceAt, pieceById, placeDraft, quitRun, saveRun, staleSave, startWave,
   type Phase, type SavedRun, type Tile, type TrainingRun,
 } from '../../rules/training';
 import { Modal, confirmAction, toast } from '../ui';
@@ -30,6 +30,9 @@ const newSeed = () => Math.floor(Math.random() * 2 ** 31);
 export default function TrainingModal({ force, c, onClose }: { force: Force; c?: Campaign; onClose: () => void }) {
   const portraits = useMemo(() => Object.fromEntries(force.units.map((u) => [u.id, unitPortrait(u, force)])), [force]);
   const bank = useBank(force, c);
+  // An older version's save is dropped first (and the start screen says so, once).
+  const [cleared] = useState(() => staleSave(force.id));
+  useEffect(() => ackStale(force.id), [force.id]);
   const [saved, setSaved] = useState<SavedRun | null>(() => loadRun(force.id));
   const [run, setRun] = useState<TrainingRun | null>(null);
   const [, setTick] = useState(0);
@@ -112,7 +115,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
         {saved && <button className="primary" onClick={() => begin(saved.run)}>Resume</button>}
         <button className={saved ? '' : 'primary'} disabled={!force.units.length} onClick={newRun}>New run</button>
       </>}>
-        <StartScreen force={force} c={c} saved={saved} />
+        <StartScreen force={force} c={c} saved={saved} cleared={cleared} />
       </Modal>
     );
   }
@@ -186,7 +189,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
           <HudBar run={run} best={best.current} speed={speed} onSpeed={setSpeed} onStart={start} onQuit={quit} paused={paused} onPause={() => setPaused(!paused)} />
           <div className="training-board">
             <MapView run={run} portraits={portraits} glow={glow} selected={sel ?? undefined} placing={placing} paused={paused} onCell={onCell} />
-            {selPiece && !over && <PieceInfo piece={selPiece} onClose={() => setSel(null)} />}
+            {selPiece && !over && <PieceInfo piece={selPiece} record={selPiece.kind === 'unit' ? force.units.find((u) => u.id === selPiece.unitId) : undefined} onClose={() => setSel(null)} />}
             {craftNow && (
               <div className="training-map-banner small" role="status">
                 <span className="grow">Tap one of the glowing Shards: {craftName} stands there, the rest turn to rubble.</span>

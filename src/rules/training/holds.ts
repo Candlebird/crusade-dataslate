@@ -8,13 +8,16 @@ import type { Enemy, TrainingRun, UnitTower } from './types';
 /** Datasheet Tough (its tough less the level-ups that added to it). */
 const sheetTough = (t: UnitTower) => t.tough - t.up;
 
-/** How long unit `t` holds enemy `e` (0 if it can't: a flyer, an Aircraft, datasheet Tough 1). Bosses and big ones
- *  are held `bigMul` as long; hold cards lengthen every hold. */
+/** Can it hold walkers at all: not an Aircraft, datasheet Tough above 1. */
+export const canHold = (t: UnitTower) => t.category !== 'Aircraft' && sheetTough(t) > 1;
+
+/** How long unit `t` holds enemy `e` (0 if it can't: a flyer, or canHold fails). Bosses and big ones are held `bigMul`
+ *  as long; hold cards and the unit's record (grit) lengthen every hold. */
 export function holdTime(run: TrainingRun, t: UnitTower, e: Enemy): number {
   const H = TRAINING.holds;
-  if (e.flies || t.category === 'Aircraft' || sheetTough(t) <= 1) return 0;
+  if (e.flies || !canHold(t)) return 0;
   const big = isBoss(e) || enemyDef(e).big ? H.bigMul : 1;
-  return Math.min(H.max, H.perTough * t.tough) * big * run.mods.holdMul;
+  return Math.min(H.max, H.perTough * t.tough) * big * run.mods.holdMul * (t.grit ?? 1);
 }
 
 /** Seconds before an enemy let go can be grabbed again: `regrab[0]` at Defense 6+, straight down to `regrab[1]` at 2+. */
@@ -61,7 +64,9 @@ export function holds(run: TrainingRun, dt: number): void {
     const e = grabbable(run, t);
     if (!e) continue;
     t.holding = e.id;
-    t.holdLeft = holdTime(run, t, e);
+    // An armour relic's brace goes on this hold.
+    t.holdLeft = holdTime(run, t, e) * (t.brace && t.brace > 0 ? t.brace : 1);
+    t.brace = 0;
     e.heldBy = t.id;
     const c = centreOf(t);
     run.fx.push({ x1: c.x, y1: c.y, x2: e.x, y2: e.y, t: t.holdLeft, color: FX_COLOR.hold, kind: 'hold' });

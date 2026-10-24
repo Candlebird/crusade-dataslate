@@ -1,8 +1,4 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { Unit } from '../../model/types';
-import { applySelection, normalizeBook } from '../../armyforge/book';
-import { unitFromCatalog } from '../../model/factory';
 import maze from '../trainingTestMaze.json';
 import { routeLength } from './map';
 import { playRun } from './bot';
@@ -10,42 +6,9 @@ import { createRun } from './run';
 import { placeDraft } from './shards';
 import { mapOf, placeProblem } from './board';
 import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
+import { FORCES, SEEDS } from './testForces';
 
 // Balance: the bot plays a run for sample forces of every army book in the repo; each should land near wave 20-27.
-
-const BOOKS = ['armies/void-echoes.gf.json', 'armies/shadow-stalkers.aof.json', 'src/data/spears-of-dothea.raw.json'];
-/** A sample force's points: about this many, never more than `MAX`. */
-const AIM = 750;
-const MAX = 850;
-
-const bookUnits = (file: string): Unit[] => {
-  const book = normalizeBook(JSON.parse(readFileSync(file, 'utf8')));
-  return book.units.map((cu) => unitFromCatalog(cu, applySelection(cu, {}), book));
-};
-
-/** A ~800 pt force from a book: units in the given order while they fit, until AIM is reached. */
-function sample(units: Unit[]): Unit[] {
-  const out: Unit[] = [];
-  let pts = 0;
-  for (const u of units) {
-    if (pts >= AIM) break;
-    if (pts + u.points > MAX) continue;
-    out.push({ ...u, id: `${u.id}-${out.length}` });
-    pts += u.points;
-  }
-  return out;
-}
-
-/** Two forces a book: its datasheets in order, and every other one from the back. */
-const FORCES = BOOKS.flatMap((file) => {
-  const us = bookUnits(file);
-  const name = file.split('/').pop()!.split('.')[0];
-  return [
-    { name: `${name} A`, units: sample(us) },
-    { name: `${name} B`, units: sample(us.filter((_, i) => i % 2 === 0).reverse()) },
-  ];
-});
-const SEEDS = [1, 2, 3];
 
 describe('training balance (bot)', () => {
   it('a typical walker takes about 60-90 s to walk the full test maze at 1×', () => {

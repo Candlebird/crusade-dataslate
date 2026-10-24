@@ -878,6 +878,14 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-recipe-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .training-recipe-slots { display: flex; flex-wrap: wrap; gap: 4px; }
 .training-recipes-done { display: flex; align-items: center; gap: 4px; }
+.training-record { display: flex; flex-wrap: wrap; gap: 2px 0; }
+.training-record-row { flex-basis: 100%; display: flex; align-items: baseline; gap: 6px; }
+.training-record-row .tag { margin: 0; flex-shrink: 0; }
+.training-record-inline .tag { margin: 0 3px 0 0; font-size: 0.72rem; padding: 0 0.3rem; }
+.training-record-fold > summary { list-style: none; cursor: pointer; }
+.training-record-fold > summary::-webkit-details-marker { display: none; }
+.training-record .shard-badge { display: inline-flex; vertical-align: -1px; }
+.training-cleared { color: var(--gold); }
 .training-recipe-crafting { color: var(--gold); font-style: italic; white-space: nowrap; }
 .training-shop-row { display: flex; align-items: center; gap: 6px; }
 .training-shop-row.lit .training-shop-unit { border-color: var(--gold); }

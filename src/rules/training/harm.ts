@@ -14,7 +14,7 @@ export type Harm = 'shot' | 'melee' | 'other';
 
 /** Seconds each kind of fx stays on screen, and the colours of the ones that aren't shots. */
 export const FX_TIME = { shot: 0.15, melee: 0.3, heal: 0.5, bolt: 0.3, pulse: 0.5 };
-export const FX_COLOR = { shot: '#9fd3ff', melee: '#ffd27a', bleed: '#c0392b', bolt: '#c08cff', shield: '#5ab0ff', blast: '#ff9a4a', field: '#b98cff', hold: '#ffe08a' };
+export const FX_COLOR = { shot: '#9fd3ff', melee: '#ffd27a', bleed: '#c0392b', bolt: '#c08cff', shield: '#5ab0ff', blast: '#ff9a4a', field: '#b98cff', hold: '#ffe08a', relic: '#ffc94a' };
 
 export const isUnit = (t: Tower): t is UnitTower => t.kind === 'unit';
 export const enemyDef = (e: Enemy) => TRAINING_ENEMIES[e.kind];

@@ -628,6 +628,70 @@ export const TRAINING = {
      */
     recipeFit: { topSpan: 250, repeat: 0.5, grade: 0.15, offTier: 2 },
   },
+  /**
+   * Living recipes (veterans.ts): a unit's crusade record reworks its recipe. Each trait is +1 grade on a slot of its own
+   * Shard type (`traitTypes`, else what its effect is: see veterans.ts), else on the lowest slot, up to Pristine; with
+   * every slot Pristine a trait adds a slot (up to `maxSlots`). Each scar is −1 grade on the dearest slot, never below
+   * Cracked. Traits and scars net out, at most `cap` grades either way. `notScars` don't count. What a trait or scar does
+   * in a fight that never reaches a tower (towers are never attacked) comes in as `grit`: `hold` a share longer holds,
+   * `tough` more Tough (holds, and grabs at all), `atk` a share more damage. Traits that move a unit mid-game (redeploy)
+   * give `redeployInit` initiative a use; ones that bring it back from the dead (revive) `reviveHold` longer holds. A
+   * weapon's +6" range trait adds `rangeTrait` cells. A dearer recipe makes a harder-hitting tower: each grade the
+   * record lifts is `liftDmg` more damage, each it cracks `crackDmg` less.
+   */
+  veterans: {
+    cap: 3,
+    maxSlots: 5,
+    notScars: ['Comatose'],
+    traitTypes: {
+      'Tough +3': 'bulwark', 'Toughened Scars': 'bulwark', Resilient: 'bulwark', Fortified: 'bulwark', Enhanced: 'bulwark',
+      'Dug In': 'bulwark', Protected: 'bulwark', 'Armoured Prow': 'bulwark', Ghostly: 'bulwark', 'Heroic Presence': 'bulwark',
+      Regeneration: 'vigor',
+      'Blade Master': 'assault', Berserkers: 'assault', 'Impact +3': 'assault', 'Impact +6': 'assault', Momentum: 'assault',
+      'Point Blank': 'firepower', 'Targeting Array': 'firepower', '+6" range': 'firepower', 'Spread Shot': 'blast',
+      Surge: 'firepower', Specialists: 'firepower', Elite: 'firepower', '+1 A': 'firepower',
+      'Precise Strikes': 'breach', Mutations: 'breach', '+1 AP': 'breach', Rending: 'breach', Unstoppable: 'breach', Brutal: 'breach',
+      Fast: 'swift', Swift: 'swift', Stealth: 'swift', Evasive: 'swift', 'Flying + Fast': 'swift',
+      'Caster +1': 'command',
+    } as Record<string, ShardType>,
+    grit: {
+      Resilient: { hold: 0.15 }, Fortified: { hold: 0.1 }, Protected: { hold: 0.1 }, Ghostly: { hold: 0.1 },
+      'Heroic Presence': { hold: 0.1 }, Evasive: { hold: 0.1 }, Regeneration: { hold: 0.15 }, 'Dug In': { hold: 0.05 },
+      'Armoured Prow': { hold: 0.05 }, Stealth: { hold: 0.05 }, 'Tough +3': { tough: 3 }, 'Toughened Scars': { tough: 3 },
+      Enhanced: { tough: 3, hold: 0.1 }, 'Impact +3': { atk: 0.05 }, 'Impact +6': { atk: 0.1 }, Momentum: { atk: 0.05 },
+      'Weakened Armor': { hold: -0.15 }, 'Weak Spot': { hold: -0.1 }, 'Lowered Constitution': { hold: -0.15 },
+    } as Record<string, { hold?: number; tough?: number; atk?: number }>,
+    redeployInit: 0.5,
+    reviveHold: 0.2,
+    /** Holds never drop below this share, however the record cuts them. */
+    minHold: 0.25,
+    liftDmg: 1,
+    crackDmg: 0.05,
+    rangeTrait: 6,
+  },
+  /**
+   * Relic sockets (relics.ts): every relic on a crafted unit goes off by itself during waves, every `cd[tier]` seconds ×
+   * `actMul` for what it does, the first time at `first` of that into the wave. A weapon relic keeps its gun and fires a
+   * special shot: `shot.attacks` attacks at once. A relic with a mapped effect uses it; any other does what its kind
+   * does: wargear a damage pulse (`pulse.share[tier]` of each enemy's wounds within `pulse.radius` cells, a boss
+   * `pulse.bossShare` of that), armour a longer next hold (`brace.mul` ×; a unit that can't hold deals `brace.ward` more
+   * for `brace.secs`), an artefact marks the enemies in its reach (+markDmg a hit), a banner or icon makes towers within
+   * `rally.radius` attack `rally.mul` faster for `rally.secs`. A mapped hit status lands on up to `status.max` enemies in
+   * reach; a mapped field holds its status on what is in it for `field.secs`; a mapped heal bleeds (as bleedField) with
+   * `bleed.mul` × its wounds.
+   */
+  relics: {
+    cd: { Common: 20, Rare: 12, Legendary: 6 } as Record<string, number>,
+    first: 0.25,
+    actMul: { shot: 1, pulse: 1, brace: 0.75, mark: 0.75, rally: 1, barrage: 1, shield: 0.75, frenzy: 1.25, field: 1, bleed: 0.75, status: 0.75 } as Record<string, number>,
+    shot: { attacks: 4 },
+    pulse: { radius: 4, share: { Common: 0.35, Rare: 0.45, Legendary: 0.55 } as Record<string, number>, bossShare: 0.25 },
+    brace: { mul: 1.5, ward: 0.3, secs: 4 },
+    rally: { radius: 4, mul: 0.5, secs: 5 },
+    status: { max: 6 },
+    field: { secs: 3 },
+    bleed: { mul: 2 },
+  },
   /** A force's power (squadPower, which Sorties scale by too): its points, with each veteran level adding this share. */
   levelPower: 0.05,
   /** Legacy: only the old rules text and force page read these, until their rework. Nothing in the run uses them. */

@@ -12,7 +12,7 @@ import type { Tower, TowerGun, TowerSkill, TrainingRun, UnitTower } from './type
 // boost on another tower. Barrages, frenzies and fields work as they did.
 
 /** Cells a unit's auras and fields grow by with its level-ups. */
-const grown = (t: Tower) => (isUnit(t) ? t.up * TRAINING.levels.range : 0);
+export const grown = (t: Tower) => (isUnit(t) ? t.up * TRAINING.levels.range : 0);
 
 /**
  * Recompute every tower's boost: +1 to hit near a Hero or a Command Shard (one or many, it's +1), and aura skills on
@@ -52,7 +52,7 @@ export function auras(run: TrainingRun, dt: number): void {
 const ticks = (run: TrainingRun, dt: number, period: number) => Math.floor(run.t / period) !== Math.floor((run.t - dt) / period);
 
 /** A bleed field: every enemy within `r` cells of a tower bleeds `total` over bleedField.secs (refreshed while inside). */
-function bleedField(run: TrainingRun, t: Tower, r: number, total: number, show: boolean) {
+export function bleedField(run: TrainingRun, t: Tower, r: number, total: number, show: boolean) {
   const c = centreOf(t);
   const secs = TRAINING.bleedField.secs;
   const near = enemiesNear(run, c.x, c.y, r);
@@ -61,7 +61,7 @@ function bleedField(run: TrainingRun, t: Tower, r: number, total: number, show: 
 }
 
 /** A shield: a random other tower deals n × shieldBoost.perN more for an ability round. */
-function shieldBoost(run: TrainingRun, t: UnitTower, n: number): boolean {
+export function shieldBoost(run: TrainingRun, t: UnitTower, n: number): boolean {
   const to = pick(run, towers(run).filter((o) => o.id !== t.id));
   if (!to) return false;
   to.dmgBoost = { mul: Math.max(to.dmgBoost.left > 0 ? to.dmgBoost.mul : 0, n * TRAINING.shieldBoost.perN), left: TRAINING.abilityRound };
@@ -73,7 +73,7 @@ function shieldBoost(run: TrainingRun, t: UnitTower, n: number): boolean {
 }
 
 /** A barrage: `hits` extra hits at AP `ap` at the enemy furthest along in range, spilling `radius`. */
-function barrage(run: TrainingRun, t: UnitTower, e: Extract<Effect, { kind: 'barrage' }>): boolean {
+export function barrage(run: TrainingRun, t: UnitTower, e: Extract<Effect, { kind: 'barrage' }>): boolean {
   const c = centreOf(t);
   const r = e.range ?? Math.max(0, ...t.guns.map((g) => reach(t, g)));
   const target = enemiesNear(run, c.x, c.y, r).sort((a, b) => toGo(run, a) - toGo(run, b))[0];

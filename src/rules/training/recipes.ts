@@ -6,6 +6,8 @@ import { hasRule, levelForXp, ruleRating } from '../engine';
 import { SHARD_TYPES, SORTIE_QUIRKS, SORTIE_TRINKETS, TRAINING, type ShardType, type SortieTrinket } from '../downtimeData';
 import { shardsOnMap } from './board';
 import { levelCap } from './economy';
+import { socketRuns, socketsOf } from './relics';
+import { adjustSlots, gritOf, rangeBonus, recordBudget } from './veterans';
 import type { Grade, Recipe, RecipeSlot, ShardPiece, Tile, TowerSkill, TrainingRun, UnitTower } from './types';
 
 // Recipes: every unit in the force gets one, a multiset of Shard types with minimum grades, from its datasheet. And a
@@ -134,22 +136,27 @@ function fit(slots: RecipeSlot[], score: Record<ShardType, number>, tier: Return
   return v - grade * Math.abs(high - tier.high);
 }
 
-/** The best-fitting recipe for these scores and points not already in `taken` (signatures). In-tier grades first;
- *  every grade only if the tier's recipes are all taken. */
-function bestRecipe(score: Record<ShardType, number>, points: number, taken: Set<string>): RecipeSlot[] {
+/** The best-fitting recipe for these scores and points whose final form (after `adjust`: the unit's record) is not
+ *  already in `taken` (signatures). In-tier grades first; every grade only if the tier's recipes are all taken. */
+function bestRecipe(
+  score: Record<ShardType, number>, points: number, taken: Set<string>, adjust: (s: RecipeSlot[]) => RecipeSlot[] = (s) => s,
+): RecipeSlot[] {
   const tier = tierOf(points);
   const sets = typeSets(tier.count);
   const all: Grade[] = [1, 2, 3, 4, 5];
+  const order = (a: RecipeSlot, b: RecipeSlot) => score[b.type] - score[a.type] || b.grade - a.grade || a.type.localeCompare(b.type);
   for (const grades of [[tier.lo, tier.hi], all] as Grade[][]) {
     let best: { slots: RecipeSlot[]; v: number; sig: string } | undefined;
     for (const types of sets) for (const gs of gradeSets(tier.count, [...new Set(grades)])) {
-      const slots = types.map((type, i) => ({ type, grade: gs[i] }));
-      const sig = signature(slots);
-      if (taken.has(sig)) continue;
-      const v = fit(slots, score, tier);
-      if (!best || v > best.v + 1e-9 || (Math.abs(v - best.v) <= 1e-9 && sig < best.sig)) best = { slots, v, sig };
+      const raw = types.map((type, i) => ({ type, grade: gs[i] }));
+      const v = fit(raw, score, tier);
+      const rawSig = signature(raw);
+      if (best && (v < best.v - 1e-9 || (Math.abs(v - best.v) <= 1e-9 && rawSig >= best.sig))) continue;
+      const slots = adjust(raw.sort(order)).sort(order);
+      if (taken.has(signature(slots))) continue;
+      best = { slots, v, sig: rawSig };
     }
-    if (best) return best.slots.sort((a, b) => score[b.type] - score[a.type] || b.grade - a.grade || a.type.localeCompare(b.type));
+    if (best) return best.slots;
   }
   throw new Error('No recipe left.');
 }
@@ -160,7 +167,8 @@ export function recipesFor(units: Unit[]): Recipe[] {
   const raw = force.map(rawScores);
   const taken = new Set<string>();
   return force.map((u, i) => {
-    const slots = bestRecipe(ranked(raw[i], raw), u.points, taken);
+    const budget = recordBudget(u);
+    const slots = bestRecipe(ranked(raw[i], raw), u.points, taken, (s) => adjustSlots(s, budget));
     taken.add(signature(slots));
     return { unitId: u.id, name: unitName(u), points: u.points, slots };
   });
@@ -203,17 +211,26 @@ const skillsOf = (u: Unit): TowerSkill[] =>
   })));
 
 /** A unit as a crafted tower, standing at `at`. `craftedAt`: run.cleared at the craft. Weapon ranges in inches are
- *  cells. */
+ *  cells. Its record adds grit (veterans.ts); its relics go in sockets (relics.ts), whose timed effects leave its skills. */
 export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): UnitTower {
   const f = fighterOf(u);
   const h = habitsOf(u);
+  const g = gritOf(u);
+  const relics = socketsOf(u);
+  const relicGuns = new Set(u.relics.filter((r) => r.profile).map((r) => r.name));
+  const skills = skillsOf(u).filter((s) => !relics.some((r) => socketRuns(r, s.source, s.effect.kind)));
   return {
     kind: 'unit', id, x: at.x, y: at.y, unitId: u.id, name: unitName(u), category: u.category, points: u.points,
-    rank: levelForXp(u.xp), tough: f.tough, size: f.size, impact: f.impact, skills: skillsOf(u),
-    quality: f.quality, guns: f.guns.map((g) => ({ ...g, cd: 0, pending: 0, gap: 0, next: 0 })),
-    hitShoot: f.hitShoot + h.shoot, hitMelee: f.hitMelee + h.melee, atkBonus: f.atkBonus,
+    rank: levelForXp(u.xp), tough: f.tough + g.tough, size: f.size, impact: f.impact, skills,
+    quality: f.quality,
+    guns: f.guns.map((x) => ({
+      ...x, range: x.melee ? x.range : x.range + rangeBonus(u, x.name), cd: 0, pending: 0, gap: 0, next: 0,
+      ...(relicGuns.has(x.name) ? { relic: true } : {}),
+    })),
+    hitShoot: f.hitShoot + h.shoot, hitMelee: f.hitMelee + h.melee, atkBonus: f.atkBonus + g.atk,
     boost: { hit: 0, save: 0, rate: 0, range: 0 }, dmgBoost: { mul: 0, left: 0 }, kills: 0, dealt: 0,
     up: 0, cap: levelCap(u.points), holdLeft: 0, frenzy: 0, frenzyMul: 1, craftedAt, xp: 0,
-    init: h.init, jumpy: h.jumpy, myopic: h.myopic,
+    init: h.init + g.init, jumpy: h.jumpy, myopic: h.myopic,
+    ...(g.hold !== 1 ? { grit: g.hold } : {}), ...(relics.length ? { relics } : {}),
   };
 }

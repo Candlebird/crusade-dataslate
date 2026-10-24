@@ -22,6 +22,8 @@ export interface TowerGun extends Gun {
   pending: number;
   gap: number;
   next: number;
+  /** A relic weapon's gun: its shots draw in gold. */
+  relic?: boolean;
 }
 
 /** One effect of one ability on a crafted unit, with its own timer. */
@@ -53,6 +55,8 @@ export interface Armed {
   boost: Record<AuraStat, number>;
   /** A shield-skill boost on it: extra damage share and seconds left. */
   dmgBoost: { mul: number; left: number };
+  /** A banner relic's rally on it (relics.ts): a share faster and seconds left. */
+  rush?: { mul: number; left: number };
   kills: number;
   dealt: number;
 }
@@ -100,6 +104,29 @@ export interface UnitTower extends PieceBase, Armed {
   init: number;
   jumpy: boolean;
   myopic: boolean;
+  /** Its crusade record's share on every hold (veterans.ts gritOf; 1 if unset). */
+  grit?: number;
+  /** An armour relic's brace: the next hold lasts this many times as long (0 or unset: none). */
+  brace?: number;
+  /** Its relics, each going off by itself on its own clock during waves (relics.ts). */
+  relics?: RelicSocket[];
+}
+
+/** What a relic does when it goes off (relics.ts). */
+export type RelicAct = 'shot' | 'pulse' | 'brace' | 'mark' | 'rally' | 'barrage' | 'shield' | 'frenzy' | 'field' | 'bleed' | 'status';
+
+/** A relic on a crafted unit: what it does, every how many seconds, and its clock. */
+export interface RelicSocket {
+  name: string;
+  tier: RelicTier;
+  act: RelicAct;
+  /** Seconds between goes, and until the next. */
+  every: number;
+  cd: number;
+  /** The mapped effect it uses, if any. */
+  effect?: Effect;
+  /** A weapon relic's gun (its name). */
+  gun?: string;
 }
 
 export type Piece = ShardPiece | RubblePiece | UnitTower;
@@ -224,8 +251,8 @@ export interface RunMods {
 }
 
 export interface TrainingRun {
-  /** Save format version (save.ts). */
-  v: 1;
+  /** Save format version (save.ts SAVE_VERSION). */
+  v: 2;
   forceId: string;
   seed: number;
   /** mulberry32 state: the same seed and the same moves play out the same. */
@@ -268,7 +295,7 @@ export interface TrainingRun {
 
 /** What a saved run looks like on disk (save.ts). */
 export interface SavedRun {
-  v: 1;
+  v: 2;
   savedAt: string;
   run: TrainingRun;
 }

@@ -11,7 +11,7 @@ import type { Enemy, Tower, TowerGun, TowerSkill, TrainingRun } from './types';
 // skills and auras in skills.ts; this module is the one the rest of the run imports.
 
 export { afflict, FX_COLOR, FX_TIME, hurt, levelDmg, reach, targetFor, type Harm } from './harm';
-export { holds, holdTime, regrabTime } from './holds';
+export { canHold, holds, holdTime, regrabTime } from './holds';
 export { abilities, auras } from './skills';
 
 /** Does this gun's attack carry the skill? A weapon's rule only on that weapon; melee- or shooting-only ones only there. */
@@ -21,9 +21,10 @@ function carried(s: TowerSkill, g: TowerGun): boolean {
   return !only || (only === 'melee') === g.melee;
 }
 
-/** How fast a tower attacks: level-ups, a frenzy, rate auras, and a unit's initiative and Jumpy habit. */
+/** How fast a tower attacks: level-ups, a frenzy, rate auras, a banner relic's rally, and a unit's initiative and
+ *  Jumpy habit. */
 export function rateOf(run: TrainingRun, t: Tower): number {
-  const base = 1 + t.boost.rate;
+  const base = (1 + t.boost.rate) * (1 + (t.rush && t.rush.left > 0 ? t.rush.mul : 0));
   if (!isUnit(t)) return base;
   const H = TRAINING.habits;
   const habit = Math.max(0.5, 1 + H.rate * t.init) * (t.jumpy && run.t < H.jumpySecs ? H.jumpyMul : 1);
@@ -50,7 +51,7 @@ export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): bo
   run.fx.push({
     x1: c.x + (Math.random() - 0.5) * 0.7, y1: c.y + (Math.random() - 0.5) * 0.7,
     x2: target.x + Math.cos(a) * off, y2: target.y + Math.sin(a) * off,
-    t: g.melee ? FX_TIME.melee : FX_TIME.shot, color: g.melee ? FX_COLOR.melee : FX_COLOR.shot,
+    t: g.melee ? FX_TIME.melee : FX_TIME.shot, color: g.relic ? FX_COLOR.relic : g.melee ? FX_COLOR.melee : FX_COLOR.shot,
     melee: g.melee, miss, blocked: miss && cover < 0,
   });
   if (miss) return true;

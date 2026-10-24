@@ -10,4 +10,6 @@ export * from './combat';
 export * from './waves';
 export * from './cards';
 export * from './save';
+export * from './veterans';
+export * from './relics';
 export * from './run';

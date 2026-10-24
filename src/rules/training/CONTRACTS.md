@@ -15,6 +15,9 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | pieces (shard → unit swap on craft) | run.ts (craft, via recipes.unitTower) |
 | UnitTower.up / cap / tough growth | economy.ts (buyLevel, applyLevel) |
 | Tower combat fields (guns clocks, boost, dmgBoost, frenzy, holding, holdLeft, kills, dealt, skills cd) | combat.ts |
+| UnitTower.grit, UnitTower.relics (set at craft), TowerGun.relic | recipes.unitTower (via veterans.gritOf, relics.socketsOf) |
+| UnitTower.relics[].cd, Tower.rush, UnitTower.brace (set), dmgBoost from a brace ward | relics.ts (run.startWave resets via resetSockets, rush, brace 0) |
+| UnitTower.brace (spent on a grab) | holds.ts |
 | UnitTower.xp | run.ts (XP at wave end) |
 | credits, luck, mends | economy.ts |
 | baseHp | waves.ts (leaks), economy.ts (mends), cards.ts (base cards) |
@@ -22,7 +25,7 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | enemies (hp, status, dots, heldBy, regrab; removal of the dead) | combat.ts |
 | cover | run.ts at create (via waves.layCover), cards.ts (cover card) |
 | offer, cards, mods | cards.ts |
-| fx | combat.ts pushes; run.step decays |
+| fx | combat.ts pushes (relics.ts too, recoloured gold); run.step decays |
 
 ## run.step(dt) call order
 
@@ -33,6 +36,7 @@ run.t += dt
 waves.spawnDue(run)
 combat.auras(run, dt)          // boosts from auras; dmgBoost wears down
 combat.abilities(run, dt)      // timed skills, fields, bleed fields, Vigor bleed
+relics.relics(run, dt)         // rush wears down; each socket's clock; one that goes off restarts it (fx gold)
 combat.holds(run, dt)          // grab / release (before walking, so held enemies stand still)
 combat.fireAll(run, dt)        // volleys; hurt() pays kills, death-blasts, boss → cards.offerCards
 combat.tickEnemies(run, dt)    // statuses, dots, regrab cooldowns
@@ -123,6 +127,24 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - Split (combat.ts re-exports all of it; import from combat.ts): `harm.ts` (reach, levelDmg, hurt, afflict, dots, targeting,
   fx consts, dmgMul), `holds.ts` (holdTime, regrabTime, holds), `skills.ts` (auras, abilities).
 
+### veterans.ts (living recipes)
+- `recordOf(u): RecordEntry[]` — traits (unit, then weapon), then scars (less TRAINING.veterans.notScars).
+- `traitType(r): ShardType | undefined` — veterans.traitTypes, else its effect's type, else its weapon's (melee/shooting).
+- `recordBudget(u): { lifts: (ShardType | undefined)[]; cracks: number }` — traits − scars, capped ±veterans.cap.
+- `adjustSlots(slots, budget): RecipeSlot[]` — a copy: each lift +1 grade (own type, else lowest; all Pristine → a new grade-1 slot, up to maxSlots), each crack −1 on the dearest (floor 1).
+- `gritOf(u): { hold; tough; atk; init }` — what the record does beyond fighter(): veterans.grit, redeploy/revive traits, liftDmg/crackDmg a grade.
+- `rangeBonus(u, gun): number` — cells from +6" range weapon traits.
+- `recordBadges(u): RecordBadge[]` — {name, kind, type?, text} for PieceInfo and RecipeBook. `hereText(e)` — an effect in Training words.
+- recipes.recipesFor adjusts each unit's raw best recipe by its record before the uniqueness check (adjusted signatures stay unique).
+
+### relics.ts (relic sockets)
+- `relicKind(name): 'wargear' | 'armour' | 'artefact' | 'banner'` — by name, then RELICS desc, else wargear.
+- `socketOf(r): RelicSocket` — act: 'shot' for a profiled relic (gun = its name), a mapped effect's act, else its kind's (pulse / brace / mark / rally); every = cd[tier] × actMul[act]; cd = every × first.
+- `socketsOf(u): RelicSocket[]`; `socketRuns(s, source, kind)` — a timed relic skill (barrage/shield/frenzy) the socket runs (dropped from skills).
+- `relics(run, dt): void` — wear Tower.rush; tick every socket; a go that finds nothing to do tries again next step.
+- `resetSockets(t)` — every clock back to its first go (startWave). `relicText(s): string` — for the tower card.
+- New fields: `UnitTower.relics?: RelicSocket[]`, `UnitTower.grit?` (hold-time share), `UnitTower.brace?` (next hold ×), `Tower.rush?: {mul, left}` (rateOf × (1 + mul)), `TowerGun.relic?` (fires gold).
+
 ### waves.ts
 - `isFlyWave(w)`, `isBossWave(w)`, `isFlyBossWave(w): boolean`
 - `planWave(run, w: number): SpawnPlan[]` — budget base × (power/perPoints) × growth^(w-1); flyers; boss + escorts; scouts at pad scoutAt (scoutHp); ambush hp; hp ×hpGrowth past hpFrom; staggered by gap; sorted by `at`.
@@ -149,6 +171,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `saveKey(forceId): string` (done) — `trainingRun:<forceId>`.
 - `serialize(run): string`, `deserialize(s: string): TrainingRun | null` — JSON; null on bad/old version. fx may be dropped.
 - `saveRun(run): void`, `loadRun(forceId): SavedRun | null` (null for a run already 'over'), `clearSave(forceId): void` — localStorage wrapped in try/catch.
+- `SAVE_VERSION` (2: living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
 
 ### run.ts
 - `createRun(forceId: string, units: Unit[], seed: number): TrainingRun` — power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
@@ -163,6 +186,9 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `endRun(run, why): void`, `quitRun(run): void` — endRun is a no-op once 'over' (also clears any card offer).
 - `score(run): number` — waves cleared (trainingBest, trainingFeats).
 
+### testForces.ts (test-only; not in index.ts)
+- `bookUnits(file)`, `FORCES` (two ~750 pt sample forces a book), `SEEDS` — shared by training.test.ts and veteranBalance.test.ts.
+
 ### testRun.ts (test-only; not in index.ts)
 - `blankRun(seed = 1): TrainingRun` — an empty build-phase run (no recipes, cover or draft; mods bounty 1, holdMul 1) for module tests.
 
@@ -172,4 +198,4 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt? }): TrainingRun`
 
 ### index.ts
-Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, run (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).
+Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, run (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).

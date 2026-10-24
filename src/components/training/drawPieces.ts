@@ -1,6 +1,6 @@
 import type { EmblemLayer } from '../../model/types';
 import type { Category } from '../../rules/data';
-import type { Grade, RubblePiece, ShardPiece, Tile, UnitTower } from '../../rules/training';
+import { FX_COLOR, type Grade, type RubblePiece, type ShardPiece, type Tile, type UnitTower } from '../../rules/training';
 import type { ShardType } from '../../rules/downtimeData';
 import { drawEmblem } from '../Emblem';
 import { RUBBLE_ICON, SHARD_ICON, alpha, drawIcon, gradeTint, label, pipRow, roundRect, shade, shardColor } from './art';
@@ -101,7 +101,8 @@ export function drawRubble(ctx: CanvasRenderingContext2D, p: RubblePiece, s: num
   ctx.restore();
 }
 
-/** A crafted unit: a dark plate rimmed in its category's colour with a drop shadow, its Emblem, level pips and state rings. */
+/** A crafted unit: a dark plate rimmed in its category's colour with a drop shadow, its Emblem, level pips and state rings;
+ *  one carrying relics has a gold ring and a glint running round it. */
 export function drawUnit(ctx: CanvasRenderingContext2D, t: UnitTower, s: number, face: EmblemLayer[] | undefined, time: number) {
   const color = CATEGORY_COLORS[t.category] ?? CATEGORY_COLORS.Fortification;
   ctx.save();
@@ -128,6 +129,7 @@ export function drawUnit(ctx: CanvasRenderingContext2D, t: UnitTower, s: number,
     ctx.beginPath(); ctx.arc(cx, cy, r * s, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
   };
+  if (t.relics?.length) relicRing(ctx, cx, cy, s, time);
   if (t.dmgBoost.left > 0) ring('#5ab0ff', 1.3);
   if (t.frenzy > 0) {
     ctx.save();
@@ -141,4 +143,23 @@ export function drawUnit(ctx: CanvasRenderingContext2D, t: UnitTower, s: number,
     ring(HOLD_COLOR, 1.15, [Math.max(2, s * 0.3), Math.max(2, s * 0.2)]);
     ctx.restore();
   }
+}
+
+/** A relic bearer's mark: a thin gold ring just inside the plate's corners and a bright glint going round it. */
+function relicRing(ctx: CanvasRenderingContext2D, cx: number, cy: number, s: number, time: number) {
+  const r = s * 1.02;
+  const gold = FX_COLOR.relic;
+  ctx.save();
+  ctx.strokeStyle = alpha(gold, 0.7);
+  ctx.lineWidth = Math.min(2.5, Math.max(1, s * 0.07));
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+  const a = time * 1.6;
+  ctx.shadowColor = gold;
+  ctx.shadowBlur = Math.min(10, s * 0.6);
+  ctx.strokeStyle = gold;
+  ctx.lineWidth = Math.min(3.5, Math.max(1.5, s * 0.12));
+  ctx.beginPath(); ctx.arc(cx, cy, r, a, a + 0.6); ctx.stroke();
+  ctx.fillStyle = '#fff6d8';
+  ctx.beginPath(); ctx.arc(cx + Math.cos(a + 0.6) * r, cy + Math.sin(a + 0.6) * r, Math.max(1, s * 0.09), 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
 }
