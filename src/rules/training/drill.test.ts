@@ -22,8 +22,8 @@ const drilled = (drill: RunDrill, o: Partial<TrainingRun> = {}): TrainingRun => 
 const all = () => drillFrom(DRILL_GOALS.map((_, i) => i));
 
 describe('drill honours', () => {
-  it('has about 20 goals, and every boss card opens once: at the start or in one group', () => {
-    expect(DRILL_GOALS).toHaveLength(20);
+  it('has about 20 goals (22 with the Final waves), and every boss card opens once: at the start or in one group', () => {
+    expect(DRILL_GOALS).toHaveLength(22);
     const groups = Object.values(D.groups).flatMap((g) => g.cards);
     const sources = [...D.cardsAtStart, ...groups];
     expect(new Set(sources).size).toBe(sources.length);
@@ -46,7 +46,7 @@ describe('drill honours', () => {
     const d = all();
     expect(d.luck).toBe(TRAINING.shards.luckCost.length);
     expect([...d.cards].sort()).toEqual(CARDS.map((c) => c.id).sort());
-    expect(d.perks).toEqual({ purse: 4, mend: 3, reroll: 2, thrift: 3, offer: 2 });
+    expect(d.perks).toEqual({ purse: 5, mend: 3, reroll: 3, thrift: 3, offer: 2 });
   });
 
   it('counts goals from the force, and an old force starts from its units\' records', () => {

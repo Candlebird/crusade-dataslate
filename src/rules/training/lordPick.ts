@@ -62,26 +62,32 @@ export function campaignLords(c: Campaign, r: Rng): RunLord[] {
   return crisis ? [...out, crisis] : out;
 }
 
-/** The boss wave each lord comes on: every bossEvery-th from lords.from, the nemesis's wave skipped (`nemesis`: the
- *  force has one). */
-export function lordWaves(nx: RunNexus | undefined, nemesis: boolean): number[] {
+/** The boss wave each lord comes on: every bossEvery-th from lords.from, the nemesis's wave and the Final wave `final`
+ *  skipped (`nemesis`: the force has one); at the top Final (finale.to) a last Nexus Crisis lord takes the Final. */
+export function lordWaves(nx: RunNexus | undefined, nemesis: boolean, final: number = TRAINING.finale.from): number[] {
   const out: number[] = [];
   const every = TRAINING.wave.bossEvery;
-  for (let w = Math.ceil(L.from / every) * every; out.length < (nx?.lords.length ?? 0); w += every) {
-    if (!(nemesis && w === TRAINING.shared.nemesis.wave)) out.push(w);
+  const lords = nx?.lords ?? [];
+  const crisis = final >= TRAINING.finale.to && lords[lords.length - 1]?.from === 'crisis';
+  const n = lords.length - (crisis ? 1 : 0);
+  for (let w = Math.ceil(L.from / every) * every; out.length < n; w += every) {
+    if (!(nemesis && w === TRAINING.shared.nemesis.wave) && w !== final) out.push(w);
   }
-  return out;
+  return crisis ? [...out, final] : out;
 }
 
+type LordRun = Pick<TrainingRun, 'nexus' | 'nemesis' | 'finale'>;
+const wavesOf = (run: LordRun) => lordWaves(run.nexus, !!run.nemesis, run.finale?.final);
+
 /** The lord (RunNexus.lords index) that leads wave `w`, if a real one does. */
-export function lordIndex(run: Pick<TrainingRun, 'nexus' | 'nemesis'>, w: number): number | undefined {
-  const i = lordWaves(run.nexus, !!run.nemesis).indexOf(w);
+export function lordIndex(run: LordRun, w: number): number | undefined {
+  const i = wavesOf(run).indexOf(w);
   return i < 0 ? undefined : i;
 }
 
-/** The next real lord still to come after wave `w` (default the run's wave), and its wave. */
-export function nextLord(run: Pick<TrainingRun, 'nexus' | 'nemesis' | 'wave'>, w = run.wave): { lord: RunLord; wave: number } | undefined {
-  const waves = lordWaves(run.nexus, !!run.nemesis);
+/** The next real lord still to come after wave `w` (default the run's wave), and its wave (in wave order). */
+export function nextLord(run: LordRun & Pick<TrainingRun, 'wave'>, w = run.wave): { lord: RunLord; wave: number } | undefined {
+  const waves = wavesOf(run);
   const i = waves.findIndex((x) => x > w);
   return i < 0 ? undefined : { lord: run.nexus!.lords[i], wave: waves[i] };
 }

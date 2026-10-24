@@ -27,7 +27,7 @@ import { DetachmentsBox } from './Detachments';
 import { claimableRounds } from '../rules/rounds';
 import { TASK_NAMES, claimGarrisons, freeUnits, garrisonClaims, tasksOf } from '../rules/tasks';
 import { GARRISON, OFF_TABLE_XP, SORTIE, TRAINING } from '../rules/downtimeData';
-import { canTrain } from '../rules/training';
+import { canTrain, finalWon } from '../rules/training';
 import { canSortie } from '../rules/sortie';
 import { RESULT_LABEL, unitName } from '../rules/battle';
 import { listTotals, newList } from '../rules/lists';
@@ -593,7 +593,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const trainingRow = (
     <div className="span-all row">
       <span className="grow small">
-        <b>Training sim:</b> draft Shards into a maze, craft your units from them, and hold the base against endless waves; each crafted unit earns {TRAINING.xpPerWave} XP every {TRAINING.xpEvery} waves (up to {TRAINING.xpCap}). <span className="muted">Any time, as often as you like; a unit banks at most {OFF_TABLE_XP.perRound} XP a {c ? 'round' : 'week'} from Training and free Sorties together. Units don't become busy.{f.trainingBest ? ` Best: ${f.trainingBest} waves.` : ''}</span>
+        <b>Training sim:</b> draft Shards into a maze, craft your units from them, and hold the base against endless waves; each crafted unit earns {TRAINING.xpPerWave} XP every {TRAINING.xpEvery} waves (up to {TRAINING.xpCap}). <span className="muted">Any time, as often as you like; a unit banks at most {OFF_TABLE_XP.perRound} XP a {c ? 'round' : 'week'} from Training and free Sorties together. Units don't become busy.{f.trainingBest ? ` Best: ${f.trainingBest} waves${f.finale && Object.keys(f.finale.wins).length ? `, Victory at ${finalWon(f)}` : ''}${f.finale?.endless ? `, Endless +${f.finale.endless}` : ''}.` : ''}</span>
       </span>
       <button disabled={!f.units.some(canTrain)} onClick={() => setTraining(true)}>Train…</button>
       {training && <TrainingModal force={f} c={c} onClose={() => setTraining(false)} />}

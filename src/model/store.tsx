@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS, type AppState, type CatalogBook, type Force, type Uni
 import { buildSeedState, withBuiltinBooks } from './seed';
 import { migrateForce } from '../rules/migrate';
 import { migrateBattle } from '../rules/tracker';
+import { noteVeterancy } from '../rules/training/veterancy';
 import { nowIso } from './factory';
 import { toast } from '../components/ui';
 
@@ -67,7 +68,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const update = useCallback((fn: (d: AppState) => void) => {
     const draft = structuredClone(latest.current);
+    // Veterancy never drops: noted before a change (a unit removed keeps its XP in it) and after (XP just earned).
+    draft.forces.forEach(noteVeterancy);
     fn(draft);
+    draft.forces.forEach(noteVeterancy);
     latest.current = draft;
     setState(draft);
   }, []);

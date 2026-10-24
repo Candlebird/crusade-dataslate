@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyDef } from '../../rules/downtimeData';
-import { isNemesisWave, lordIndex, lordLine, nemesisTricks, previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
+import { finalBoss, finalOf, inEndless, isNemesisWave, lordIndex, lordLine, nemesisTricks, previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
 import { enemyShape } from './drawLive';
 
 export interface WavePreviewProps {
@@ -30,6 +30,11 @@ export function WaveStatus({ run }: WavePreviewProps) {
           </span>
         )}
         {run.nexus && <RealLordTag run={run} w={n} />}
+        {run.finale && n === finalOf(run) && !inEndless(run) && (
+          <span className="tag gold" title={run.siege ? 'It comes alone and cannot fall: hurt it all you can before it reaches the base.' : 'Slay it with the base standing for a Victory; if it reaches the base the run ends.'}>
+            Final: {finalBoss(run)}
+          </span>
+        )}
       </div>
       {live ? <div className="muted">{left} enem{left === 1 ? 'y' : 'ies'} left</div> : <WavePreview run={run} />}
     </div>

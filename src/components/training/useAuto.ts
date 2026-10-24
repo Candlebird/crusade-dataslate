@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Unit } from '../../model/types';
 import maze from '../../rules/trainingTestMaze.json';
-import { startProblem, type TrainingRun } from '../../rules/training';
+import { continueEndless, startProblem, type TrainingRun } from '../../rules/training';
 import { botMoves, type MazeSpot } from '../../rules/training/bot';
 
 // Auto (debug, TRAINING.debugAuto): the balance bot plays the live run a move at a time, slow enough to watch. Each
@@ -44,6 +44,11 @@ export function useAuto(run: TrainingRun | null, opts: AutoOpts): void {
       if (o.paused || run.phase !== 'build') {
         moves = null;
         wait = 0;
+        return;
+      }
+      if (run.finale?.victory === 'pending') {
+        continueEndless(run);
+        o.onMove('On into Endless');
         return;
       }
       if (!moves) {

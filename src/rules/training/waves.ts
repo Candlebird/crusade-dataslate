@@ -4,6 +4,7 @@ import { BASE, dist, mapOf } from './board';
 import { LEGS, N, WAYPOINTS, centre, heading, mapFor, route, type MapState } from './map';
 import { budgetMul } from './nexus';
 import { pick, rand, randInt, type Rng } from './rng';
+import { finalOf } from './finaleCore';
 import { waveDice } from './siege';
 import { noteMet } from './tally';
 import type { Enemy, SpawnPlan, Tile, TrainingRun } from './types';
@@ -14,6 +15,7 @@ import { costOf, countFor, isElite, waveKind } from './waveKinds';
 
 const W = TRAINING.wave;
 const R = TRAINING.route;
+const F = TRAINING.finale;
 
 /** Every TRAINING.wave.flyEvery-th wave flies. */
 export const isFlyWave = (w: number) => w > 0 && w % W.flyEvery === 0;
@@ -45,30 +47,48 @@ export const flyHpAt = (w: number) => W.flyHp * W.flyFade ** (w - 1);
 /** How many times tougher everything is on a ground wave `w` (no flying wave nor sky boss): earlyHp[w−1] on the first
  *  waves (a gentle start), groundGrowth a wave from groundFrom to groundTo, groundLate a wave after, and ease a wave
  *  less from easeFrom to easeTo (the run-up to the wave-25 Lord), held after. */
-export const groundHpAt = (w: number) =>
+export const groundHpAt = (w: number, lv = w) =>
   isFlyWave(w) || isFlyBossWave(w) ? 1
-    : (W.earlyHp[w - 1] ?? 1)
-      * W.groundGrowth ** Math.max(0, Math.min(w, W.groundTo) - W.groundFrom + 1) * W.groundLate ** Math.max(0, w - W.groundTo)
-      * W.ease ** Math.max(0, Math.min(w, W.easeTo) - W.easeFrom + 1);
+    : (W.earlyHp[lv - 1] ?? 1)
+      * W.groundGrowth ** Math.max(0, Math.min(lv, W.groundTo) - W.groundFrom + 1) * W.groundLate ** Math.max(0, lv - W.groundTo)
+      * W.ease ** Math.max(0, Math.min(lv, W.easeTo) - W.easeFrom + 1);
+
+/** The level wave `w` is planned at (budget, wounds): itself up to TRAINING.finale.from, held there after (climbAt does the rest). */
+export const levelOf = (w: number) => Math.min(w, F.from);
+
+/** How many times tougher wave `w` is than its level, in a run whose Final is `final`: climb a wave past finale.from up
+ *  to the Final, then (Endless) endless a wave, rise more for every riseEvery waves gone. */
+export function climbAt(w: number, final: number = F.from): number {
+  let m = 1;
+  for (let k = F.from + 1; k <= w; k++) m *= k <= final ? F.climb : F.endless + F.rise * Math.floor((k - final - 1) / F.riseEvery);
+  return m;
+}
+
+/** How many times its wounds every enemy has on wave `w` past the level's own: lateHp at its level × climbAt. */
+export const climbHp = (w: number, final: number = F.from) => lateHp(levelOf(w)) * climbAt(w, final);
 
 /** How tough the Echo Lord is on wave `w`, beside its share of the budget: bossHp by boss wave, the last holding on. */
 export const bossHpAt = (w: number) => W.bossHp[Math.min(W.bossHp.length, Math.max(1, Math.floor(w / W.bossEvery))) - 1];
 
 /** Wave `w`'s spawns for a force of `power` points, sorted by time (rolls `r`): one kind (waveKinds.ts), as many as
  *  the budget buys (past maxCount, or flyMax on a flying wave, the rest makes them tougher), every eliteEvery-th an
- *  elite; a boss wave's escorts take `escorts` of the budget. A flying wave brings flyShare of the budget, its flyers
- *  flyHpAt as tough; on a boss wave that would fly only the boss flies (flyHpAt × flyBossHp as tough), its escorts walk. */
-export function planFor(r: Rng, power: number, w: number): SpawnPlan[] {
+ *  elite; a boss wave's escorts take `escorts` of the budget (finale.escorts from finale.from, the boss keeping its old
+ *  share, so the wave after is no cliff). A flying wave brings flyShare of the budget, its flyers flyHpAt as tough; on a
+ *  boss wave that would fly only the boss flies (flyHpAt × flyBossHp as tough), its escorts walk. Past finale.from a
+ *  wave is planned at its level (levelOf) and climbAt times as tough, for a run whose Final is `final`. */
+export function planFor(r: Rng, power: number, w: number, final: number = F.from): SpawnPlan[] {
+  const lv = levelOf(w);
   const boss = isBossWave(w);
   const skyBoss = boss && (isFlyWave(w) || isFlyBossWave(w));
   // Flyers skip the maze, so a flying wave brings only flyShare of the budget (a flying boss's escorts walk).
   const flies = !boss && isFlyWave(w);
-  const budget = waveBudget(power, w) * (flies ? W.flyShare : 1);
-  const minions = boss ? budget * W.escorts : budget;
+  const budget = waveBudget(power, lv) * (flies ? W.flyShare : 1);
+  const minions = boss ? budget * (w >= F.from ? F.escorts : W.escorts) : budget;
   const kind = waveKind(r, w, flies);
   const { n, hpMul } = countFor(kind, minions, (flies ? W.flyMax : W.maxCount) - (boss ? 1 : 0));
-  const hp = hpMul * lateHp(w) * groundHpAt(w) * TRAINING.enemyHp * (flies ? flyHpAt(w) : 1);
-  const bossMul = Math.max(W.bossMin, (budget - minions) / costOf('lord'));
+  const tough = climbHp(w, final) * groundHpAt(w, lv) * TRAINING.enemyHp;
+  const hp = hpMul * tough * (flies ? flyHpAt(lv) : 1);
+  const bossMul = Math.max(W.bossMin, (budget * (1 - W.escorts)) / costOf('lord'));
 
   const out: SpawnPlan[] = [];
   let at = 0;
@@ -78,7 +98,7 @@ export function planFor(r: Rng, power: number, w: number): SpawnPlan[] {
   }
   if (boss) {
     const s = spawnPlan(r, 'lord', at / 2, 1, skyBoss, false);
-    s.hp = TRAINING_ENEMIES.lord.hp * TRAINING.enemyHp * lateHp(w) * groundHpAt(w) * bossMul * bossHpAt(w) * (skyBoss ? flyHpAt(w) * W.flyBossHp : 1);
+    s.hp = TRAINING_ENEMIES.lord.hp * tough * bossMul * bossHpAt(w) * (skyBoss ? flyHpAt(lv) * W.flyBossHp : 1);
     out.push(s);
   }
   return out.sort((a, b) => a.at - b.at);
@@ -97,7 +117,7 @@ function spawnPlan(r: Rng, kind: TrainingEnemyKind, at: number, hpMul: number, f
 }
 
 /** Wave `w`'s spawns, sorted by time, rolling `r`: the Nexus's budget and affixes on them (nexus.ts, affixes.ts). */
-const nexusWave = (r: Rng, run: TrainingRun, w: number) => affixPlan(r, run, planFor(r, run.power * budgetMul(run), w));
+const nexusWave = (r: Rng, run: TrainingRun, w: number) => affixPlan(r, run, planFor(r, run.power * budgetMul(run), w, finalOf(run)));
 
 /** Wave `w`'s spawns, sorted by time (rolls the run's dice; a siege's own for the wave). */
 export const planWave = (run: TrainingRun, w: number): SpawnPlan[] => nexusWave(waveDice(run, w, run), run, w);
@@ -157,7 +177,8 @@ export const runCover = (r: Rng, extra = 0): Tile[] =>
   layCover(r, randInt(r, TRAINING.cover.patches[0], TRAINING.cover.patches[1]) + extra, route(mapFor([])));
 
 /** An enemy on the field from a spawn plan (id run.nextId++), met for the bestiary. A nemesis plan gets its tricks
- *  through `nem` (nemesis.ts sets them up), a real lord's through `lord` (lords.ts); an Armoured one its `hard`. */
+ *  through `nem` (nemesis.ts sets them up), a real lord's through `lord` (lords.ts); an Armoured one its `hard`; the
+ *  Final boss `final`. */
 export function spawnOne(run: TrainingRun, s: SpawnPlan): Enemy {
   const next = centre(WAYPOINTS[Math.min(LEGS, s.leg + 1)]);
   const e: Enemy = {
@@ -165,7 +186,7 @@ export function spawnOne(run: TrainingRun, s: SpawnPlan): Enemy {
     hp: s.hp, maxHp: s.hp, flies: s.flies, ...(s.elite ? { elite: true } : {}), status: {}, dots: [], regrab: 0,
     ...(s.nemesis ? { nem: { born: run.t, speed: 1, hard: 0, next: 0, regen: 0 } } : {}),
     ...(s.lord !== undefined ? { lord: { i: s.lord, next: 0, ward: 0, burst: 0 } } : {}),
-    ...(s.hard ? { hard: s.hard } : {}),
+    ...(s.hard ? { hard: s.hard } : {}), ...(s.final ? { final: true as const } : {}),
   };
   run.enemies.push(e);
   noteMet(run, e);
@@ -229,7 +250,8 @@ export function move(m: MapState | undefined, e: Enemy, step: number): void {
   }
 }
 
-/** Walk every enemy not held or stunned (flyers straight pad to pad); ambush jumps; leaks cost run.baseHp, count run.leaked. */
+/** Walk every enemy not held or stunned (flyers straight pad to pad); ambush jumps; leaks cost run.baseHp, count
+ *  run.leaked; the Final boss getting through marks run.finale.through (run.ts ends the run). */
 export function walk(run: TrainingRun, dt: number): void {
   let m: MapState | undefined;
   const gone = new Set<number>();
@@ -240,6 +262,7 @@ export function walk(run: TrainingRun, dt: number): void {
     if (atBase(e)) {
       run.baseHp = Math.max(0, run.baseHp - leakCost(e));
       run.leaked += 1;
+      if (e.final && run.finale) run.finale.through = true;
       gone.add(e.id);
     }
   }

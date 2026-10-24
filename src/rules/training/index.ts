@@ -36,3 +36,6 @@ export * from './clock';
 export * from './emplacements';
 export * from './waveKinds';
 export * from './flightLane';
+export * from './finaleCore';
+export * from './finale';
+export * from './veterancy';

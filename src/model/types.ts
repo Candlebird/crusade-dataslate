@@ -273,7 +273,7 @@ export interface ForceTale {
   date: string;
   /** The campaign round it happened in (a force in a campaign). */
   round?: number;
-  kind: 'best' | 'lord' | 'nemesis' | 'title';
+  kind: 'best' | 'lord' | 'nemesis' | 'title' | 'victory';
   text: string;
   /** The units it tells of. */
   units: string[];
@@ -326,9 +326,9 @@ export interface DrillStats {
   clean: number;
   /** The most units crafted in one run. */
   crafted: number;
-  /** Weekly Sieges entered (weeks), and this week's best. */
+  /** Weekly Sieges entered (weeks), and this week's best (the wave reached; `dmg`, damage to the colossus if it got there). */
   sieges: number;
-  siege?: { week: string; best: number };
+  siege?: { week: string; best: number; dmg?: number };
 }
 
 /** A force's best Weekly Siege of a week, on the campaign's board (rules/training/siegeBoard.ts postSiege). */
@@ -341,6 +341,8 @@ export interface SiegeBoardEntry {
   /** The wave reached, and waves cleared. */
   score: number;
   cleared: number;
+  /** Damage dealt to the wave-25 colossus (it reached the boss); entries without it rank below every one with it. */
+  dmg?: number;
   date: string;
 }
 
@@ -352,8 +354,20 @@ export interface SiegeWin {
   player: string;
   factionId?: string;
   score: number;
+  /** Damage dealt to the colossus, if it reached it. */
+  dmg?: number;
   round: number;
   date: string;
+}
+
+/** A force's Final-wave ladder in Training (rules/training/veterancy.ts): its veterancy (the most XP its units have
+ *  ever held between them; it never drops), the highest Final wave open, the first Victory at each Final (wave → date)
+ *  and the deepest Endless (waves cleared past the Final). */
+export interface ForceFinale {
+  vet: number;
+  open: number;
+  wins: Record<string, string>;
+  endless?: number;
 }
 
 export interface Force {
@@ -385,6 +399,8 @@ export interface Force {
   tales?: ForceTale[];
   /** Drill Honour counts (rules/training/drillBank.ts): what unlocks luck, cards and perks in Training. */
   drill?: DrillStats;
+  /** The Final-wave ladder in Training: veterancy, the Final open, Victories, Endless depth. */
+  finale?: ForceFinale;
   /** Feats earned, by id, with the date (rules/feats.ts): each pays once. */
   feats?: Record<string, string>;
   /** Furthest any unit got on one Sortie: nodes cleared (rules/sortie.ts). */

@@ -3,11 +3,11 @@ import type { Gun } from '../autoBattle';
 import type { AuraStat, Effect } from '../abilities';
 import type { DrillPerk, ShardType } from '../downtimeData';
 import type { Tile } from './map';
-import type { RunNexus } from './nexusTypes';
+import type { RunFinale, RunNexus } from './nexusTypes';
 import type { Enemy, RunBeast, RunNemesis, SpawnPlan } from './enemyTypes';
 import type { ForceTale, TrainingRecord } from '../../model/types';
 
-export type { LordState, LordTrick, NexusAffixId, RunLord, RunNexus } from './nexusTypes';
+export type { LordState, LordTrick, NexusAffixId, RunFinale, RunLord, RunNexus } from './nexusTypes';
 export type { Dot, Enemy, NemesisState, RunBeast, RunNemesis, SpawnPlan } from './enemyTypes';
 
 // Every shape a Training run holds. A run is plain data all the way down (no classes, functions or Maps), so it saves
@@ -277,7 +277,7 @@ export interface RunDrill {
 
 export interface TrainingRun {
   /** Save format version (save.ts SAVE_VERSION). */
-  v: 8;
+  v: 9;
   forceId: string;
   seed: number;
   /** mulberry32 state: the same seed and the same moves play out the same. */
@@ -342,11 +342,13 @@ export interface TrainingRun {
   drilled?: { earned: number[] };
   /** The Auto (debug) button played some of it (TRAINING.debugAuto): the run banks nothing (useBank). Set by the UI. */
   auto?: boolean;
+  /** The Final wave and its Victory (finale.ts); none on a run older than v9 (taken as Final finale.from). */
+  finale?: RunFinale;
 }
 
 /** What a saved run looks like on disk (save.ts). */
 export interface SavedRun {
-  v: 8;
+  v: 9;
   savedAt: string;
   run: TrainingRun;
 }

@@ -112,11 +112,11 @@ export function eventInfo(id: string | undefined): { name: string; desc: string;
 }
 
 /** The Nexus as the start screen lists it: threat and credits, each affix, the event, and the lords by wave (`nemesis`:
- *  the force's nemesis takes its wave). */
-export function nexusLines(nx: RunNexus | undefined, nemesis = false): { threat: string; affixes: string[]; event: string; lords: string[] } {
+ *  the force's nemesis takes its wave; `final`: the run's Final wave, which a named lord takes). */
+export function nexusLines(nx: RunNexus | undefined, nemesis = false, final?: number): { threat: string; affixes: string[]; event: string; lords: string[] } {
   if (!nx) return { threat: 'Threat 0: not in a campaign.', affixes: [], event: 'No Galactic Event.', lords: [`Every boss: ${GENERIC_LORD}.`] };
   const ev = eventInfo(nx.event);
-  const waves = lordWaves(nx, nemesis);
+  const waves = lordWaves(nx, nemesis, final);
   return {
     threat: `Threat ${nx.threat}: earned credits +${Math.round(X.credit * nx.threat * 100)}%.`,
     affixes: nx.affixes.map((a) => { const i = affixInfo(a, nx.threat); return `${i.name}: ${i.text}`; }),

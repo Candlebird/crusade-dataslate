@@ -2,8 +2,9 @@ import type { DrillStats, Force } from '../../model/types';
 import { bankBeasts } from './bestiary';
 import { DRILL_GOALS, drillEarned, drillStats, unlockText } from './drill';
 import { runHonours } from './records';
-import { siegeScore } from './siege';
+import { siegeDmg, siegeScore } from './siege';
 import type { TrainingRun } from './types';
+import { finaleAfter } from './veterancy';
 
 // Drill Honours banked (F5): a finished run's counts go into force.drill once (bankDrill, before the records move),
 // and once the rest is banked drillNews names the goals it reached. drillPreview works them out without touching it.
@@ -32,7 +33,8 @@ export function statsAfter(st: DrillStats, run: TrainingRun): DrillStats {
   if (run.siege) {
     const fresh = st.siege?.week !== run.siege;
     out.sieges = st.sieges + (fresh ? 1 : 0);
-    out.siege = { week: run.siege, best: Math.max(fresh ? 0 : st.siege!.best, siegeScore(run)) };
+    const dmg = Math.max(fresh ? -1 : st.siege!.dmg ?? -1, siegeDmg(run) ?? -1);
+    out.siege = { week: run.siege, best: Math.max(fresh ? 0 : st.siege!.best, siegeScore(run)), ...(dmg >= 0 ? { dmg } : {}) };
   }
   return out;
 }
@@ -51,6 +53,7 @@ export function drillPreview(f: Force, run: TrainingRun): number[] {
   bankBeasts(sortie, run);
   const after: Force = {
     ...f, units, sortie, drill: statsAfter(drillStats(f), run), trainingBest: Math.max(f.trainingBest ?? 0, run.cleared),
+    finale: finaleAfter(f, run, ''),
   };
   const before = drillEarned(f);
   return drillEarned(after).filter((i) => !before.includes(i));

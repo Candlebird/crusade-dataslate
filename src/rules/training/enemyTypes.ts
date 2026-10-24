@@ -20,10 +20,12 @@ export interface SpawnPlan {
   elite?: boolean;
   /** The force's Sortie nemesis (nemesis.ts): the wave's boss is it. */
   nemesis?: boolean;
-  /** A real lord (lords.ts): the wave's boss is RunNexus.lords[lord]. */
+  /** A real lord (lords.ts): the wave's boss is RunNexus.lords[lord] (-1: the run's Final lord, RunFinale.lord). */
   lord?: number;
   /** Saves at +this (the Armoured affix). */
   hard?: number;
+  /** The Final wave's boss (finale.ts). */
+  final?: true;
 }
 
 /** Damage over time on an enemy, credited to piece `by`. */
@@ -61,6 +63,8 @@ export interface Enemy {
   /** Saves at +this (the Armoured affix); seconds left of a Vengeful rush (affixes.ts). */
   hard?: number;
   surge?: number;
+  /** The Final wave's boss (finale.ts): its damage counts to RunFinale.dealt. */
+  final?: true;
 }
 
 /** A nemesis on the field: when it came, its walking speed share (rage, Vengeful), better saves (Hardened), whether

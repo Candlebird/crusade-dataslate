@@ -1,7 +1,12 @@
 // The words of Training tales (tales.ts), Sortie-story style: a few lines for each kind of highlight, one picked by the
 // run's seed. {force}, {unit}, {wave}, {lord}, {title} are filled in.
 
-export const TALE_TEXT: Record<'best' | 'lord' | 'nemesis' | 'title', string[]> = {
+export const TALE_TEXT: Record<'best' | 'lord' | 'nemesis' | 'title' | 'victory', string[]> = {
+  victory: [
+    'Wave {wave}, the Final, and {lord} at the head of it. {force} held the maze, and {unit} struck the blow that ended it. The drill field has a Victory to remember.',
+    'They had trained for this one wave. {lord} came, and the maze took it apart piece by piece until {unit} finished it. {force} walked off the field victorious.',
+    'When {lord} fell in the Final wave {wave}, the instructors did not say a word. They did not need to. {force} had won, and everyone had seen {unit} do it.',
+  ],
   best: [
     'On the drill field the Shards fell into a maze no one had built before, and {force} held it for {wave} waves, longer than ever. {unit} was the last wall the Echoes broke on.',
     'The instructors stopped counting at twenty and started again at one. {force} held for {wave} waves, its best yet, and the talk in the barracks was all of {unit}.',

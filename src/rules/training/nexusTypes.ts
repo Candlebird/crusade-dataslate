@@ -15,7 +15,7 @@ export interface RunLord {
   name: string;
   tier: RelicTier;
   trick: LordTrick;
-  from: 'crisis' | 'guardian';
+  from: 'crisis' | 'guardian' | 'final';
   slain?: boolean;
   /** The crafted unit (id) that landed the killing blow, if one did (tally.ts; records.ts). */
   by?: string;
@@ -28,6 +28,21 @@ export interface RunNexus {
   affixes: NexusAffixId[];
   event?: string;
   lords: RunLord[];
+}
+
+/** The run's Final wave (finale.ts): which wave, the named lord that leads it (when neither the nemesis nor a campaign
+ *  lord does), damage dealt to its boss (the Weekly Siege's score), whether the boss fell or got through, the Victory
+ *  ('pending' until the player banks it or goes on into Endless), and whether the force has banked it. */
+export interface RunFinale {
+  final: number;
+  lord?: RunLord;
+  dealt: number;
+  slain?: boolean;
+  through?: boolean;
+  victory?: 'pending' | 'endless' | 'banked';
+  banked?: boolean;
+  /** The crafted unit (id) that slew the Final boss, if one did. */
+  by?: string;
 }
 
 /** A real lord on the field: which (RunNexus.lords index), its trick clock, its ward (shield), seconds of burst left. */

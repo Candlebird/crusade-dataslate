@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Force } from '../../model/types';
 import { unitPortrait } from '../../model/emblem';
 import {
-  ackStale, cardText, readyRecipes, clearRubble, defaultByKey, clearSave, loadRun, pickCard, rerollCards, pieceAt, pieceById, placeDraft, quitRun, saveRun, staleSave, startWave,
+  ackStale, bankVictory, cardText, continueEndless, finalBoss, readyRecipes, clearRubble, defaultByKey, clearSave, loadRun, pickCard, rerollCards, pieceAt, pieceById, placeDraft, quitRun, saveRun, staleSave, startWave,
   type Phase, type SavedRun, type Tile, type TrainingRun,
 } from '../../rules/training';
 import { TRAINING } from '../../rules/downtimeData';
@@ -212,6 +212,9 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     if (cr) setSel(null);
   };
   const over = run.phase === 'over';
+  // The Final boss fell: bank the Victory (the run ends, the loop banks it) or go on into Endless.
+  const victory = build && run.finale?.victory === 'pending';
+  const onVictory = (go: boolean) => act(() => (go ? continueEndless(run) : bankVictory(run)), refresh);
   const craftName = !craftNow ? '' : craftNow.def ? defaultByKey(craftNow.def)?.name ?? 'The defence'
     : run.recipes.find((r) => r.unitId === craftNow.unitId)?.name ?? 'The unit';
 
@@ -232,6 +235,18 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
               <div className="training-map-banner small" role="status">
                 <span className="grow">Tap one of the glowing Shards: {craftName} stands there, the rest turn to rubble.</span>
                 <button onClick={() => setCrafting(null)}>Cancel</button>
+              </div>
+            )}
+            {victory && !auto && (
+              <div className="training-over" role="dialog" aria-label="Victory">
+                <div className="training-over-card small">
+                  <div style={{ marginBottom: 4, color: 'var(--gold)' }}><b>Victory!</b> {finalBoss(run)} falls on the Final wave {run.finale!.final}, the base standing at {run.baseHp}/{TRAINING.baseHp}.</div>
+                  <div className="muted">Bank it and end the run here, or go on into Endless: waves with no Final ahead, every one climbing steeper. The Victory stands either way.</div>
+                  <div className="training-over-actions">
+                    <button onClick={() => onVictory(false)}>Bank and end</button>
+                    <button className="primary" onClick={() => onVictory(true)}>Continue into Endless</button>
+                  </div>
+                </div>
               </div>
             )}
             {over && (
@@ -283,7 +298,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
           </div>
         </div>
       </div>
-      {build && run.offer && !peek && <CardOffer run={run} offer={run.offer} portraits={portraits} auto={auto} autoPick={BOT_CARD} onPick={take} onPeek={() => setPeek(true)} onReroll={() => act(() => rerollCards(run), refresh)} />}
+      {build && !victory && run.offer && !peek && <CardOffer run={run} offer={run.offer} portraits={portraits} auto={auto} autoPick={BOT_CARD} onPick={take} onPeek={() => setPeek(true)} onReroll={() => act(() => rerollCards(run), refresh)} />}
     </Modal>
   );
 }

@@ -50,10 +50,12 @@ describe('real Echo Lords', () => {
     for (const k of Object.keys(T.byLord)) expect(trickText(T.byLord[k] as LordTrick)).not.toBe('');
   });
 
-  it('lead the boss waves from lords.from, skipping the nemesis wave', () => {
+  it('lead the boss waves from lords.from, skipping the nemesis wave and the Final', () => {
     const nx = nexusOf(campaign(2, Array.from({ length: 5 }, (_, i) => guardian(`G${i}`, 'Common'))))!;
-    expect(lordWaves(nx, false)).toEqual([5, 10, 15, 20, 25]);
+    expect(lordWaves(nx, false)).toEqual([5, 10, 15, 20, 30]);
     expect(lordWaves(nx, true)).toEqual([5, 10, 15, 20, 30]);
+    expect(lordWaves(nx, false, 30)).toEqual([5, 10, 15, 20, 25]);
+    expect(lordWaves(nx, true, 30)).toEqual([5, 10, 15, 20, 35]);
     const run = blankRun();
     run.nexus = nx;
     expect(lordIndex(run, 10)).toBe(1);

@@ -7,6 +7,7 @@ import { canTrain, recipesFor, recipeUses, unitTower } from './recipes';
 import { crumbleDraft, drawDraft, toRubble } from './shards';
 import { relics, resetSockets } from './relics';
 import { affixTick } from './affixes';
+import { finalePlan, newFinale, SIEGE_BOSS, throughText } from './finale';
 import { lordPlan, lordTick } from './lords';
 import { nemesisPlan, nemesisTick, pickNemesis } from './nemesis';
 import { nexusStart } from './nexus';
@@ -20,16 +21,17 @@ import type { RunDrill, RunNexus, ShardPiece, TrainingRun, UnitTower } from './t
 /** A new run for a force: recipes for every unit that can train, cover, credits, and the first draft drawn ('build').
  *  `story`: the force's Sortie record, for its nemesis (nemesis.ts). `nexus`: its campaign's (nexus.ts nexusOf), which
  *  can change the starting credits, base HP and cover. `opts.drill`: what the force's Drill Honours open (drill.ts
- *  drillOf; none = everything); `opts.siege`: the Weekly Siege's week (siege.ts), whose seed gives the cover and drafts. */
+ *  drillOf; none = everything); `opts.siege`: the Weekly Siege's week (siege.ts), whose seed gives the cover and drafts;
+ *  `opts.final`: the force's Final wave (veterancy.ts finaleOpen; default finale.from, a siege's always that). */
 export function createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus,
-  opts: { drill?: RunDrill; siege?: string } = {}): TrainingRun {
+  opts: { drill?: RunDrill; siege?: string; final?: number } = {}): TrainingRun {
   const force = units.filter(canTrain);
   const run: TrainingRun = {
-    v: 8, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
+    v: 9, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
     power: force.reduce((n, u) => n + u.points, 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
     mends: 0, leaked: 0, nextId: 1, pieces: [], draft: { step: 'done', hand: [], placed: [] }, recipes: recipesFor(force),
     crafted: [], enemies: [], queue: [], cover: [], cards: [], mods: { bounty: 1, holdMul: 1, regrabAdd: 0 }, banked: {},
-    fx: [], log: [],
+    fx: [], log: [], finale: newFinale(opts.final ?? TRAINING.finale.from, !!opts.siege),
   };
   if (opts.drill) run.drill = JSON.parse(JSON.stringify(opts.drill)) as RunDrill;
   if (opts.siege) run.siege = opts.siege;
@@ -50,6 +52,7 @@ export function startProblem(run: TrainingRun): string | null {
   if (run.phase === 'over') return 'The run is over.';
   if (run.phase !== 'build') return 'A wave is already under way.';
   if (run.offer?.length) return 'Pick a card first.';
+  if (run.finale?.victory === 'pending') return 'Bank the Victory or go on into Endless first.';
   if (run.draft.step !== 'done') return run.draft.step === 'place' ? 'Place the draft first.' : 'Keep a Shard first.';
   return null;
 }
@@ -62,7 +65,7 @@ export function startWave(run: TrainingRun): void {
   run.phase = 'wave';
   run.t = 0;
   run.leaked = 0;
-  run.queue = lordPlan(run, nemesisPlan(run, planWave(run, run.wave)));
+  run.queue = finalePlan(run, lordPlan(run, nemesisPlan(run, planWave(run, run.wave))));
   for (const p of run.pieces) {
     if (p.kind === 'rubble') continue;
     p.guns.forEach((g) => Object.assign(g, { cd: 0, pending: 0, next: 0 }));
@@ -98,11 +101,13 @@ export function step(run: TrainingRun, dt: number): void {
   walk(run, dt);
   watchBosses(run);
   reap(run);
-  if (run.baseHp <= 0) endRun(run, 'The base falls.');
+  if (run.finale?.through) endRun(run, throughText(run));
+  else if (run.baseHp <= 0) endRun(run, 'The base falls.');
   else if (!run.queue.length && !run.enemies.length) waveCleared(run);
 }
 
-/** The wave is beaten: credits, XP, and back to building with a fresh draft. */
+/** The wave is beaten: credits, XP, and back to building with a fresh draft. The Final wave with its boss slain is a
+ *  Victory, pending the player's choice (bankVictory, continueEndless); a siege's Final ends the attempt. */
 function waveCleared(run: TrainingRun): void {
   run.cleared += 1;
   if (!run.leaked && (run.clean ?? 0) === run.cleared - 1) run.clean = run.cleared;
@@ -112,7 +117,33 @@ function waveCleared(run: TrainingRun): void {
   run.t = 0;
   run.log.push(`Wave ${run.wave} cleared${run.leaked ? `, ${run.leaked} got through` : ''}: +${pay} credits.`);
   awardXp(run);
+  const fin = run.finale;
+  if (fin && run.wave === fin.final && run.siege) return endRun(run, `${SIEGE_BOSS} falls: ${Math.round(fin.dealt)} damage dealt.`);
+  if (fin && run.wave === fin.final && fin.slain && !fin.victory) {
+    fin.victory = 'pending';
+    run.log.push(`Victory! The Final wave ${fin.final} is beaten. Bank it and end, or go on into Endless.`);
+  }
   drawDraft(run);
+}
+
+/** Why the Victory can't be banked or taken into Endless, or null. */
+export const victoryProblem = (run: TrainingRun): string | null =>
+  run.phase === 'over' ? 'The run is over.' : run.finale?.victory !== 'pending' ? 'No Victory to choose for.' : null;
+
+/** Go on past the Final into Endless (bosses every bossEvery waves, the climb steepening). Throws on a problem. */
+export function continueEndless(run: TrainingRun): void {
+  const why = victoryProblem(run);
+  if (why) throw new Error(why);
+  run.finale!.victory = 'endless';
+  run.log.push('On into Endless: no Final ahead, only deeper waves.');
+}
+
+/** Bank the Victory and end the run. Throws on a problem. */
+export function bankVictory(run: TrainingRun): void {
+  const why = victoryProblem(run);
+  if (why) throw new Error(why);
+  run.finale!.victory = 'banked';
+  endRun(run, 'Victory banked.');
 }
 
 /** A unit's XP cap this run: xpCap, and more with Glory Seekers (nexus.ts). */

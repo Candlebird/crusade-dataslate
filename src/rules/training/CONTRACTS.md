@@ -52,6 +52,8 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | run.drilled (earned: goal indexes reached so far, set by drillNews) | drillBank.bankDrill (once, from useBank.finish, before bankHonours) |
 | Force.drill (DrillStats: runs, kills, bosses, lords, clean, crafted, sieges, siege {week, best}) | drillBank.bankDrill (seeded from the units' trainingRecords the first time, via drill.drillStats) |
 | Campaign.siegeBoard (each force's best a week, last TRAINING.siege.weeks weeks), Campaign.siegeWins (settled weeks, last TRAINING.siege.keep) | siegeBoard.postSiege (useBank.finish), siegeBoard.settleSieges (useBank.finish, useSiegeSettle on Training open and the RoundPanel assets row) |
+| run.finale (final, lord at create; dealt / slain / by from tally; through from waves.walk; victory from run.ts; banked from veterancy.bankFinale) | run.ts via finale.newFinale (createRun opts.final: freshRun passes veterancy.finaleOpen(force)) |
+| Force.finale (vet, open, wins by Final, endless) | veterancy.noteVeterancy (the store, on every change), veterancy.bankFinale (useBank.finish) |
 | Force.sortie.bestiary (incl. SortieBeast.drill), Unit.quirks / trinket, sortie.trinkets, sortie.bled | shared.ts (bankShared, bestiary.bankBeasts) on finish; sortie.ts / downtime.applySortie as before; applySortie clears bled[lord] once a Sortie meets it |
 
 ## run.step(dt) call order
@@ -73,10 +75,12 @@ combat.tickEnemies(run, dt)    // statuses, dots, regrab cooldowns
 waves.walk(run, dt)            // move, ambush jump, leaks → baseHp, leaked
 quirks.watchBosses(run)        // units a live boss walks past in reach
 combat.reap(run)               // drop the dead (and leaked ones waves already removed)
-if (run.baseHp <= 0) endRun(run, 'The base falls.')   // endRun → quirks.rollGains once
+if (run.finale.through) endRun(run, finale.throughText(run))   // the Final boss reached the base
+else if (run.baseHp <= 0) endRun(run, 'The base falls.')   // endRun → quirks.rollGains once
 else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, private):
     run.cleared++, run.clean = run.cleared while nothing has leaked, run.credits += economy.waveCredits(run), XP to crafted units, phase 'build',
-    shards.drawDraft(run), log line. (The UI saves the run whenever it sees a new build phase.)
+    a siege's Final ends the run (score = finale.dealt); the Final boss slain → finale.victory 'pending' (startProblem refuses until
+    continueEndless or bankVictory), shards.drawDraft(run), log line. (The UI saves the run whenever it sees a new build phase.)
 ```
 
 ## Functions (exact signatures)
@@ -210,11 +214,11 @@ Numbers in `TRAINING.nexus`. Outside a campaign run.nexus is undefined: threat 0
 - nexus.ts: `nexusOf(c?): RunNexus | undefined` — threat (+ Rising Dark), affixes (one a `affixes.per` levels, at most `affixes.max`, dice seeded by campaign id and round), this round's event only, lords via lordPick.campaignLords.
   `threatOf`, `hasAffix`, `eventIs`, `eventMapped(id)`, `creditMul(run)` (1 + credit × threat), `budgetMul(run)` (Fierce, Echo Surge, Void Lull),
   `nexusStart(run)` → {credits, baseHp, cover, luck, xp} (Convoys, Bleed, Derelicts, Shard Rush, Glory), `affixInfo(id, threat)`, `shroudFrom(threat)`,
-  `eventEffect(id)`, `eventInfo(id)` → {name, desc, effect ('' = flavour)}, `nexusLines(nx, nemesis)` → {threat, affixes[], event, lords[]} for the start screen and HUD.
+  `eventEffect(id)`, `eventInfo(id)` → {name, desc, effect ('' = flavour)}, `nexusLines(nx, nemesis, final?)` → {threat, affixes[], event, lords[]} for the start screen and HUD.
 - lordPick.ts (pure, no engine imports): `campaignLords(c, r)` — sector guardians (by name, at most lords.max − crisis slot, tier order), then the unwon crisis lord as Legendary;
   keys `nexus:g:<name>` / `nexus:<ECHO_LORDS id>`; tricks by ECHO_LORDS id (tricks.byLord), a guardian's rules (byRule), else one of `plain` by its name.
-  `guardianTrick(g)`, `TRICK_NAMES`, `trickText(k)`, `lordWaves(nx, nemesis)` (boss waves from lords.from, skipping the nemesis wave), `lordIndex(run, w)`, `nextLord(run, w?)`, `lordLine(l, wave?)`, `lordsSlain(run)`, `GENERIC_LORD`.
-- lords.ts: `lordOf(run, e)`, `lordPlan(run, plans)` (boss plan not the nemesis's → lord i, hp × lords.hp[tier]), `lordTick(run, dt)`,
+  `guardianTrick(g)`, `TRICK_NAMES`, `trickText(k)`, `lordWaves(nx, nemesis, final = finale.from)` (boss waves from lords.from, skipping the nemesis wave and the Final; the crisis lord, if last, takes the Final at finale.to), `lordIndex(run, w)`, `nextLord(run, w?)`, `lordLine(l, wave?)`, `lordsSlain(run)`, `GENERIC_LORD`.
+- lords.ts: `lordOf(run, e)` (i −1: run.finale.lord), `lordPlan(run, plans)` (boss plan not the nemesis's → lord i, hp × lords.hp[tier]), `lordTick(run, dt)`,
   `lordHit(run, g, e)` (Mirror Veil −1 to shots; combat.fire), `lordDmg(run, by, e, dmg, how)` (Umbral Hide, Ward; harm.hurt).
 - affixes.ts: `affixPlan(r, run, plans)` (Frenzied hp, Proud elites, Armoured hard), `affixPace(run, e)` (Swift, Warp Currents, a Vengeful surge; waves.speedOf),
   `affixTick(run, dt)`, `onEchoDeath(run, dead)` (Vengeful; harm.hurt after payKill), `affixHit(run, g, d, reach)` (Shrouded, Ion Storm; combat.fire, never melee).
@@ -232,21 +236,29 @@ Numbers in `TRAINING.titles` (each `{name, n}`, Unbowed also `scars`) and `TRAIN
 - records.ts: `blankRecord()`, `deedOf(run, t, u?)` (lords: real ones it landed the killing blow on; mvp: run.mvp with kills > 0; scars less veterans.notScars),
   `recordAfter(rec, d)` (lords + 1 for the nemesis), `runHonours(run, force, best?)` (pure: records, titles, `best`, tales; RunSummary shows it before banking),
   `bankHonours(f, run, date, newId, round?): string[]` (once via run.honours; tales prepended, `records.keep` kept, `round` = campaign round), `recordLine(r)`, `talesFor(f, unitId)`.
-- tales.ts: `Highlight {kind, units, vars}`, `taleText(h, seed, i)` (seeded pick from taleText.TALE_TEXT), `talesOf(hs, seed)` — priority nemesis, best, lord, title; at most `records.tales`.
+- tales.ts: `Highlight {kind, units, vars}`, `taleText(h, seed, i)` (seeded pick from taleText.TALE_TEXT), `talesOf(hs, seed)` — priority victory, nemesis, best, lord, title; at most `records.tales`.
 - Sortie side: downtime.applySortie builds a SortieDeed per party member (heat = sortie.markHeat when the lord fell; nemesis = a lord slain with grudgeBefore > 0; alone = the only one standing at a win) and earns titles with a line each.
 - Chronicle: chronicle.`chronicle(c, viewer?, forces = [])` adds kind 'training' (🎖) entries for tales with a round, from forces linked to the campaign's factions (a viewer sees only its own).
 - UI: training/RunHonours.tsx (record table, titles, tales in RunSummary once over), training/UnitRecord.tsx (title picker, records, the title list, tales on UnitSheet).
 
 ### Drill Honours and the Weekly Siege (F5): drill.ts, drillBank.ts, siege.ts, siegeBoard.ts
-Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, perks, 20 goals `{goal, n, unlock}`) and `TRAINING.siege` (weeks on the board, wins kept). Types `DrillGoal`, `DrillPerk`, `DrillUnlock` in downtimeData.ts; `DrillStats`, `SiegeBoardEntry`, `SiegeWin` in model/types.ts; `RunDrill {luck, cards, perks}` in types.ts.
+Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, perks, 22 goals `{goal, n, unlock}`; goal 'final' = the highest Final won) and `TRAINING.siege` (weeks on the board, wins kept). Types `DrillGoal`, `DrillPerk`, `DrillUnlock` in downtimeData.ts; `DrillStats`, `SiegeBoardEntry`, `SiegeWin` in model/types.ts; `RunDrill {luck, cards, perks}` in types.ts.
 - drill.ts (pure): `DRILL_GOALS`, `blankDrill()`, `drillStats(f)` (Force.drill, else seeded from the units' trainingRecords), `drillProgress(f, goal)` (best wave, titles and lore from the force; the rest from DrillStats), `goalReached(f, i)`, `drillEarned(f): number[]`,
   `drillFrom(earned): RunDrill`, `drillOf(f)`; on a run (no run.drill = all open, no perks): `luckCap`, `cardOpen(run, id)`, `perkOf(run, p)`, `purseOf`, `thrifty(run, cost)`, `mendPerk`, `rerollsOf`; `drillGoalText(goal, n)`, `unlockText(u): {name, text}`.
 - drillBank.ts: `statsAfter(st, run)` (kills from pieces; bosses = generic, nemesis and real lords slain; lords = real lords + nemesis; clean and crafted the best; a siege counts once a week and keeps that week's best),
   `drillPreview(f, run)` (goals reached once this run banks; RunSummary), `bankDrill(f, run): number[] | null` (once via run.drilled; returns the goals reached before), `drillNews(f, run, before): string[]` (after every other bank, so best, titles and lore count; sets run.drilled.earned).
-- siege.ts (types only): `isSiege`, `siegeDice(run, 'draft' | 'wave', w)` (seed salted by wave: never moves run.rng), `draftDice(run)`, `waveDice(run, w, own)`, `siegeScore(run)` = max(wave, cleared). The cover and first draft come from the week's seed; later drafts and every wave from these dice, so every force meets the same ones (scaled by its points) however it plays.
-- siegeBoard.ts (pure, no engine imports): `weekSettled`, `postSiege(c, force, run, date)` (a force's best a week, refused once settled), `siegeRanking(board, week)` (score, then cleared, then earliest), `weeksDue(c, nowWeek)`, `settleSieges(c, nowWeek, date): SiegeWin[]` (mutates c: winner of each past week, round = c.round),
+- siege.ts (types only): `isSiege`, `siegeDice(run, 'draft' | 'wave', w)` (seed salted by wave: never moves run.rng), `draftDice(run)`, `waveDice(run, w, own)`, `siegeScore(run)` = max(wave, cleared), `siegeDmg(run)` (damage to the Final boss once the run reached it, else undefined), `siegeOrder(a, b)` (damage-holders first by dmg, then score, then cleared). The cover and first draft come from the week's seed; later drafts and every wave from these dice, so every force meets the same ones (scaled by its points) however it plays.
+- siegeBoard.ts (pure, no engine imports): `weekSettled`, `postSiege(c, force, run, date)` (a force's best a week, refused once settled), `siegeRanking(board, week)` (siegeOrder, then earliest; entries from before dmg rank by score, below every damage), `weeksDue(c, nowWeek)`, `settleSieges(c, nowWeek, date): SiegeWin[]` (mutates c: winner of each past week, round = c.round),
   `siegeAssets(c, factionId)` (wins settled this round; rounds.assetsOf adds them to skirmish wins within NEXUS_ROUNDS.assetsMax), `lastSiegeWin(c?)`.
 - UI: training/freshRun.ts (`freshRun(force, c, siege)`: a drill run with story and Nexus, or a siege on the week's seed), training/useSiegeSettle.ts (`thisWeek()`, `useSiegeSettle(c)`), training/DrillTrack.tsx, training/SiegePanel.tsx; StartScreen toggles Your own / Weekly Siege; CardOffer's Re-draw; useBank.finish banks the drill, posts the siege and settles.
+
+### Final waves (finaleCore.ts, finale.ts, veterancy.ts)
+Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEvery, escorts, lords, bossHp, trick, siegeHp). Types `RunFinale` (nexusTypes.ts), `ForceFinale` (model/types.ts).
+- finaleCore.ts (no imports): `finalOf(run)`, `inEndless(run)`, `endlessDepth(run)` (waves cleared past the Final in Endless).
+- finale.ts: `SIEGE_BOSS`, `finalSteps()`, `finalLord(final)`, `newFinale(final, siege)`, `isFinalWave(run, w)`, `finalBoss(run)` (name: colossus, nemesis on its wave, a campaign lord, else finale.lord),
+  `finalePlan(run, plans)` (boss marked final, × bossHp[final], a named lord lord −1 × lords.hp[tier]; a siege's a lone boss of siegeHp), `throughText(run)`. lords.ts: a Final boss's Ward and Regrowth are finale.trick as much.
+- veterancy.ts: `unitXp(f)`, `veterancyOf(f)` (max of stored and Σ unit XP), `stepBar(n)`, `finalWon(f)`, `finaleOpen(f)`, `noteVeterancy(f)`, `runWon(run)`, `finaleAfter(f, run, date)`, `bankFinale(f, run, date): string[]` (once via run.finale.banked), `finaleTrack(f)`.
+- UI: training/FinaleTrack.tsx (StartScreen), HudBar's Final / Endless chip, TrainingModal's Victory card (Bank and end / Continue into Endless; useAuto goes on), RunSummary's Victory and siege damage lines.
 
 ### trinkets.ts
 - `TRINKET_CARD`, `isTrinketCard(d)`, `trinketDice(run)` (its own dice from seed and wave: never moves run.rng).
@@ -288,7 +300,7 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 - `leakCost(e: Enemy): number` — def.leak, or leak.elite for an elite if more; a boss ceil(leak × hp/maxHp), never below leak.bossMin.
 - `walk(run, dt): void` — skip held (heldBy) / stunned; walkers by flow field, flyers pad to pad; ambush jump on reaching pad ambushFrom → pad ambushAt; reaching base: remove, baseHp −= leakCost, leaked++.
 - Also (waves agent): `waveTags(w): string[]` ('Flying'/'Boss' for the HUD), `waveBudget(power, w)`, `lateHp(w)` (hpGrowth from hpFrom to hpTo, lateGrowth after), `groundHpAt(w)` (1 on flying and sky-boss waves; groundGrowth a wave from groundFrom to groundTo, groundLate after), `flyHpAt(w)`, `bossHpAt(w)`,
-  `planFor(r: Rng, power, w)` (planWave on any dice), `previewGroups(plans): PreviewGroup[]` ({kind, n, elites, hp, flies}
+  `planFor(r: Rng, power, w, final = finale.from)` (planWave on any dice; past finale.from at `levelOf(w)` × `climbAt(w, final)`, a boss wave's escorts finale.escorts of the budget), `levelOf(w)`, `climbAt(w, final)`, `climbHp(w, final)`, `previewGroups(plans): PreviewGroup[]` ({kind, n, elites, hp, flies}
   for WavePreview), `mainKind(plans)` (the wave's one kind, for the preview and log), `runCover(r, extra = 0): Tile[]` (createRun's cover, + extra patches for Derelicts: patches range on the empty map's route), `layCover` takes an
   optional 4th `taken: Tile[]` to keep clear of, `atBase(e)`, `move(m, e, step)`. New TRAINING keys: `dazeMul`, `wave.bossMin`.
 - `spawnOne(run, plan): Enemy` — one spawn (spawnDue and the nemesis's brood); a nemesis plan gets `nem`; noteMet. speedOf × nem.speed × the lord's Surge × affixes.affixPace; a real lord's plan gets `lord`, an Armoured one `hard`.
@@ -306,12 +318,13 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 - `saveKey(forceId): string` (done) — `trainingRun:<forceId>`.
 - `serialize(run): string`, `deserialize(s: string): TrainingRun | null` — JSON; null on bad/old version. fx may be dropped.
 - `saveRun(run): void`, `loadRun(forceId): SavedRun | null` (null for a run already 'over'), `clearSave(forceId): void` — localStorage wrapped in try/catch.
-- `SAVE_VERSION` (8: crowded waves, fast guns and the base at 80 HP; 7: the playtest pass, default towers and one-kind waves; 6: Drill Honours and the Weekly Siege; 5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
+- `SAVE_VERSION` (9: the Final wave and Endless (run.finale); 8: crowded waves, fast guns and the base at 80 HP; 7: the playtest pass, default towers and one-kind waves; 6: Drill Honours and the Weekly Siege; 5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
 
 ### run.ts
-- `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus, opts: { drill?: RunDrill; siege?: string } = {}): TrainingRun` — run.drill = a copy of opts.drill (unset: everything open), credits + drill.purseOf; run.siege = opts.siege (the UI then passes no story, nexus or drill, and seed = sortie.weekSeed(week)); run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
-- `startProblem(run): string | null` — build phase, draft step 'done', no card offer pending.
-- `startWave(run): void` — wave++, phase 'wave', t 0, leaked 0, queue = lords.lordPlan(run, nemesis.nemesisPlan(run, waves.planWave(...))); gun clocks reset.
+- `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus, opts: { drill?: RunDrill; siege?: string; final?: number } = {}): TrainingRun` — run.finale = finale.newFinale(opts.final ?? finale.from, siege); — run.drill = a copy of opts.drill (unset: everything open), credits + drill.purseOf; run.siege = opts.siege (the UI then passes no story, nexus or drill, and seed = sortie.weekSeed(week)); run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
+- `startProblem(run): string | null` — build phase, draft step 'done', no card offer pending, no Victory pending.
+- `victoryProblem(run)`, `continueEndless(run)` (victory 'endless'), `bankVictory(run)` (victory 'banked', endRun).
+- `startWave(run): void` — wave++, phase 'wave', t 0, leaked 0, queue = finale.finalePlan(run, lords.lordPlan(run, nemesis.nemesisPlan(run, waves.planWave(...)))); gun clocks reset.
 - `step(run, dt): void` — see the order above.
 - `craftProblem(run, unitId, uses: number[], onId: number): string | null` — build phase, not crafted, `uses` satisfy the recipe (recipeUses-style check), onId ∈ uses; if any of `uses` is a draft piece the draft must be at step 'keep' (the craft is then this draft's keep).
 - `craft(run, unit: Unit, uses: number[], onId: number): void` — Shard onId becomes recipes.unitTower (same id/cell); other uses → rubble; draft pieces used → shards.crumbleDraft(run, []) after; push unitId to crafted.

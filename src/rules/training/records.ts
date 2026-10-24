@@ -1,6 +1,7 @@
 import type { Force, ForceTale, TrainingRecord, Unit } from '../../model/types';
 import { TRAINING } from '../downtimeData';
 import { unitTowers } from './board';
+import { finalBoss } from './finale';
 import { lordWaves } from './lordPick';
 import { mvp } from './run';
 import { talesOf, type Highlight } from './tales';
@@ -73,8 +74,12 @@ export function runHonours(run: TrainingRun, force: Force, best = force.training
   const hs: Highlight[] = [];
   const n = run.nemesis;
   if (n?.slain) hs.push({ kind: 'nemesis', units: n.by ? [n.by] : [], vars: { ...base, unit: nameOf(run, n.by), lord: n.name, wave: String(TRAINING.shared.nemesis.wave) } });
+  const fin = run.finale;
+  if (fin?.slain && fin.victory) {
+    hs.push({ kind: 'victory', units: fin.by ? [fin.by] : [], vars: { ...base, unit: nameOf(run, fin.by), lord: finalBoss(run), wave: String(fin.final) } });
+  }
   if (isBest) hs.push({ kind: 'best', units: lead ? [lead.unitId] : [], vars: { ...base, unit: lead?.name ?? 'the maze' } });
-  const waves = lordWaves(run.nexus, !!run.nemesis);
+  const waves = lordWaves(run.nexus, !!run.nemesis, run.finale?.final);
   (run.nexus?.lords ?? []).forEach((l, i) => {
     if (l.slain) hs.push({ kind: 'lord', units: l.by ? [l.by] : [], vars: { ...base, unit: nameOf(run, l.by), lord: l.name, wave: String(waves[i] ?? run.cleared) } });
   });

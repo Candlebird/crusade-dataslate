@@ -970,7 +970,9 @@ export const TRAINING = {
       { goal: 'clean', n: 12, unlock: { perk: 'mend' } },
       { goal: 'kills', n: 16000, unlock: { perk: 'purse' } },
       { goal: 'lords', n: 4, unlock: { perk: 'thrift' } },
-      { goal: 'best', n: 25, unlock: { perk: 'offer' } },
+      { goal: 'final', n: 25, unlock: { perk: 'offer' } },
+      { goal: 'final', n: 35, unlock: { perk: 'purse' } },
+      { goal: 'final', n: 50, unlock: { perk: 'reroll' } },
     ] as { goal: DrillGoal; n: number; unlock: DrillUnlock }[],
   },
   /**
@@ -981,6 +983,39 @@ export const TRAINING = {
    * settled, and the last `keep` winners are kept.
    */
   siege: { weeks: 4, keep: 12 },
+  /**
+   * Final waves (training/finale.ts, veterancy.ts). A run has a Final wave: `from` at first, `step` more for each step
+   * the force has opened, up to `to`; the run always uses the highest one open. Step N + step opens once the force has
+   * won the Final at N and its veterancy (every XP its units have ever earned; it never drops) reaches `bars[N + step]`.
+   * Killing the Final boss with the base standing is a Victory: bank it, or go on into Endless.
+   * The bars are paced to a full campaign. A round (a week outside one) a unit takes about 3 XP from a table game
+   * (participation 2, an agenda or Marked for Greatness now and then; 0-2 games a week, so about one) and most of its
+   * off-table 5 (OFF_TABLE_XP.perRound: Training and Sorties), so about 7-8 XP; a force of about 8 units banks some 60
+   * a round. A season of about 12 rounds is some 700: `to` opens near its end, a step every two rounds or so.
+   * Past wave `from` every wave is planned at that wave's level (budget, wounds) and `climb` times tougher a wave up to
+   * the Final; past the Final (Endless) `endless` a wave, `rise` more for every `riseEvery` waves gone. From `from` on a
+   * boss wave's escorts take `escorts` of its budget (the boss keeps its old share), so a boss wave weighs about as
+   * much as the waves round it and the one after is no cliff. The Final boss: the nemesis at `from`, the Nexus Crisis
+   * lord at `to` (in a campaign), else `lords[N]` (ECHO_LORDS ids, its trick by TRAINING.nexus.tricks.byLord), with
+   * `bossHp[N]` times the wounds a boss of its wave has; a ward or mending that goes by its wounds (Shield, Regeneration) is
+   * `trick` as much, or the Crisis lord would be a wall. A Weekly Siege's Final is `from`: a lone Echo Lord of
+   * `siegeHp` wounds and no escorts, the attempt over when it reaches the base; its score is the damage dealt to it.
+   */
+  finale: {
+    from: 25,
+    step: 5,
+    to: 50,
+    bars: { 30: 120, 35: 250, 40: 400, 45: 550, 50: 700 } as Record<number, number>,
+    climb: 1.06,
+    endless: 1.12,
+    rise: 0.01,
+    riseEvery: 5,
+    escorts: 0.85,
+    lords: { 25: 'whisperer', 30: 'hollowKing', 35: 'stormHerald', 40: 'umbralTitan', 45: 'mirrorWraith', 50: 'shardEater' } as Record<number, string>,
+    bossHp: { 25: 0.5, 30: 0.8, 35: 1.4, 40: 4, 45: 3, 50: 3 } as Record<number, number>,
+    trick: 0.3,
+    siegeHp: 9_999_999,
+  },
   /** A force's power (squadPower, which Sorties scale by too): its points, with each veteran level adding this share. */
   levelPower: 0.05,
   /** Legacy: only the old rules text and force page read these, until their rework. Nothing in the run uses them. */
@@ -991,7 +1026,7 @@ export const TRAINING = {
 };
 
 /** What a Drill Honour counts (training/drill.ts drillProgress). */
-export type DrillGoal = 'runs' | 'best' | 'kills' | 'bosses' | 'lords' | 'clean' | 'crafted' | 'titles' | 'lore' | 'sieges';
+export type DrillGoal = 'runs' | 'best' | 'kills' | 'bosses' | 'lords' | 'clean' | 'crafted' | 'titles' | 'lore' | 'sieges' | 'final';
 /** A small run option a Drill Honour unlocks a level of (TRAINING.drill.perks). */
 export type DrillPerk = 'purse' | 'mend' | 'reroll' | 'thrift' | 'offer';
 /** What a Drill Honour unlocks: a luck level, a card group (TRAINING.drill.groups) or a perk level. */

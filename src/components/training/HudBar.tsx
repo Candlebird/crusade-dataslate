@@ -1,5 +1,5 @@
 import { TRAINING } from '../../rules/downtimeData';
-import { eventInfo, lordLine, luckCap, nemesisTricks, nexusLines, nextLord, startProblem, type TrainingRun } from '../../rules/training';
+import { endlessDepth, eventInfo, finalBoss, finalOf, inEndless, lordLine, luckCap, nemesisTricks, nexusLines, nextLord, startProblem, type TrainingRun } from '../../rules/training';
 import { Icon } from '../Icon';
 
 export type Speed = 1 | 2 | 4;
@@ -46,10 +46,11 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
         <Icon name="g:sparkles" /> {run.luck}/{luckCap(run)}
       </span>
       {run.siege && (
-        <span className="training-hud-stat" title="The Weekly Siege: the week's map, drafts and waves for every force; score is the wave reached">
+        <span className="training-hud-stat" title="The Weekly Siege: the week's map, drafts and waves for every force; score is the damage dealt to the Final boss, or the wave reached">
           <Icon name="g:castle" /> Siege <span className="muted">· {run.siege}</span>
         </span>
       )}
+      {run.finale && <FinalStat run={run} />}
       {run.nexus && <NexusStat run={run} />}
       {run.nemesis && !run.nemesis.slain && run.wave <= TRAINING.shared.nemesis.wave && (
         <span
@@ -82,10 +83,27 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
   );
 }
 
+/** The run's Final wave and its boss, or how deep into Endless it has gone. */
+function FinalStat({ run }: { run: TrainingRun }) {
+  const fin = finalOf(run);
+  if (inEndless(run)) {
+    return (
+      <span className="training-hud-stat" title={`Victory at the Final wave ${fin}; every wave past it climbs steeper`}>
+        <Icon name="g:medal" /> Endless <b>+{endlessDepth(run)}</b>
+      </span>
+    );
+  }
+  return (
+    <span className="training-hud-stat" title={`Slay ${finalBoss(run)} on wave ${fin} with the base standing for a Victory${run.siege ? '; in the Siege it cannot fall: hurt it all you can' : ''}`}>
+      <Icon name="g:crown" /> Final wave <b>{fin}</b>
+    </span>
+  );
+}
+
 /** The campaign's hold on the run: threat (hover for the affixes and the event), and the next real Echo Lord. */
 function NexusStat({ run }: { run: TrainingRun }) {
   const nx = run.nexus!;
-  const lines = nexusLines(nx, !!run.nemesis);
+  const lines = nexusLines(nx, !!run.nemesis, finalOf(run));
   const ev = eventInfo(nx.event);
   const next = nextLord(run, run.phase === 'wave' ? run.wave - 1 : run.wave);
   return (

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { Relic, Unit } from '../../model/types';
 import { applySelection, normalizeBook } from '../../armyforge/book';
 import { unitFromCatalog } from '../../model/factory';
+import { LEVEL_THRESHOLDS } from '../data';
 
 // Test-only: the sample forces the balance tests play (two a book, about 750 pts each). Never imported by the app.
 
@@ -59,3 +60,18 @@ export const veteran = (u: Unit, i: number): Unit => ({
 
 /** A unit with three scars. */
 export const scarred = (u: Unit): Unit => ({ ...u, scars: SCARS.map((name, j) => ({ id: `s${j}`, name })) });
+
+const LADDER_TRAITS = ['Resilient', 'Point Blank', 'Blade Master', 'Fortified', 'Rending', 'Fast', 'Precise Strikes'];
+
+/** A force seasoned to veterancy `vet` (the Final-wave balance tests): the XP shared out evenly, a trait a level
+ *  (LEVEL_THRESHOLDS) and a relic from level 3, another from level 6. */
+export function seasoned(units: Unit[], vet: number): Unit[] {
+  const each = Math.floor(vet / Math.max(1, units.length));
+  const level = LEVEL_THRESHOLDS.filter((t) => each >= t).length;
+  return units.map((u, i) => ({
+    ...u,
+    xp: each,
+    upgrades: LADDER_TRAITS.slice(0, level).map((name, j) => ({ id: `t${j}`, name, unique: false })),
+    relics: Array.from({ length: level >= 6 ? 2 : level >= 3 ? 1 : 0 }, (_, k) => ({ id: `r${i}${k}`, ...RELIC_SET[(i + k) % RELIC_SET.length] })),
+  }));
+}

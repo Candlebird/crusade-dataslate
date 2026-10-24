@@ -1,6 +1,7 @@
 import type { DrillStats, Force, TrainingRecord } from '../../model/types';
 import { TRAINING, type DrillGoal, type DrillPerk, type DrillUnlock } from '../downtimeData';
 import { heldTitles } from './titles';
+import { finalWon } from './veterancy';
 import type { RunDrill, TrainingRun } from './types';
 
 // Drill Honours (F5): a force's season-long unlock track, Sortie-boon style. A new force's runs are held to luck
@@ -40,6 +41,7 @@ export function drillProgress(f: Force, goal: DrillGoal): number {
     case 'best': return f.trainingBest ?? 0;
     case 'titles': return f.units.reduce((n, u) => n + heldTitles(u).length, 0);
     case 'lore': return loreOf(f);
+    case 'final': return finalWon(f);
     default: return st[goal];
   }
 }
@@ -104,6 +106,7 @@ const GOAL_TEXT: Record<DrillGoal, (n: number) => string> = {
   titles: (n) => `Hold ${n} titles across the force`,
   lore: (n) => `Open ${n} bestiary entries`,
   sieges: (n) => `Enter ${n} Weekly Sieges`,
+  final: (n) => `Win at ${n}: slay the boss of the Final wave ${n}`,
 };
 
 /** A goal in words. */

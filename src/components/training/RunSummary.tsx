@@ -1,5 +1,5 @@
 import {
-  DRILL_GOALS, drillPreview, mvp, runXp, sharedPreview, siegeScore, towers, unlockText, unitTowers, type TrainingRun,
+  DRILL_GOALS, drillPreview, endlessDepth, finalBoss, mvp, runWon, runXp, sharedPreview, siegeDmg, siegeScore, towers, unlockText, unitTowers, type TrainingRun,
 } from '../../rules/training';
 import type { Force } from '../../model/types';
 import { Icon } from '../Icon';
@@ -36,7 +36,18 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
         {lead && lead.kills > 0 && <span className="muted"> · {lead.name} led the defence</span>}
       </div>
       {run.auto && <div style={{ marginBottom: 4, color: 'var(--red)' }}>Auto was used: nothing banked.</div>}
-      {banks && run.siege && <div style={{ marginBottom: 4 }}>Weekly Siege {run.siege}: <b>wave {siegeScore(run)}</b> <span className="muted">· your best this week counts</span></div>}
+      {!run.siege && runWon(run) && (
+        <div style={{ marginBottom: 4, color: 'var(--gold)' }}>
+          <Icon name="g:medal" /> <b>Victory</b> at the Final wave {run.finale!.final}: {finalBoss(run)} slain
+          {endlessDepth(run) > 0 ? <span> · Endless: {endlessDepth(run)} wave{endlessDepth(run) === 1 ? '' : 's'} past it</span> : null}
+        </div>
+      )}
+      {banks && run.siege && (
+        <div style={{ marginBottom: 4 }}>
+          Weekly Siege {run.siege}: <b>{siegeDmg(run) !== undefined ? `${siegeDmg(run)!.toLocaleString()} damage` : `wave ${siegeScore(run)}`}</b>{' '}
+          <span className="muted">· your best this week counts</span>
+        </div>
+      )}
       {!units.length && <div className="muted">No unit was crafted this run.</div>}
       {(units.length > 0 || shards.length > 0 || defences.length > 0) && (
         <table>

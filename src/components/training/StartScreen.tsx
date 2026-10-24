@@ -4,9 +4,10 @@ import { levelForXp } from '../../rules/engine';
 import { unitName } from '../../rules/battle';
 import { OFF_TABLE_XP, TRAINING } from '../../rules/downtimeData';
 import { offTableKey, offTableLeft } from '../../rules/downtime';
-import { canTrain, nexusLines, nexusOf, pickNemesis, type SavedRun } from '../../rules/training';
+import { canTrain, finaleOpen, finalWon, nexusLines, nexusOf, pickNemesis, type SavedRun } from '../../rules/training';
 import { FeatList } from '../Feats';
 import { DrillTrack } from './DrillTrack';
+import { FinaleTrack } from './FinaleTrack';
 import { SiegePanel } from './SiegePanel';
 import { Portrait } from '../Emblem';
 
@@ -38,10 +39,11 @@ export function StartScreen({ force, c, saved, cleared, siege, onSiege, week = '
             <li><b>Craft.</b> Kept Shards that match a unit's recipe craft it: a tower with its own weapons and rules.</li>
           </ol>
           <p className="muted" style={{ margin: '6px 0 0' }}>
-            The Echoes walk from S over pads 1–{TRAINING.route.pads.length} to the base. The run is endless and ends when the
-            base ({TRAINING.baseHp} HP) falls; it saves between waves. Each crafted unit earns <b>+{TRAINING.xpPerWave} XP</b> every
+            The Echoes walk from S over pads 1–{TRAINING.route.pads.length} to the base. Slay the boss of the Final wave
+            ({finaleOpen(force)} for now) with the base ({TRAINING.baseHp} HP) standing for a Victory, then bank it or go on
+            into Endless; the run ends when the base falls, and saves between waves. Each crafted unit earns <b>+{TRAINING.xpPerWave} XP</b> every
             {' '}{TRAINING.xpEvery} waves, up to <b>{TRAINING.xpCap}</b> a run, within the {OFF_TABLE_XP.perRound} off-table XP a unit banks
-            each {c ? 'round' : 'week'}.{force.trainingBest ? ` Best so far: ${force.trainingBest} waves.` : ''}
+            each {c ? 'round' : 'week'}.{bestText(force)}
           </p>
         </div>
         <RouteThumb />
@@ -61,6 +63,7 @@ export function StartScreen({ force, c, saved, cleared, siege, onSiege, week = '
       )}
       {siege ? <SiegePanel force={force} c={c} week={week} /> : <>
         <NexusBrief force={force} c={c} />
+        <FinaleTrack force={force} c={c} />
         <DrillTrack force={force} />
       </>}
       <FeatList force={force} where="training" />
@@ -82,10 +85,18 @@ export function StartScreen({ force, c, saved, cleared, siege, onSiege, week = '
   );
 }
 
+/** The force's Training record for the intro: best waves, the highest Final won, the deepest into Endless. */
+function bestText(force: Force): string {
+  const won = finalWon(force);
+  const deep = force.finale?.endless ?? 0;
+  const bits = [force.trainingBest ? `${force.trainingBest} waves` : '', won ? `Victory at ${won}` : '', deep ? `Endless +${deep}` : ''].filter(Boolean);
+  return bits.length ? ` Best so far: ${bits.join(', ')}.` : '';
+}
+
 /** The campaign's Nexus as a new run meets it: threat and affixes, the Galactic Event, and the Echo Lords by wave. */
 function NexusBrief({ force, c }: { force: Force; c?: Campaign }) {
   const nx = nexusOf(c);
-  const lines = nexusLines(nx, !!pickNemesis(force.sortie));
+  const lines = nexusLines(nx, !!pickNemesis(force.sortie), finaleOpen(force));
   return (
     <div className="small training-nexus">
       <div><b>The Nexus</b> <span className="muted">· {lines.threat}</span></div>

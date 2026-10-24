@@ -2,7 +2,8 @@ import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { centreOf, dist, mapOf, towers } from './board';
 import { lordIndex, TRICK_NAMES } from './lordPick';
 import { wrench } from './nemesis';
-import { lateHp, move, spawnOne } from './waves';
+import { finalOf } from './finaleCore';
+import { climbHp, move, spawnOne } from './waves';
 import type { Enemy, RunLord, SpawnPlan, Tower, TowerGun, TrainingRun } from './types';
 
 // The campaign's real Echo Lords on the field (F3): each leads its boss wave (lordPick.ts says which), tougher by tier,
@@ -11,8 +12,9 @@ import type { Enemy, RunLord, SpawnPlan, Tower, TowerGun, TrainingRun } from './
 const L = TRAINING.nexus.lords;
 const T = TRAINING.nexus.tricks;
 
-/** The real lord an enemy is, if it is one. */
-export const lordOf = (run: TrainingRun, e: Enemy): RunLord | undefined => (e.lord ? run.nexus?.lords[e.lord.i] : undefined);
+/** The real lord an enemy is, if it is one (index -1: the run's named Final lord). */
+export const lordOf = (run: TrainingRun, e: Enemy): RunLord | undefined =>
+  (!e.lord ? undefined : e.lord.i < 0 ? run.finale?.lord : run.nexus?.lords[e.lord.i]);
 
 /** A wave's plans with its real lord in the boss's place (not on the nemesis's wave): wounds × lords.hp by tier. */
 export function lordPlan(run: TrainingRun, plans: SpawnPlan[]): SpawnPlan[] {
@@ -35,6 +37,9 @@ const every = (k: RunLord['trick']) =>
 const towersNear = (run: TrainingRun, e: Enemy, r: number): Tower[] =>
   towers(run).filter((t) => { const c = centreOf(t); return dist(c.x, c.y, e.x, e.y) <= r; });
 
+/** A lord's ward or mending, by its wounds: a Final boss's finale.trick as much (it has far more of them). */
+const share = (e: Enemy, n: number) => e.maxHp * n * (e.final ? TRAINING.finale.trick : 1);
+
 /** One go of a timed trick. */
 function act(run: TrainingRun, e: Enemy, k: RunLord['trick']) {
   const s = e.lord!;
@@ -42,16 +47,16 @@ function act(run: TrainingRun, e: Enemy, k: RunLord['trick']) {
     wrench(run, e);
     move(e.flies ? undefined : mapOf(run), e, T.teleport.cells);
   } else if (k === 'shield') {
-    s.ward = e.maxHp * T.shield.share;
+    s.ward = share(e, T.shield.share);
   } else if (k === 'summon') {
-    const hp = TRAINING_ENEMIES.swarm.hp * TRAINING.enemyHp * lateHp(run.wave) * T.summon.hp;
+    const hp = TRAINING_ENEMIES.swarm.hp * TRAINING.enemyHp * climbHp(run.wave, finalOf(run)) * T.summon.hp;
     for (let i = 0; i < T.summon.n; i++) {
       spawnOne(run, { kind: 'swarm', at: run.t, leg: e.leg, x: e.x + (i - (T.summon.n - 1) / 2) * T.summon.spread, y: e.y, hp, flies: e.flies });
     }
   } else if (k === 'burst') {
     s.burst = T.burst.secs;
   } else if (k === 'regen') {
-    e.hp = Math.min(e.maxHp, e.hp + e.maxHp * T.regen.share);
+    e.hp = Math.min(e.maxHp, e.hp + share(e, T.regen.share));
   } else if (k === 'storm') {
     for (const t of towersNear(run, e, T.storm.radius)) for (const g of t.guns) Object.assign(g, { cd: Math.max(g.cd, T.storm.secs), pending: 0 });
   }
@@ -64,7 +69,7 @@ export function lordTick(run: TrainingRun, dt: number): void {
     const l = lordOf(run, e);
     const s = e.lord;
     if (!l || !s || e.hp <= 0) continue;
-    if (!s.armed) Object.assign(s, { armed: true, next: every(l.trick), ward: l.trick === 'shield' ? e.maxHp * T.shield.share : 0 });
+    if (!s.armed) Object.assign(s, { armed: true, next: every(l.trick), ward: l.trick === 'shield' ? share(e, T.shield.share) : 0 });
     if (s.burst > 0) s.burst = Math.max(0, s.burst - dt);
     if (l.trick === 'fear') for (const t of towersNear(run, e, T.fear.radius)) t.boost.hit -= 1;
     if (every(l.trick) && (s.next -= dt) <= 0) {

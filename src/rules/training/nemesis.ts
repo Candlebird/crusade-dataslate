@@ -3,7 +3,8 @@ import { SORTIE, TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { SORTIE_BOSSES } from '../sortieStory';
 import { centreOf, dist, mapOf, pieceById, towers } from './board';
 import { regrabTime } from './holds';
-import { lateHp, move, spawnOne } from './waves';
+import { finalOf } from './finaleCore';
+import { climbHp, move, spawnOne } from './waves';
 import type { Enemy, RunNemesis, SpawnPlan, TrainingRun } from './types';
 
 // The force's Sortie nemesis comes to Training as the boss of wave TRAINING.shared.nemesis.wave: its name, its
@@ -29,7 +30,7 @@ export function pickNemesis(story?: ForceSortie): RunNemesis | undefined {
 }
 
 /** Is wave `w` the one the nemesis comes on (once a run, and not once it has fallen)? */
-export const isNemesisWave = (run: TrainingRun, w: number) => !!run.nemesis && !run.nemesis.slain && w === N.wave;
+export const isNemesisWave = (run: Pick<TrainingRun, 'nemesis'>, w: number) => !!run.nemesis && !run.nemesis.slain && w === N.wave;
 
 /** A wave's plans with the nemesis in the boss's place on its wave: a share tougher per grudge level. */
 export function nemesisPlan(run: TrainingRun, plans: SpawnPlan[]): SpawnPlan[] {
@@ -88,7 +89,7 @@ function act(run: TrainingRun, e: Enemy, sig: string) {
   } else if (sig === 'tremor') {
     run.baseHp = Math.max(0, run.baseHp - N.tremor.dmg);
   } else if (sig === 'brood') {
-    const hp = TRAINING_ENEMIES.swarm.hp * TRAINING.enemyHp * lateHp(run.wave) * N.brood.hp;
+    const hp = TRAINING_ENEMIES.swarm.hp * TRAINING.enemyHp * climbHp(run.wave, finalOf(run)) * N.brood.hp;
     for (let i = 0; i < N.brood.n; i++) {
       spawnOne(run, { kind: 'swarm', at: run.t, leg: e.leg, x: e.x + (i - (N.brood.n - 1) / 2) * N.brood.spread, y: e.y, hp, flies: e.flies });
     }

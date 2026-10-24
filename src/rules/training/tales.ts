@@ -3,8 +3,8 @@ import { TRAINING } from '../downtimeData';
 import { TALE_TEXT } from './taleText';
 import type { RunHonours } from './types';
 
-// Training tales (F4): a story only for a highlight (the nemesis slain, a new best, a real lord slain, a title
-// earned), one each, at most TRAINING.records.tales a run. The words come from taleText.ts, picked by the run's seed.
+// Training tales (F4): a story only for a highlight (a Victory at the Final wave, the nemesis slain, a new best, a real
+// lord slain, a title earned), one each, at most TRAINING.records.tales a run. The words come from taleText.ts, picked by the run's seed.
 
 export type TaleKind = ForceTale['kind'];
 export type Tale = RunHonours['tales'][number];
@@ -29,9 +29,9 @@ export function taleText(h: Highlight, seed: number, i: number): string {
   return pool[lineOf(seed, i, pool.length)].replace(/\{(\w+)\}/g, (_, k: string) => h.vars[k as keyof Highlight['vars']] ?? '');
 }
 
-/** The run's tales: highlights in priority order (nemesis, best, lords, titles), one each, at most records.tales. */
+/** The run's tales: highlights in priority order (Victory, nemesis, best, lords, titles), one each, at most records.tales. */
 export function talesOf(highlights: Highlight[], seed: number): Tale[] {
-  const order: TaleKind[] = ['nemesis', 'best', 'lord', 'title'];
+  const order: TaleKind[] = ['victory', 'nemesis', 'best', 'lord', 'title'];
   return [...highlights]
     .sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind))
     .slice(0, TRAINING.records.tales)

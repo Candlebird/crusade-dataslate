@@ -1,10 +1,11 @@
 import type { Campaign, Force, SiegeBoardEntry, SiegeWin } from '../../model/types';
 import { TRAINING } from '../downtimeData';
-import { siegeScore } from './siege';
+import { siegeDmg, siegeOrder, siegeScore } from './siege';
 import type { TrainingRun } from './types';
 
 // The Weekly Siege board (F5), kept on the campaign like the Sortie weekly's (downtime.ts postWeekly): each force's
-// best siege a week, for the last TRAINING.siege.weeks weeks. Once a week is over its top force wins its faction one
+// best siege a week, for the last TRAINING.siege.weeks weeks, ranked by damage to the colossus (siege.ts siegeOrder; an
+// entry from before the damage check has none, so ranks by wave below them: kept as it was, not reset). Once a week is over its top force wins its faction one
 // Strategic Asset in the round it is settled (rounds.ts assetsOf, within the skirmish cap); repeat wins are fine.
 
 const S = TRAINING.siege;
@@ -22,21 +23,22 @@ export const weekSettled = (c: Pick<Campaign, 'siegeWins'>, week: string) => (c.
 export function postSiege(c: Pick<Campaign, 'siegeBoard' | 'siegeWins'>, force: Force, run: TrainingRun, date: string): SiegeBoardEntry[] {
   const list = [...(c.siegeBoard ?? [])];
   if (!run.siege || weekSettled(c, run.siege)) return list;
+  const dmg = siegeDmg(run);
   const entry: SiegeBoardEntry = {
     week: run.siege, forceId: force.id, force: force.name, player: force.player,
-    ...(force.nexus?.factionId ? { factionId: force.nexus.factionId } : {}), score: siegeScore(run), cleared: run.cleared, date,
+    ...(force.nexus?.factionId ? { factionId: force.nexus.factionId } : {}), score: siegeScore(run), cleared: run.cleared,
+    ...(dmg !== undefined ? { dmg } : {}), date,
   };
   const i = list.findIndex((e) => e.week === entry.week && e.forceId === force.id);
   if (i < 0) list.push(entry);
-  else if (entry.score > list[i].score || (entry.score === list[i].score && entry.cleared > list[i].cleared)) list[i] = entry;
+  else if (siegeOrder(entry, list[i]) < 0) list[i] = entry;
   const weeks = [...new Set(list.map((e) => e.week))].sort().reverse().slice(0, S.weeks);
   return list.filter((e) => weeks.includes(e.week));
 }
 
-/** A week's board, best first: the wave reached, then waves cleared, then who got there first. */
+/** A week's board, best first: damage to the colossus, else the wave reached and waves cleared, then who got there first. */
 export const siegeRanking = (board: Campaign['siegeBoard'], week: string): SiegeBoardEntry[] =>
-  (board ?? []).filter((e) => e.week === week)
-    .sort((a, b) => b.score - a.score || b.cleared - a.cleared || a.date.localeCompare(b.date));
+  (board ?? []).filter((e) => e.week === week).sort((a, b) => siegeOrder(a, b) || a.date.localeCompare(b.date));
 
 /** Weeks on the board that are over (before `nowWeek`) and not yet settled, oldest first. */
 export const weeksDue = (c: Pick<Campaign, 'siegeBoard' | 'siegeWins'>, nowWeek: string): string[] =>
@@ -53,7 +55,7 @@ export function settleSieges(c: Campaign, nowWeek: string, date: string): SiegeW
     if (!top) continue;
     won.push({
       week, forceId: top.forceId, force: top.force, player: top.player, ...(top.factionId ? { factionId: top.factionId } : {}),
-      score: top.score, round: roundOf(c), date,
+      score: top.score, ...(top.dmg !== undefined ? { dmg: top.dmg } : {}), round: roundOf(c), date,
     });
   }
   if (won.length) c.siegeWins = [...(c.siegeWins ?? []), ...won].slice(-S.keep);

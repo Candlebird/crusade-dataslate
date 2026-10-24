@@ -6,7 +6,7 @@ import { buyLevel, buyLuck, buyMend, levelCost, levelProblem, luckProblem, mendP
 import { N, overlaps } from './map';
 import { craftDefault, readyDefaults } from './emplacements';
 import { readyRecipes } from './recipes';
-import { craft, createRun, endRun, startWave, step } from './run';
+import { continueEndless, craft, createRun, endRun, startWave, step } from './run';
 import { keep, keepOptions, placeDraft } from './shards';
 import type { KeepOption, RunDrill, RunNexus, ShardPiece, Tile, TrainingRun } from './types';
 
@@ -181,11 +181,13 @@ export function botBuild(run: TrainingRun, units: Unit[], maze: MazeSpot[], curs
 /** Play a run to its end (or `maxWaves` cleared), stepping `dt` (default 0.05) at a time; `nexus`: a campaign's;
  *  `drill`, `siege`: createRun's opts; `watch` is called after every step of a wave (the balance tests' probes). */
 export function playRun(units: Unit[], seed: number,
-  opts: { maze?: MazeSpot[]; maxWaves?: number; dt?: number; nexus?: RunNexus; drill?: RunDrill; siege?: string; watch?: (run: TrainingRun) => void } = {}): TrainingRun {
+  opts: { maze?: MazeSpot[]; maxWaves?: number; dt?: number; nexus?: RunNexus; drill?: RunDrill; siege?: string; final?: number; watch?: (run: TrainingRun) => void } = {}): TrainingRun {
   const { maze = [], maxWaves = 60, dt = 0.05 } = opts;
-  const run = createRun('bot', units, seed, undefined, opts.nexus, { drill: opts.drill, siege: opts.siege });
+  const run = createRun('bot', units, seed, undefined, opts.nexus, { drill: opts.drill, siege: opts.siege, final: opts.final });
   let cursor = 0;
   while (run.phase !== 'over' && run.cleared < maxWaves) {
+    // A Victory: the bot always goes on into Endless.
+    if (run.finale?.victory === 'pending') continueEndless(run);
     cursor = botBuild(run, units, maze, cursor);
     if (run.draft.step !== 'done') { endRun(run, 'The bot is stuck.'); break; }
     startWave(run);
