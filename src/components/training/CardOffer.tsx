@@ -16,6 +16,8 @@ export interface CardOfferProps {
   portraits?: Record<string, EmblemLayer[]>;
   /** Auto play: the card it will take is lit and the buttons are off. */
   auto?: boolean;
+  /** The card Auto takes (default autoCardIndex: the rarest). */
+  autoPick?: number;
   onPick: (i: number) => void;
   /** Hide the offer for a look at the field. */
   onPeek: () => void;
@@ -25,8 +27,8 @@ export interface CardOfferProps {
 
 /** The cards on offer after a boss falls: they rise up one after another, and glow by rarity. A trinket card (a Sortie
  *  trinket the unit keeps) is tagged as one. */
-export function CardOffer({ run, offer, portraits, auto, onPick, onPeek, onReroll }: CardOfferProps) {
-  const best = autoCardIndex(run);
+export function CardOffer({ run, offer, portraits, auto, autoPick, onPick, onPeek, onReroll }: CardOfferProps) {
+  const best = autoPick ?? autoCardIndex(run);
   const top = offer.some((d) => d.rarity === 'Legendary') ? 'legendary' : offer.some((d) => d.rarity === 'Rare') ? 'rare' : 'common';
   const units = unitTowers(run);
   return (
@@ -57,7 +59,7 @@ export function CardOffer({ run, offer, portraits, auto, onPick, onPeek, onRerol
           );
         })}
       </div>
-      {auto ? <div className="muted small">Auto takes the rarest card…</div> : (
+      {auto ? <div className="muted small">Auto takes the lit card…</div> : (
         <div className="row" style={{ gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button className="small" onClick={onPeek}>Look at the field first</button>
           {onReroll && rerollsOf(run) > 0 && (

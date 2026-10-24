@@ -780,7 +780,7 @@ fieldset.fields:disabled { opacity: 0.6; }
 
 /* Training sim: the modal fills the window but for a small margin; the map (with its HUD) is the stage and takes all the
    room the side panels leave, a box of any shape (the map fits its short side; zoomed in, the long side shows more).
-   Under 860px they stack, the stage (a square --map side) sticking to the top while the panels scroll under it. */
+   On a phone it changes shape (below). */
 .modal-back:has(> .modal > .modal-body > .training-game) { padding: 8px; align-items: stretch; }
 .modal:has(> .modal-body > .training-game) {
   width: calc(100vw - 16px); max-width: 100% !important; height: calc(100vh - 16px); height: calc(100dvh - 16px);
@@ -834,29 +834,58 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-log > div:first-child { color: var(--text); }
 .training-held { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .training-held .tag { margin: 0; cursor: help; }
-@media (max-width: 860px) {
-  .modal:has(> .modal-body > .training-game) { width: 100%; height: auto; min-height: 100%; }
-  .modal-body:has(> .training-game) { flex: none; padding: 10px 12px 12px; }
-  .training-game { --map: min(calc(100vw - 24px), 60vh); height: auto; display: flex; flex-direction: column; gap: 10px; }
-  .training-board { flex: none; width: var(--map); max-width: 100%; }
-  .training-map { height: auto; aspect-ratio: 1; }
-  .training-stage {
-    position: sticky; top: 0; z-index: 4; margin: -10px -12px 0; padding: 8px 12px 6px; background: var(--panel);
-    border-bottom: 1px solid var(--line); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
-  }
-  .training-board { margin: 0 auto; }
-  .training-side { contain: none; overflow: visible; padding: 0 0 24px; }
-  .training-board .training-info { top: auto; bottom: 6px; left: 6px; right: 6px; width: auto; max-height: 45%; }
-  .training-map-banner { left: 6px; right: 6px; bottom: 6px; }
-  .modal-back:has(> .modal > .modal-body > .training-game) { padding: 0; align-items: flex-start; }
-  /* Stats on one line, the controls on the next, Start wave taking the room left. */
-  .training-hud-actions { flex: 1 1 100%; }
-  .training-hud-actions > button { padding-left: 10px; padding-right: 10px; }
-  .training-hud-actions > button.training-hud-go { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-  .training-hud button { min-height: 38px; white-space: nowrap; }
-  .training-speed button { min-width: 40px; }
+/* The side panel's tabs are a phone's (below); a wide screen shows every section, stacked, the wave line first. */
+.training-tabs { display: none; }
+.training-sec { display: contents; }
+.training-sec-wave > .training-status { order: -1; }
+.training-map canvas { -webkit-touch-callout: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+/* Phones and small windows: the game fills the screen and the page never scrolls. The map stays in view; under it (or
+   beside it, held sideways) the HUD, then the panels one tab at a time, scrolling on their own. Touch targets 42px. */
+@media (max-width: 860px), (max-height: 560px) {
+  body:has(.training-game) { overflow: hidden; }
+  .modal-back:has(> .modal > .modal-body > .training-game) { padding: 0; align-items: stretch; overflow: hidden; overscroll-behavior: none; }
+  .modal:has(> .modal-body > .training-game) { width: 100%; height: 100vh; height: 100dvh; border: 0; }
+  .modal:has(> .modal-body > .training-game) > .modal-head { padding: 2px 2px 2px 10px; }
+  .modal:has(> .modal-body > .training-game) > .modal-head h2 { font-size: 1rem; }
+  .modal:has(> .modal-body > .training-game) > .modal-head button { min-width: 42px; min-height: 42px; }
+  .modal-body:has(> .training-game) { padding: 4px 8px max(8px, env(safe-area-inset-bottom)); }
+  .training-game { gap: 6px; }
+  .training-game button { min-height: 42px; touch-action: manipulation; }
+  .training-hud { gap: 2px 10px; min-height: 0; }
+  .training-hud-actions { flex: 1 1 100%; gap: 4px; }
+  .training-hud-actions > button { padding: 0 10px; white-space: nowrap; }
+  .training-hud-actions > button.training-hud-go { flex: 1 1 7.5em; min-width: 7.5em; overflow: hidden; text-overflow: ellipsis; }
+  .training-speed button { min-width: 42px; }
   .training-game .training-shard { min-width: 48px; min-height: 52px; }
-  .training-game .training-keep-opt, .training-game .training-keep-down, .training-game .training-shop-unit { min-height: 42px; }
+  .training-map-fit { min-width: 52px; }
+  .training-side { contain: none; min-height: 0; overflow-y: auto; scrollbar-gutter: auto; padding: 0 2px 8px 0; gap: 6px; }
+  .training-tabs { display: flex; position: sticky; top: 0; z-index: 1; gap: 4px; padding-bottom: 4px; background: var(--panel); }
+  .training-tabs > button { position: relative; flex: 1; min-width: 0; padding: 0 4px; }
+  .training-tab-dot { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+  .training-sec { display: none; }
+  .training-sec.on { display: flex; flex-direction: column; gap: 6px; }
+  .training-sec-wave .training-log { margin-top: 0; height: auto; }
+  .training-board .training-info { top: auto; bottom: 6px; left: 6px; right: 6px; width: auto; max-height: 55%; }
+  .training-map-banner { left: 6px; right: 6px; bottom: 6px; }
+}
+/* Upright: the HUD, a square map as big as leaves the panels room, then the tabs. */
+@media (max-width: 860px) and (orientation: portrait), (max-width: 860px) and (min-height: 561px) {
+  .training-game { height: 100%; display: flex; flex-direction: column; }
+  .training-stage { flex: none; gap: 4px; }
+  .training-board { flex: none; width: min(100%, max(240px, calc(100dvh - 370px))); aspect-ratio: 1; margin: 0 auto; }
+  .training-map { height: auto; aspect-ratio: 1; }
+  .training-side { flex: 1; }
+}
+/* Held sideways: the map down the left, as tall as the screen; the HUD and the tabs beside it. */
+@media (max-height: 560px) and (orientation: landscape) {
+  .training-game {
+    --map: min(calc(100dvh - 60px), 60vw); height: 100%;
+    grid-template-columns: var(--map) minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); grid-template-areas: "map hud" "map side";
+  }
+  .training-stage { display: contents; }
+  .training-hud { grid-area: hud; }
+  .training-board { grid-area: map; width: var(--map); height: var(--map); }
+  .training-side { grid-area: side; }
 }
 
 /* Training panels: HUD, draft, recipe book, shop, wave preview (components/training). */

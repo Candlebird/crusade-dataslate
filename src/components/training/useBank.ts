@@ -14,7 +14,8 @@ import { siegeWinLine } from './useSiegeSettle';
 
 // Paying a run out to the force: XP as it lands (within the off-table limit), then at the end the best score, feats,
 // who led the defence, records, titles and tales (records.ts bankHonours), the Sortie layer (shared.ts bankShared), the
-// Drill Honours (drillBank.ts) and, for a Weekly Siege in a campaign, its board (siegeBoard.ts postSiege).
+// Drill Honours (drillBank.ts) and, for a Weekly Siege in a campaign, its board (siegeBoard.ts postSiege). A run the
+// Auto (debug) button played (run.auto) banks nothing more.
 
 /** XP a unit earned this session, and what the off-table limit let it bank. */
 interface Gain { name: string; earned: number; got: number }
@@ -26,6 +27,7 @@ export function useBank(force: Force, c?: Campaign) {
 
   /** Bank whatever XP the run has earned since last time; a toast says who got it. */
   const bankXp = useCallback((run: TrainingRun) => {
+    if (run.auto) return;
     const xp = takeXp(run);
     const ids = Object.keys(xp);
     if (!ids.length) return;
@@ -50,6 +52,10 @@ export function useBank(force: Force, c?: Campaign) {
   const finish = useCallback((run: TrainingRun) => {
     if (done.current || run.wave === 0) return;
     done.current = true;
+    if (run.auto) {
+      toast(`${run.cleared} wave${run.cleared === 1 ? '' : 's'} cleared. Auto was used: nothing banked.`);
+      return;
+    }
     bankXp(run);
     const lead = mvp(run);
     let feats: string[] = [];

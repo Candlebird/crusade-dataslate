@@ -29,9 +29,11 @@ export interface MapViewProps {
   className?: string;
 }
 
-/** Most it zooms in, times the fit; and how far a press moves (pixels) before it is a drag, not a click. */
+/** Most it zooms in, times the fit; and how far a press moves (pixels) before it is a drag, not a click (a finger
+ *  wobbles more than a mouse). */
 const MAX_ZOOM = 8;
 const DRAG_PX = 6;
+const DRAG_TOUCH_PX = 12;
 /** Below this many pixels a cell, a first tap to place zooms in to TAP_ZOOM_PX a cell around it. */
 const TAP_ZOOM_BELOW = 9;
 const TAP_ZOOM_PX = 14;
@@ -182,7 +184,7 @@ export function MapView(props: MapViewProps) {
 
   // Pointers: one drags (or clicks if it barely moved), two pinch.
   const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const press = useRef({ x: 0, y: 0, moved: false, pinched: false });
+  const press = useRef({ x: 0, y: 0, moved: false, pinched: false, slop: DRAG_PX });
   const pinch = useRef({ d: 0, mx: 0, my: 0 });
   const lastCell = useRef('');
 
@@ -206,7 +208,7 @@ export function MapView(props: MapViewProps) {
     e.currentTarget.setPointerCapture(e.pointerId);
     const at = local(e);
     pointers.current.set(e.pointerId, at);
-    if (pointers.current.size === 1) press.current = { ...at, moved: false, pinched: false };
+    if (pointers.current.size === 1) press.current = { ...at, moved: false, pinched: false, slop: e.pointerType === 'mouse' ? DRAG_PX : DRAG_TOUCH_PX };
     if (pointers.current.size === 2) { pinch.current = pinchState(); press.current.pinched = true; }
   };
   const move = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -228,7 +230,7 @@ export function MapView(props: MapViewProps) {
       return;
     }
     const p = press.current;
-    if (!p.moved && Math.hypot(at.x - p.x, at.y - p.y) > DRAG_PX) p.moved = true;
+    if (!p.moved && Math.hypot(at.x - p.x, at.y - p.y) > p.slop) p.moved = true;
     if (p.moved) setView({ ...v, ox: v.ox + at.x - prev.x, oy: v.oy + at.y - prev.y });
     if (e.pointerType === 'mouse') reportHover(at);
   };
@@ -237,7 +239,7 @@ export function MapView(props: MapViewProps) {
     if (pointers.current.size === 1) {
       // A pinch ended with one finger still down: carry on as a drag from where it is.
       const [rest] = pointers.current.values();
-      press.current = { ...rest, moved: true, pinched: true };
+      press.current = { ...rest, moved: true, pinched: true, slop: DRAG_PX };
       return;
     }
     if (pointers.current.size || press.current.moved || press.current.pinched || e.type === 'pointercancel') return;

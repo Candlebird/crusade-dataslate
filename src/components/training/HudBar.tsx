@@ -17,11 +17,14 @@ export interface HudBarProps {
   onQuit: () => void;
   paused?: boolean;
   onPause?: () => void;
+  /** Auto (debug, TRAINING.debugAuto): on or off; left out, no button. */
+  auto?: boolean;
+  onAuto?: () => void;
 }
 
 /** The strip over the map: wave, base, credits, luck, the campaign's threat and event and next real Echo Lord (in a
  *  campaign), the Sortie nemesis waiting (if any), speed, and Start wave / End run. */
-export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onPause }: HudBarProps) {
+export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onPause, auto, onAuto }: HudBarProps) {
   const low = run.baseHp <= TRAINING.baseHp / 3;
   const why = run.phase === 'build' ? startProblem(run) : null;
   const next = run.wave + 1;
@@ -56,6 +59,7 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
           <Icon name="g:crown" /> <b style={{ color: 'var(--red)' }}>{run.nemesis.name}</b> <span className="muted">· wave {TRAINING.shared.nemesis.wave}</span>
         </span>
       )}
+      {run.auto && <span className="training-hud-stat" style={{ color: 'var(--red)' }} title="The Auto (debug) button played this run">Auto was used: nothing banked</span>}
       <span className="grow" />
       {run.phase !== 'over' && (
         <span className="training-hud-actions">
@@ -64,9 +68,12 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
               <button key={s} className={s === speed ? 'primary' : ''} aria-pressed={s === speed} onClick={() => onSpeed(s)}>{s}×</button>
             ))}
           </span>
-          {onPause && live && <button className="training-hud-go" onClick={onPause}>{paused ? 'Resume' : 'Pause'}</button>}
+          {auto !== undefined && onAuto && (
+            <button className={auto ? 'primary' : ''} aria-pressed={auto} title="Debug: the test bot plays the run (a run that uses it banks nothing)" onClick={onAuto}>Auto (debug)</button>
+          )}
+          {onPause && (live || auto) && <button className="training-hud-go" onClick={onPause}>{paused ? 'Resume' : 'Pause'}</button>}
           {run.phase === 'build' && (
-            <button className="primary training-hud-go" disabled={!!why} title={why ?? undefined} onClick={onStart}>Start wave {next}</button>
+            <button className="primary training-hud-go" disabled={!!why || auto} title={why ?? undefined} onClick={onStart}>Start wave {next}</button>
           )}
           <button onClick={onQuit}>End run</button>
         </span>

@@ -340,6 +340,8 @@ export interface TrainingRun {
   rerolls?: number;
   /** The Drill Honours this run earned, banked into the force once (drillBank.ts bankDrill). */
   drilled?: { earned: number[] };
+  /** The Auto (debug) button played some of it (TRAINING.debugAuto): the run banks nothing (useBank). Set by the UI. */
+  auto?: boolean;
 }
 
 /** What a saved run looks like on disk (save.ts). */

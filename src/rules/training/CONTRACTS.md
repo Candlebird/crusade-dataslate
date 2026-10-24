@@ -48,6 +48,7 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | Unit.titles (stored ids, oldest first), Unit.title (the one shown; '-' none; unset the latest) | titles.earnTitles (records.bankHonours, downtime.applySortie); titles.pickTitle (UnitSheet via UnitRecord) |
 | run.drill (luck cap, open boss cards, perks: a JSON copy of drill.drillOf(force) at create), run.siege (the ISO week) | run.ts via createRun opts (the UI's freshRun passes drill, or siege for a Weekly Siege; bots pass either or none) |
 | run.rerolls (card offers re-drawn) | cards.rerollCards |
+| run.auto (the Auto (debug) button was used: nothing banks) | the UI (TrainingModal, via useAuto); useBank reads it |
 | run.drilled (earned: goal indexes reached so far, set by drillNews) | drillBank.bankDrill (once, from useBank.finish, before bankHonours) |
 | Force.drill (DrillStats: runs, kills, bosses, lords, clean, crafted, sieges, siege {week, best}) | drillBank.bankDrill (seeded from the units' trainingRecords the first time, via drill.drillStats) |
 | Campaign.siegeBoard (each force's best a week, last TRAINING.siege.weeks weeks), Campaign.siegeWins (settled weeks, last TRAINING.siege.keep) | siegeBoard.postSiege (useBank.finish), siegeBoard.settleSieges (useBank.finish, useSiegeSettle on Training open and the RoundPanel assets row) |
@@ -327,9 +328,10 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 - `blankRun(seed = 1): TrainingRun` — an empty build-phase run (no recipes, cover or draft; mods bounty 1, holdMul 1) for module tests.
 - `testUnit(o)`, `testEnemy(o)` — a UnitTower at 20,30 (12-cell rifle) and a 100 hp drone at 21.5,31.5.
 
-### bot.ts (test-only; not in index.ts)
+### bot.ts (not in index.ts: the tests, and the app's Auto (debug) button via components/training/useAuto, import it directly)
 - `interface MazeSpot { n; x; y }`
-- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (recipe progress, then grade), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use, spend (levels cheapest first, then luck, mend when low), pick card 0.
+- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (recipe progress, then grade), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use, spend (levels cheapest first, then luck, mend when low), pick card 0 (`BOT_CARD`).
+- `botMoves(run, units, maze, cursor): Generator<string, number>` — botBuild a move at a time (each yield one move, a few words saying it; returns the cursor); botBuild runs it straight through, so headless results are the same.
 - `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt?; nexus?; drill?; siege? }): TrainingRun`
 
 ### nexusTest.ts (test-only; not in index.ts)

@@ -472,6 +472,9 @@ export const OFF_TABLE_XP = { perRound: 5 };
  * but XP: units don't become busy. The logic is in rules/training/; the game is components/training/.
  */
 export const TRAINING = {
+  /** Debug: the HUD's Auto button lets the balance bot (training/bot.ts) play the live run; a run that uses it banks
+   *  nothing. Set false to take the button away. */
+  debugAuto: true,
   /** XP each crafted unit earns for every `xpEvery` waves cleared since it was crafted, up to `xpCap` a run. */
   xpPerWave: 1,
   xpEvery: 5,

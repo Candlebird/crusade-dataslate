@@ -23,9 +23,11 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
   const shards = towers(run).filter((t) => t.kind === 'shard');
   const defences = towers(run).filter((t) => t.kind === 'default');
   const n = (x: number) => Math.round(x);
-  const record = best !== undefined && run.cleared > best;
-  const shared = run.phase === 'over' ? sharedPreview(run) : [];
-  const drill = force && run.phase === 'over' ? drillPreview(force, run) : [];
+  // A run Auto (debug) played banks nothing: no best, honours, Sortie layer, Drill or siege score to show.
+  const banks = !run.auto;
+  const record = banks && best !== undefined && run.cleared > best;
+  const shared = banks && run.phase === 'over' ? sharedPreview(run) : [];
+  const drill = banks && force && run.phase === 'over' ? drillPreview(force, run) : [];
   return (
     <div className="training-summary small">
       <div style={{ marginBottom: 4 }}>
@@ -33,7 +35,8 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
         {record && <span style={{ color: 'var(--gold)' }}> · a new best</span>}
         {lead && lead.kills > 0 && <span className="muted"> · {lead.name} led the defence</span>}
       </div>
-      {run.siege && <div style={{ marginBottom: 4 }}>Weekly Siege {run.siege}: <b>wave {siegeScore(run)}</b> <span className="muted">· your best this week counts</span></div>}
+      {run.auto && <div style={{ marginBottom: 4, color: 'var(--red)' }}>Auto was used: nothing banked.</div>}
+      {banks && run.siege && <div style={{ marginBottom: 4 }}>Weekly Siege {run.siege}: <b>wave {siegeScore(run)}</b> <span className="muted">· your best this week counts</span></div>}
       {!units.length && <div className="muted">No unit was crafted this run.</div>}
       {(units.length > 0 || shards.length > 0 || defences.length > 0) && (
         <table>
@@ -47,7 +50,7 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
                 <td>{t.kills}</td>
                 <td>{n(t.dealt)}</td>
                 <td>{t.up}/{t.cap}</td>
-                <td>{xp[t.unitId] ?? 0}</td>
+                <td>{banks ? xp[t.unitId] ?? 0 : '–'}</td>
               </tr>
             ))}
             {defences.length > 0 && (
@@ -71,7 +74,7 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
           </tbody>
         </table>
       )}
-      {force && run.phase === 'over' && <RunHonoursView run={run} force={force} best={best} />}
+      {banks && force && run.phase === 'over' && <RunHonoursView run={run} force={force} best={best} />}
       {shared.length > 0 && (
         <ul className="training-shared">
           {shared.map((l, i) => (

@@ -10,7 +10,8 @@ import { craft, createRun, endRun, startWave, step } from './run';
 import { keep, keepOptions, placeDraft } from './shards';
 import type { KeepOption, RunDrill, RunNexus, ShardPiece, Tile, TrainingRun } from './types';
 
-// Test-only balance bot: plays a whole run headless. Never imported by the app (index.ts leaves it out).
+// The balance bot: plays a whole run headless for the tests, and a move at a time for the app's Auto (debug) button
+// (botMoves). index.ts leaves it out: the app imports it from here.
 
 /** A maze spot, as in src/rules/trainingTestMaze.json. */
 export interface MazeSpot {
@@ -94,51 +95,76 @@ const wanted = (run: TrainingRun, p: ShardPiece) =>
   run.recipes.some((r) => !run.crafted.includes(r.unitId) && r.slots.some((s) => s.type === p.type && p.grade >= s.grade));
 
 /** Craft every ready recipe, then every ready default tower none of whose Shards a unit still wants, each on its used
- *  Shard nearest the route. */
-function craftAll(run: TrainingRun, units: Unit[]): void {
+ *  Shard nearest the route; a move a yield. */
+function* craftAll(run: TrainingRun, units: Unit[]): Generator<string, void> {
   for (let ready = readyRecipes(run); ready.length; ready = readyRecipes(run)) {
     const { unitId, uses } = ready[0];
-    craft(run, units.find((u) => u.id === unitId)!, uses, nearest(run, uses).id);
+    const u = units.find((x) => x.id === unitId)!;
+    craft(run, u, uses, nearest(run, uses).id);
+    yield `crafts ${u.name}`;
   }
   const spare = () => readyDefaults(run).filter((d) => !shardsOnMap(run).some((p) => d.uses.includes(p.id) && wanted(run, p)));
   for (let ready = spare(); ready.length; ready = spare()) {
     const { key, uses } = ready[0];
     craftDefault(run, key, uses, nearest(run, uses).id);
+    yield 'crafts a defence';
   }
 }
 
-/** Spend: mend when low, then levels cheapest first, then luck. */
-function spend(run: TrainingRun): void {
-  while (run.baseHp <= MEND_AT && !mendProblem(run)) buyMend(run);
+/** Spend: mend when low, then levels cheapest first, then luck; a move a yield. */
+function* spend(run: TrainingRun): Generator<string, void> {
+  while (run.baseHp <= MEND_AT && !mendProblem(run)) {
+    buyMend(run);
+    yield 'mends the base';
+  }
   for (;;) {
     const t = unitTowers(run).filter((u) => !levelProblem(run, u.id)).sort((a, b) => levelCost(a) - levelCost(b))[0];
     if (t) buyLevel(run, t.id);
     else if (!luckProblem(run)) buyLuck(run);
     else return;
+    yield t ? `levels ${t.name}` : 'buys luck';
   }
 }
 
-/** One build phase as the bot plays it: places the hand at the next legal maze spots from `cursor`, keeps, crafts,
- *  spends, picks a card. Returns the cursor moved on. */
-export function botBuild(run: TrainingRun, units: Unit[], maze: MazeSpot[], cursor: number): number {
-  if (run.offer?.length) pickCard(run, 0);
-  craftAll(run, units);
+/** The card the bot takes from an offer. */
+export const BOT_CARD = 0;
+
+/** One build phase as the bot plays it, a move at a time (each yield is one move done, said in a few words): picks a
+ *  card, places the hand at the next legal maze spots from `cursor`, keeps, crafts, spends. Returns the cursor moved on.
+ *  Every loop looks at the run afresh after each move, so the player may act between moves. */
+export function* botMoves(run: TrainingRun, units: Unit[], maze: MazeSpot[], cursor: number): Generator<string, number> {
+  if (run.offer?.length) {
+    pickCard(run, BOT_CARD);
+    yield 'takes a card';
+  }
+  yield* craftAll(run, units);
   while (run.draft.step === 'place' && run.draft.hand.length) {
     const s = nextSpot(run, maze, cursor);
     if (!s) break;
     cursor = s.cursor;
     placeDraft(run, 0, s.at.x, s.at.y);
+    yield 'places a Shard';
   }
-  craftAll(run, units);
+  yield* craftAll(run, units);
   if (run.draft.step === 'keep') {
     // The bot never keeps a Shard a grade down (it only crafts units, whose recipes take a grade or better).
     const opts = keepOptions(run).filter((o) => !o.down).map((o) => ({ o, p: progress(run, o) }));
     opts.sort((a, b) => b.p - a.p || b.o.grade - a.o.grade || a.o.with.length - b.o.with.length);
     keep(run, opts[0].o);
+    yield 'keeps a Shard';
   }
-  craftAll(run, units);
-  spend(run);
+  yield* craftAll(run, units);
+  yield* spend(run);
   return cursor;
+}
+
+/** One build phase played straight through (botMoves). Returns the cursor moved on. */
+export function botBuild(run: TrainingRun, units: Unit[], maze: MazeSpot[], cursor: number): number {
+  const g = botMoves(run, units, maze, cursor);
+  for (;;) {
+    const r = g.next();
+    if (r.done) return r.value;
+  }
 }
 
 /** Play a run to its end (or `maxWaves` cleared), stepping `dt` (default 0.05) at a time; `nexus`: a campaign's;
