@@ -54,6 +54,7 @@ export function sharedPreview(run: TrainingRun): { text: string; good: boolean }
     out.push({ text: `${k.name} ${who ? `for ${who} (to the spares if it already carries one)` : 'for the spares'}`, good: true });
   }
   if (run.nemesis?.slain) out.push({ text: `${run.nemesis.name} slain: it meets your next Sortie hurt and a trick short`, good: true });
+  for (const l of run.nexus?.lords ?? []) if (l.slain) out.push({ text: `${l.name} (${l.tier}) slain: marked slain in the bestiary`, good: true });
   const slain = Object.entries(run.beasts ?? {}).reduce((n, [, b]) => n + b.slain, 0);
   if (slain) out.push({ text: `${slain} Echo${slain === 1 ? '' : 'es'} slain for the bestiary`, good: true });
   return out;

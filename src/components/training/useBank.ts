@@ -5,7 +5,7 @@ import { localDate } from '../../model/date';
 import { uid } from '../../model/factory';
 import { bankOffTableXp, offTableKey } from '../../rules/downtime';
 import { awardFeats, trainingFeats } from '../../rules/feats';
-import { bankShared, mvp, takeXp, type TrainingRun } from '../../rules/training';
+import { bankShared, lordsSlain, mvp, takeXp, type TrainingRun } from '../../rules/training';
 import { toast } from '../ui';
 
 // Paying a run out to the force: XP as it lands (within the off-table limit), then at the end the best score, feats,
@@ -51,7 +51,7 @@ export function useBank(force: Force, c?: Campaign) {
     let shared: string[] = [];
     updateForce(force.id, (f) => {
       if (run.cleared > (f.trainingBest ?? 0)) f.trainingBest = run.cleared;
-      feats = awardFeats(f, trainingFeats(run.cleared), run.crafted, localDate(), uid);
+      feats = awardFeats(f, trainingFeats(run.cleared, lordsSlain(run)), run.crafted, localDate(), uid);
       // Quirks, the trinket, the bestiary and a slain nemesis go to the Sortie side with the XP.
       shared = bankShared(f, run);
     });

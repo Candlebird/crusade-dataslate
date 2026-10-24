@@ -1,5 +1,5 @@
 import { TRAINING } from '../../rules/downtimeData';
-import { nemesisTricks, startProblem, type TrainingRun } from '../../rules/training';
+import { eventInfo, lordLine, nemesisTricks, nexusLines, nextLord, startProblem, type TrainingRun } from '../../rules/training';
 import { Icon } from '../Icon';
 
 export type Speed = 1 | 2 | 4;
@@ -19,7 +19,8 @@ export interface HudBarProps {
   onPause?: () => void;
 }
 
-/** The strip over the map: wave, base, credits, luck, the Sortie nemesis waiting (if any), speed, and Start wave / End run. */
+/** The strip over the map: wave, base, credits, luck, the campaign's threat and event and next real Echo Lord (in a
+ *  campaign), the Sortie nemesis waiting (if any), speed, and Start wave / End run. */
 export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onPause }: HudBarProps) {
   const low = run.baseHp <= TRAINING.baseHp / 3;
   const why = run.phase === 'build' ? startProblem(run) : null;
@@ -41,6 +42,7 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
       <span className="training-hud-stat" title="Luck: better Shard grades in each draft">
         <Icon name="g:sparkles" /> {run.luck}/{TRAINING.shards.luckCost.length}
       </span>
+      {run.nexus && <NexusStat run={run} />}
       {run.nemesis && !run.nemesis.slain && run.wave <= TRAINING.shared.nemesis.wave && (
         <span
           className="training-hud-stat"
@@ -65,5 +67,26 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
         </span>
       )}
     </div>
+  );
+}
+
+/** The campaign's hold on the run: threat (hover for the affixes and the event), and the next real Echo Lord. */
+function NexusStat({ run }: { run: TrainingRun }) {
+  const nx = run.nexus!;
+  const lines = nexusLines(nx, !!run.nemesis);
+  const ev = eventInfo(nx.event);
+  const next = nextLord(run, run.phase === 'wave' ? run.wave - 1 : run.wave);
+  return (
+    <>
+      <span className="training-hud-stat" title={[lines.threat, ...lines.affixes, lines.event].join('\n')}>
+        <Icon name="g:death-skull" /> Threat <b style={{ color: nx.threat ? 'var(--red)' : undefined }}>{nx.threat}</b>
+        {ev && <span className="muted"> · {ev.name}{ev.effect ? '' : ' (flavour)'}</span>}
+      </span>
+      {next && (
+        <span className="training-hud-stat" title={lordLine(next.lord, next.wave)}>
+          <Icon name="g:crown" /> <b>{next.lord.name}</b> <span className="muted">· wave {next.wave}</span>
+        </span>
+      )}
+    </>
   );
 }

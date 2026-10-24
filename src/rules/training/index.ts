@@ -20,3 +20,7 @@ export * from './quirks';
 export * from './bestiary';
 export * from './trinkets';
 export * from './shared';
+export * from './nexus';
+export * from './lordPick';
+export * from './lords';
+export * from './affixes';

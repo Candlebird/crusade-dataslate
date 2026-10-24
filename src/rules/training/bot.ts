@@ -6,7 +6,7 @@ import { N, overlaps } from './map';
 import { readyRecipes } from './recipes';
 import { craft, createRun, endRun, startWave, step } from './run';
 import { keep, keepOptions, placeDraft } from './shards';
-import type { KeepOption, ShardPiece, Tile, TrainingRun } from './types';
+import type { KeepOption, RunNexus, ShardPiece, Tile, TrainingRun } from './types';
 
 // Test-only balance bot: plays a whole run headless. Never imported by the app (index.ts leaves it out).
 
@@ -124,10 +124,10 @@ export function botBuild(run: TrainingRun, units: Unit[], maze: MazeSpot[], curs
   return cursor;
 }
 
-/** Play a run to its end (or `maxWaves` cleared), stepping `dt` (default 0.05) at a time. */
-export function playRun(units: Unit[], seed: number, opts: { maze?: MazeSpot[]; maxWaves?: number; dt?: number } = {}): TrainingRun {
+/** Play a run to its end (or `maxWaves` cleared), stepping `dt` (default 0.05) at a time; `nexus`: a campaign's. */
+export function playRun(units: Unit[], seed: number, opts: { maze?: MazeSpot[]; maxWaves?: number; dt?: number; nexus?: RunNexus } = {}): TrainingRun {
   const { maze = [], maxWaves = 60, dt = 0.05 } = opts;
-  const run = createRun('bot', units, seed);
+  const run = createRun('bot', units, seed, undefined, opts.nexus);
   let cursor = 0;
   while (run.phase !== 'over' && run.cleared < maxWaves) {
     cursor = botBuild(run, units, maze, cursor);

@@ -4,7 +4,7 @@ import { levelForXp } from '../../rules/engine';
 import { unitName } from '../../rules/battle';
 import { OFF_TABLE_XP, TRAINING } from '../../rules/downtimeData';
 import { offTableKey, offTableLeft } from '../../rules/downtime';
-import { canTrain, type SavedRun } from '../../rules/training';
+import { canTrain, nexusLines, nexusOf, pickNemesis, type SavedRun } from '../../rules/training';
 import { FeatList } from '../Feats';
 import { Portrait } from '../Emblem';
 
@@ -17,7 +17,8 @@ export interface StartScreenProps {
   cleared?: boolean;
 }
 
-/** Before a run: what Training is, the units that can be crafted, and the saved run if there is one. */
+/** Before a run: what Training is, what the campaign's Nexus brings to it, the units that can be crafted, and the saved
+ *  run if there is one. */
 export function StartScreen({ force, c, saved, cleared }: StartScreenProps) {
   const key = offTableKey(c, localDate());
   const units = force.units.filter(canTrain);
@@ -46,6 +47,7 @@ export function StartScreen({ force, c, saved, cleared }: StartScreenProps) {
           {saved.savedAt ? <span className="muted"> · {new Date(saved.savedAt).toLocaleString()}</span> : null}.
         </p>
       )}
+      <NexusBrief force={force} c={c} />
       <FeatList force={force} where="training" />
       <div className="small" style={{ marginBottom: 4 }}><b>Units</b> <span className="muted">· each has a recipe</span></div>
       {!units.length && <p className="muted small">No active units to train.</p>}
@@ -62,6 +64,26 @@ export function StartScreen({ force, c, saved, cleared }: StartScreenProps) {
         ))}
       </div>
     </>
+  );
+}
+
+/** The campaign's Nexus as a new run meets it: threat and affixes, the Galactic Event, and the Echo Lords by wave. */
+function NexusBrief({ force, c }: { force: Force; c?: Campaign }) {
+  const nx = nexusOf(c);
+  const lines = nexusLines(nx, !!pickNemesis(force.sortie));
+  return (
+    <div className="small training-nexus">
+      <div><b>The Nexus</b> <span className="muted">· {lines.threat}</span></div>
+      {nx && (
+        <ul>
+          {lines.affixes.map((a) => <li key={a}>{a}</li>)}
+          {!lines.affixes.length && <li className="muted">No threat affixes yet (one a {TRAINING.nexus.affixes.per} threat levels).</li>}
+          <li>{lines.event}</li>
+        </ul>
+      )}
+      <div style={{ marginTop: 4 }}><b>Echo Lords</b></div>
+      <ul>{lines.lords.map((l) => <li key={l}>{l}</li>)}</ul>
+    </div>
   );
 }
 

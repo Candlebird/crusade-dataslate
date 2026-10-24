@@ -1,6 +1,6 @@
-import { SHARD_TYPES, TRAINING } from '../../rules/downtimeData';
+import { SHARD_TYPES } from '../../rules/downtimeData';
 import {
-  gradeName, keep, keepOptions, pieceById, shardsOnMap, type KeepOption, type ShardPiece, type TrainingRun,
+  drawSize, gradeName, keep, keepOptions, pieceById, shardsOnMap, type KeepOption, type ShardPiece, type TrainingRun,
 } from '../../rules/training';
 import { Icon } from '../Icon';
 import { act } from './act';
@@ -27,7 +27,7 @@ export function DraftPanel({ run, pick, sel, onPick, onFocus, onChange }: DraftP
   if (run.phase === 'wave') {
     return (
       <div className="training-draft small">
-        <div className="training-panel-title"><b>Draft</b> <span className="muted">· the next {TRAINING.shards.draw} Shards come after this wave</span></div>
+        <div className="training-panel-title"><b>Draft</b> <span className="muted">· the next {drawSize(run)} Shards come after this wave</span></div>
       </div>
     );
   }

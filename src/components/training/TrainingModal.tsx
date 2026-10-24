@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Force } from '../../model/types';
 import { unitPortrait } from '../../model/emblem';
 import {
-  ackStale, cardText, clearRubble, clearSave, createRun, loadRun, pickCard, pieceAt, pieceById, placeDraft, quitRun, saveRun, staleSave, startWave,
+  ackStale, cardText, nexusOf, clearRubble, clearSave, createRun, loadRun, pickCard, pieceAt, pieceById, placeDraft, quitRun, saveRun, staleSave, startWave,
   type Phase, type SavedRun, type Tile, type TrainingRun,
 } from '../../rules/training';
 import { Modal, confirmAction, toast } from '../ui';
@@ -81,7 +81,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
       bank.reset();
       end(saved.run);
     }
-    begin(createRun(force.id, force.units, newSeed(), force.sortie));
+    begin(createRun(force.id, force.units, newSeed(), force.sortie, nexusOf(c)));
   };
 
   const onPhase = (r: TrainingRun, _was: Phase) => {
@@ -171,7 +171,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     act(() => pickCard(run, i), refresh);
     setPeek(false);
   };
-  const again = () => begin(createRun(force.id, force.units, newSeed(), force.sortie));
+  const again = () => begin(createRun(force.id, force.units, newSeed(), force.sortie, nexusOf(c)));
   /** Start (or cancel) a craft; the floating piece card makes way for the craft banner. */
   const craftMode = (cr: Crafting | null) => {
     setCrafting(cr);

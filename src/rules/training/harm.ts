@@ -1,10 +1,12 @@
 import type { Effect, Status } from '../abilities';
 import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { centreOf, dist, inCover, mapOf, pieceById } from './board';
+import { onEchoDeath } from './affixes';
 import { offerCards } from './cards';
 import { payKill } from './economy';
 import { centre, remaining, upstream, WAYPOINTS } from './map';
 import { rand, saveChance } from './rng';
+import { lordDmg } from './lords';
 import { tallyHarm } from './tally';
 import type { Enemy, Tower, TowerGun, TowerSkill, TrainingRun, UnitTower } from './types';
 
@@ -60,8 +62,9 @@ export const busy = (run: TrainingRun, t: Tower) => t.guns.some((g) => targetFor
 /** Is the enemy at -1 to be hit by this weapon: a shot at one standing in cover. */
 export const covered = (run: TrainingRun, g: TowerGun, e: Enemy) => !g.melee && inCover(run, e.x, e.y);
 
-/** Did a hit get through the enemy's save (Defense + AP; a Hardened nemesis saves better)? */
-export const unsaved = (run: TrainingRun, e: Enemy, ap: number) => rand(run) >= saveChance(enemyDef(e).defense - (e.nem?.hard ?? 0), ap);
+/** Did a hit get through the enemy's save (Defense + AP; a Hardened nemesis and an Armoured Echo save better)? */
+export const unsaved = (run: TrainingRun, e: Enemy, ap: number) =>
+  rand(run) >= saveChance(enemyDef(e).defense - (e.nem?.hard ?? 0) - (e.hard ?? 0), ap);
 
 /** A ring of `r` cells swelling out from a point. */
 export const pulse = (run: TrainingRun, x: number, y: number, r: number, color: string) =>
@@ -83,7 +86,8 @@ export function dmgMul(t: Tower): number {
 /**
  * Damage to an enemy from tower `by` (undefined: no one). A shot or blow on a marked enemy deals more; some enemies take
  * less from shots or more from blows. A kill credits `by`, pays out, sets off death-blasts, and a boss kill offers cards.
- * The run's tallies (tally.ts) note it all for the Sortie layer.
+ * The run's tallies (tally.ts) note it all for the Sortie layer. A real lord's ward and hide take their share first
+ * (lords.ts); a kill sets off a Vengeful rush (affixes.ts).
  * `chain`: whether this kill may set off a death-blast (a blast's own kills don't).
  */
 export function hurt(run: TrainingRun, by: Tower | undefined, e: Enemy, dmg: number, how: Harm, chain = true): void {
@@ -92,13 +96,14 @@ export function hurt(run: TrainingRun, by: Tower | undefined, e: Enemy, dmg: num
   const mul = how === 'shot' ? def.shotMul ?? 1 : how === 'melee' ? def.meleeMul ?? 1 : 1;
   const mark = how !== 'other' && e.status.mark ? TRAINING.markDmg : 0;
   const before = e.hp;
-  e.hp -= (dmg + mark) * mul;
+  e.hp -= lordDmg(run, by, e, (dmg + mark) * mul, how);
   const dealt = before - Math.max(0, e.hp);
   if (by) by.dealt += dealt;
   tallyHarm(run, by, e, dealt, how, e.hp <= 0);
   if (e.hp > 0) return;
   if (by) by.kills += 1;
   payKill(run, e);
+  onEchoDeath(run, e);
   if (chain) deathBlasts(run, e);
   if (def.spawn === 'boss') offerCards(run);
 }

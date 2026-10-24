@@ -743,6 +743,73 @@ export const TRAINING = {
       bled: 0.15,
     },
   },
+  /**
+   * The Nexus in Training (F3, training/nexus.ts, affixes.ts, lords.ts), for a force in a campaign; outside one threat
+   * is 0, there is no event and every boss is the generic lord. Threat is Campaign.threat (Rising Dark adds 1), up to
+   * `threatMax`; earned credits are 1 + `credit` × threat times as many. A run takes one affix (Sortie's affixes and
+   * pact marks, remapped) per `affixes.per` threat levels, rounded up, at most `affixes.max`, the same for every force
+   * that round. Each affix scales with threat (the `per` numbers are per threat level):
+   * - armoured: `share` of each wave's Echoes (at most `max`) save at +1.
+   * - swift: Echoes walk `per` faster. - frenzied: `per` more wounds. - fierce: `per` bigger waves.
+   * - regenerating: every Echo but a lord mends `per` of its wounds a second.
+   * - vengeful: an Echo slain makes those within `radius` cells walk `mul` × as fast for `secs` × threat seconds.
+   * - shrouded: shots at an Echo more than `from` − `per` × threat of the gun's reach away (at least `min`) are at -1.
+   * - proud: `per` of the plain Echoes from wave 1 come as veterans too. - bleed: the base starts `per` lower.
+   * Events (`events`, by GALACTIC_EVENTS id) that map to the maze; any other is flavour on the start screen and HUD.
+   * Lords: up to `lords.max` of the campaign's own (Echo-held guardians by tier, then the Nexus Crisis lord last)
+   * take the boss waves from `lords.from` on, in tier order, skipping the nemesis's wave; their wounds × `lords.hp` by
+   * tier (the crisis lord counts as Legendary). Each has one trick (`tricks`, by ECHO_LORDS id; a guardian's from its
+   * rules, else by its name from `tricks.plain`); see lords.ts trickText for what each number means.
+   */
+  nexus: {
+    threatMax: 7, credit: 0.1,
+    affixes: { per: 2, max: 3 },
+    armoured: { share: 0.1, max: 0.6 },
+    swift: { per: 0.03 },
+    frenzied: { per: 0.04 },
+    fierce: { per: 0.03 },
+    regenerating: { per: 0.003 },
+    vengeful: { radius: 3, mul: 1.4, secs: 0.4 },
+    shrouded: { from: 0.8, per: 0.05, min: 0.4 },
+    proud: { per: 0.04 },
+    bleed: { per: 2 },
+    events: {
+      warpCurrents: { walk: 1.1 },
+      ionStorm: { from: 18 },
+      shardRush: { draw: 1 },
+      convoys: { credits: 25 },
+      echoSurge: { budget: 1.1 },
+      voidLull: { budget: 0.9 },
+      risingDark: { threat: 1 },
+      derelicts: { cover: 2 },
+      glory: { xp: 1 },
+    },
+    lords: {
+      max: 5, from: 5,
+      hp: { Common: 1, Rare: 1.25, Legendary: 1.5 } as Record<'Common' | 'Rare' | 'Legendary', number>,
+    },
+    tricks: {
+      teleport: { every: 7, cells: 4 },
+      shield: { share: 0.25, every: 10 },
+      summon: { every: 6, n: 2, hp: 1.5, spread: 0.3 },
+      burst: { every: 8, secs: 2, mul: 2 },
+      regen: { every: 2, share: 0.03 },
+      fear: { radius: 5 },
+      storm: { every: 8, secs: 2, radius: 6 },
+      armour: { from: 12, mul: 0.5 },
+      stealth: {},
+      byLord: {
+        devourer: 'regen', hollowKing: 'fear', stormHerald: 'storm', broodmother: 'summon', umbralTitan: 'armour',
+        whisperer: 'teleport', shardEater: 'burst', nexusWarden: 'shield', mirrorWraith: 'stealth', rift: 'summon',
+      } as Record<string, string>,
+      /** A guardian's trick from the first of its rules found here, else one of `plain` by its name. */
+      byRule: [
+        ['Regeneration', 'regen'], ['Fear', 'fear'], ['Caster', 'storm'], ['Stealth', 'stealth'], ['Ambush', 'teleport'],
+        ['Scout', 'teleport'], ['Fast', 'burst'], ['Flying', 'burst'], ['Shielded', 'shield'],
+      ] as [string, string][],
+      plain: ['teleport', 'shield', 'summon', 'burst'],
+    },
+  },
   /** A force's power (squadPower, which Sorties scale by too): its points, with each veteran level adding this share. */
   levelPower: 0.05,
   /** Legacy: only the old rules text and force page read these, until their rework. Nothing in the run uses them. */

@@ -1,6 +1,7 @@
 import { SHARD_TYPES, TRAINING, type ShardType } from '../downtimeData';
 import { hitChance, pick, saveChance, weighted } from './rng';
 import { pieceById, placeProblem } from './board';
+import { nexusStart } from './nexus';
 import type { Grade, KeepOption, Piece, RubblePiece, ShardPiece, Tile, TowerGun, TrainingRun } from './types';
 
 // The Shard draft: drawing, placing, keeping (and merging), rubble. And a Shard's own tower stats.
@@ -20,9 +21,12 @@ export function rollGrade(run: TrainingRun): Grade {
   return (weighted(run, odds) + 1) as Grade;
 }
 
-/** Start the build phase's draft: draw TRAINING.shards.draw Shards into run.draft.hand, step 'place'. */
+/** Shards a draft draws: TRAINING.shards.draw, and more in a Shard Rush (nexus.ts). */
+export const drawSize = (run: TrainingRun) => TRAINING.shards.draw + nexusStart(run).draw;
+
+/** Start the build phase's draft: draw drawSize Shards into run.draft.hand, step 'place'. */
 export function drawDraft(run: TrainingRun): void {
-  const hand = Array.from({ length: TRAINING.shards.draw }, () => {
+  const hand = Array.from({ length: drawSize(run) }, () => {
     const type = pick(run, SHARD_KINDS);
     return { type, grade: rollGrade(run) };
   });

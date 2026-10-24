@@ -4,11 +4,13 @@ import { beastInfo } from '../sortie';
 import type { TrainingRun } from './types';
 
 // The bestiary Sortie keeps (ForceSortie.bestiary, by Echo datasheet name or 'lord:<id>'), fed from Training: each
-// enemy kind counts as the Echo it stands for (TRAINING.shared.beasts), the nemesis as its lord.
+// enemy kind counts as the Echo it stands for (TRAINING.shared.beasts), the nemesis as its lord, and a campaign's real
+// lord under its own key ('nexus:<ECHO_LORDS id>' or 'nexus:g:<guardian name>'), slain for real.
 
 /** The bestiary key a run tally counts under (none for a kind with no Echo). */
 export function beastKey(run: TrainingRun, k: string): string | undefined {
   if (k === 'nemesis') return run.nemesis ? `lord:${run.nemesis.id}` : undefined;
+  if (k.startsWith('real:')) return run.nexus?.lords[Number(k.slice(5))]?.key;
   return (TRAINING.shared.beasts as Record<string, string>)[k];
 }
 

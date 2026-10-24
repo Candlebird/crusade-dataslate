@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyDef } from '../../rules/downtimeData';
-import { isNemesisWave, nemesisTricks, previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
+import { isNemesisWave, lordIndex, lordLine, nemesisTricks, previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
 import { enemyShape } from './drawLive';
 
 export interface WavePreviewProps {
@@ -29,10 +29,19 @@ export function WaveStatus({ run }: WavePreviewProps) {
             Nemesis: {run.nemesis.name}
           </span>
         )}
+        {run.nexus && <RealLordTag run={run} w={n} />}
       </div>
       {live ? <div className="muted">{left} enem{left === 1 ? 'y' : 'ies'} left</div> : <WavePreview run={run} />}
     </div>
   );
+}
+
+/** A tag for a wave one of the campaign's real Echo Lords leads; hover for its trick. */
+function RealLordTag({ run, w }: { run: TrainingRun; w: number }) {
+  const i = lordIndex(run, w);
+  const l = i === undefined ? undefined : run.nexus!.lords[i];
+  if (!l) return null;
+  return <span className="tag red" title={lordLine(l, w)}>{l.slain ? 'Slain: ' : ''}{l.name} ({l.tier})</span>;
 }
 
 /** What the next wave sends, one icon a kind with a count; hover for what it is. */

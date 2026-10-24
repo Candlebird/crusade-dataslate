@@ -44,3 +44,10 @@ export function shuffle<T>(r: Rng, xs: T[]): T[] {
 export const hitChance = (quality: number, mod: number) => Math.max(1 / 6, Math.min(5 / 6, (7 - quality + mod) / 6));
 /** A save's odds on `defense`+ against `ap` (a 1 always fails). */
 export const saveChance = (defense: number, ap: number, mod = 0) => Math.max(0, Math.min(5 / 6, (7 - defense - ap + mod) / 6));
+
+/** A string's FNV-1a hash, as a dice seed. */
+export function seedOf(s: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  return h | 0;
+}

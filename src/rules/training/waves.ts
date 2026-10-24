@@ -1,6 +1,8 @@
 import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyKind } from '../downtimeData';
+import { affixPace, affixPlan } from './affixes';
 import { BASE, dist, mapOf } from './board';
 import { LEGS, N, WAYPOINTS, centre, heading, mapFor, route, type MapState } from './map';
+import { budgetMul } from './nexus';
 import { pick, rand, randInt, shuffle, type Rng } from './rng';
 import { noteMet } from './tally';
 import type { Enemy, SpawnPlan, Tile, TrainingRun } from './types';
@@ -95,11 +97,14 @@ function spawnPlan(r: Rng, kind: TrainingEnemyKind, at: number, w: number, hpMul
   return { kind, at, leg, x, y, hp, flies, ...(vet ? { vet } : {}) };
 }
 
+/** Wave `w`'s spawns, sorted by time, rolling `r`: the Nexus's budget and affixes on them (nexus.ts, affixes.ts). */
+const nexusWave = (r: Rng, run: TrainingRun, w: number) => affixPlan(r, run, planFor(r, run.power * budgetMul(run), w));
+
 /** Wave `w`'s spawns, sorted by time (rolls the run's dice). */
-export const planWave = (run: TrainingRun, w: number): SpawnPlan[] => planFor(run, run.power, w);
+export const planWave = (run: TrainingRun, w: number): SpawnPlan[] => nexusWave(run, run, w);
 
 /** The next wave as startWave will plan it, without touching the run (rolls on a copy of the dice). */
-export const previewWave = (run: TrainingRun): SpawnPlan[] => planFor({ rng: run.rng }, run.power, run.wave + 1);
+export const previewWave = (run: TrainingRun): SpawnPlan[] => nexusWave({ rng: run.rng }, run, run.wave + 1);
 
 /** A wave's spawns grouped by kind, for the preview: how many, how many veterans, a plain one's wounds, and if they fly. */
 export interface PreviewGroup {
@@ -144,18 +149,20 @@ export function layCover(r: Rng, n: number, route: Tile[], taken: Tile[] = []): 
   return out;
 }
 
-/** A new run's cover: TRAINING.cover.patches patches, biased to the empty map's route. */
-export const runCover = (r: Rng): Tile[] =>
-  layCover(r, randInt(r, TRAINING.cover.patches[0], TRAINING.cover.patches[1]), route(mapFor([])));
+/** A new run's cover: TRAINING.cover.patches patches (and `extra` more: the Derelict Fleet), biased to the empty map's route. */
+export const runCover = (r: Rng, extra = 0): Tile[] =>
+  layCover(r, randInt(r, TRAINING.cover.patches[0], TRAINING.cover.patches[1]) + extra, route(mapFor([])));
 
 /** An enemy on the field from a spawn plan (id run.nextId++), met for the bestiary. A nemesis plan gets its tricks
- *  through `nem` (nemesis.ts sets them up). */
+ *  through `nem` (nemesis.ts sets them up), a real lord's through `lord` (lords.ts); an Armoured one its `hard`. */
 export function spawnOne(run: TrainingRun, s: SpawnPlan): Enemy {
   const next = centre(WAYPOINTS[Math.min(LEGS, s.leg + 1)]);
   const e: Enemy = {
     id: run.nextId++, kind: s.kind, x: s.x, y: s.y, leg: s.leg, face: Math.atan2(next.y - s.y, next.x - s.x),
     hp: s.hp, maxHp: s.hp, flies: s.flies, ...(s.vet ? { vet: true } : {}), status: {}, dots: [], regrab: 0,
     ...(s.nemesis ? { nem: { born: run.t, speed: 1, hard: 0, next: 0, regen: 0 } } : {}),
+    ...(s.lord !== undefined ? { lord: { i: s.lord, next: 0, ward: 0, burst: 0 } } : {}),
+    ...(s.hard ? { hard: s.hard } : {}),
   };
   run.enemies.push(e);
   noteMet(run, e);
@@ -167,11 +174,13 @@ export function spawnDue(run: TrainingRun): void {
   while (run.queue.length && run.queue[0].at <= run.t) spawnOne(run, run.queue.shift()!);
 }
 
-/** An enemy's speed now, in cells a second (slow, daze; a nemesis's rage and Vengeful). */
-export function speedOf(_run: TrainingRun, e: Enemy): number {
+/** An enemy's speed now, in cells a second (slow, daze; a nemesis's rage and Vengeful; a real lord's Surge; the
+ *  Nexus's Swift, Warp Currents and Vengeful rushes). */
+export function speedOf(run: TrainingRun, e: Enemy): number {
   const slow = (e.status.slow ?? 0) > 0 ? TRAINING.slowMul : 1;
   const daze = (e.status.daze ?? 0) > 0 ? TRAINING.dazeMul : 1;
-  return TRAINING_ENEMIES[e.kind].speed * TRAINING.walkMul * slow * daze * (e.nem?.speed ?? 1);
+  const surge = (e.lord?.burst ?? 0) > 0 ? TRAINING.nexus.tricks.burst.mul : 1;
+  return TRAINING_ENEMIES[e.kind].speed * TRAINING.walkMul * slow * daze * (e.nem?.speed ?? 1) * surge * affixPace(run, e);
 }
 
 /** Base HP an enemy costs if it gets through. */

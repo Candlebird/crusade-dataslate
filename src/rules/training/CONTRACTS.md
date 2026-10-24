@@ -34,6 +34,11 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | Enemy.nem (speed, hard, free, next, regen, armed), boss SpawnPlan.nemesis / hp | nemesis.ts (nemesisPlan, nemesisTick); waves.spawnOne seeds it |
 | run.trinket, CardDraw.trinket | trinkets.ts |
 | run.shared | shared.bankShared (the force's Sortie layer banked once) |
+| run.nexus (threat, affixes, event, lords; set at create, a JSON copy) | run.ts via nexus.nexusOf(campaign) (the UI passes it; bots pass none) |
+| run.nexus.lords[].slain | tally.ts (a real lord's kill) |
+| Enemy.lord (i, next, ward, burst, armed), boss SpawnPlan.lord / hp | lords.ts (lordPlan, lordTick, lordDmg); waves.spawnOne seeds it |
+| Enemy.hard, SpawnPlan.hard / vet / hp (affixes) | affixes.affixPlan; waves.spawnOne copies hard |
+| Enemy.surge | affixes.ts (onEchoDeath sets it, affixTick wears it) |
 | Force.sortie.bestiary (incl. SortieBeast.drill), Unit.quirks / trinket, sortie.trinkets, sortie.bled | shared.ts (bankShared, bestiary.bankBeasts) on finish; sortie.ts / downtime.applySortie as before; applySortie clears bled[lord] once a Sortie meets it |
 
 ## run.step(dt) call order
@@ -45,6 +50,8 @@ run.t += dt
 waves.spawnDue(run)
 combat.auras(run, dt)          // boosts from auras; dmgBoost wears down
 nemesis.nemesisTick(run, dt)   // the nemesis's signature and tricks (dirge -1 hit after auras; dive, tremor, brood, regen)
+lords.lordTick(run, dt)        // real Echo Lords: ward up, Dread -1 hit near it, timed tricks, Surge wears off
+affixes.affixTick(run, dt)     // Regenerating mends Echoes (not bosses); a Vengeful rush wears off
 combat.abilities(run, dt)      // timed skills, fields, bleed fields, Vigor bleed
 relics.relics(run, dt)         // rush wears down; each socket's clock; one that goes off restarts it (fx gold)
 combat.holds(run, dt)          // grab / release (before walking, so held enemies stand still)
@@ -179,6 +186,24 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `beastKey(run, k)` — kind → Echo name (TRAINING.shared.beasts), 'nemesis' → `lord:<id>`. `loreKnown(b)` — slain or drill.
 - `bankBeasts(story, run): string[]` — met / slain added (a lord killed here → drill, not slain); lines for first meetings and lore.
 
+### Nexus (F3): nexusTypes.ts, nexus.ts, lordPick.ts, lords.ts, affixes.ts
+Numbers in `TRAINING.nexus`. Outside a campaign run.nexus is undefined: threat 0, no affixes or event, every boss the generic lord.
+- nexusTypes.ts: `NexusAffixId`, `LordTrick`, `RunLord {key, name, tier, trick, from, slain?}`, `RunNexus {threat, affixes, event?, lords}`, `LordState`; re-exported from types.ts.
+- nexus.ts: `nexusOf(c?): RunNexus | undefined` — threat (+ Rising Dark), affixes (one a `affixes.per` levels, at most `affixes.max`, dice seeded by campaign id and round), this round's event only, lords via lordPick.campaignLords.
+  `threatOf`, `hasAffix`, `eventIs`, `eventMapped(id)`, `creditMul(run)` (1 + credit × threat), `budgetMul(run)` (Fierce, Echo Surge, Void Lull),
+  `nexusStart(run)` → {credits, baseHp, cover, draw, xp} (Convoys, Bleed, Derelicts, Shard Rush, Glory), `affixInfo(id, threat)`, `shroudFrom(threat)`,
+  `eventEffect(id)`, `eventInfo(id)` → {name, desc, effect ('' = flavour)}, `nexusLines(nx, nemesis)` → {threat, affixes[], event, lords[]} for the start screen and HUD.
+- lordPick.ts (pure, no engine imports): `campaignLords(c, r)` — sector guardians (by name, at most lords.max − crisis slot, tier order), then the unwon crisis lord as Legendary;
+  keys `nexus:g:<name>` / `nexus:<ECHO_LORDS id>`; tricks by ECHO_LORDS id (tricks.byLord), a guardian's rules (byRule), else one of `plain` by its name.
+  `guardianTrick(g)`, `TRICK_NAMES`, `trickText(k)`, `lordWaves(nx, nemesis)` (boss waves from lords.from, skipping the nemesis wave), `lordIndex(run, w)`, `nextLord(run, w?)`, `lordLine(l, wave?)`, `lordsSlain(run)`, `GENERIC_LORD`.
+- lords.ts: `lordOf(run, e)`, `lordPlan(run, plans)` (boss plan not the nemesis's → lord i, hp × lords.hp[tier]), `lordTick(run, dt)`,
+  `lordHit(run, g, e)` (Mirror Veil −1 to shots; combat.fire), `lordDmg(run, by, e, dmg, how)` (Umbral Hide, Ward; harm.hurt).
+- affixes.ts: `affixPlan(r, run, plans)` (Frenzied hp, Proud veterans, Armoured hard), `affixPace(run, e)` (Swift, Warp Currents, a Vengeful surge; waves.speedOf),
+  `affixTick(run, dt)`, `onEchoDeath(run, dead)` (Vengeful; harm.hurt after payKill), `affixHit(run, g, d, reach)` (Shrouded, Ion Storm; combat.fire, never melee).
+- Elsewhere: harm.unsaved − Enemy.hard; economy payKill / waveCredits × creditMul; shards.`drawSize(run)`; run.`runXpCap(run)` (xpCap + Glory);
+  tally beastOf → `real:<i>`, marks slain; bestiary.beastKey `real:<i>` → the lord's key (banked slain, not drill); sortie.beastInfo knows `nexus:` keys
+  (Sortie goals and rematches ignore them); feats.trainingFeats(cleared, lords) → 'trainLord' (Lordfall).
+
 ### trinkets.ts
 - `TRINKET_CARD`, `isTrinketCard(d)`, `trinketDice(run)` (its own dice from seed and wave: never moves run.rng).
 - `trinketOffer(run)` — each boss kill at trinkets.odds until one is offered (then never again); to the crafted unit with most kills and none, else spares. `trinketCardText`, `takeTrinket`.
@@ -190,7 +215,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 
 ### waves.ts
 - `isFlyWave(w)`, `isBossWave(w)`, `isFlyBossWave(w): boolean`
-- `planWave(run, w: number): SpawnPlan[]` — budget base × (power/perPoints) × growth^(w-1); flyers; boss + escorts; scouts at pad scoutAt (scoutHp); ambush hp; hp ×hpGrowth past hpFrom; staggered by gap; sorted by `at`.
+- `planWave(run, w: number): SpawnPlan[]` — via `nexusWave`: planFor(power × nexus.budgetMul) then affixes.affixPlan; budget base × (power/perPoints) × growth^(w-1); flyers; boss + escorts; scouts at pad scoutAt (scoutHp); ambush hp; hp ×hpGrowth past hpFrom; staggered by gap; sorted by `at`.
 - `previewWave(run): SpawnPlan[]` — planWave(run.wave + 1) on a copy of the dice.
 - `layCover(r: Rng, n: number, route: Tile[]): Tile[]` — n patches, onRoute share centred on route cells, clear of pads/base/spawn.
 - `spawnDue(run): void` — queue entries with at ≤ run.t → enemies (id run.nextId++).
@@ -199,9 +224,9 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `walk(run, dt): void` — skip held (heldBy) / stunned; walkers by flow field, flyers pad to pad; ambush jump on reaching pad ambushFrom → pad ambushAt; reaching base: remove, baseHp −= leakCost, leaked++.
 - Also (waves agent): `waveTags(w): string[]` ('Flying'/'Boss' for the HUD), `waveBudget(power, w)`, `lateHp(w)`,
   `planFor(r: Rng, power, w)` (planWave on any dice), `previewGroups(plans): PreviewGroup[]` ({kind, n, vets, hp, flies}
-  for WavePreview), `runCover(r): Tile[]` (createRun's cover: patches range on the empty map's route), `layCover` takes an
+  for WavePreview), `runCover(r, extra = 0): Tile[]` (createRun's cover, + extra patches for Derelicts: patches range on the empty map's route), `layCover` takes an
   optional 4th `taken: Tile[]` to keep clear of, `atBase(e)`, `move(m, e, step)`. New TRAINING keys: `dazeMul`, `wave.bossMin`.
-- `spawnOne(run, plan): Enemy` — one spawn (spawnDue and the nemesis's brood); a nemesis plan gets `nem`; noteMet. speedOf × nem.speed.
+- `spawnOne(run, plan): Enemy` — one spawn (spawnDue and the nemesis's brood); a nemesis plan gets `nem`; noteMet. speedOf × nem.speed × the lord's Surge × affixes.affixPace; a real lord's plan gets `lord`, an Armoured one `hard`.
 
 ### cards.ts
 - `interface TrainingCard { id; name; rarity; text; unit?(t); apply(run, t?) }`, `CARDS: TrainingCard[]`
@@ -215,12 +240,12 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `saveKey(forceId): string` (done) — `trainingRun:<forceId>`.
 - `serialize(run): string`, `deserialize(s: string): TrainingRun | null` — JSON; null on bad/old version. fx may be dropped.
 - `saveRun(run): void`, `loadRun(forceId): SavedRun | null` (null for a run already 'over'), `clearSave(forceId): void` — localStorage wrapped in try/catch.
-- `SAVE_VERSION` (3: the Sortie layer; 2 was living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
+- `SAVE_VERSION` (4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
 
 ### run.ts
-- `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie): TrainingRun` — run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
+- `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus): TrainingRun` — run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
 - `startProblem(run): string | null` — build phase, draft step 'done', no card offer pending.
-- `startWave(run): void` — wave++, phase 'wave', t 0, leaked 0, queue = nemesis.nemesisPlan(run, waves.planWave(...)); gun clocks reset.
+- `startWave(run): void` — wave++, phase 'wave', t 0, leaked 0, queue = lords.lordPlan(run, nemesis.nemesisPlan(run, waves.planWave(...))); gun clocks reset.
 - `step(run, dt): void` — see the order above.
 - `craftProblem(run, unitId, uses: number[], onId: number): string | null` — build phase, not crafted, `uses` satisfy the recipe (recipeUses-style check), onId ∈ uses; if any of `uses` is a draft piece the draft must be at step 'keep' (the craft is then this draft's keep).
 - `craft(run, unit: Unit, uses: number[], onId: number): void` — Shard onId becomes recipes.unitTower (same id/cell); other uses → rubble; draft pieces used → shards.crumbleDraft(run, []) after; push unitId to crafted.
@@ -240,7 +265,10 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 ### bot.ts (test-only; not in index.ts)
 - `interface MazeSpot { n; x; y }`
 - `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (recipe progress, then grade), craft when ready (unit on the used Shard nearest the route), spend (levels cheapest first, then luck, mend when low), pick card 0.
-- `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt? }): TrainingRun`
+- `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt?; nexus? }): TrainingRun`
+
+### nexusTest.ts (test-only; not in index.ts)
+- `guardian(name, tier, rules?)`, `campaign(threat, guardians?, o?)` — a round-2 campaign for the Nexus tests.
 
 ### index.ts
-Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).
+Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared, nexus, lordPick, lords, affixes (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).

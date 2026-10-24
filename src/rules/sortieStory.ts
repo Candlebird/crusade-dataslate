@@ -576,6 +576,10 @@ export const SORTIE_LORE: Record<string, string> = {
 
 /** Lore for an Echo with no entry of its own. */
 export const SORTIE_LORE_DEFAULT = 'Another shape the Void wears. The scouts can only say that it bleeds, and that it can die.';
+/** Lore for the campaign's real lords as Training meets them (bestiary keys 'nexus:...'). */
+export const NEXUS_LORE = {
+  guardian: 'A hero of the Void Echoes, set to guard what they hold in the Nexus. Its echo walked the training maze, and fell there.',
+};
 
 /** What a party unit shouts as it makes a last stand; {name} is the unit's name. */
 export const SORTIE_STAND: Record<SortieVoiceKind, string[]> = {

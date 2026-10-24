@@ -1,9 +1,11 @@
 import { SHARD_TYPES, TRAINING } from '../downtimeData';
+import { affixHit } from './affixes';
 import { centreOf, dist, towers } from './board';
 import {
   afflict, covered, dmgMul, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, levelDmg, reach, targetFor,
   towerById, unsaved,
 } from './harm';
+import { lordHit } from './lords';
 import { hitChance, rand } from './rng';
 import type { Enemy, Tower, TowerGun, TowerSkill, TrainingRun } from './types';
 
@@ -42,8 +44,11 @@ export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): bo
   const c = centreOf(t);
   // Region quirks change the cover penalty on a unit's shots (habits.ts coverMul).
   const cover = covered(run, g, target) ? TRAINING.cover.hit * (isUnit(t) ? t.coverMul ?? 1 : 1) : 0;
-  const far = !g.melee && isUnit(t) && t.myopic && dist(c.x, c.y, target.x, target.y) > reach(t, g) * TRAINING.habits.myopicFrom ? -1 : 0;
-  const p = g.reliable ? hitChance(2, cover) : hitChance(t.quality, g.hitMod + (g.melee ? t.hitMelee : t.hitShoot) + t.boost.hit + cover + far);
+  const d = dist(c.x, c.y, target.x, target.y);
+  const far = !g.melee && isUnit(t) && t.myopic && d > reach(t, g) * TRAINING.habits.myopicFrom ? -1 : 0;
+  // The Nexus: Shrouded, Ion Storm and a lord's Mirror Veil (affixes.ts, lords.ts).
+  const nexus = affixHit(run, g, d, reach(t, g)) + lordHit(run, g, target);
+  const p = g.reliable ? hitChance(2, cover + nexus) : hitChance(t.quality, g.hitMod + (g.melee ? t.hitMelee : t.hitShoot) + t.boost.hit + cover + far + nexus);
   const r = rand(run);
   const miss = r >= p;
   // Where a shot lands is only for show, so it doesn't touch the run's dice.

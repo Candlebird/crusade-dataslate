@@ -12,8 +12,9 @@ import {
   type SortieAffix, type SortieBoonId, type SortieChoice, type SortieEvent, type SortieLength, type SortieMode, type SortieOutcome,
   type SortieCurseId, type SortieMarkId, type SortieScarId,
 } from './downtimeData';
-import { SORTIE_BOSSES, SORTIE_LORE, SORTIE_LORE_DEFAULT, SORTIE_REGIONS, SORTIE_STAND, SORTIE_VOICE, type SortieBoss, type SortieRegion, type SortieRegionId, type SortieVoiceKind } from './sortieStory';
+import { NEXUS_LORE, SORTIE_BOSSES, SORTIE_LORE, SORTIE_LORE_DEFAULT, SORTIE_REGIONS, SORTIE_STAND, SORTIE_VOICE, type SortieBoss, type SortieRegion, type SortieRegionId, type SortieVoiceKind } from './sortieStory';
 import { RELICS, type RelicDef } from './data';
+import { ECHO_LORDS } from './nexusData';
 import { pickRaiders, raidBand, type Raider } from './raiders';
 
 // Sortie: a party of three units sets out across a branching map, Darkest Dungeon style. Fights are turn based. The
@@ -681,8 +682,8 @@ export function goalProgress(story: ForceSortie | undefined, goal: SortieGoal): 
     case 'flawless': return st?.flawless ?? 0;
     case 'deepest': return st?.deepest ?? 0;
     case 'lords': return beasts.filter(([k]) => k.startsWith('lord:')).reduce((n, [, b]) => n + b.slain, 0);
-    case 'beasts': return beasts.filter(([k]) => !k.startsWith('lord:')).length;
-    case 'lore': return beasts.filter(([, b]) => b.slain || b.drill).length;
+    case 'beasts': return beasts.filter(([k]) => !k.startsWith('lord:') && !k.startsWith('nexus:')).length;
+    case 'lore': return beasts.filter(([k, b]) => !k.startsWith('nexus:') && (b.slain || b.drill)).length;
     case 'tier': return story?.tier ?? 0;
     case 'deep': return story?.deep?.length ?? 0;
     case 'relics': return story?.relics?.length ?? 0;
@@ -2261,11 +2262,17 @@ export function leaveCombat(run: SortieRun) {
 /** The bestiary key of an Echo squad: its datasheet, or the lord's id. */
 export const beastKey = (run: SortieRun, c: SortieCombat, e: SortieSquad) => (c.lord === e.key ? `lord:${run.boss}` : e.unit.unitType);
 
-/** A bestiary entry's name and lore, from its key. */
+/** A bestiary entry's name and lore, from its key (a Training run's real Nexus lords too: 'nexus:<ECHO_LORDS id>',
+ *  'nexus:g:<guardian name>'). */
 export function beastInfo(key: string): { name: string; unit: string; lore: string; lord: boolean } {
   if (key.startsWith('lord:')) {
     const b = SORTIE_BOSSES.find((x) => x.id === key.slice(5));
     if (b) return { name: b.name, unit: b.unit, lore: b.lore, lord: true };
+  }
+  if (key.startsWith('nexus:g:')) return { name: key.slice(8), unit: 'a guardian of the Nexus', lore: NEXUS_LORE.guardian, lord: true };
+  if (key.startsWith('nexus:')) {
+    const l = ECHO_LORDS.find((x) => x.id === key.slice(6));
+    if (l) return { name: l.name, unit: 'a lord of the Nexus Crisis', lore: l.desc, lord: true };
   }
   return { name: key, unit: key, lore: SORTIE_LORE[key] ?? SORTIE_LORE_DEFAULT, lord: false };
 }

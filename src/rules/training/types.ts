@@ -3,6 +3,9 @@ import type { Gun } from '../autoBattle';
 import type { AuraStat, Effect, Status } from '../abilities';
 import type { ShardType, TrainingEnemyKind } from '../downtimeData';
 import type { Tile } from './map';
+import type { LordState, RunNexus } from './nexusTypes';
+
+export type { LordState, LordTrick, NexusAffixId, RunLord, RunNexus } from './nexusTypes';
 
 // Every shape a Training run holds. A run is plain data all the way down (no classes, functions or Maps), so it saves
 // as JSON and loads back as it was; map caches (map.ts mapFor) rebuild from the pieces.
@@ -199,6 +202,10 @@ export interface SpawnPlan {
   vet?: boolean;
   /** The force's Sortie nemesis (nemesis.ts): the wave's boss is it. */
   nemesis?: boolean;
+  /** A real lord (lords.ts): the wave's boss is RunNexus.lords[lord]. */
+  lord?: number;
+  /** Saves at +this (the Armoured affix). */
+  hard?: number;
 }
 
 /** Damage over time on an enemy, credited to piece `by`. */
@@ -231,6 +238,11 @@ export interface Enemy {
   regrab: number;
   /** The nemesis's tricks at work (nemesis.ts). */
   nem?: NemesisState;
+  /** A real lord's trick at work (lords.ts). */
+  lord?: LordState;
+  /** Saves at +this (the Armoured affix); seconds left of a Vengeful rush (affixes.ts). */
+  hard?: number;
+  surge?: number;
 }
 
 /** A nemesis on the field: when it came, its walking speed share (rage, Vengeful), better saves (Hardened), whether
@@ -311,7 +323,7 @@ export interface RunMods {
 
 export interface TrainingRun {
   /** Save format version (save.ts SAVE_VERSION). */
-  v: 3;
+  v: 4;
   forceId: string;
   seed: number;
   /** mulberry32 state: the same seed and the same moves play out the same. */
@@ -360,11 +372,13 @@ export interface TrainingRun {
   gains?: QuirkGain[];
   /** The Sortie layer has been banked into the force (shared.ts bankShared). */
   shared?: boolean;
+  /** The Nexus (F3, nexus.ts): the campaign's threat, affixes, event and real lords; none outside a campaign. */
+  nexus?: RunNexus;
 }
 
 /** What a saved run looks like on disk (save.ts). */
 export interface SavedRun {
-  v: 3;
+  v: 4;
   savedAt: string;
   run: TrainingRun;
 }

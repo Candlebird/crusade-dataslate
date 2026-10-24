@@ -4,7 +4,7 @@ import type { Force } from '../model/types';
 
 export type FeatId =
   | 'sortieTop' | 'sortieFlawless' | 'sortieAsc4' | 'sortieAsc8' | 'sortieHeat' | 'sortieNemesis'
-  | 'train20' | 'train25' | 'train30';
+  | 'train20' | 'train25' | 'train30' | 'trainLord';
 
 /** What a feat pays: Requisition, Supply and Umbra Shards to the force, XP to each unit that took part. */
 export interface FeatReward { rp?: number; supply?: number; us?: number; xp?: number }
@@ -21,6 +21,7 @@ export const FEATS: Feat[] = [
   { id: 'train20', where: 'training', name: 'Iron Line', text: 'Clear 20 waves in one training run.', reward: { rp: 3 } },
   { id: 'train25', where: 'training', name: 'Unbroken', text: 'Clear 25 waves in one training run.', reward: { rp: 3, supply: 100 } },
   { id: 'train30', where: 'training', name: 'The Last Wall', text: 'Clear 30 waves in one training run.', reward: { us: 3, xp: 1 } },
+  { id: 'trainLord', where: 'training', name: 'Lordfall', text: 'Slay one of the Nexus’s own Echo Lords in a training run.', reward: { rp: 3 } },
 ];
 
 export const featInfo = (id: string) => FEATS.find((f) => f.id === id);
@@ -36,9 +37,11 @@ export function rewardText(r: FeatReward): string {
   ].filter(Boolean).join(', ');
 }
 
-/** The training feats a run of `cleared` waves earns. */
-export const trainingFeats = (cleared: number): FeatId[] =>
-  ([['train20', 20], ['train25', 25], ['train30', 30]] as [FeatId, number][]).filter(([, n]) => cleared >= n).map(([id]) => id);
+/** The training feats a run of `cleared` waves earns, slaying `lords` of the campaign's real Echo Lords. */
+export const trainingFeats = (cleared: number, lords = 0): FeatId[] => [
+  ...([['train20', 20], ['train25', 25], ['train30', 30]] as [FeatId, number][]).filter(([, n]) => cleared >= n).map(([id]) => id),
+  ...(lords > 0 ? ['trainLord' as const] : []),
+];
 
 /**
  * Pay the feats the force hasn't earned before: Umbra Shards and XP straight away, RP and Supply on the ledger.

@@ -907,6 +907,8 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 12px; }
 .training-roster-unit { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .training-roster-xp { display: block; }
+.training-nexus { margin-bottom: 10px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
+.training-nexus ul { margin: 2px 0 0; padding-left: 1.2rem; }
 @media (max-width: 700px) {
   .training-intro { grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
   .training-thumb { width: 96px; height: 96px; }

@@ -71,8 +71,8 @@ const every = (sig: string) => (sig === 'dive' ? N.dive.every : sig === 'tremor'
 /** Is its dirge sounding now. */
 export const dirgeOn = (run: TrainingRun, e: Enemy) => !!e.nem && (run.t - e.nem.born) % N.dirge.every < N.dirge.secs;
 
-/** Let go of it, if a unit holds it. */
-function wrench(run: TrainingRun, e: Enemy) {
+/** Let go of it, if a unit holds it (lords.ts uses it too). */
+export function wrench(run: TrainingRun, e: Enemy) {
   if (e.heldBy === undefined) return;
   const t = pieceById(run, e.heldBy);
   if (t?.kind === 'unit') Object.assign(t, { holding: undefined, holdLeft: 0 });

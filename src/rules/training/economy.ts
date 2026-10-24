@@ -2,6 +2,7 @@ import type { Unit } from '../../model/types';
 import { levelForXp } from '../engine';
 import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { pieceById } from './board';
+import { creditMul } from './nexus';
 import type { Enemy, TrainingRun, UnitTower } from './types';
 
 // Credits in (kills, waves), credits out (levels, luck, base mends). Spending is only in the build phase.
@@ -95,13 +96,13 @@ export function buyMend(run: TrainingRun): void {
 /** Credits a kill pays, before run.mods.bounty: its cost × perCost, at least 1. */
 export const killCredits = (e: Enemy): number => Math.max(1, Math.round(TRAINING_ENEMIES[e.kind].cost * TRAINING.credits.perCost));
 
-/** Pay a kill into run.credits, with the bounty (rounded). */
+/** Pay a kill into run.credits, with the bounty and the Nexus's threat (nexus.ts creditMul), rounded. */
 export function payKill(run: TrainingRun, e: Enemy): void {
-  run.credits += Math.round(killCredits(e) * run.mods.bounty);
+  run.credits += Math.round(killCredits(e) * run.mods.bounty * creditMul(run));
 }
 
-/** Credits for clearing wave run.wave: the wave bonus, and the no-leak bonus when run.leaked is 0. */
+/** Credits for clearing wave run.wave: the wave bonus, and the no-leak bonus when run.leaked is 0; × creditMul. */
 export function waveCredits(run: TrainingRun): number {
   const C = TRAINING.credits;
-  return C.wave + C.perWave * run.wave + (run.leaked === 0 ? C.noLeak : 0);
+  return Math.round((C.wave + C.perWave * run.wave + (run.leaked === 0 ? C.noLeak : 0)) * creditMul(run));
 }

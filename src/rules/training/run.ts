@@ -6,19 +6,23 @@ import { waveCredits } from './economy';
 import { canTrain, recipesFor, recipeUses, unitTower } from './recipes';
 import { crumbleDraft, drawDraft, toRubble } from './shards';
 import { relics, resetSockets } from './relics';
+import { affixTick } from './affixes';
+import { lordPlan, lordTick } from './lords';
 import { nemesisPlan, nemesisTick, pickNemesis } from './nemesis';
+import { nexusStart } from './nexus';
 import { rollGains, watchBosses } from './quirks';
 import { planWave, runCover, spawnDue, walk } from './waves';
-import type { ShardPiece, TrainingRun, UnitTower } from './types';
+import type { RunNexus, ShardPiece, TrainingRun, UnitTower } from './types';
 
 // A run's life: create, build-phase actions, waves, step(), XP, the end.
 
 /** A new run for a force: recipes for every unit that can train, cover, credits, and the first draft drawn ('build').
- *  `story`: the force's Sortie record, for its nemesis (nemesis.ts). */
-export function createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie): TrainingRun {
+ *  `story`: the force's Sortie record, for its nemesis (nemesis.ts). `nexus`: its campaign's (nexus.ts nexusOf), which
+ *  can change the starting credits, base HP and cover. */
+export function createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus): TrainingRun {
   const force = units.filter(canTrain);
   const run: TrainingRun = {
-    v: 3, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
+    v: 4, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
     power: force.reduce((n, u) => n + u.points, 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
     mends: 0, leaked: 0, nextId: 1, pieces: [], draft: { step: 'done', hand: [], placed: [] }, recipes: recipesFor(force),
     crafted: [], enemies: [], queue: [], cover: [], cards: [], mods: { bounty: 1, holdMul: 1, regrabAdd: 0 }, banked: {},
@@ -26,7 +30,11 @@ export function createRun(forceId: string, units: Unit[], seed: number, story?: 
   };
   const nemesis = pickNemesis(story);
   if (nemesis) run.nemesis = nemesis;
-  run.cover = runCover(run);
+  if (nexus) run.nexus = JSON.parse(JSON.stringify(nexus)) as RunNexus;
+  const start = nexusStart(run);
+  run.credits += start.credits;
+  run.baseHp = Math.max(1, run.baseHp + start.baseHp);
+  run.cover = runCover(run, start.cover);
   drawDraft(run);
   return run;
 }
@@ -48,7 +56,7 @@ export function startWave(run: TrainingRun): void {
   run.phase = 'wave';
   run.t = 0;
   run.leaked = 0;
-  run.queue = nemesisPlan(run, planWave(run, run.wave));
+  run.queue = lordPlan(run, nemesisPlan(run, planWave(run, run.wave)));
   for (const p of run.pieces) {
     if (p.kind === 'rubble') continue;
     p.guns.forEach((g) => Object.assign(g, { cd: 0, pending: 0, next: 0 }));
@@ -73,6 +81,8 @@ export function step(run: TrainingRun, dt: number): void {
   spawnDue(run);
   auras(run, dt);
   nemesisTick(run, dt);
+  lordTick(run, dt);
+  affixTick(run, dt);
   abilities(run, dt);
   relics(run, dt);
   holds(run, dt);
@@ -97,9 +107,12 @@ function waveCleared(run: TrainingRun): void {
   drawDraft(run);
 }
 
-/** XP a unit has earned by now: xpPerWave for each xpEvery waves cleared since its craft, up to xpCap. */
+/** A unit's XP cap this run: xpCap, and more with Glory Seekers (nexus.ts). */
+export const runXpCap = (run: TrainingRun) => TRAINING.xpCap + nexusStart(run).xp;
+
+/** XP a unit has earned by now: xpPerWave for each xpEvery waves cleared since its craft, up to runXpCap. */
 const xpDue = (run: TrainingRun, t: UnitTower) =>
-  Math.min(TRAINING.xpCap, Math.floor((run.cleared - t.craftedAt) / TRAINING.xpEvery) * TRAINING.xpPerWave);
+  Math.min(runXpCap(run), Math.floor((run.cleared - t.craftedAt) / TRAINING.xpEvery) * TRAINING.xpPerWave);
 
 function awardXp(run: TrainingRun): void {
   for (const t of unitTowers(run)) {
