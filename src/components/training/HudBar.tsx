@@ -1,6 +1,7 @@
 import { TRAINING } from '../../rules/downtimeData';
 import { endlessDepth, eventInfo, finalBoss, finalOf, inEndless, lordLine, luckCap, nemesisTricks, nexusLines, nextLord, startProblem, type TrainingRun } from '../../rules/training';
 import { Icon } from '../Icon';
+import { NextRoundIcon } from './NextRound';
 
 export type Speed = 1 | 2 | 4;
 export const SPEEDS: Speed[] = [1, 2, 4];
@@ -29,7 +30,7 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
   const why = run.phase === 'build' ? startProblem(run) : null;
   const next = run.wave + 1;
   const live = run.phase === 'wave';
-  // What the next wave brings is on the wave line beside the map; the HUD only counts.
+  // What the next wave brings in full is on the wave line beside the map; the HUD has its icon (tap for what it does).
   return (
     <div className="training-hud small" role="toolbar" aria-label="Training run">
       <span className="training-hud-stat" title={live ? 'The wave under way' : 'Waves cleared'}>
@@ -45,6 +46,7 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
       <span className="training-hud-stat" title={`Luck: better Shard grades in each draft (up to ${luckCap(run)} this run)`}>
         <Icon name="g:sparkles" /> {run.luck}/{luckCap(run)}
       </span>
+      {run.phase === 'build' && <NextRoundIcon run={run} />}
       {run.siege && (
         <span className="training-hud-stat" title="The Weekly Siege: the week's map, drafts and waves for every force; score is the damage dealt to the Final boss, or the wave reached">
           <Icon name="g:castle" /> Siege <span className="muted">· {run.siege}</span>

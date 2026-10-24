@@ -1118,6 +1118,28 @@ export const TRAINING_ENEMIES: Record<TrainingEnemyKind, TrainingEnemyDef> = {
   lord: { name: 'Echo Lord', desc: `Every ${TRAINING.wave.bossEvery}th wave. Held half as long; costs the base up to 16 if it gets there (less the more it is hurt). Kill it for a card.`, hp: 30, speed: 0.5, defense: 4, armor: 0, cost: 20, leak: 16, big: true, from: 1, spawn: 'boss', color: '#e04a6a', size: 0.9, shape: 'crown' },
 };
 
+/** One line each on what an enemy kind does, for the HUD's next-round icon (components/training/NextRound.tsx). */
+export const TRAINING_ENEMY_BLURBS: Record<TrainingEnemyKind, string> = {
+  swarm: 'Swarm: fast and frail, in big numbers.',
+  drone: 'Line infantry: no special ability.',
+  spitter: 'Slick: only Defense 4+, easy to wound.',
+  outrider: `Scout: races in at pad ${TRAINING.route.scoutAt} as the wave starts.`,
+  carapace: 'Carapace armour 1: each hit does 1 less damage. Bring AP.',
+  mirror: 'Mirrored hide: shots do 40%, melee 150%.',
+  stalker: `Ambusher: vanishes at pad ${TRAINING.route.ambushFrom} and teleports to pad ${TRAINING.route.ambushAt}.`,
+  brute: 'Huge and slow: held half as long.',
+  lord: 'Echo Lord: held half as long, costs the base up to 16; kill it for a card.',
+};
+
+/** One line each on a wave's marks, for the next-round icon. */
+export const TRAINING_WAVE_BLURBS = {
+  flies: 'Flyers: skip the maze, pad to pad. Never held.',
+  elite: `Elites (gold rim): ×${TRAINING.wave.eliteHp} wounds, cost the base more.`,
+  final: 'The Final wave: slay its boss with the base standing for a Victory; if it gets through the run ends.',
+  siege: 'The Siege Final: a lone colossus that cannot fall. Hurt it all you can.',
+  endless: 'Endless: every wave climbs steeper.',
+};
+
 /**
  * Sortie: a Darkest Dungeon-like run between games. A party of three units sets out across a branching map of fights
  * with the Void Echoes, camps, shrines and caches. Fights are turn based: the party stands in a line of front, middle

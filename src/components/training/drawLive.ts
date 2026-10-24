@@ -79,6 +79,27 @@ const isBossKind = (e: Enemy) => TRAINING_ENEMIES[e.kind].spawn === 'boss';
 export const enemyRadius = (e: Enemy, s: number) =>
   Math.max(MIN_R * (isBossKind(e) ? 1.5 : 1), TRAINING_ENEMIES[e.kind].size * s * (isBossKind(e) ? BOSS_SCALE : 1));
 
+/** A flyer's wings over (x, y), flapped up by `flap` px (drawn on the map and on the HUD's next-round icon). */
+export function flyerWings(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, flap = 0) {
+  ctx.strokeStyle = 'rgba(225,230,255,0.85)';
+  ctx.lineWidth = Math.max(1.2, r * 0.18);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x - r * 1.7, y - r * 0.5 - flap); ctx.quadraticCurveTo(x - r * 0.8, y - r * 1.25 - flap, x, y - r * 0.3);
+  ctx.quadraticCurveTo(x + r * 0.8, y - r * 1.25 - flap, x + r * 1.7, y - r * 0.5 - flap);
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+}
+
+/** A boss's gold glow round (x, y), swelling with `pulse` (0 to 1). */
+export function bossGlow(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, pulse = 0.5) {
+  const g = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * (1.9 + 0.3 * pulse));
+  g.addColorStop(0, 'rgba(255,214,90,0.45)');
+  g.addColorStop(1, 'rgba(255,214,90,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r * (1.9 + 0.3 * pulse), 0, Math.PI * 2); ctx.fill();
+}
+
 /**
  * Every enemy: walkers on the ground, flyers lifted over a shadow with pale wings, held ones gripped by a cyan line,
  * the boss big with a pulsing gold aura. HP bars once hurt (always on the boss). Drawn between their last two steps
@@ -99,24 +120,9 @@ export function drawEnemies(ctx: CanvasRenderingContext2D, run: TrainingRun, s: 
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.beginPath(); ctx.ellipse(x, y, r * 0.9, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
       y -= Math.max(3, LIFT * s);
-      const flap = Math.sin(time * 14 + e.id) * r * 0.25;
-      ctx.strokeStyle = 'rgba(225,230,255,0.85)';
-      ctx.lineWidth = Math.max(1.2, r * 0.18);
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      ctx.moveTo(x - r * 1.7, y - r * 0.5 - flap); ctx.quadraticCurveTo(x - r * 0.8, y - r * 1.25 - flap, x, y - r * 0.3);
-      ctx.quadraticCurveTo(x + r * 0.8, y - r * 1.25 - flap, x + r * 1.7, y - r * 0.5 - flap);
-      ctx.stroke();
-      ctx.lineCap = 'butt';
+      flyerWings(ctx, x, y, r, Math.sin(time * 14 + e.id) * r * 0.25);
     }
-    if (boss) {
-      const pulse = 0.5 + 0.5 * Math.sin(time * 4);
-      const g = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * (1.9 + 0.3 * pulse));
-      g.addColorStop(0, 'rgba(255,214,90,0.45)');
-      g.addColorStop(1, 'rgba(255,214,90,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath(); ctx.arc(x, y, r * (1.9 + 0.3 * pulse), 0, Math.PI * 2); ctx.fill();
-    }
+    if (boss) bossGlow(ctx, x, y, r, 0.5 + 0.5 * Math.sin(time * 4));
     const holder = e.heldBy === undefined ? undefined : pieceById(run, e.heldBy);
     if (holder) {
       const c = centreOf(holder);

@@ -260,6 +260,10 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - veterancy.ts: `unitXp(f)`, `veterancyOf(f)` (max of stored and Σ unit XP), `stepBar(n)`, `finalWon(f)`, `finaleOpen(f)`, `noteVeterancy(f)`, `runWon(run)`, `finaleAfter(f, run, date)`, `bankFinale(f, run, date): string[]` (once via run.finale.banked), `finaleTrack(f)`.
 - UI: training/FinaleTrack.tsx (StartScreen), HudBar's Final / Endless chip, TrainingModal's Victory card (Bank and end / Continue into Endless; useAuto goes on), RunSummary's Victory and siege damage lines.
 
+### nextRound.ts (the HUD's next-round icon)
+- `nextRound(run, plans): NextRound | undefined` from `previewWave(run)`: wave run.wave + 1, its one kind (a siege's lone colossus: `lord`), flies, elite, the boss's name and if it flies, and `lines` (one each): `TRAINING_ENEMY_BLURBS[kind]`, `TRAINING_WAVE_BLURBS` (flies, elite, final, siege, endless), the boss and its tricks (nemesis, campaign or Final lord: TRICK_NAMES/trickText), every campaign affix (affixInfo).
+- UI: training/NextRound.tsx in HudBar while building: the kind as drawn on the map (drawLive `enemyShape`, `flyerWings`, `bossGlow`) and the boss beside it; tap toggles the popover, a mouse hover shows it.
+
 ### trinkets.ts
 - `TRINKET_CARD`, `isTrinketCard(d)`, `trinketDice(run)` (its own dice from seed and wave: never moves run.rng).
 - `trinketOffer(run)` — each boss kill at trinkets.odds until one is offered (then never again); to the crafted unit with most kills and none, else spares. `trinketCardText`, `takeTrinket`.

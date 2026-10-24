@@ -852,7 +852,15 @@ fieldset.fields:disabled { opacity: 0.6; }
   .training-game { gap: 6px; }
   .training-game button { min-height: 42px; touch-action: manipulation; }
   .training-hud { gap: 2px 10px; min-height: 0; }
-  .training-hud-actions { flex: 1 1 100%; gap: 4px; }
+  /* The next-round icon: tap (or hover) for a popover of what the next wave does. */
+.training-next { position: relative; }
+.training-next-btn { display: inline-flex; align-items: center; gap: 2px; min-height: 30px; padding: 0 4px; }
+.training-next-pop {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 30; display: flex; flex-direction: column; gap: 3px;
+  width: max-content; max-width: min(320px, calc(100vw - 32px)); padding: 8px 10px; white-space: normal;
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line-2); border-radius: var(--radius); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
+.training-hud-actions { flex: 1 1 100%; gap: 4px; }
   .training-hud-actions > button { padding: 0 10px; white-space: nowrap; }
   .training-hud-actions > button.training-hud-go { flex: 1 1 7.5em; min-width: 7.5em; overflow: hidden; text-overflow: ellipsis; }
   .training-speed button { min-width: 42px; }
