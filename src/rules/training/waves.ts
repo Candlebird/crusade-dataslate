@@ -40,6 +40,12 @@ export const lateHp = (w: number) =>
 /** How tough a flyer is on wave `w` beside a walker: flyHp, fading flyFade a wave (the guns on the lane grow slower than the maze). */
 export const flyHpAt = (w: number) => W.flyHp * W.flyFade ** (w - 1);
 
+/** How many times tougher everything is on a ground wave `w` (no flying wave nor sky boss): groundGrowth a wave from
+ *  groundFrom to groundTo, groundLate a wave after; the early waves (before units are crafted) as they were. */
+export const groundHpAt = (w: number) =>
+  isFlyWave(w) || isFlyBossWave(w) ? 1
+    : W.groundGrowth ** Math.max(0, Math.min(w, W.groundTo) - W.groundFrom + 1) * W.groundLate ** Math.max(0, w - W.groundTo);
+
 /** How tough the Echo Lord is on wave `w`, beside its share of the budget: bossHp by boss wave, the last holding on. */
 export const bossHpAt = (w: number) => W.bossHp[Math.min(W.bossHp.length, Math.max(1, Math.floor(w / W.bossEvery))) - 1];
 
@@ -56,7 +62,7 @@ export function planFor(r: Rng, power: number, w: number): SpawnPlan[] {
   const minions = boss ? budget * W.escorts : budget;
   const kind = waveKind(r, w, flies);
   const { n, hpMul } = countFor(kind, minions, (flies ? W.flyMax : W.maxCount) - (boss ? 1 : 0));
-  const hp = hpMul * lateHp(w) * TRAINING.enemyHp * (flies ? flyHpAt(w) : 1);
+  const hp = hpMul * lateHp(w) * groundHpAt(w) * TRAINING.enemyHp * (flies ? flyHpAt(w) : 1);
   const bossMul = Math.max(W.bossMin, (budget - minions) / costOf('lord'));
 
   const out: SpawnPlan[] = [];
@@ -67,7 +73,7 @@ export function planFor(r: Rng, power: number, w: number): SpawnPlan[] {
   }
   if (boss) {
     const s = spawnPlan(r, 'lord', at / 2, 1, skyBoss, false);
-    s.hp = TRAINING_ENEMIES.lord.hp * TRAINING.enemyHp * lateHp(w) * bossMul * bossHpAt(w) * (skyBoss ? flyHpAt(w) * W.flyBossHp : 1);
+    s.hp = TRAINING_ENEMIES.lord.hp * TRAINING.enemyHp * lateHp(w) * groundHpAt(w) * bossMul * bossHpAt(w) * (skyBoss ? flyHpAt(w) * W.flyBossHp : 1);
     out.push(s);
   }
   return out.sort((a, b) => a.at - b.at);

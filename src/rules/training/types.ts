@@ -189,6 +189,8 @@ export interface KeepOption {
   grade: Grade;
   /** The other draft pieces the merge uses up (empty for a plain keep). */
   with: number[];
+  /** Kept a grade lower than drawn (to fit a recipe or default that wants that grade); never with a merge. */
+  down?: boolean;
 }
 
 /** One Shard a recipe needs: its type, at this grade or better. */

@@ -551,7 +551,10 @@ export const TRAINING = {
    * Waves. Wave w's enemies cost `base` for every `perPoints` points in the force × w^`curve` × `growth`^(w-1); past
    * `maxCount` enemies (`flyMax` on a flying wave) the rest of the budget makes them tougher instead. Every enemy has
    * `hpGrowth` times more wounds a wave from wave `hpFrom` to `hpTo`, `lateGrowth` times a wave after (waves.ts lateHp).
-   * Every `flyEvery`th wave flies, with `flyShare` of the budget (flyers skip the maze), its flyers `flyHp` × `flyFade`^(w-1)
+   * Ground waves (not a flying wave nor the sky boss's) are tougher again from `groundFrom`, about when the first units
+   * are crafted: `groundGrowth` times a wave to `groundTo`, `groundLate` a wave after (waves.ts groundHpAt), since crafted
+   * units with long guns rake the whole maze while flyers only cross their reach once. Waves 1 to `groundFrom` − 1 and
+   * every flying wave are as they were. Every `flyEvery`th wave flies, with `flyShare` of the budget (flyers skip the maze), its flyers `flyHp` × `flyFade`^(w-1)
    * as tough (thinner as the maze grows). Every `bossEvery`th brings an Echo Lord with `escorts` of its budget as escorts
    * (the rest toughens the boss, never below `bossMin` of its wounds), the Lord `bossHp` times tougher again (one entry a
    * boss wave, the last holding on); every `flyBossEvery`th the Lord flies (`flyBossHp` as tough; its escorts walk).
@@ -561,7 +564,7 @@ export const TRAINING = {
    * can turn up (a flying wave's from the `main` ones); as many come as the budget buys, their wounds evened out so the
    * wave costs its budget. From wave `eliteFrom` every `eliteEvery`th is an elite, with `eliteHp` times the wounds (drawn
    * with a gold rim). Tuned with the balance bot (balance.test.ts): a boss gets a pad or two into the maze, the bot leaks
-   * now and then in waves 8-15, and no flying wave is a wall.
+   * now and then in waves 8-15, a fresh force reaches about wave 21, and no flying wave is a wall.
    */
   wave: {
     base: 1.6,
@@ -574,6 +577,10 @@ export const TRAINING = {
     hpTo: 20,
     hpGrowth: 1.15,
     lateGrowth: 1.17,
+    groundFrom: 8,
+    groundTo: 16,
+    groundGrowth: 1.07,
+    groundLate: 1.02,
     flyEvery: 4,
     flyShare: 0.4,
     flyMax: 48,

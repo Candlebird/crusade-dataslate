@@ -89,14 +89,16 @@ export function placeDraft(run: TrainingRun, i: number, x: number, y: number): v
   if (!run.draft.hand.length) run.draft.step = 'keep';
 }
 
-/** Every way to keep a piece of this draft: each plain, and merges of 2 alike (+1 grade) or 4 alike (+2), cap 5.
- *  A merge that can't raise the grade (already Pristine) isn't offered. Merges use the earliest-placed alike pieces. */
+/** Every way to keep a piece of this draft: each plain, each a grade lower (`down`, not a Cracked one), and merges of
+ *  2 alike (+1 grade) or 4 alike (+2), cap 5. A merge that can't raise the grade (already Pristine) isn't offered.
+ *  Merges use the earliest-placed alike pieces. */
 export function keepOptions(run: TrainingRun): KeepOption[] {
   if (run.phase !== 'build' || run.draft.step !== 'keep') return [];
   const ps = draftPieces(run);
   const out: KeepOption[] = [];
   for (const p of ps) {
     out.push({ pieceId: p.id, grade: p.grade, with: [] });
+    if (p.grade > 1) out.push({ pieceId: p.id, grade: (p.grade - 1) as Grade, with: [], down: true });
     if (p.grade >= TOP) continue;
     const alike = ps.filter((o) => o !== p && o.type === p.type && o.grade === p.grade).map((o) => o.id);
     if (alike.length >= 1) out.push({ pieceId: p.id, grade: Math.min(TOP, p.grade + 1) as Grade, with: alike.slice(0, 1) });
@@ -108,11 +110,12 @@ export function keepOptions(run: TrainingRun): KeepOption[] {
 /** Why this keep can't be made (not keep time, or not one of keepOptions), or null. */
 export function keepProblem(run: TrainingRun, opt: KeepOption): string | null {
   if (run.phase !== 'build' || run.draft.step !== 'keep') return 'Nothing to keep yet.';
-  const ok = keepOptions(run).some((o) => o.pieceId === opt.pieceId && o.grade === opt.grade && o.with.length === opt.with.length && o.with.every((id) => opt.with.includes(id)));
+  const ok = keepOptions(run).some((o) => o.pieceId === opt.pieceId && o.grade === opt.grade && !o.down === !opt.down
+    && o.with.length === opt.with.length && o.with.every((id) => opt.with.includes(id)));
   return ok ? null : 'That Shard can’t be kept that way.';
 }
 
-/** Keep one: it stays (graded up by a merge), every other draft piece crumbles to rubble, step 'done'. Throws on a problem. */
+/** Keep one: it stays (graded up by a merge, or down a grade), every other draft piece crumbles to rubble, step 'done'. Throws on a problem. */
 export function keep(run: TrainingRun, opt: KeepOption): void {
   const why = keepProblem(run, opt);
   if (why) throw new Error(why);

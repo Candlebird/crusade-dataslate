@@ -5,7 +5,7 @@ import { WAYPOINTS, centre, mapFor, open, route, routeLength } from './map';
 import { blankRun } from './testRun';
 import type { Enemy, RubblePiece, TrainingRun } from './types';
 import {
-  bossHpAt, isBossWave, isFlyBossWave, isFlyWave, lateHp, layCover, leakCost, planWave, previewGroups, previewWave,
+  bossHpAt, groundHpAt, isBossWave, isFlyBossWave, isFlyWave, lateHp, layCover, leakCost, planWave, previewGroups, previewWave,
   runCover, spawnDue, speedOf, walk, waveBudget,
 } from './waves';
 import { costOf, countFor } from './waveKinds';
@@ -84,7 +84,7 @@ describe('planWave', () => {
   it('sends Scouts in on pad 1 and Ambushers from the spawn, both with less HP', () => {
     // One kind a wave, so it takes more seeds to meet both.
     const plans = Array.from({ length: 60 }, (_, i) => planWave({ ...blankRun(i + 1), power: 2000 }, 9)).flat();
-    const base = (k: Enemy['kind']) => TRAINING_ENEMIES[k].hp * TRAINING.enemyHp * countFor(k, waveBudget(2000, 9), W.maxCount).hpMul * lateHp(9);
+    const base = (k: Enemy['kind']) => TRAINING_ENEMIES[k].hp * TRAINING.enemyHp * countFor(k, waveBudget(2000, 9), W.maxCount).hpMul * lateHp(9) * groundHpAt(9);
     const scout = plans.find((s) => s.kind === 'outrider' && !s.elite)!;
     const amb = plans.find((s) => s.kind === 'stalker' && !s.elite)!;
     expect(scout.leg).toBe(TRAINING.route.scoutAt);
@@ -100,7 +100,7 @@ describe('planWave', () => {
     const w = W.hpFrom + 6;
     const plain = planWave({ ...blankRun(), power: 2000 }, w).find((s) => !s.elite && TRAINING_ENEMIES[s.kind].spawn === 'main')!;
     const { hpMul } = countFor(plain.kind, waveBudget(2000, w), W.maxCount);
-    expect(plain.hp).toBeCloseTo(TRAINING_ENEMIES[plain.kind].hp * TRAINING.enemyHp * hpMul * lateHp(w));
+    expect(plain.hp).toBeCloseTo(TRAINING_ENEMIES[plain.kind].hp * TRAINING.enemyHp * hpMul * lateHp(w) * groundHpAt(w));
   });
 
   it('grows wounds hpGrowth a wave from hpFrom to hpTo, lateGrowth after', () => {
@@ -108,6 +108,14 @@ describe('planWave', () => {
     expect(lateHp(W.hpFrom - 1)).toBe(1);
     expect(lateHp(W.hpFrom + 2)).toBeCloseTo(W.hpGrowth ** 2);
     expect(lateHp(W.hpTo + 3) / lateHp(W.hpTo)).toBeCloseTo(W.lateGrowth ** 3);
+  });
+
+  it('toughens ground waves groundGrowth a wave from groundFrom to groundTo, groundLate after; never early or flying ones', () => {
+    for (let w = 1; w < W.groundFrom; w++) expect(groundHpAt(w)).toBe(1);
+    expect(groundHpAt(W.groundFrom + 1)).toBeCloseTo(W.groundGrowth ** 2);
+    expect(groundHpAt(W.groundTo + 2) / groundHpAt(W.groundTo - 1)).toBeCloseTo(W.groundGrowth * W.groundLate ** 2);
+    for (const w of [12, 16, 20, 24]) expect(groundHpAt(w)).toBe(1);
+    expect(isFlyWave(12) && isFlyBossWave(20)).toBe(true);
   });
 
   it('toughens the Echo Lord by bossHp a boss wave, the last holding on', () => {

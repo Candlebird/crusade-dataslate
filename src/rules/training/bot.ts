@@ -131,7 +131,8 @@ export function botBuild(run: TrainingRun, units: Unit[], maze: MazeSpot[], curs
   }
   craftAll(run, units);
   if (run.draft.step === 'keep') {
-    const opts = keepOptions(run).map((o) => ({ o, p: progress(run, o) }));
+    // The bot never keeps a Shard a grade down (it only crafts units, whose recipes take a grade or better).
+    const opts = keepOptions(run).filter((o) => !o.down).map((o) => ({ o, p: progress(run, o) }));
     opts.sort((a, b) => b.p - a.p || b.o.grade - a.o.grade || a.o.with.length - b.o.with.length);
     keep(run, opts[0].o);
   }

@@ -83,7 +83,7 @@ describe('keeping and merging', () => {
     const run = placedRun([s('swift', 2), s('swift', 2), s('swift', 2), s('swift', 2), s('blast', 1)]);
     const opts = keepOptions(run);
     const [first, , , , last] = run.draft.placed;
-    const mine = opts.filter((o) => o.pieceId === first);
+    const mine = opts.filter((o) => o.pieceId === first && !o.down);
     expect(mine.map((o) => o.grade)).toEqual([2, 3, 4]);
     expect(mine[2].with).toHaveLength(3);
     expect(opts.filter((o) => o.pieceId === last)).toEqual([{ pieceId: last, grade: 1, with: [] }]);
@@ -93,8 +93,8 @@ describe('keeping and merging', () => {
     const run = placedRun([s('vigor', 4), s('vigor', 4), s('vigor', 4), s('vigor', 4), s('vigor', 5)]);
     const opts = keepOptions(run);
     expect(Math.max(...opts.map((o) => o.grade))).toBe(5);
-    expect(opts.filter((o) => o.pieceId === run.draft.placed[0]).map((o) => o.grade)).toEqual([4, 5]);
-    expect(opts.filter((o) => o.pieceId === run.draft.placed[4])).toHaveLength(1);
+    expect(opts.filter((o) => o.pieceId === run.draft.placed[0] && !o.down).map((o) => o.grade)).toEqual([4, 5]);
+    expect(opts.filter((o) => o.pieceId === run.draft.placed[4] && !o.down)).toHaveLength(1);
   });
 
   it('keeps one (graded up), and the rest crumble', () => {
@@ -109,9 +109,32 @@ describe('keeping and merging', () => {
     expect(keepProblem(run, opt)).not.toBeNull();
   });
 
+  it('offers each Shard a grade down too, but never a Cracked one nor with a merge', () => {
+    const run = placedRun([s('swift', 4), s('swift', 4), s('blast', 1), s('firepower', 2), s('command', 5)]);
+    const downs = keepOptions(run).filter((o) => o.down);
+    const [a, b, c, d, e] = run.draft.placed;
+    expect(downs).toEqual([
+      { pieceId: a, grade: 3, with: [], down: true }, { pieceId: b, grade: 3, with: [], down: true },
+      { pieceId: d, grade: 1, with: [], down: true }, { pieceId: e, grade: 4, with: [], down: true },
+    ]);
+    expect(downs.some((o) => o.pieceId === c)).toBe(false);
+  });
+
+  it('keeps a Shard a grade down, and the rest crumble', () => {
+    const run = placedRun([s('firepower', 4), s('breach', 1), s('blast', 1), s('assault', 1), s('command', 1)]);
+    const opt = keepOptions(run).find((o) => o.pieceId === run.draft.placed[0] && o.down)!;
+    expect(keepProblem(run, opt)).toBeNull();
+    // A plain keep at the lower grade isn't on offer: the grade down has to say so.
+    expect(keepProblem(run, { ...opt, down: undefined })).not.toBeNull();
+    keep(run, opt);
+    expect(run.pieces.find((p) => p.kind === 'shard')).toMatchObject({ id: opt.pieceId, type: 'firepower', grade: 3, draft: false });
+    expect(run.pieces.filter((p) => p.kind === 'rubble')).toHaveLength(4);
+  });
+
   it('refuses a made-up keep', () => {
     const run = placedRun([s('breach', 1), s('firepower', 1), s('blast', 1), s('assault', 1), s('command', 1)]);
     expect(keepProblem(run, { pieceId: run.draft.placed[0], grade: 3, with: [] })).not.toBeNull();
+    expect(keepProblem(run, { pieceId: run.draft.placed[0], grade: 1, with: [], down: true })).not.toBeNull();
     expect(() => keep(run, { pieceId: 999, grade: 1, with: [] })).toThrow();
   });
 

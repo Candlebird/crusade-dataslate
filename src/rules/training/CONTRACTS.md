@@ -120,7 +120,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `shardPiece(id, at: Tile, type: ShardType, grade: Grade, draft: boolean): ShardPiece` — guns/Quality from SHARD_TYPES × value.
 - `placeDraftProblem(run, i, x, y): string | null` — build phase, step 'place', hand[i] exists, board.placeProblem.
 - `placeDraft(run, i, x, y): void` — adds a draft ShardPiece (id run.nextId++); empty hand → step 'keep'.
-- `keepOptions(run): KeepOption[]` — each draft piece plain; 2 alike (type+grade) → +1, 4 alike → +2, cap 5.
+- `keepOptions(run): KeepOption[]` — each draft piece plain, and (grade > 1) a grade down (`down: true`, never with a merge; the bot skips these); 2 alike (type+grade) → +1, 4 alike → +2, cap 5.
 - `keepProblem(run, opt: KeepOption): string | null` — keep step, and `opt` matches one of keepOptions.
 - `keep(run, opt: KeepOption): void` — kept piece draft=false (new grade, guns rebuilt); rest of draft → rubble; step 'done'.
 - `SHARD_KINDS: ShardType[]`; `shardGun(type, grade): TowerGun` — attacks = max(1, round(SHARD_TYPES attacks × value)).
@@ -279,14 +279,14 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 
 ### waves.ts
 - `isFlyWave(w)`, `isBossWave(w)`, `isFlyBossWave(w): boolean`
-- `planWave(run, w: number): SpawnPlan[]` — one kind a wave (waveKinds.waveKind; a boss wave the lord + one escort kind; a flying wave one main-spawn kind), as many as countFor buys (the rest of the budget in their wounds), every eliteEvery-th from eliteFrom an elite (×eliteHp, gold outline); on siege.waveDice (a siege's own dice for wave w, else the run's); via `nexusWave`: planFor(power × nexus.budgetMul) then affixes.affixPlan; budget base × (power/perPoints) × w^curve × growth^(w-1) (count capped at maxCount, flyMax flying); flyers (×flyHpAt(w)); boss + escorts (the boss's wounds × max(bossMin, (budget − escorts) / costOf(lord)), ×bossHpAt(w); a sky boss alone flies, ×flyHpAt × flyBossHp, its escorts walk); scouts at pad scoutAt (scoutHp); ambush hp; hp ×lateHp(w); staggered by gap; sorted by `at`.
+- `planWave(run, w: number): SpawnPlan[]` — one kind a wave (waveKinds.waveKind; a boss wave the lord + one escort kind; a flying wave one main-spawn kind), as many as countFor buys (the rest of the budget in their wounds), every eliteEvery-th from eliteFrom an elite (×eliteHp, gold outline); on siege.waveDice (a siege's own dice for wave w, else the run's); via `nexusWave`: planFor(power × nexus.budgetMul) then affixes.affixPlan; budget base × (power/perPoints) × w^curve × growth^(w-1) (count capped at maxCount, flyMax flying); flyers (×flyHpAt(w)); boss + escorts (the boss's wounds × max(bossMin, (budget − escorts) / costOf(lord)), ×bossHpAt(w); a sky boss alone flies, ×flyHpAt × flyBossHp, its escorts walk); scouts at pad scoutAt (scoutHp); ambush hp; hp ×lateHp(w) ×groundHpAt(w) (minions and boss); staggered by gap; sorted by `at`.
 - `previewWave(run): SpawnPlan[]` — planWave(run.wave + 1) on a copy of the dice.
 - `layCover(r: Rng, n: number, route: Tile[]): Tile[]` — n patches, onRoute share centred on route cells, clear of pads/base/spawn.
 - `spawnDue(run): void` — queue entries with at ≤ run.t → enemies (id run.nextId++).
 - `speedOf(run, e: Enemy): number` — cells/s: def.speed × walkMul × slow/daze.
 - `leakCost(e: Enemy): number` — def.leak, or leak.elite for an elite if more; a boss ceil(leak × hp/maxHp), never below leak.bossMin.
 - `walk(run, dt): void` — skip held (heldBy) / stunned; walkers by flow field, flyers pad to pad; ambush jump on reaching pad ambushFrom → pad ambushAt; reaching base: remove, baseHp −= leakCost, leaked++.
-- Also (waves agent): `waveTags(w): string[]` ('Flying'/'Boss' for the HUD), `waveBudget(power, w)`, `lateHp(w)` (hpGrowth from hpFrom to hpTo, lateGrowth after), `flyHpAt(w)`, `bossHpAt(w)`,
+- Also (waves agent): `waveTags(w): string[]` ('Flying'/'Boss' for the HUD), `waveBudget(power, w)`, `lateHp(w)` (hpGrowth from hpFrom to hpTo, lateGrowth after), `groundHpAt(w)` (1 on flying and sky-boss waves; groundGrowth a wave from groundFrom to groundTo, groundLate after), `flyHpAt(w)`, `bossHpAt(w)`,
   `planFor(r: Rng, power, w)` (planWave on any dice), `previewGroups(plans): PreviewGroup[]` ({kind, n, elites, hp, flies}
   for WavePreview), `mainKind(plans)` (the wave's one kind, for the preview and log), `runCover(r, extra = 0): Tile[]` (createRun's cover, + extra patches for Derelicts: patches range on the empty map's route), `layCover` takes an
   optional 4th `taken: Tile[]` to keep clear of, `atBase(e)`, `move(m, e, step)`. New TRAINING keys: `dazeMul`, `wave.bossMin`.
