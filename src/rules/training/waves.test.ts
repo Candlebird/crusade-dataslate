@@ -6,13 +6,15 @@ import { blankRun } from './testRun';
 import type { Enemy, RubblePiece, TrainingRun } from './types';
 import {
   bossHpAt, groundHpAt, isBossWave, isFlyBossWave, isFlyWave, lateHp, layCover, leakCost, planWave, previewGroups, previewWave,
-  runCover, spawnDue, speedOf, walk, waveBudget,
+  runCover, spawnDue, speedOf, walk, waveBudget, wavePoints,
 } from './waves';
 import { costOf, countFor } from './waveKinds';
 
 // Waves: planning, spawning, walking and leaks.
 
 const W = TRAINING.wave;
+/** A force big enough to be met as 2000 points (wavePoints). */
+const BIG = W.fullPoints + (2000 - W.fullPoints) / W.overRate;
 
 const foe = (kind: Enemy['kind'], o: Partial<Enemy> = {}): Enemy => {
   const c = centre(WAYPOINTS[o.leg ?? 0]);
@@ -55,10 +57,14 @@ describe('planWave', () => {
       expect(waveBudget(1000, i + 1)).toBeCloseTo(W.base * (i + 1) ** W.curve * W.growth ** i * m);
     }
     expect(waveBudget(2000, 3)).toBeCloseTo(2 * waveBudget(1000, 3));
+    // Points past fullPoints count overRate each (a small force is met in full); planWave goes by them.
+    expect(wavePoints(W.fullPoints - 100)).toBe(W.fullPoints - 100);
+    expect(wavePoints(W.fullPoints + 400)).toBeCloseTo(W.fullPoints + 400 * W.overRate);
+    expect(wavePoints(BIG)).toBeCloseTo(2000);
     const run = blankRun();
     const cost = (w: number) => planWave(run, w).reduce((n, s) => n + costOf(s.kind), 0);
     // The count rounds to the nearest, so a wave may overspend by half an enemy.
-    expect(cost(3)).toBeLessThanOrEqual(waveBudget(run.power, 3) + Math.max(...planWave(run, 3).map((s) => costOf(s.kind))) / 2);
+    expect(cost(3)).toBeLessThanOrEqual(waveBudget(wavePoints(run.power), 3) + Math.max(...planWave(run, 3).map((s) => costOf(s.kind))) / 2);
     expect(cost(14)).toBeGreaterThan(cost(2));
   });
 
@@ -86,7 +92,7 @@ describe('planWave', () => {
 
   it('sends Scouts in on pad 1 and Ambushers from the spawn, both with less HP', () => {
     // One kind a wave, so it takes more seeds to meet both.
-    const plans = Array.from({ length: 60 }, (_, i) => planWave({ ...blankRun(i + 1), power: 2000 }, 9)).flat();
+    const plans = Array.from({ length: 60 }, (_, i) => planWave({ ...blankRun(i + 1), power: BIG }, 9)).flat();
     const base = (k: Enemy['kind']) => TRAINING_ENEMIES[k].hp * TRAINING.enemyHp * countFor(k, waveBudget(2000, 9), W.maxCount).hpMul * lateHp(9) * groundHpAt(9);
     const scout = plans.find((s) => s.kind === 'outrider' && !s.elite)!;
     const amb = plans.find((s) => s.kind === 'stalker' && !s.elite)!;
@@ -98,10 +104,10 @@ describe('planWave', () => {
 
   it('has elites only from eliteFrom, every eliteEvery-th, and HP growth past hpFrom', () => {
     expect(planWave(blankRun(), W.eliteFrom - 1).some((s) => s.elite)).toBe(false);
-    const p = planWave({ ...blankRun(), power: 2000 }, W.eliteFrom + 1);
+    const p = planWave({ ...blankRun(), power: BIG }, W.eliteFrom + 1);
     expect(p.filter((s) => s.elite)).toHaveLength(Math.floor(p.length / W.eliteEvery));
     const w = W.hpFrom + 6;
-    const plain = planWave({ ...blankRun(), power: 2000 }, w).find((s) => !s.elite && TRAINING_ENEMIES[s.kind].spawn === 'main')!;
+    const plain = planWave({ ...blankRun(), power: BIG }, w).find((s) => !s.elite && TRAINING_ENEMIES[s.kind].spawn === 'main')!;
     const { hpMul } = countFor(plain.kind, waveBudget(2000, w), W.maxCount);
     expect(plain.hp).toBeCloseTo(TRAINING_ENEMIES[plain.kind].hp * TRAINING.enemyHp * hpMul * lateHp(w) * groundHpAt(w));
   });

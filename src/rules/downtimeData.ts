@@ -551,7 +551,9 @@ export const TRAINING = {
   /** Mending the base: +`hp` for `cost` credits (each mend this run `growth` times dearer), never above `baseHp`. */
   mend: { hp: 20, cost: 40, growth: 1.2 },
   /**
-   * Waves. Wave w's enemies cost `base` for every `perPoints` points in the force × w^`curve` × `growth`^(w-1); past
+   * Waves. Wave w's enemies cost `base` for every `perPoints` points in the force × w^`curve` × `growth`^(w-1), each
+   * point past `fullPoints` (the size the waves are tuned for) counting only `overRate` of one (waves.ts wavePoints: new
+   * level-0 units are slow to earn their keep, so a bigger force mustn't fall sooner); past
    * `maxCount` enemies (`flyMax` on a flying wave) the rest of the budget makes them tougher instead. Every enemy has
    * `hpGrowth` times more wounds a wave from wave `hpFrom` to `hpTo`, `lateGrowth` times a wave after (waves.ts lateHp).
    * Ground waves (not a flying wave nor the sky boss's) are tougher again from `groundFrom`, about when the first units
@@ -574,6 +576,8 @@ export const TRAINING = {
   wave: {
     base: 1.6,
     perPoints: 1000,
+    fullPoints: 850,
+    overRate: 0.25,
     growth: 1.15,
     curve: 0.7,
     crowd: 4,

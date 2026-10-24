@@ -34,11 +34,20 @@ export const FORCES = BOOKS.flatMap((file) => {
   const us = bookUnits(file);
   const name = file.split('/').pop()!.split('.')[0];
   return [
-    { name: `${name} A`, units: sample(us) },
-    { name: `${name} B`, units: sample(us.filter((_, i) => i % 2 === 0).reverse()) },
+    { name: `${name} A`, book: file, units: sample(us) },
+    { name: `${name} B`, book: file, units: sample(us.filter((_, i) => i % 2 === 0).reverse()) },
   ];
 });
 export const SEEDS = [1, 2, 3];
+
+/** A recruit costs at most this: the size of unit a force takes on, not a titan. */
+const RECRUIT_MAX = 250;
+
+/** `n` fresh (level-0) units of at most RECRUIT_MAX pts from a sample force's book that it doesn't already field. */
+export function recruits(f: { book: string; units: Unit[] }, n: number): Unit[] {
+  const have = new Set(f.units.map((u) => u.unitType));
+  return bookUnits(f.book).filter((u) => !have.has(u.unitType) && u.points <= RECRUIT_MAX).slice(0, n).map((u, i) => ({ ...u, id: `${u.id}-new${i}`, xp: 0 }));
+}
 
 const TRAITS = ['Resilient', 'Point Blank', 'Blade Master'];
 const SCARS = ['Damaged Equipment', 'Weakened Armor', 'Faulty Aim'];

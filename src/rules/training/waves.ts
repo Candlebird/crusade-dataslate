@@ -32,6 +32,10 @@ export const waveTags = (w: number): string[] => [
   ...(isBossWave(w) ? ['Boss'] : []),
 ];
 
+/** The points a force of `power` points is met with: all of them up to fullPoints, overRate of each point past it
+ *  (fresh units added to a force are slow to earn their keep). The Weekly Siege's waves go by it too. */
+export const wavePoints = (power: number) => Math.min(power, W.fullPoints) + Math.max(0, power - W.fullPoints) * W.overRate;
+
 /** What wave `w`'s enemies cost in all, for a force of `power` points: base a perPoints, × w^curve × growth^(w−1),
  *  × earlyBudget[w−1] on the first waves (fewer of them, while a Shard or two holds the maze). */
 export const waveBudget = (power: number, w: number) =>
@@ -117,7 +121,7 @@ function spawnPlan(r: Rng, kind: TrainingEnemyKind, at: number, hpMul: number, f
 }
 
 /** Wave `w`'s spawns, sorted by time, rolling `r`: the Nexus's budget and affixes on them (nexus.ts, affixes.ts). */
-const nexusWave = (r: Rng, run: TrainingRun, w: number) => affixPlan(r, run, planFor(r, run.power * budgetMul(run), w, finalOf(run)));
+const nexusWave = (r: Rng, run: TrainingRun, w: number) => affixPlan(r, run, planFor(r, wavePoints(run.power) * budgetMul(run), w, finalOf(run)));
 
 /** Wave `w`'s spawns, sorted by time (rolls the run's dice; a siege's own for the wave). */
 export const planWave = (run: TrainingRun, w: number): SpawnPlan[] => nexusWave(waveDice(run, w, run), run, w);
