@@ -100,13 +100,15 @@ function volleySize(run: TrainingRun, attacks: number): number {
 }
 
 /** One gun's clocks: start a volley when it's ready and something is in reach; its shots go one after another over
- *  the first part of the wait before the next. */
+ *  the first part of the wait before the next. The wait carries what this step overshot (never more than a step), so
+ *  a quick gun keeps its rate between fixed steps. */
 function runGun(run: TrainingRun, t: Tower, g: TowerGun, rate: number, dt: number) {
   g.cd -= dt;
-  if (g.cd <= 0 && g.pending <= 0 && targetFor(run, t, g)) {
-    g.cd = (g.melee ? TRAINING.meleeEvery : TRAINING.shootEvery) / rate;
+  if (g.cd <= 1e-9 && g.pending <= 0 && targetFor(run, t, g)) {
+    const wait = (g.melee ? TRAINING.meleeEvery : TRAINING.shootEvery) / rate;
+    g.cd = Math.max(g.cd, -dt) + wait;
     g.pending = volleySize(run, g.attacks);
-    g.gap = g.pending ? (g.cd * TRAINING.volleySpread) / g.pending : 0;
+    g.gap = g.pending ? (wait * TRAINING.volleySpread) / g.pending : 0;
     g.next = 0;
   }
   if (g.pending <= 0) return;

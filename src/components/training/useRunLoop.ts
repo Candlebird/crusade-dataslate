@@ -1,8 +1,10 @@
 import { useEffect, useRef } from 'react';
 import { gameSeconds, step, type Phase, type TrainingRun } from '../../rules/training';
+import { setAlpha, snapshot } from './smooth';
 
 // The game loop: fixed steps of STEP sim seconds (real time by the speed and TRAINING.timeScale, clock.ts) while a
-// wave runs, shots fading the rest of the time.
+// wave runs, shots fading the rest of the time. Each step is snapshotted so the map can draw enemies between the
+// last two steps (smooth.ts).
 // The map redraws itself; the panels are refreshed a few times a second in a wave and whenever the phase changes.
 
 export const STEP = 0.05;
@@ -35,12 +37,16 @@ export function useRunLoop(run: TrainingRun | null, opts: LoopOpts): void {
       if (run.phase === 'wave' && !o.paused) {
         acc += gameSeconds(dt, o.speed);
         while (acc >= STEP && run.phase === 'wave') {
+          snapshot(run);
           step(run, STEP);
           acc -= STEP;
         }
-      } else {
+        setAlpha(run, run.phase === 'wave' ? acc / STEP : 1);
+      } else if (run.phase !== 'wave') {
+        // (Paused, acc is kept, under a step, so the enemies stay drawn where they were.)
         acc = 0;
-        if (run.phase !== 'wave') step(run, gameSeconds(dt, 1)); // let the last shots fade
+        setAlpha(run, 1);
+        step(run, gameSeconds(dt, 1)); // let the last shots fade
       }
       ui += dt;
       if (run.phase !== phase) {

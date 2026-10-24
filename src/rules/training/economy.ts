@@ -98,12 +98,17 @@ export function buyMend(run: TrainingRun): void {
   run.mends++;
 }
 
-/** Credits a kill pays, before run.mods.bounty: its cost × perCost, at least 1. */
-export const killCredits = (e: Enemy): number => Math.max(1, Math.round(TRAINING_ENEMIES[e.kind].cost * TRAINING.credits.perCost));
+/** Credits a kill pays, before run.mods.bounty: its cost × perCost (at least 1), shared over the TRAINING.wave.crowd
+ *  that come in its place (not the Lord's), so most kills pay a fraction of a credit. */
+export function killCredits(e: Enemy): number {
+  const def = TRAINING_ENEMIES[e.kind];
+  return Math.max(1, Math.round(def.cost * TRAINING.credits.perCost)) / (def.spawn === 'boss' ? 1 : TRAINING.wave.crowd);
+}
 
-/** Pay a kill into run.credits, with the bounty and the Nexus's threat (nexus.ts creditMul), rounded. */
+/** Pay a kill into run.credits, with the bounty and the Nexus's threat (nexus.ts creditMul). Credits may be fractional
+ *  (the screens show them rounded down). */
 export function payKill(run: TrainingRun, e: Enemy): void {
-  run.credits += Math.round(killCredits(e) * run.mods.bounty * creditMul(run));
+  run.credits = Math.round((run.credits + killCredits(e) * run.mods.bounty * creditMul(run)) * 1e6) / 1e6;
 }
 
 /** Credits for clearing wave run.wave: the wave bonus, and the no-leak bonus when run.leaked is 0; × creditMul. */

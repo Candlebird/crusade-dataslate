@@ -53,7 +53,8 @@ describe('serialize', () => {
     let a = 0;
     let b = 0;
     for (let i = 0; i < 3 && run.phase === 'build'; i++) { a = wave(run, a); b = wave(back, b); }
-    expect(serialize(back)).toBe(serialize(run));
+    // Equal field by field (key order may differ: a field first set on the copy lands later in its JSON).
+    expect(JSON.parse(serialize(back))).toEqual(JSON.parse(serialize(run)));
   });
 
   it('refuses what isn\'t a run', () => {

@@ -84,13 +84,13 @@ describe('mending', () => {
 
 describe('credits', () => {
   it('pays kills by cost, with the bounty', () => {
-    expect(killCredits(enemy('swarm'))).toBe(1);
+    expect(killCredits(enemy('swarm'))).toBe(1 / TRAINING.wave.crowd);
     const lord = TRAINING_ENEMIES.lord.cost * TRAINING.credits.perCost;
     expect(killCredits(enemy('lord'))).toBe(lord);
     const run = blankRun();
     run.mods.bounty = 1.25;
     payKill(run, enemy('lord'));
-    expect(run.credits).toBe(Math.round(lord * 1.25));
+    expect(run.credits).toBeCloseTo(lord * 1.25, 6);
   });
 
   it('pays a wave bonus, and more with no leaks', () => {

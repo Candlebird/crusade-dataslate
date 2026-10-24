@@ -503,14 +503,16 @@ export const TRAINING = {
   /** Every shooting weapon (unit, Shard, default, relic shot, barrage) reaches this share of its listed range in cells. */
   rangeMul: 0.5,
   /** The base's HP, and what each leak costs it: an enemy's own `leak`, or `elite` for an elite (whichever is more); an
-   *  Echo Lord its `leak` × the share of its wounds left (rounded up), never below `bossMin`. */
-  baseHp: 20,
-  leak: { elite: 3, bossMin: 1 },
+   *  Echo Lord its `leak` × the share of its wounds left (rounded up), never below `bossMin`. Four times the old 20,
+   *  since waves come four times as thick (`wave.crowd`): a leaking wave costs the same share of the base as before. */
+  baseHp: 80,
+  leak: { elite: 3, bossMin: 4 },
   /** Melee weapons reach this many cells from the middle of their piece (so they hit walkers squeezing past). */
   meleeReach: 2,
-  /** Seconds between a tower's volleys: shooting, and melee. A volley spreads its shots over `volleySpread` of the wait. */
-  shootEvery: 2,
-  meleeEvery: 1.2,
+  /** Seconds between a tower's volleys: shooting, and melee (every tower: units, Shards, defaults). A volley spreads its
+   *  shots over `volleySpread` of the wait. A quarter of the old 2 s and 1.2 s, for waves four times as thick. */
+  shootEvery: 0.5,
+  meleeEvery: 0.3,
   volleySpread: 0.5,
   /** Blast(X) hits up to X enemies within this many cells of the target. */
   blastRadius: 2,
@@ -540,10 +542,11 @@ export const TRAINING = {
     rate: 0.25,
     range: 1,
   },
-  /** Credits: a kill pays its enemy's cost × `perCost` (at least 1); a wave cleared pays `wave` + `perWave` × its number, and `noLeak` more if nothing got through. */
+  /** Credits: a kill pays its enemy's cost × `perCost` (at least 1), shared out over the `wave.crowd` that come in its
+   *  place (all but the Lord: a fraction of a credit each, so a wave pays as before); a wave cleared pays `wave` + `perWave` × its number, and `noLeak` more if nothing got through. */
   credits: { start: 20, perCost: 0.5, wave: 8, perWave: 1, noLeak: 10 },
   /** Mending the base: +`hp` for `cost` credits (each mend this run `growth` times dearer), never above `baseHp`. */
-  mend: { hp: 5, cost: 40, growth: 1.2 },
+  mend: { hp: 20, cost: 40, growth: 1.2 },
   /**
    * Waves. Wave w's enemies cost `base` for every `perPoints` points in the force × w^`curve` × `growth`^(w-1); past
    * `maxCount` enemies (`flyMax` on a flying wave) the rest of the budget makes them tougher instead. Every enemy has
@@ -553,7 +556,8 @@ export const TRAINING = {
    * (the rest toughens the boss, never below `bossMin` of its wounds), the Lord `bossHp` times tougher again (one entry a
    * boss wave, the last holding on); every `flyBossEvery`th the Lord flies (`flyBossHp` as tough; its escorts walk).
    * Scouts come in with `scoutHp` of their wounds, Ambushers with `ambushHp`. Enemies come in `gap` seconds apart
-   * (about). Each wave is one kind (a boss wave the boss and one kind of escort), drawn by `kinds` weight from those that
+   * (about). Every enemy (the Lord too) costs the budget its `cost` / `crowd`, so a wave is `crowd` times as thick as
+   * its costs say (towers fire as much faster); a kill pays `crowd` times less, bar the Lord's. Each wave is one kind (a boss wave the boss and one kind of escort), drawn by `kinds` weight from those that
    * can turn up (a flying wave's from the `main` ones); as many come as the budget buys, their wounds evened out so the
    * wave costs its budget. From wave `eliteFrom` every `eliteEvery`th is an elite, with `eliteHp` times the wounds (drawn
    * with a gold rim). Tuned with the balance bot (balance.test.ts): a boss gets a pad or two into the maze, the bot leaks
@@ -564,14 +568,15 @@ export const TRAINING = {
     perPoints: 1000,
     growth: 1.15,
     curve: 0.7,
-    maxCount: 24,
+    crowd: 4,
+    maxCount: 96,
     hpFrom: 4,
     hpTo: 20,
     hpGrowth: 1.15,
     lateGrowth: 1.17,
     flyEvery: 4,
     flyShare: 0.4,
-    flyMax: 12,
+    flyMax: 48,
     flyHp: 1.4,
     flyFade: 0.9,
     bossEvery: 5,
@@ -582,7 +587,7 @@ export const TRAINING = {
     flyBossHp: 0.5,
     scoutHp: 0.8,
     ambushHp: 0.65,
-    gap: 0.6,
+    gap: 0.15,
     kinds: { swarm: 3, drone: 3, spitter: 2, outrider: 1.5, carapace: 2, mirror: 1.5, stalker: 1.5, brute: 1.5 } as Partial<Record<TrainingEnemyKind, number>>,
     eliteFrom: 6,
     eliteEvery: 6,
@@ -599,7 +604,7 @@ export const TRAINING = {
    */
   defaults: {
     dpsShare: 0.75,
-    unitDps: 0.346,
+    unitDps: 1.384,
     dpsDefense: 5,
     qualityBonus: 1,
     recipes: [
@@ -632,7 +637,7 @@ export const TRAINING = {
    * Numbers for the cards that need them: base HP a mend card adds, a bounty's share more credits, a hold card's longer
    * holds (×) and longer re-grab (+ seconds), cover patches a sandbag card lays. (`every` is only for the rules text.)
    */
-  cards: { every: 5, offer: 3, odds: { Legendary: 0.1, Rare: 0.3 }, walls: 5, ramparts: 10, bounty: 0.25, holdMul: 1.5, regrabAdd: 1, patches: 2 },
+  cards: { every: 5, offer: 3, odds: { Legendary: 0.1, Rare: 0.3 }, walls: 20, ramparts: 40, bounty: 0.25, holdMul: 1.5, regrabAdd: 1, patches: 2 },
   /** Seconds in an ability round: an ability that comes back every 2 rounds comes back every 12 seconds. */
   abilityRound: 6,
   /** Seconds each status lasts once a hit leaves it. */
@@ -798,8 +803,8 @@ export const TRAINING = {
       rage: { per: 0.02, max: 0.6 },
       dive: { every: 8, cells: 5 },
       dirge: { every: 8, secs: 4, radius: 6 },
-      tremor: { every: 6, dmg: 1 },
-      brood: { every: 6, n: 2, hp: 1.5, spread: 0.3 },
+      tremor: { every: 6, dmg: 4 },
+      brood: { every: 6, n: 8, hp: 1.5, spread: 0.3 },
       vengeful: 1.25, regen: 0.05, regenEvery: 2,
       bled: 0.15,
     },
@@ -833,7 +838,7 @@ export const TRAINING = {
     vengeful: { radius: 3, mul: 1.4, secs: 0.4 },
     shrouded: { from: 0.8, per: 0.05, min: 0.4 },
     proud: { per: 0.04 },
-    bleed: { per: 2 },
+    bleed: { per: 8 },
     events: {
       warpCurrents: { walk: 1.1 },
       ionStorm: { from: 9 },
@@ -852,7 +857,7 @@ export const TRAINING = {
     tricks: {
       teleport: { every: 7, cells: 4 },
       shield: { share: 0.25, every: 10 },
-      summon: { every: 6, n: 2, hp: 1.5, spread: 0.3 },
+      summon: { every: 6, n: 8, hp: 1.5, spread: 0.3 },
       burst: { every: 8, secs: 2, mul: 2 },
       regen: { every: 2, share: 0.03 },
       fear: { radius: 5 },
@@ -892,14 +897,14 @@ export const TRAINING = {
     peakwalker: { name: 'Peakwalker', n: 1 },
     curseborn: { name: 'Curse-born', n: 4 },
     pyreWalker: { name: 'Pyre-walker', n: 6 },
-    echoReaper: { name: 'Echo-reaper', n: 300 },
+    echoReaper: { name: 'Echo-reaper', n: 1200 },
     unmoved: { name: 'the Unmoved', n: 150 },
     lordslayer: { name: 'Lordslayer', n: 1 },
     wallWarden: { name: 'Wall-warden', n: 30 },
     gatekeeper: { name: 'Gatekeeper', n: 15 },
     unbowed: { name: 'Unbowed', n: 20, scars: 2 },
     drillmaster: { name: 'Drillmaster', n: 5 },
-    legionBane: { name: 'Legion-bane', n: 2500 },
+    legionBane: { name: 'Legion-bane', n: 10000 },
     mazeHardened: { name: 'Maze-hardened', n: 15 },
     twiceTested: { name: 'Twice-tested', n: 5 },
   },
@@ -925,18 +930,18 @@ export const TRAINING = {
       support: { name: 'Support cards', cards: ['medic', 'drill', 'banner'] },
       fury: { name: 'Fury cards', cards: ['trance', 'uplink'] },
     } as Record<string, { name: string; cards: string[] }>,
-    perks: { purse: 10, mend: 2, reroll: 1, thrift: 0.1, offer: 1 },
+    perks: { purse: 10, mend: 8, reroll: 1, thrift: 0.1, offer: 1 },
     thriftMax: 0.9,
     goals: [
       { goal: 'runs', n: 1, unlock: { cards: 'fieldcraft' } },
       { goal: 'best', n: 5, unlock: { perk: 'purse' } },
-      { goal: 'kills', n: 250, unlock: { cards: 'hold' } },
+      { goal: 'kills', n: 1000, unlock: { cards: 'hold' } },
       { goal: 'bosses', n: 3, unlock: { luck: 3 } },
       { goal: 'runs', n: 4, unlock: { perk: 'reroll' } },
       { goal: 'best', n: 10, unlock: { perk: 'mend' } },
       { goal: 'clean', n: 5, unlock: { cards: 'support' } },
       { goal: 'lords', n: 1, unlock: { perk: 'purse' } },
-      { goal: 'kills', n: 1000, unlock: { perk: 'thrift' } },
+      { goal: 'kills', n: 4000, unlock: { perk: 'thrift' } },
       { goal: 'best', n: 15, unlock: { luck: 4 } },
       { goal: 'crafted', n: 6, unlock: { cards: 'fury' } },
       { goal: 'bosses', n: 12, unlock: { perk: 'mend' } },
@@ -945,7 +950,7 @@ export const TRAINING = {
       { goal: 'sieges', n: 3, unlock: { perk: 'thrift' } },
       { goal: 'lore', n: 6, unlock: { perk: 'offer' } },
       { goal: 'clean', n: 12, unlock: { perk: 'mend' } },
-      { goal: 'kills', n: 4000, unlock: { perk: 'purse' } },
+      { goal: 'kills', n: 16000, unlock: { perk: 'purse' } },
       { goal: 'lords', n: 4, unlock: { perk: 'thrift' } },
       { goal: 'best', n: 25, unlock: { perk: 'offer' } },
     ] as { goal: DrillGoal; n: number; unlock: DrillUnlock }[],
@@ -1057,7 +1062,7 @@ export const TRAINING_ENEMIES: Record<TrainingEnemyKind, TrainingEnemyDef> = {
   mirror: { name: 'Mirrorshell', desc: 'Mirrored hide: shots do 40% damage, melee 150%. Meet it with blades.', hp: 10, speed: 0.85, defense: 4, armor: 0, shotMul: 0.4, meleeMul: 1.5, cost: 5, leak: 2, from: 4, spawn: 'main', color: '#a8dce8', size: 0.6, shape: 'shield' },
   stalker: { name: 'Stalker', desc: `Ambush: on pad ${TRAINING.route.ambushFrom} it vanishes, and comes out on pad ${TRAINING.route.ambushAt}.`, hp: 7, speed: 1.3, defense: 5, armor: 0, cost: 4, leak: 1, from: 3, spawn: 'ambush', color: '#b05cc8', size: 0.5, shape: 'star' },
   brute: { name: 'Brute', desc: 'Slow and huge: held half as long.', hp: 22, speed: 0.6, defense: 4, armor: 0, cost: 6, leak: 2, big: true, from: 4, spawn: 'main', color: '#c0583e', size: 0.7, shape: 'spikes' },
-  lord: { name: 'Echo Lord', desc: `Every ${TRAINING.wave.bossEvery}th wave. Held half as long; costs the base up to 4 if it gets there (less the more it is hurt). Kill it for a card.`, hp: 30, speed: 0.5, defense: 4, armor: 0, cost: 20, leak: 4, big: true, from: 1, spawn: 'boss', color: '#e04a6a', size: 0.9, shape: 'crown' },
+  lord: { name: 'Echo Lord', desc: `Every ${TRAINING.wave.bossEvery}th wave. Held half as long; costs the base up to 16 if it gets there (less the more it is hurt). Kill it for a card.`, hp: 30, speed: 0.5, defense: 4, armor: 0, cost: 20, leak: 16, big: true, from: 1, spawn: 'boss', color: '#e04a6a', size: 0.9, shape: 'crown' },
 };
 
 /**

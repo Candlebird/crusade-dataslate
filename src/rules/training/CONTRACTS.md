@@ -137,8 +137,8 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `applyLevel(t: UnitTower): boolean` — +1 up, +1 tough (others read `up` for dmg/rate/range); false at cap.
 - `luckCost(run): number | null` (less the Thrift perk), `luckProblem(run): string | null` (also refused at drill.luckCap), `buyLuck(run): void`
 - `mendCost(run): number`, `mendProblem(run): string | null`, `buyMend(run): void` — +mend.hp (+ the Field mending perk), cap baseHp; run.mends++.
-- `killCredits(e: Enemy): number` — max(1, round(cost × perCost)).
-- `payKill(run, e: Enemy): void` — run.credits += killCredits × run.mods.bounty.
+- `killCredits(e: Enemy): number` — max(1, round(cost × perCost)) / wave.crowd (the Lord's not divided): a fraction; the UI floors credits.
+- `payKill(run, e: Enemy): void` — run.credits += killCredits × run.mods.bounty (rounded to 1e-6).
 - `waveCredits(run): number` — wave + perWave × run.wave, + noLeak if run.leaked === 0.
 
 ### combat.ts
@@ -258,7 +258,7 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 
 ### waveKinds.ts
 - `kindPool(w, flies)` — kinds out by wave w with a TRAINING.wave.kinds weight, never the boss, a flying wave's only main-spawn ones.
-- `waveKind(r, w, flies)` — weighted draw from kindPool (swarm if none). `countFor(kind, budget, max)` — { n: round(budget/cost) in 1..max, hpMul: budget/(n × cost) }.
+- `waveKind(r, w, flies)` — weighted draw from kindPool (swarm if none). `costOf(kind)` — cost / wave.crowd (what one costs a wave's budget; waves are crowd times as thick as costs say). `countFor(kind, budget, max)` — { n: round(budget/costOf) in 1..max, hpMul: budget/(n × costOf) }.
 - `isElite(w, i)` — i-th spawn (from 0) of wave w: w ≥ eliteFrom and (i + 1) % eliteEvery === 0.
 
 ### emplacements.ts (default towers)
@@ -279,7 +279,7 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 
 ### waves.ts
 - `isFlyWave(w)`, `isBossWave(w)`, `isFlyBossWave(w): boolean`
-- `planWave(run, w: number): SpawnPlan[]` — one kind a wave (waveKinds.waveKind; a boss wave the lord + one escort kind; a flying wave one main-spawn kind), as many as countFor buys (the rest of the budget in their wounds), every eliteEvery-th from eliteFrom an elite (×eliteHp, gold outline); on siege.waveDice (a siege's own dice for wave w, else the run's); via `nexusWave`: planFor(power × nexus.budgetMul) then affixes.affixPlan; budget base × (power/perPoints) × w^curve × growth^(w-1) (count capped at maxCount, flyMax flying); flyers (×flyHpAt(w)); boss + escorts (×bossHpAt(w); a sky boss alone flies, ×flyHpAt × flyBossHp, its escorts walk); scouts at pad scoutAt (scoutHp); ambush hp; hp ×lateHp(w); staggered by gap; sorted by `at`.
+- `planWave(run, w: number): SpawnPlan[]` — one kind a wave (waveKinds.waveKind; a boss wave the lord + one escort kind; a flying wave one main-spawn kind), as many as countFor buys (the rest of the budget in their wounds), every eliteEvery-th from eliteFrom an elite (×eliteHp, gold outline); on siege.waveDice (a siege's own dice for wave w, else the run's); via `nexusWave`: planFor(power × nexus.budgetMul) then affixes.affixPlan; budget base × (power/perPoints) × w^curve × growth^(w-1) (count capped at maxCount, flyMax flying); flyers (×flyHpAt(w)); boss + escorts (the boss's wounds × max(bossMin, (budget − escorts) / costOf(lord)), ×bossHpAt(w); a sky boss alone flies, ×flyHpAt × flyBossHp, its escorts walk); scouts at pad scoutAt (scoutHp); ambush hp; hp ×lateHp(w); staggered by gap; sorted by `at`.
 - `previewWave(run): SpawnPlan[]` — planWave(run.wave + 1) on a copy of the dice.
 - `layCover(r: Rng, n: number, route: Tile[]): Tile[]` — n patches, onRoute share centred on route cells, clear of pads/base/spawn.
 - `spawnDue(run): void` — queue entries with at ≤ run.t → enemies (id run.nextId++).
@@ -305,7 +305,7 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 - `saveKey(forceId): string` (done) — `trainingRun:<forceId>`.
 - `serialize(run): string`, `deserialize(s: string): TrainingRun | null` — JSON; null on bad/old version. fx may be dropped.
 - `saveRun(run): void`, `loadRun(forceId): SavedRun | null` (null for a run already 'over'), `clearSave(forceId): void` — localStorage wrapped in try/catch.
-- `SAVE_VERSION` (7: the playtest pass, default towers and one-kind waves; 6: Drill Honours and the Weekly Siege; 5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
+- `SAVE_VERSION` (8: crowded waves, fast guns and the base at 80 HP; 7: the playtest pass, default towers and one-kind waves; 6: Drill Honours and the Weekly Siege; 5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
 
 ### run.ts
 - `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus, opts: { drill?: RunDrill; siege?: string } = {}): TrainingRun` — run.drill = a copy of opts.drill (unset: everything open), credits + drill.purseOf; run.siege = opts.siege (the UI then passes no story, nexus or drill, and seed = sortie.weekSeed(week)); run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.

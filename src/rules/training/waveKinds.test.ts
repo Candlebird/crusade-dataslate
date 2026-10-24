@@ -24,9 +24,10 @@ describe('kindPool', () => {
 
 describe('countFor', () => {
   it('buys round(budget / cost), at least 1 and at most max, and spends the rest on wounds', () => {
-    expect(countFor('drone', 20, 60)).toEqual({ n: 10, hpMul: 1 });
-    expect(countFor('drone', 1, 60).n).toBe(1);
-    const big = countFor('swarm', 120, 60);
+    // A drone costs 2 / crowd 4 = 0.5 of a budget, a swarm 0.25.
+    expect(countFor('drone', 5, 60)).toEqual({ n: 10, hpMul: 1 });
+    expect(countFor('drone', 0.1, 60).n).toBe(1);
+    const big = countFor('swarm', 30, 60);
     expect(big).toEqual({ n: 60, hpMul: 2 });
   });
 });

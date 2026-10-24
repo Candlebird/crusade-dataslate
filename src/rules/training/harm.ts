@@ -54,11 +54,20 @@ export const enemiesNear = (run: TrainingRun, x: number, y: number, r: number) =
 
 /** The enemy a gun aims at: the one in reach furthest along the route (least still to go), or the toughest for a Sniper. */
 export function targetFor(run: TrainingRun, t: Tower, g: TowerGun): Enemy | undefined {
+  // Hot (every gun, every step, with waves of a hundred): no arrays, squared distances, the maze looked up once.
   const c = centreOf(t);
+  const r = reach(t, g);
+  const r2 = r * r;
+  const sniper = g.name.includes('Sniper');
+  let m: ReturnType<typeof mapOf> | undefined;
   let best: Enemy | undefined;
   let score = Infinity;
-  for (const e of enemiesNear(run, c.x, c.y, reach(t, g))) {
-    const s = g.name.includes('Sniper') ? -e.hp : toGo(run, e);
+  for (const e of run.enemies) {
+    if (e.hp <= 0) continue;
+    const dx = e.x - c.x;
+    const dy = e.y - c.y;
+    if (dx * dx + dy * dy > r2) continue;
+    const s = sniper ? -e.hp : remaining((m ??= mapOf(run)), e.leg, e.x, e.y);
     if (s < score) { score = s; best = e; }
   }
   return best;

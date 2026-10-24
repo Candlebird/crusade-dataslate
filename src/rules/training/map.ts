@@ -202,7 +202,9 @@ export function remaining(m: MapState, leg: number, x: number, y: number): numbe
   const here = m.fields[leg][idx(t.x, t.y)];
   const g = centre(WAYPOINTS[leg + 1]);
   const toGoal = Number.isFinite(here) ? here : Math.hypot(g.x - x, g.y - y);
-  return toGoal + m.lengths.slice(leg + 1).reduce((n, l) => n + l, 0);
+  let rest = 0;
+  for (let i = leg + 1; i < m.lengths.length; i++) rest += m.lengths[i];
+  return toGoal + rest;
 }
 
 /** The route's whole length, spawn to base. */

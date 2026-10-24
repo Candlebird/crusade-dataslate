@@ -286,11 +286,13 @@ describe('fireAll volleys', () => {
     const t = unit({ guns: [gun({ attacks: 3 })] });
     run.pieces = [t];
     run.enemies = [enemy({ hp: 999, maxHp: 999 })];
-    for (let i = 0; i < 20; i++) fireAll(run, 0.05);
+    // Steps of a 40th of the wait (TRAINING.shootEvery): the volley in the first half, the next one from the 40th on.
+    const dt = TRAINING.shootEvery / 40;
+    for (let i = 0; i < 20; i++) fireAll(run, dt);
     expect(run.fx).toHaveLength(3);
-    for (let i = 0; i < 18; i++) fireAll(run, 0.05);
+    for (let i = 0; i < 18; i++) fireAll(run, dt);
     expect(run.fx).toHaveLength(3);
-    for (let i = 0; i < 4; i++) fireAll(run, 0.05);
+    for (let i = 0; i < 4; i++) fireAll(run, dt);
     expect(run.fx.length).toBeGreaterThan(3);
   });
 });

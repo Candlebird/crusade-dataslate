@@ -8,7 +8,7 @@ import {
   bossHpAt, isBossWave, isFlyBossWave, isFlyWave, lateHp, layCover, leakCost, planWave, previewGroups, previewWave,
   runCover, spawnDue, speedOf, walk, waveBudget,
 } from './waves';
-import { countFor } from './waveKinds';
+import { costOf, countFor } from './waveKinds';
 
 // Waves: planning, spawning, walking and leaks.
 
@@ -53,8 +53,9 @@ describe('planWave', () => {
     expect(waveBudget(1000, 2) / waveBudget(1000, 1)).toBeCloseTo(W.growth * 2 ** W.curve);
     expect(waveBudget(2000, 3)).toBeCloseTo(2 * waveBudget(1000, 3));
     const run = blankRun();
-    const cost = (w: number) => planWave(run, w).reduce((n, s) => n + TRAINING_ENEMIES[s.kind].cost, 0);
-    expect(cost(3)).toBeLessThanOrEqual(waveBudget(run.power, 3));
+    const cost = (w: number) => planWave(run, w).reduce((n, s) => n + costOf(s.kind), 0);
+    // The count rounds to the nearest, so a wave may overspend by half an enemy.
+    expect(cost(3)).toBeLessThanOrEqual(waveBudget(run.power, 3) + Math.max(...planWave(run, 3).map((s) => costOf(s.kind))) / 2);
     expect(cost(14)).toBeGreaterThan(cost(2));
   });
 

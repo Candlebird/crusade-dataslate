@@ -51,14 +51,14 @@ describe('drill honours', () => {
 
   it('counts goals from the force, and an old force starts from its units\' records', () => {
     const a = newUnit({ id: 'a', name: 'Alpha' });
-    a.trainingRecord = { best: 9, kills: 200, lords: 1, runs: 4, mvps: 1 };
+    a.trainingRecord = { best: 9, kills: 950, lords: 1, runs: 4, mvps: 1 };
     const b = newUnit({ id: 'b', name: 'Bravo' });
     b.trainingRecord = { best: 6, kills: 60, lords: 0, runs: 2, mvps: 0 };
     const f = force({ units: [a, b], trainingBest: 11 });
-    expect(drillStats(f)).toMatchObject({ runs: 4, kills: 260, lords: 1 });
+    expect(drillStats(f)).toMatchObject({ runs: 4, kills: 1010, lords: 1 });
     expect(drillProgress(f, 'best')).toBe(11);
     const earned = drillEarned(f);
-    // runs 1, best 5, kills 250, runs 4, best 10, lords 1
+    // runs 1, best 5, kills 1000, runs 4, best 10, lords 1
     expect(earned).toEqual([0, 1, 2, 4, 5, 7]);
     const st = { ...blankDrill(), runs: 1 };
     expect(drillEarned(force({ drill: st }))).toEqual([0]);

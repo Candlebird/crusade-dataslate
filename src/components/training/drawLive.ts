@@ -3,6 +3,7 @@ import { TRAINING_ENEMIES, type TrainingEnemyShape } from '../../rules/downtimeD
 import { FX_COLOR, FX_TIME, centreOf, pieceById, type Enemy, type Fx, type TrainingRun } from '../../rules/training';
 import { bar, shade } from './art';
 import { HOLD_COLOR } from './drawPieces';
+import { drawAt } from './smooth';
 
 // Canvas drawing for what moves on the Training map: enemies (the old modal's shapes) and fx. Same frame as draw.ts.
 
@@ -80,7 +81,8 @@ export const enemyRadius = (e: Enemy, s: number) =>
 
 /**
  * Every enemy: walkers on the ground, flyers lifted over a shadow with pale wings, held ones gripped by a cyan line,
- * the boss big with a pulsing gold aura. HP bars once hurt (always on the boss).
+ * the boss big with a pulsing gold aura. HP bars once hurt (always on the boss). Drawn between their last two steps
+ * (smooth.ts), so they glide at any speed.
  */
 export function drawEnemies(ctx: CanvasRenderingContext2D, run: TrainingRun, s: number, time = performance.now() / 1000) {
   // Walkers first, so flyers pass over them; the boss over everything.
@@ -90,8 +92,9 @@ export function drawEnemies(ctx: CanvasRenderingContext2D, run: TrainingRun, s: 
     const d = TRAINING_ENEMIES[e.kind];
     const boss = isBossKind(e);
     const r = enemyRadius(e, s);
-    const x = e.x * s;
-    let y = e.y * s;
+    const at = drawAt(run, e);
+    const x = at.x * s;
+    let y = at.y * s;
     if (e.flies) {
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.beginPath(); ctx.ellipse(x, y, r * 0.9, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();

@@ -60,7 +60,7 @@ describe('cards', () => {
 
   it('mends the base no higher than full, and hold cards change the run mods', () => {
     const run = withUnit();
-    run.baseHp = 18;
+    run.baseHp = TRAINING.baseHp - 2;
     run.offer = [{ id: 'walls', rarity: 'Common' }];
     pickCard(run, 0);
     expect(run.baseHp).toBe(TRAINING.baseHp);

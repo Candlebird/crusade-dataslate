@@ -7,7 +7,7 @@ import { pick, rand, randInt, type Rng } from './rng';
 import { waveDice } from './siege';
 import { noteMet } from './tally';
 import type { Enemy, SpawnPlan, Tile, TrainingRun } from './types';
-import { countFor, isElite, waveKind } from './waveKinds';
+import { costOf, countFor, isElite, waveKind } from './waveKinds';
 
 // Waves: what comes (budget by force points, one kind a wave, elites, flyers, bosses, scouts, ambushers, HP scaling),
 // spawning and walking.
@@ -57,7 +57,7 @@ export function planFor(r: Rng, power: number, w: number): SpawnPlan[] {
   const kind = waveKind(r, w, flies);
   const { n, hpMul } = countFor(kind, minions, (flies ? W.flyMax : W.maxCount) - (boss ? 1 : 0));
   const hp = hpMul * lateHp(w) * TRAINING.enemyHp * (flies ? flyHpAt(w) : 1);
-  const bossMul = Math.max(W.bossMin, (budget - minions) / TRAINING_ENEMIES.lord.cost);
+  const bossMul = Math.max(W.bossMin, (budget - minions) / costOf('lord'));
 
   const out: SpawnPlan[] = [];
   let at = 0;

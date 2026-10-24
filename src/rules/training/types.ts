@@ -275,7 +275,7 @@ export interface RunDrill {
 
 export interface TrainingRun {
   /** Save format version (save.ts SAVE_VERSION). */
-  v: 7;
+  v: 8;
   forceId: string;
   seed: number;
   /** mulberry32 state: the same seed and the same moves play out the same. */
@@ -342,7 +342,7 @@ export interface TrainingRun {
 
 /** What a saved run looks like on disk (save.ts). */
 export interface SavedRun {
-  v: 7;
+  v: 8;
   savedAt: string;
   run: TrainingRun;
 }

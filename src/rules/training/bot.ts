@@ -1,4 +1,5 @@
 import type { Unit } from '../../model/types';
+import { TRAINING } from '../downtimeData';
 import { centreOf, placeProblem, routeOf, shardsOnMap, unitTowers } from './board';
 import { pickCard } from './cards';
 import { buyLevel, buyLuck, buyMend, levelCost, levelProblem, luckProblem, mendProblem } from './economy';
@@ -19,7 +20,7 @@ export interface MazeSpot {
 }
 
 /** The bot mends the base at or below this much HP. */
-const MEND_AT = 10;
+const MEND_AT = TRAINING.baseHp / 2;
 /** Game seconds a wave may run before the bot calls it off (a stuck wave would never end). */
 const WAVE_LIMIT = 900;
 

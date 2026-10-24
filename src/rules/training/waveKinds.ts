@@ -20,9 +20,12 @@ export function waveKind(r: Rng, w: number, flies: boolean): TrainingEnemyKind {
   return pool[weighted(r, pool.map((k) => W.kinds[k] ?? 0))];
 }
 
+/** What one `kind` costs a wave's budget: its cost / TRAINING.wave.crowd (waves come that many times as thick). */
+export const costOf = (kind: TrainingEnemyKind): number => TRAINING_ENEMIES[kind].cost / W.crowd;
+
 /** How many of `kind` a budget buys (1 to `max`), and the share of their wounds that makes them cost the budget. */
 export function countFor(kind: TrainingEnemyKind, budget: number, max: number): { n: number; hpMul: number } {
-  const cost = TRAINING_ENEMIES[kind].cost;
+  const cost = costOf(kind);
   const n = Math.max(1, Math.min(max, Math.round(budget / cost)));
   return { n, hpMul: budget / (n * cost) };
 }

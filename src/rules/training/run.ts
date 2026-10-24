@@ -25,7 +25,7 @@ export function createRun(forceId: string, units: Unit[], seed: number, story?: 
   opts: { drill?: RunDrill; siege?: string } = {}): TrainingRun {
   const force = units.filter(canTrain);
   const run: TrainingRun = {
-    v: 7, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
+    v: 8, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
     power: force.reduce((n, u) => n + u.points, 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
     mends: 0, leaked: 0, nextId: 1, pieces: [], draft: { step: 'done', hand: [], placed: [] }, recipes: recipesFor(force),
     crafted: [], enemies: [], queue: [], cover: [], cards: [], mods: { bounty: 1, holdMul: 1, regrabAdd: 0 }, banked: {},
