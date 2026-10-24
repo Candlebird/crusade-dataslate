@@ -1,4 +1,5 @@
-import { readyRecipes, shardsOnMap, type Recipe, type ShardPiece, type TrainingRun } from '../../rules/training';
+import type { DefaultRecipeDef } from '../../rules/downtimeData';
+import { readyDefaults, readyRecipes, shardsOnMap, type Recipe, type ShardPiece, type TrainingRun } from '../../rules/training';
 
 // What the recipe book shows: how far each recipe is along, and which Shards on the map a ready one would use.
 
@@ -17,10 +18,21 @@ export function recipeProgress(recipe: Recipe, shards: ShardPiece[]): (ShardPiec
   return out;
 }
 
+/** Each slot of a default's Shard on the map that is exactly it (or null), kept Shards first. */
+export function defaultProgress(d: DefaultRecipeDef, shards: ShardPiece[]): (ShardPiece | null)[] {
+  const free = [...shards].sort((a, b) => Number(a.draft) - Number(b.draft) || a.id - b.id);
+  const used = new Set<number>();
+  return d.slots.map(([type, grade]) => {
+    const p = free.find((x) => !used.has(x.id) && x.type === type && x.grade === grade) ?? null;
+    if (p) used.add(p.id);
+    return p;
+  });
+}
+
 /** The Shards a recipe can count right now: kept ones, and this draft's (placed) ones too. */
 export const countable = (run: TrainingRun): ShardPiece[] => shardsOnMap(run, run.draft.step !== 'done');
 
-/** Ids of the Shards that a ready recipe would use: these glow on the map. */
+/** Ids of the Shards that a ready recipe or default would use: these glow on the map. */
 export function glowIds(run: TrainingRun): Set<number> {
-  return new Set(readyRecipes(run).flatMap((r) => r.uses));
+  return new Set([...readyRecipes(run), ...readyDefaults(run)].flatMap((r) => r.uses));
 }

@@ -5,9 +5,10 @@ import { WAYPOINTS, centre, mapFor, open, route, routeLength } from './map';
 import { blankRun } from './testRun';
 import type { Enemy, RubblePiece, TrainingRun } from './types';
 import {
-  isBossWave, isFlyBossWave, isFlyWave, layCover, leakCost, planWave, previewGroups, previewWave, runCover, spawnDue,
-  speedOf, walk, waveBudget,
+  bossHpAt, isBossWave, isFlyBossWave, isFlyWave, lateHp, layCover, leakCost, planWave, previewGroups, previewWave,
+  runCover, spawnDue, speedOf, walk, waveBudget,
 } from './waves';
+import { countFor } from './waveKinds';
 
 // Waves: planning, spawning, walking and leaks.
 
@@ -48,8 +49,8 @@ describe('wave kinds', () => {
 });
 
 describe('planWave', () => {
-  it('spends a budget that grows 12% a wave and scales with the force', () => {
-    expect(waveBudget(1000, 2) / waveBudget(1000, 1)).toBeCloseTo(W.growth);
+  it('spends a budget that grows by curve and growth a wave and scales with the force', () => {
+    expect(waveBudget(1000, 2) / waveBudget(1000, 1)).toBeCloseTo(W.growth * 2 ** W.curve);
     expect(waveBudget(2000, 3)).toBeCloseTo(2 * waveBudget(1000, 3));
     const run = blankRun();
     const cost = (w: number) => planWave(run, w).reduce((n, s) => n + TRAINING_ENEMIES[s.kind].cost, 0);
@@ -69,30 +70,59 @@ describe('planWave', () => {
     expect(planWave(blankRun(), 6).some((s) => s.flies)).toBe(false);
   });
 
-  it('brings one Echo Lord every boss wave, flying on wave 20', () => {
+  it('brings one Echo Lord every boss wave, flying on wave 20 (its escorts walking)', () => {
     for (const w of [5, 10, 20]) {
       const p = planWave(blankRun(), w);
       expect(p.filter((s) => s.kind === 'lord')).toHaveLength(1);
-      expect(p.every((s) => s.flies)).toBe(w === 20);
+      expect(p.find((s) => s.kind === 'lord')!.flies).toBe(w === 20);
+      expect(p.some((s) => s.kind !== 'lord' && s.flies)).toBe(false);
     }
     expect(planWave(blankRun(), 6).some((s) => s.kind === 'lord')).toBe(false);
   });
 
   it('sends Scouts in on pad 1 and Ambushers from the spawn, both with less HP', () => {
-    const plans = Array.from({ length: 20 }, (_, i) => planWave({ ...blankRun(i + 1), power: 2000 }, 9)).flat();
-    const base = (k: Enemy['kind']) => TRAINING_ENEMIES[k].hp * TRAINING.enemyHp;
-    const scout = plans.find((s) => s.kind === 'outrider' && !s.vet)!;
-    const amb = plans.find((s) => s.kind === 'stalker' && !s.vet)!;
+    // One kind a wave, so it takes more seeds to meet both.
+    const plans = Array.from({ length: 60 }, (_, i) => planWave({ ...blankRun(i + 1), power: 2000 }, 9)).flat();
+    const base = (k: Enemy['kind']) => TRAINING_ENEMIES[k].hp * TRAINING.enemyHp * countFor(k, waveBudget(2000, 9), W.maxCount).hpMul * lateHp(9);
+    const scout = plans.find((s) => s.kind === 'outrider' && !s.elite)!;
+    const amb = plans.find((s) => s.kind === 'stalker' && !s.elite)!;
     expect(scout.leg).toBe(TRAINING.route.scoutAt);
     expect(scout.hp).toBeCloseTo(base('outrider') * W.scoutHp);
     expect(amb.leg).toBe(0);
     expect(amb.hp).toBeCloseTo(base('stalker') * W.ambushHp);
   });
 
-  it('has veterans only from vetFrom, and HP growth past hpFrom', () => {
-    expect(planWave(blankRun(), W.vetFrom - 1).some((s) => s.vet)).toBe(false);
-    const swarm = planWave({ ...blankRun(), power: 10 / waveBudget(1, W.hpFrom + 4) }, W.hpFrom + 4).find((s) => s.kind === 'swarm' && !s.vet)!;
-    expect(swarm.hp).toBeCloseTo(TRAINING_ENEMIES.swarm.hp * TRAINING.enemyHp * W.hpGrowth ** 4);
+  it('has elites only from eliteFrom, every eliteEvery-th, and HP growth past hpFrom', () => {
+    expect(planWave(blankRun(), W.eliteFrom - 1).some((s) => s.elite)).toBe(false);
+    const p = planWave({ ...blankRun(), power: 2000 }, W.eliteFrom + 1);
+    expect(p.filter((s) => s.elite)).toHaveLength(Math.floor(p.length / W.eliteEvery));
+    const w = W.hpFrom + 6;
+    const plain = planWave({ ...blankRun(), power: 2000 }, w).find((s) => !s.elite && TRAINING_ENEMIES[s.kind].spawn === 'main')!;
+    const { hpMul } = countFor(plain.kind, waveBudget(2000, w), W.maxCount);
+    expect(plain.hp).toBeCloseTo(TRAINING_ENEMIES[plain.kind].hp * TRAINING.enemyHp * hpMul * lateHp(w));
+  });
+
+  it('grows wounds hpGrowth a wave from hpFrom to hpTo, lateGrowth after', () => {
+    expect(lateHp(W.hpFrom)).toBe(1);
+    expect(lateHp(W.hpFrom - 1)).toBe(1);
+    expect(lateHp(W.hpFrom + 2)).toBeCloseTo(W.hpGrowth ** 2);
+    expect(lateHp(W.hpTo + 3) / lateHp(W.hpTo)).toBeCloseTo(W.lateGrowth ** 3);
+  });
+
+  it('toughens the Echo Lord by bossHp a boss wave, the last holding on', () => {
+    expect(bossHpAt(5)).toBe(W.bossHp[0]);
+    expect(bossHpAt(10)).toBe(W.bossHp[1]);
+    expect(bossHpAt(W.bossEvery * W.bossHp.length)).toBe(W.bossHp[W.bossHp.length - 1]);
+    expect(bossHpAt(W.bossEvery * (W.bossHp.length + 4))).toBe(W.bossHp[W.bossHp.length - 1]);
+  });
+
+  it('brings one kind a wave (a boss wave: the boss and one escort kind)', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      for (const w of [1, 3, 4, 5, 9, 10, 12, 20]) {
+        const kinds = new Set(planWave(blankRun(seed), w).filter((s) => s.kind !== 'lord').map((s) => s.kind));
+        expect(kinds.size).toBe(1);
+      }
+    }
   });
 
   it('previews the next wave without rolling the run\'s dice', () => {
@@ -128,8 +158,8 @@ describe('cover', () => {
 
 describe('spawning and walking', () => {
   it('spawns what is due, with fresh ids', () => {
-    const run = blankRun();
-    run.queue = planWave(run, 3);
+    const run = { ...blankRun(), power: 2000 };
+    run.queue = planWave(run, 6);
     run.nextId = 50;
     run.t = run.queue[1].at;
     spawnDue(run);
@@ -172,10 +202,13 @@ describe('spawning and walking', () => {
     expect(e).toMatchObject({ leg: TRAINING.route.ambushAt, jumped: true, x: to.x, y: to.y });
   });
 
-  it('leaks 1, 3 for heavy or veteran, 10 for the boss', () => {
+  it('leaks its own leak, elite for an elite, a boss by the share of its wounds left', () => {
     expect(leakCost(foe('drone'))).toBe(1);
-    expect(leakCost(foe('drone', { vet: true }))).toBe(3);
-    expect(['brute', 'carapace', 'mirror'].map((k) => leakCost(foe(k as Enemy['kind'])))).toEqual([3, 3, 3]);
-    expect(leakCost(foe('lord'))).toBe(10);
+    expect(leakCost(foe('drone', { elite: true }))).toBe(TRAINING.leak.elite);
+    expect(['brute', 'carapace', 'mirror'].map((k) => leakCost(foe(k as Enemy['kind'])))).toEqual([2, 2, 2]);
+    const L = TRAINING_ENEMIES.lord.leak;
+    expect(leakCost(foe('lord', { hp: 100, maxHp: 100 }))).toBe(L);
+    expect(leakCost(foe('lord', { hp: 50, maxHp: 100 }))).toBe(Math.ceil(L / 2));
+    expect(leakCost(foe('lord', { hp: 1, maxHp: 100 }))).toBe(TRAINING.leak.bossMin);
   });
 });

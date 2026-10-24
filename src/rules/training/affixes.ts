@@ -11,16 +11,16 @@ const X = TRAINING.nexus;
 
 const isBossPlan = (s: SpawnPlan) => TRAINING_ENEMIES[s.kind].spawn === 'boss';
 
-/** A wave's plans with the affixes on them, rolling `r`: Frenzied wounds, Proud veterans, Armoured saves. */
+/** A wave's plans with the affixes on them, rolling `r`: Frenzied wounds, Proud elites, Armoured saves. */
 export function affixPlan(r: Rng, run: Pick<TrainingRun, 'nexus'>, plans: SpawnPlan[]): SpawnPlan[] {
   const t = threatOf(run);
   if (!t || !run.nexus?.affixes.length) return plans;
   const armoured = Math.min(X.armoured.max, X.armoured.share * t);
   for (const s of plans) {
     if (hasAffix(run, 'frenzied')) s.hp *= 1 + X.frenzied.per * t;
-    if (hasAffix(run, 'proud') && !isBossPlan(s) && !s.vet && rand(r) < X.proud.per * t) {
-      s.vet = true;
-      s.hp *= TRAINING.wave.vetHp;
+    if (hasAffix(run, 'proud') && !isBossPlan(s) && !s.elite && rand(r) < X.proud.per * t) {
+      s.elite = true;
+      s.hp *= TRAINING.wave.eliteHp;
     }
     if (hasAffix(run, 'armoured') && rand(r) < armoured) s.hard = 1;
   }

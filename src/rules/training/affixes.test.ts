@@ -29,12 +29,12 @@ describe('threat affixes', () => {
     expect(affixPace(blankRun(), testEnemy())).toBe(1);
   });
 
-  it('Frenzied adds wounds, Proud veterans, Armoured saves, all by threat', () => {
+  it('Frenzied adds wounds, Proud elites, Armoured saves, all by threat', () => {
     const f = affixPlan({ rng: 1 }, withAffix(5, 'frenzied'), [plan()]);
     expect(f[0].hp).toBeCloseTo(100 * (1 + 5 * X.frenzied.per));
     const many = () => Array.from({ length: 400 }, () => plan());
     const p = affixPlan({ rng: 1 }, withAffix(6, 'proud'), many());
-    expect(p.filter((s) => s.vet).length / 400).toBeCloseTo(6 * X.proud.per, 1);
+    expect(p.filter((s) => s.elite).length / 400).toBeCloseTo(6 * X.proud.per, 1);
     const a = affixPlan({ rng: 1 }, withAffix(4, 'armoured'), many());
     expect(a.filter((s) => s.hard).length / 400).toBeCloseTo(4 * X.armoured.share, 1);
     const through = (hard?: number) => {

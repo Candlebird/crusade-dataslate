@@ -1,5 +1,5 @@
 import type { ForceSortie, Unit } from '../../model/types';
-import { TRAINING } from '../downtimeData';
+import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { pieceById, unitTowers } from './board';
 import { abilities, auras, fireAll, holds, reap, tickEnemies } from './combat';
 import { waveCredits } from './economy';
@@ -11,7 +11,7 @@ import { lordPlan, lordTick } from './lords';
 import { nemesisPlan, nemesisTick, pickNemesis } from './nemesis';
 import { nexusStart } from './nexus';
 import { rollGains, watchBosses } from './quirks';
-import { planWave, runCover, spawnDue, walk } from './waves';
+import { mainKind, planWave, runCover, spawnDue, walk } from './waves';
 import { purseOf } from './drill';
 import type { RunDrill, RunNexus, ShardPiece, TrainingRun, UnitTower } from './types';
 
@@ -25,7 +25,7 @@ export function createRun(forceId: string, units: Unit[], seed: number, story?: 
   opts: { drill?: RunDrill; siege?: string } = {}): TrainingRun {
   const force = units.filter(canTrain);
   const run: TrainingRun = {
-    v: 6, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
+    v: 7, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
     power: force.reduce((n, u) => n + u.points, 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
     mends: 0, leaked: 0, nextId: 1, pieces: [], draft: { step: 'done', hand: [], placed: [] }, recipes: recipesFor(force),
     crafted: [], enemies: [], queue: [], cover: [], cards: [], mods: { bounty: 1, holdMul: 1, regrabAdd: 0 }, banked: {},
@@ -75,8 +75,9 @@ export function startWave(run: TrainingRun): void {
     }
   }
   const flank = run.queue.filter((s) => s.leg > 0).length;
-  const vets = run.queue.filter((s) => s.vet).length;
-  run.log.push(`Wave ${run.wave}: ${run.queue.length} enemies${flank ? `, ${flank} of them coming in on the pads` : ''}${vets ? `, ${vets} veterans` : ''}.`);
+  const elites = run.queue.filter((s) => s.elite).length;
+  const kind = mainKind(run.queue);
+  run.log.push(`Wave ${run.wave}: ${run.queue.length} enemies${kind ? ` (${TRAINING_ENEMIES[kind].name})` : ''}${flank ? `, ${flank} of them coming in on the pads` : ''}${elites ? `, ${elites} elite` : ''}.`);
 }
 
 /** Advance the run by `dt` seconds (see CONTRACTS.md for the order). */

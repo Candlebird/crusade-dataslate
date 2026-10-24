@@ -8,7 +8,8 @@ import { centre, remaining, upstream, WAYPOINTS } from './map';
 import { rand, saveChance } from './rng';
 import { lordDmg } from './lords';
 import { tallyHarm } from './tally';
-import type { Enemy, Tower, TowerGun, TowerSkill, TrainingRun, UnitTower } from './types';
+import type { ShardType } from '../downtimeData';
+import type { Enemy, Grade, Tower, TowerGun, TowerSkill, TrainingRun, UnitTower } from './types';
 
 // The pieces of combat every part of it shares: reach, damage, statuses, dots, and the fx a hit leaves.
 
@@ -23,11 +24,18 @@ export const isUnit = (t: Tower): t is UnitTower => t.kind === 'unit';
 export const enemyDef = (e: Enemy) => TRAINING_ENEMIES[e.kind];
 export const isBoss = (e: Enemy) => enemyDef(e).spawn === 'boss';
 
-/** How far a gun reaches, in cells: inches = cells, + levels and range boosts; melee TRAINING.meleeReach. */
+/** A listed range (inches) as cells on the map: TRAINING.rangeMul of it. */
+export const rangeCells = (inches: number) => inches * TRAINING.rangeMul;
+
+/** How far a gun reaches, in cells: its range by TRAINING.rangeMul, + levels and range boosts; melee TRAINING.meleeReach. */
 export function reach(t: Tower, g: TowerGun): number {
   if (g.melee) return TRAINING.meleeReach;
-  return g.range + (isUnit(t) ? t.up * TRAINING.levels.range : 0) + t.boost.range;
+  return rangeCells(g.range) + (isUnit(t) ? t.up * TRAINING.levels.range : 0) + t.boost.range;
 }
+
+/** The Shards a tower that isn't a unit is made of, by type and grade: a Shard itself, a default tower its slots. */
+export const partsOf = (t: Tower): [ShardType, Grade][] =>
+  t.kind === 'shard' ? [[t.type, t.grade]] : t.kind === 'default' ? t.slots : [];
 
 /** Damage a hit gets from level-ups (0 for Shards). */
 export const levelDmg = (t: Tower, g: TowerGun): number =>

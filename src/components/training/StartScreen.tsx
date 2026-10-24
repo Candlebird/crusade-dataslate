@@ -33,7 +33,7 @@ export function StartScreen({ force, c, saved, cleared, siege, onSiege, week = '
       <div className="training-intro">
         <div className="small">
           <ol className="training-steps">
-            <li><b>Draft.</b> Before each wave, draw {TRAINING.shards.draw} Shards and set them on the map as a maze.</li>
+            <li><b>Draft.</b> Before each wave, draw {TRAINING.shards.draw} Shards (always {TRAINING.shards.draw}) and set them on the map as a maze.</li>
             <li><b>Keep.</b> Keep one (two or four alike merge a grade or two up); the rest crumble to rubble.</li>
             <li><b>Craft.</b> Kept Shards that match a unit's recipe craft it: a tower with its own weapons and rules.</li>
           </ol>

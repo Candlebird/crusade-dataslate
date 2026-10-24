@@ -495,9 +495,17 @@ export const TRAINING = {
   },
   /** Enemies walk this many cells a second for each point of their speed (a 1405-cell maze takes a drone about 70 s). */
   walkMul: 18,
-  /** The base's HP, and what each leak costs it: an enemy's own `leak`, or `vet` for a veteran (whichever is more). */
+  /**
+   * Game time: a second of play at 1× runs this many seconds of the sim (walking, spawns, fire clocks, fx), so 2× and
+   * 4× scale with it. Only the screen's loop reads it (clock.ts); the engine and the bot count in sim seconds.
+   */
+  timeScale: 0.5,
+  /** Every shooting weapon (unit, Shard, default, relic shot, barrage) reaches this share of its listed range in cells. */
+  rangeMul: 0.5,
+  /** The base's HP, and what each leak costs it: an enemy's own `leak`, or `elite` for an elite (whichever is more); an
+   *  Echo Lord its `leak` × the share of its wounds left (rounded up), never below `bossMin`. */
   baseHp: 20,
-  leak: { vet: 3 },
+  leak: { elite: 3, bossMin: 1 },
   /** Melee weapons reach this many cells from the middle of their piece (so they hit walkers squeezing past). */
   meleeReach: 2,
   /** Seconds between a tower's volleys: shooting, and melee. A volley spreads its shots over `volleySpread` of the wait. */
@@ -508,8 +516,9 @@ export const TRAINING = {
   blastRadius: 2,
   /** A Hero's aura gives +1 to hit to every tower within this many cells of it, itself included. */
   auraRadius: 6,
-  /** Every enemy has this many times its listed wounds (tuned with the balance bot: every sample force reaches about wave 20-27). */
-  enemyHp: 0.1,
+  /** Every enemy has this many times its listed wounds (tuned with the balance bot, balance.test.ts: a fresh sample force
+   *  reaches about wave 20-25). */
+  enemyHp: 0.16,
   /**
    * Holds: a crafted unit with Tough above 1 (not an Aircraft) grabs one walker in melee reach and holds it `perTough`
    * seconds per Tough, up to `max`; a boss or a monster is held `bigMul` as long. Let go, an enemy can't be grabbed
@@ -526,8 +535,8 @@ export const TRAINING = {
     base: 30,
     perPoints: 100,
     growth: 1.25,
-    dmg: 1,
-    meleeDmg: 2,
+    dmg: 0.5,
+    meleeDmg: 1,
     rate: 0.25,
     range: 1,
   },
@@ -536,33 +545,85 @@ export const TRAINING = {
   /** Mending the base: +`hp` for `cost` credits (each mend this run `growth` times dearer), never above `baseHp`. */
   mend: { hp: 5, cost: 40, growth: 1.2 },
   /**
-   * Waves. Wave 1's enemies cost `base` for every `perPoints` points in the force, growing `growth` times a wave; past
-   * `maxCount` enemies the rest of the budget makes them tougher instead. Past wave `hpFrom` every enemy has `hpGrowth`
-   * times more wounds a wave. Every `flyEvery`th wave flies, with `flyShare` of the budget (flyers skip the maze); every `bossEvery`th brings an Echo Lord with `escorts` of
-   * its budget as escorts (the rest toughens the boss, never below `bossMin` of its wounds), and every `flyBossEvery`th the boss and its escorts fly. Scouts come in with `scoutHp` of
-   * their wounds, Ambushers with `ambushHp`. Enemies come in `gap` seconds apart (about); `vets` of them as veterans
-   * (×`vetHp` wounds) from wave `vetFrom`.
+   * Waves. Wave w's enemies cost `base` for every `perPoints` points in the force × w^`curve` × `growth`^(w-1); past
+   * `maxCount` enemies (`flyMax` on a flying wave) the rest of the budget makes them tougher instead. Every enemy has
+   * `hpGrowth` times more wounds a wave from wave `hpFrom` to `hpTo`, `lateGrowth` times a wave after (waves.ts lateHp).
+   * Every `flyEvery`th wave flies, with `flyShare` of the budget (flyers skip the maze), its flyers `flyHp` × `flyFade`^(w-1)
+   * as tough (thinner as the maze grows). Every `bossEvery`th brings an Echo Lord with `escorts` of its budget as escorts
+   * (the rest toughens the boss, never below `bossMin` of its wounds), the Lord `bossHp` times tougher again (one entry a
+   * boss wave, the last holding on); every `flyBossEvery`th the Lord flies (`flyBossHp` as tough; its escorts walk).
+   * Scouts come in with `scoutHp` of their wounds, Ambushers with `ambushHp`. Enemies come in `gap` seconds apart
+   * (about). Each wave is one kind (a boss wave the boss and one kind of escort), drawn by `kinds` weight from those that
+   * can turn up (a flying wave's from the `main` ones); as many come as the budget buys, their wounds evened out so the
+   * wave costs its budget. From wave `eliteFrom` every `eliteEvery`th is an elite, with `eliteHp` times the wounds (drawn
+   * with a gold rim). Tuned with the balance bot (balance.test.ts): a boss gets a pad or two into the maze, the bot leaks
+   * now and then in waves 8-15, and no flying wave is a wall.
    */
   wave: {
-    base: 4,
+    base: 1.6,
     perPoints: 1000,
-    growth: 1.42,
-    maxCount: 60,
-    hpFrom: 25,
-    hpGrowth: 1.05,
+    growth: 1.15,
+    curve: 0.7,
+    maxCount: 24,
+    hpFrom: 4,
+    hpTo: 20,
+    hpGrowth: 1.15,
+    lateGrowth: 1.17,
     flyEvery: 4,
     flyShare: 0.4,
+    flyMax: 12,
+    flyHp: 1.4,
+    flyFade: 0.9,
     bossEvery: 5,
     flyBossEvery: 20,
     escorts: 0.5,
     bossMin: 0.1,
+    bossHp: [2.0, 2.6, 3.5, 1.7, 0.6, 0.5] as number[],
+    flyBossHp: 0.5,
     scoutHp: 0.8,
     ambushHp: 0.65,
     gap: 0.6,
-    vets: 0.1,
-    vetFrom: 10,
-    vetHp: 2,
+    kinds: { swarm: 3, drone: 3, spitter: 2, outrider: 1.5, carapace: 2, mirror: 1.5, stalker: 1.5, brute: 1.5 } as Partial<Record<TrainingEnemyKind, number>>,
+    eliteFrom: 6,
+    eliteEvery: 6,
+    eliteHp: 2,
   },
+  /**
+   * Default towers (emplacements.ts): generic emplacements any force can build from Shards of exactly these types and
+   * grades (Flawed means Flawed). Between them the recipes use each of the 40 Shard kinds once. Each slot brings its
+   * type's gun and rule; the guns are scaled so the whole does `dpsShare` of the damage a crafted unit from Shards of
+   * the same value does: `unitDps` a point of recipe value at Defense `dpsDefense` (dps.ts towerDps; the sample
+   * forces' mean, measured, and checked by emplacements.test.ts). Quality is the best of its Shards' less
+   * `qualityBonus` (lower is better), never below 2+. A default takes no XP, levels, traits or relics, and is hidden
+   * when one of the force's unit recipes can be filled from its Shards.
+   */
+  defaults: {
+    dpsShare: 0.75,
+    unitDps: 0.346,
+    dpsDefense: 5,
+    qualityBonus: 1,
+    recipes: [
+      { key: 'picket', name: 'Picket Post', text: 'A sentry nest with a long view.', slots: [['firepower', 1], ['swift', 1], ['command', 1]] },
+      { key: 'barricade', name: 'Barricade', text: 'Sharpened stakes behind a sandbag wall.', slots: [['bulwark', 1], ['assault', 1], ['vigor', 1]] },
+      { key: 'mortar', name: 'Mortar Pit', text: 'Lobbed shells that burst among the pack.', slots: [['blast', 1], ['breach', 1], ['firepower', 2]] },
+      { key: 'razorwire', name: 'Razorwire Run', text: 'Coils of wire that slow and cut.', slots: [['assault', 2], ['swift', 2], ['bulwark', 2]] },
+      { key: 'shrine', name: 'Field Shrine', text: 'A blessed post that steadies the guns round it.', slots: [['vigor', 2], ['command', 2], ['blast', 2]] },
+      { key: 'lascannon', name: 'Lascannon Nest', text: 'A heavy beam that cuts through armour.', slots: [['breach', 2], ['firepower', 3], ['command', 3]] },
+      { key: 'pylon', name: 'Bastion Pylon', text: 'A shield pylon that dazes what brushes it.', slots: [['bulwark', 3], ['vigor', 3], ['command', 4]] },
+      { key: 'flak', name: 'Flak Battery', text: 'Quick-firing guns that fill the sky.', slots: [['swift', 3], ['firepower', 4], ['blast', 3]] },
+      { key: 'ram', name: 'Breaker Ram', text: 'Piston-driven blades for anything that comes close.', slots: [['assault', 3], ['breach', 3], ['bulwark', 4]] },
+      { key: 'hellfire', name: 'Hellfire Array', text: 'Burning shells that leave the road aflame.', slots: [['blast', 4], ['breach', 4], ['vigor', 4]] },
+      { key: 'spire', name: 'Storm Spire', text: 'A crackling mast that strikes fast and far.', slots: [['swift', 4], ['swift', 5], ['firepower', 5]] },
+      { key: 'titan', name: 'Titan Bulwark', text: 'A wall of iron fists.', slots: [['assault', 4], ['assault', 5], ['bulwark', 5]] },
+      { key: 'citadel', name: 'Nexus Citadel', text: 'A fortress that does a little of everything.', slots: [['breach', 5], ['blast', 5], ['command', 5], ['vigor', 5]] },
+    ] as DefaultRecipeDef[],
+  },
+  /**
+   * The flight lane: flyers go straight pad to pad. Building is open along it (only the pads and the spawn corner are
+   * barred); a gun within reach of a leg can shoot what flies it. Firepower and Swift Shards (SHARD_TYPES `air`) do
+   * more to flyers. `width` cells either side of a leg are drawn as the lane.
+   */
+  flightLane: { width: 1.5 },
   /** Cover: `patches` (a range) of `size`×`size` patches laid out each run, `onRoute` of them centred on cells of the
    * empty map's route. Cover never blocks building or walking; an enemy standing in it is at `hit` to be hit by shooting. */
   cover: { patches: [6, 8] as [number, number], size: 3, onRoute: 0.7, hit: -1 },
@@ -676,8 +737,8 @@ export const TRAINING = {
     reviveHold: 0.2,
     /** Holds never drop below this share, however the record cuts them. */
     minHold: 0.25,
-    liftDmg: 1,
-    crackDmg: 0.05,
+    liftDmg: 0.4,
+    crackDmg: 0.18,
     rangeTrait: 6,
   },
   /**
@@ -754,7 +815,7 @@ export const TRAINING = {
    * - regenerating: every Echo but a lord mends `per` of its wounds a second.
    * - vengeful: an Echo slain makes those within `radius` cells walk `mul` × as fast for `secs` × threat seconds.
    * - shrouded: shots at an Echo more than `from` − `per` × threat of the gun's reach away (at least `min`) are at -1.
-   * - proud: `per` of the plain Echoes from wave 1 come as veterans too. - bleed: the base starts `per` lower.
+   * - proud: `per` of the plain Echoes from wave 1 come as elites too. - bleed: the base starts `per` lower.
    * Events (`events`, by GALACTIC_EVENTS id) that map to the maze; any other is flavour on the start screen and HUD.
    * Lords: up to `lords.max` of the campaign's own (Echo-held guardians by tier, then the Nexus Crisis lord last)
    * take the boss waves from `lords.from` on, in tier order, skipping the nemesis's wave; their wounds × `lords.hp` by
@@ -775,8 +836,8 @@ export const TRAINING = {
     bleed: { per: 2 },
     events: {
       warpCurrents: { walk: 1.1 },
-      ionStorm: { from: 18 },
-      shardRush: { draw: 1 },
+      ionStorm: { from: 9 },
+      shardRush: { luck: 1 },
       convoys: { credits: 25 },
       echoSurge: { budget: 1.1 },
       voidLull: { budget: 0.9 },
@@ -852,7 +913,7 @@ export const TRAINING = {
    * `luckAtStart` and draws boss cards only from `cardsAtStart`; each goal reached (in any order)
    * unlocks a luck level, a card group, or a level of a small run perk. Perks, a level each: `purse` more starting
    * credits, `mend` more HP a base mend, `reroll` card offers re-drawn a run, `thrift` off the price of luck (a share),
-   * `offer` more cards on offer, `draw` more Shards a draft; thrift never takes more than `thriftMax` off. Goals count
+   * `offer` more cards on offer (a draft is always TRAINING.shards.draw: no perk changes it); thrift never takes more than `thriftMax` off. Goals count
    * over every run (drill.ts goalText).
    */
   drill: {
@@ -864,7 +925,7 @@ export const TRAINING = {
       support: { name: 'Support cards', cards: ['medic', 'drill', 'banner'] },
       fury: { name: 'Fury cards', cards: ['trance', 'uplink'] },
     } as Record<string, { name: string; cards: string[] }>,
-    perks: { purse: 10, mend: 2, reroll: 1, thrift: 0.1, offer: 1, draw: 1 },
+    perks: { purse: 10, mend: 2, reroll: 1, thrift: 0.1, offer: 1 },
     thriftMax: 0.9,
     goals: [
       { goal: 'runs', n: 1, unlock: { cards: 'fieldcraft' } },
@@ -886,7 +947,7 @@ export const TRAINING = {
       { goal: 'clean', n: 12, unlock: { perk: 'mend' } },
       { goal: 'kills', n: 4000, unlock: { perk: 'purse' } },
       { goal: 'lords', n: 4, unlock: { perk: 'thrift' } },
-      { goal: 'best', n: 25, unlock: { perk: 'draw' } },
+      { goal: 'best', n: 25, unlock: { perk: 'offer' } },
     ] as { goal: DrillGoal; n: number; unlock: DrillUnlock }[],
   },
   /**
@@ -909,9 +970,17 @@ export const TRAINING = {
 /** What a Drill Honour counts (training/drill.ts drillProgress). */
 export type DrillGoal = 'runs' | 'best' | 'kills' | 'bosses' | 'lords' | 'clean' | 'crafted' | 'titles' | 'lore' | 'sieges';
 /** A small run option a Drill Honour unlocks a level of (TRAINING.drill.perks). */
-export type DrillPerk = 'purse' | 'mend' | 'reroll' | 'thrift' | 'offer' | 'draw';
+export type DrillPerk = 'purse' | 'mend' | 'reroll' | 'thrift' | 'offer';
 /** What a Drill Honour unlocks: a luck level, a card group (TRAINING.drill.groups) or a perk level. */
 export type DrillUnlock = { luck: number } | { cards: string } | { perk: DrillPerk };
+
+/** A default tower's recipe (TRAINING.defaults): Shards of exactly these types and grades. */
+export interface DefaultRecipeDef {
+  key: string;
+  name: string;
+  text: string;
+  slots: [ShardType, number][];
+}
 
 export type ShardType = 'assault' | 'firepower' | 'breach' | 'blast' | 'bulwark' | 'swift' | 'command' | 'vigor';
 
@@ -930,13 +999,15 @@ export const SHARD_TYPES: Record<ShardType, {
   slow?: number;
   aura?: { radius: number; perGrade: number };
   bleed?: number;
+  /** Damage against flyers, as a multiple (anti-air). */
+  air?: number;
 }> = {
   assault: { name: 'Assault', color: '#d0603a', text: 'Strikes hard in melee.', gun: { melee: true, range: 0, attacks: 2, ap: 1 } },
-  firepower: { name: 'Firepower', color: '#e0b040', text: 'Shoots a long way.', gun: { range: 24, attacks: 1, ap: 0 } },
+  firepower: { name: 'Firepower', color: '#e0b040', text: 'Shoots a long way; good against flyers.', gun: { range: 24, attacks: 1, ap: 0 }, air: 1.5 },
   breach: { name: 'Breach', color: '#c04a8a', text: 'Few shots, but they punch through armour.', gun: { range: 18, attacks: 0.5, ap: 2 } },
   blast: { name: 'Blast', color: '#ff9a4a', text: 'Each hit spills onto the enemies round it.', gun: { range: 12, attacks: 0.5, ap: 0, blast: 3 } },
   bulwark: { name: 'Bulwark', color: '#8d8778', text: 'Its blows leave enemies dazed (slower).', gun: { melee: true, range: 0, attacks: 1, ap: 0 }, daze: 0.4 },
-  swift: { name: 'Swift', color: '#5fb3d0', text: 'Quick, short-ranged shots that slow what they hit.', gun: { range: 9, attacks: 1.5, ap: 0 }, slow: 0.25 },
+  swift: { name: 'Swift', color: '#5fb3d0', text: 'Quick, short-ranged shots that slow what they hit; good against flyers.', gun: { range: 9, attacks: 1.5, ap: 0 }, slow: 0.25, air: 1.5 },
   command: { name: 'Command', color: '#c9a24a', text: 'Towers round it get +1 to hit.', gun: { range: 12, attacks: 0.5, ap: 0 }, aura: { radius: 4, perGrade: 1 } },
   vigor: { name: 'Vigor', color: '#6fdc6f', text: 'Enemies near it bleed.', gun: { range: 12, attacks: 0.5, ap: 0 }, bleed: 0.5 },
 };
@@ -982,11 +1053,11 @@ export const TRAINING_ENEMIES: Record<TrainingEnemyKind, TrainingEnemyDef> = {
   drone: { name: 'Echo Drone', desc: 'The line infantry of the Echoes.', hp: 6, speed: 1.1, defense: 5, armor: 0, cost: 2, leak: 1, from: 1, spawn: 'main', color: '#8fa7c4', size: 0.5, shape: 'diamond' },
   spitter: { name: 'Spitter', desc: 'Soft, but slick: Defense 4.', hp: 5, speed: 0.9, defense: 4, armor: 0, cost: 3, leak: 1, from: 2, spawn: 'main', color: '#7fbf6a', size: 0.45, shape: 'pentagon' },
   outrider: { name: 'Outrider', desc: `Scout: races in on pad ${TRAINING.route.scoutAt} as the wave starts.`, hp: 5, speed: 2, defense: 5, armor: 0, cost: 3, leak: 1, from: 2, spawn: 'scout', color: '#e0a040', size: 0.45, shape: 'chevron' },
-  carapace: { name: 'Carapace', desc: 'Armour 1: each hit does 1 less damage. Bring AP.', hp: 10, speed: 0.8, defense: 4, armor: 1, cost: 4, leak: 3, from: 3, spawn: 'main', color: '#6c7a89', size: 0.55, shape: 'hexagon' },
-  mirror: { name: 'Mirrorshell', desc: 'Mirrored hide: shots do 40% damage, melee 150%. Meet it with blades.', hp: 10, speed: 0.85, defense: 4, armor: 0, shotMul: 0.4, meleeMul: 1.5, cost: 5, leak: 3, from: 4, spawn: 'main', color: '#a8dce8', size: 0.6, shape: 'shield' },
+  carapace: { name: 'Carapace', desc: 'Armour 1: each hit does 1 less damage. Bring AP.', hp: 10, speed: 0.8, defense: 4, armor: 1, cost: 4, leak: 2, from: 3, spawn: 'main', color: '#6c7a89', size: 0.55, shape: 'hexagon' },
+  mirror: { name: 'Mirrorshell', desc: 'Mirrored hide: shots do 40% damage, melee 150%. Meet it with blades.', hp: 10, speed: 0.85, defense: 4, armor: 0, shotMul: 0.4, meleeMul: 1.5, cost: 5, leak: 2, from: 4, spawn: 'main', color: '#a8dce8', size: 0.6, shape: 'shield' },
   stalker: { name: 'Stalker', desc: `Ambush: on pad ${TRAINING.route.ambushFrom} it vanishes, and comes out on pad ${TRAINING.route.ambushAt}.`, hp: 7, speed: 1.3, defense: 5, armor: 0, cost: 4, leak: 1, from: 3, spawn: 'ambush', color: '#b05cc8', size: 0.5, shape: 'star' },
-  brute: { name: 'Brute', desc: 'Slow and huge: held half as long.', hp: 22, speed: 0.6, defense: 4, armor: 0, cost: 6, leak: 3, big: true, from: 4, spawn: 'main', color: '#c0583e', size: 0.7, shape: 'spikes' },
-  lord: { name: 'Echo Lord', desc: `Every ${TRAINING.wave.bossEvery}th wave. Held half as long; costs the base 10 if it gets there. Kill it for a card.`, hp: 30, speed: 0.5, defense: 4, armor: 0, cost: 20, leak: 10, big: true, from: 1, spawn: 'boss', color: '#e04a6a', size: 0.9, shape: 'crown' },
+  brute: { name: 'Brute', desc: 'Slow and huge: held half as long.', hp: 22, speed: 0.6, defense: 4, armor: 0, cost: 6, leak: 2, big: true, from: 4, spawn: 'main', color: '#c0583e', size: 0.7, shape: 'spikes' },
+  lord: { name: 'Echo Lord', desc: `Every ${TRAINING.wave.bossEvery}th wave. Held half as long; costs the base up to 4 if it gets there (less the more it is hurt). Kill it for a card.`, hp: 30, speed: 0.5, defense: 4, armor: 0, cost: 20, leak: 4, big: true, from: 1, spawn: 'boss', color: '#e04a6a', size: 0.9, shape: 'crown' },
 };
 
 /**

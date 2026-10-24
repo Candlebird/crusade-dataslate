@@ -883,6 +883,10 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-recipe-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .training-recipe-slots { display: flex; flex-wrap: wrap; gap: 4px; }
 .training-recipes-done { display: flex; align-items: center; gap: 4px; }
+.training-defaults { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.training-defaults-fold { display: flex; flex-direction: column; gap: 4px; }
+.training-defaults-fold > summary { cursor: pointer; }
+.training-defaults-fold[open] > .training-recipe { margin-top: 4px; }
 .training-record { display: flex; flex-wrap: wrap; gap: 2px 0; }
 .training-record-row { flex-basis: 100%; display: flex; align-items: baseline; gap: 6px; }
 .training-record-row .tag { margin: 0; flex-shrink: 0; }

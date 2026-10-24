@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { step, type Phase, type TrainingRun } from '../../rules/training';
+import { gameSeconds, step, type Phase, type TrainingRun } from '../../rules/training';
 
-// The game loop: fixed steps of STEP seconds (times the speed) while a wave runs, shots fading the rest of the time.
+// The game loop: fixed steps of STEP sim seconds (real time by the speed and TRAINING.timeScale, clock.ts) while a
+// wave runs, shots fading the rest of the time.
 // The map redraws itself; the panels are refreshed a few times a second in a wave and whenever the phase changes.
 
 export const STEP = 0.05;
@@ -32,14 +33,14 @@ export function useRunLoop(run: TrainingRun | null, opts: LoopOpts): void {
       const dt = Math.min(0.25, (now - last) / 1000);
       last = now;
       if (run.phase === 'wave' && !o.paused) {
-        acc += dt * o.speed;
+        acc += gameSeconds(dt, o.speed);
         while (acc >= STEP && run.phase === 'wave') {
           step(run, STEP);
           acc -= STEP;
         }
       } else {
         acc = 0;
-        if (run.phase !== 'wave') step(run, dt); // let the last shots fade
+        if (run.phase !== 'wave') step(run, gameSeconds(dt, 1)); // let the last shots fade
       }
       ui += dt;
       if (run.phase !== phase) {

@@ -17,8 +17,9 @@ export const pieceById = (run: TrainingRun, id: number): Piece | undefined => ru
 /** The piece covering cell (x, y), if any. */
 export const pieceAt = (run: TrainingRun, x: number, y: number): Piece | undefined => run.pieces.find((p) => within(p, x, y));
 
-/** Kept Shards and crafted units: everything that fires during a wave. */
-export const towers = (run: TrainingRun): Tower[] => run.pieces.filter((p): p is Tower => p.kind === 'unit' || (p.kind === 'shard' && !p.draft));
+/** Kept Shards, default towers and crafted units: everything that fires during a wave. */
+export const towers = (run: TrainingRun): Tower[] =>
+  run.pieces.filter((p): p is Tower => p.kind === 'unit' || p.kind === 'default' || (p.kind === 'shard' && !p.draft));
 
 export const unitTowers = (run: TrainingRun): UnitTower[] => run.pieces.filter((p): p is UnitTower => p.kind === 'unit');
 

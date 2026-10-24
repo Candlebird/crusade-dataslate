@@ -12,7 +12,7 @@ import type { Enemy, Tower, TowerGun, TowerSkill, TrainingRun } from './types';
 // Towers at work: volleys and OPR rolls, cover, statuses, dots, and taking the dead off. Holds are in holds.ts, timed
 // skills and auras in skills.ts; this module is the one the rest of the run imports.
 
-export { afflict, FX_COLOR, FX_TIME, hurt, levelDmg, reach, targetFor, type Harm } from './harm';
+export { afflict, FX_COLOR, FX_TIME, hurt, levelDmg, partsOf, rangeCells, reach, targetFor, type Harm } from './harm';
 export { canHold, holds, holdTime, regrabTime } from './holds';
 export { abilities, auras } from './skills';
 
@@ -68,25 +68,27 @@ export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): bo
   const ap = rend ? Math.max(g.ap, 4) : g.ap;
   const how = g.melee ? 'melee' : 'shot';
   const raw = Math.max(1, g.deadly) + levelDmg(t, g) + (six && isUnit(t) && t.category === 'Elite' ? 1 : 0) + sixes.reduce((n, e) => n + (e.dmg ?? 0), 0);
-  const dmgTo = (e: Enemy) => Math.max(0.5, raw - (rend ? 0 : enemyDef(e).armor)) * dmgMul(t);
+  const dmgTo = (e: Enemy) => Math.max(0.5, raw - (rend ? 0 : enemyDef(e).armor)) * dmgMul(t) * (e.flies ? g.air ?? 1 : 1);
   // Blast(X): the hit spills onto up to X−1 others close by, each saving on its own.
   const splash = g.blast > 1 ? enemiesNear(run, target.x, target.y, TRAINING.blastRadius).filter((o) => o !== target).slice(0, g.blast - 1) : [];
   if (unsaved(run, target, ap)) {
     hurt(run, t, target, dmgTo(target), how);
-    onWound(run, t, target, live);
+    onWound(run, t, g, target, live);
   }
   for (const o of splash) if (unsaved(run, o, ap)) hurt(run, t, o, dmgTo(o), how);
   if (!extra && sixes.some((e) => e.again)) fire(run, t, g, true);
   return true;
 }
 
-/** What a wound leaves behind: a unit's onHit statuses, a Bulwark Shard's daze, a Swift Shard's slow. */
-function onWound(run: TrainingRun, t: Tower, e: Enemy, live: TowerSkill[]) {
+/** What a wound leaves behind: a unit's onHit statuses; a Bulwark gun's daze, a Swift gun's slow (Shards, defaults). */
+function onWound(run: TrainingRun, t: Tower, g: TowerGun, e: Enemy, live: TowerSkill[]) {
   if (isUnit(t)) {
     for (const s of live) if (s.effect.kind === 'onHit' && rand(run) < s.effect.chance) afflict(run, t, e, s.effect.status);
     return;
   }
-  const rule = SHARD_TYPES[t.type];
+  const type = g.shard ?? (t.kind === 'shard' ? t.type : undefined);
+  if (!type) return;
+  const rule = SHARD_TYPES[type];
   if (rule.daze && rand(run) < rule.daze) afflict(run, t, e, 'daze');
   if (rule.slow && rand(run) < rule.slow) afflict(run, t, e, 'slow');
 }

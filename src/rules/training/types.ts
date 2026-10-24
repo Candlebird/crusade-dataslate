@@ -1,12 +1,14 @@
 import type { Category, RelicTier } from '../data';
 import type { Gun } from '../autoBattle';
-import type { AuraStat, Effect, Status } from '../abilities';
-import type { DrillPerk, ShardType, TrainingEnemyKind } from '../downtimeData';
+import type { AuraStat, Effect } from '../abilities';
+import type { DrillPerk, ShardType } from '../downtimeData';
 import type { Tile } from './map';
-import type { LordState, RunNexus } from './nexusTypes';
+import type { RunNexus } from './nexusTypes';
+import type { Enemy, RunBeast, RunNemesis, SpawnPlan } from './enemyTypes';
 import type { ForceTale, TrainingRecord } from '../../model/types';
 
 export type { LordState, LordTrick, NexusAffixId, RunLord, RunNexus } from './nexusTypes';
+export type { Dot, Enemy, NemesisState, RunBeast, RunNemesis, SpawnPlan } from './enemyTypes';
 
 // Every shape a Training run holds. A run is plain data all the way down (no classes, functions or Maps), so it saves
 // as JSON and loads back as it was; map caches (map.ts mapFor) rebuild from the pieces.
@@ -28,6 +30,10 @@ export interface TowerGun extends Gun {
   next: number;
   /** A relic weapon's gun: its shots draw in gold. */
   relic?: boolean;
+  /** A Shard's (or a default tower slot's) gun: the Shard type whose rule its hits carry (daze, slow). */
+  shard?: ShardType;
+  /** Times the damage against flyers (anti-air: SHARD_TYPES `air`; 1 if unset). */
+  air?: number;
 }
 
 /** One effect of one ability on a crafted unit, with its own timer. */
@@ -71,6 +77,16 @@ export interface ShardPiece extends PieceBase, Armed {
   grade: Grade;
   /** Placed from the current draft and not yet kept: it turns to rubble unless kept (or used in a craft). */
   draft: boolean;
+}
+
+/** A default tower (emplacements.ts): a generic emplacement from Shards of exact grades. No XP, levels, traits or relics. */
+export interface DefaultTower extends PieceBase, Armed {
+  kind: 'default';
+  /** Its TRAINING.defaults recipe. */
+  key: string;
+  name: string;
+  /** The Shards it was built from, by type and grade (their rules: auras, bleeds). */
+  slots: [ShardType, Grade][];
 }
 
 export interface RubblePiece extends PieceBase {
@@ -146,8 +162,8 @@ export interface RelicSocket {
   gun?: string;
 }
 
-export type Piece = ShardPiece | RubblePiece | UnitTower;
-export type Tower = ShardPiece | UnitTower;
+export type Piece = ShardPiece | RubblePiece | UnitTower | DefaultTower;
+export type Tower = ShardPiece | UnitTower | DefaultTower;
 
 /** A Shard drawn but not yet placed. */
 export interface DrawnShard {
@@ -187,97 +203,6 @@ export interface Recipe {
   name: string;
   points: number;
   slots: RecipeSlot[];
-}
-
-/** A planned spawn of the current wave. */
-export interface SpawnPlan {
-  kind: TrainingEnemyKind;
-  /** Seconds into the wave. */
-  at: number;
-  /** The leg it starts on (0 = spawn; a scout starts on the scout pad's leg). */
-  leg: number;
-  x: number;
-  y: number;
-  hp: number;
-  flies: boolean;
-  vet?: boolean;
-  /** The force's Sortie nemesis (nemesis.ts): the wave's boss is it. */
-  nemesis?: boolean;
-  /** A real lord (lords.ts): the wave's boss is RunNexus.lords[lord]. */
-  lord?: number;
-  /** Saves at +this (the Armoured affix). */
-  hard?: number;
-}
-
-/** Damage over time on an enemy, credited to piece `by`. */
-export interface Dot {
-  by: number;
-  dps: number;
-  left: number;
-}
-
-export interface Enemy {
-  id: number;
-  kind: TrainingEnemyKind;
-  x: number;
-  y: number;
-  /** The leg of the route it is on: it is making for WAYPOINTS[leg + 1]. */
-  leg: number;
-  /** Facing (radians), for drawing. */
-  face?: number;
-  hp: number;
-  maxHp: number;
-  flies: boolean;
-  vet?: boolean;
-  /** An Ambusher that has made its jump. */
-  jumped?: boolean;
-  /** Seconds left of each status on it (knock and execute act at once and are never stored). */
-  status: Partial<Record<Status, number>>;
-  dots: Dot[];
-  /** The unit holding it (piece id), and seconds before anyone can grab it again once let go. */
-  heldBy?: number;
-  regrab: number;
-  /** The nemesis's tricks at work (nemesis.ts). */
-  nem?: NemesisState;
-  /** A real lord's trick at work (lords.ts). */
-  lord?: LordState;
-  /** Saves at +this (the Armoured affix); seconds left of a Vengeful rush (affixes.ts). */
-  hard?: number;
-  surge?: number;
-}
-
-/** A nemesis on the field: when it came, its walking speed share (rage, Vengeful), better saves (Hardened), whether
- *  anything can hold it (Dread), and the clocks of its timed tricks. */
-export interface NemesisState {
-  born: number;
-  speed: number;
-  hard: number;
-  free?: boolean;
-  next: number;
-  regen: number;
-  /** Its clocks are set (on its first tick). */
-  armed?: boolean;
-}
-
-/** The force's Sortie nemesis, waiting for wave TRAINING.shared.nemesis.wave: which lord, its name, its grudge, the
- *  rematch tricks it brings (times the force has slain it on a Sortie), its signature, and whether it fell here. */
-export interface RunNemesis {
-  id: string;
-  name: string;
-  grudge: number;
-  rematch: number;
-  sig: string;
-  sigName: string;
-  slain?: boolean;
-  /** The crafted unit (id) that landed the killing blow, if one did (tally.ts; records.ts). */
-  by?: string;
-}
-
-/** Echoes met (waves met in; `at` the last wave counted) and slain this run, by Training kind or 'nemesis'. */
-export interface RunBeast {
-  met: number;
-  slain: number;
-  at?: number;
 }
 
 /** A quirk a unit picks up from the run, applied when it is banked. */
@@ -350,7 +275,7 @@ export interface RunDrill {
 
 export interface TrainingRun {
   /** Save format version (save.ts SAVE_VERSION). */
-  v: 6;
+  v: 7;
   forceId: string;
   seed: number;
   /** mulberry32 state: the same seed and the same moves play out the same. */
@@ -417,7 +342,7 @@ export interface TrainingRun {
 
 /** What a saved run looks like on disk (save.ts). */
 export interface SavedRun {
-  v: 6;
+  v: 7;
   savedAt: string;
   run: TrainingRun;
 }

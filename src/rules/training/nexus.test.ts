@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TRAINING } from '../downtimeData';
 import { waveCredits } from './economy';
 import { affixInfo, budgetMul, creditMul, eventInfo, eventMapped, nexusLines, nexusOf, nexusStart } from './nexus';
+import { draftLuck } from './shards';
 import { campaign, guardian } from './nexusTest';
 import { createRun, runXpCap } from './run';
 import { blankRun } from './testRun';
@@ -53,7 +54,8 @@ describe('nexus', () => {
     const at = (id: string) => createRun('f', [], 1, undefined, { threat: 0, affixes: [], event: id, lords: [] });
     const plain = createRun('f', [], 1);
     expect(at('convoys').credits).toBe(plain.credits + X.events.convoys.credits);
-    expect(at('shardRush').draft.hand).toHaveLength(TRAINING.shards.draw + X.events.shardRush.draw);
+    expect(at('shardRush').draft.hand).toHaveLength(TRAINING.shards.draw);
+    expect(draftLuck(at('shardRush'))).toBe(plain.luck + X.events.shardRush.luck);
     expect(at('derelicts').cover.length).toBeGreaterThan(plain.cover.length);
     expect(runXpCap(at('glory'))).toBe(TRAINING.xpCap + X.events.glory.xp);
     expect(budgetMul(at('echoSurge'))).toBeCloseTo(X.events.echoSurge.budget);

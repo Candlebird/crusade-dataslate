@@ -8,9 +8,9 @@ import { HOLD_COLOR } from './drawPieces';
 
 /**
  * An enemy shape, `r` pixels round, centred on (x, y) and turned to `facing`, with a dark outline so it stands off the
- * route and pads. A veteran gets a gold dashed ring.
+ * route and pads. An elite gets a gold outline.
  */
-export function enemyShape(ctx: CanvasRenderingContext2D, shape: TrainingEnemyShape, x: number, y: number, r: number, facing: number, color: string, vet?: boolean) {
+export function enemyShape(ctx: CanvasRenderingContext2D, shape: TrainingEnemyShape, x: number, y: number, r: number, facing: number, color: string, elite?: boolean) {
   // Points of a regular polygon, or a star alternating between two radii.
   const ring = (n: number, r1: number, r2 = r1, turn = 0) =>
     Array.from({ length: n * (r2 === r1 ? 1 : 2) }, (_, i) => {
@@ -51,12 +51,13 @@ export function enemyShape(ctx: CanvasRenderingContext2D, shape: TrainingEnemySh
     ctx.lineWidth = Math.max(1.5, r * 0.16);
     ctx.stroke();
   }
-  if (vet) {
-    ctx.strokeStyle = '#e8c55a';
-    ctx.lineWidth = 1.5;
-    ctx.setLineDash([3, 2]);
-    ctx.beginPath(); ctx.arc(0, 0, r * 1.3 + 3, 0, Math.PI * 2); ctx.stroke();
-    ctx.setLineDash([]);
+  if (elite) {
+    // A gold outline round the shape itself, glowing a little.
+    ctx.shadowColor = '#ffd45a';
+    ctx.shadowBlur = Math.max(3, r * 0.5);
+    ctx.strokeStyle = '#ffd45a';
+    ctx.lineWidth = Math.max(1.5, r * 0.22);
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -126,7 +127,7 @@ export function drawEnemies(ctx: CanvasRenderingContext2D, run: TrainingRun, s: 
       ctx.lineWidth = Math.max(2, s * 0.15);
       ctx.beginPath(); ctx.arc(x, y, r * 1.25 + Math.max(2, s * 0.15), 0, Math.PI * 2); ctx.stroke();
     }
-    enemyShape(ctx, d.shape, x, y, r, e.face ?? 0, d.color, e.vet);
+    enemyShape(ctx, d.shape, x, y, r, e.face ?? 0, d.color, e.elite);
     const tint = statusTint(e);
     if (tint) { ctx.strokeStyle = tint; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r * 1.25 + 2, 0, Math.PI * 2); ctx.stroke(); }
     if (boss || e.hp < e.maxHp) {

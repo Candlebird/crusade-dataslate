@@ -1,11 +1,12 @@
 import type { EmblemLayer } from '../../model/types';
 import type { Category } from '../../rules/data';
-import { FX_COLOR, type Grade, type RubblePiece, type ShardPiece, type Tile, type UnitTower } from '../../rules/training';
+import { FX_COLOR, type DefaultTower, type Grade, type RubblePiece, type ShardPiece, type Tile, type UnitTower } from '../../rules/training';
 import type { ShardType } from '../../rules/downtimeData';
 import { drawEmblem } from '../Emblem';
 import { RUBBLE_ICON, SHARD_ICON, alpha, drawIcon, gradeTint, label, pipRow, roundRect, shade, shardColor } from './art';
 
-// Canvas drawing for the pieces on the Training map: Shards, rubble and crafted units. Same frame as draw.ts.
+// Canvas drawing for the pieces on the Training map: Shards, rubble, default towers and crafted units. Same frame as
+// draw.ts.
 
 export const CATEGORY_COLORS: Record<Category, string> = {
   Hero: '#c9a24a',
@@ -143,6 +144,32 @@ export function drawUnit(ctx: CanvasRenderingContext2D, t: UnitTower, s: number,
     ring(HOLD_COLOR, 1.15, [Math.max(2, s * 0.3), Math.max(2, s * 0.2)]);
     ctx.restore();
   }
+}
+
+/** What a default tower's plate is rimmed in: plain steel, so it never reads as a unit's category colour. */
+export const DEFAULT_COLOR = '#a7b0ba';
+
+/** A default tower: a squared steel plate with a riveted rim and its Shards' crystals in a row across it. */
+export function drawDefault(ctx: CanvasRenderingContext2D, t: DefaultTower, s: number) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = Math.max(2, s * 0.25);
+  ctx.shadowOffsetY = Math.max(1, s * 0.1);
+  const i = Math.max(1, s * 0.08);
+  ctx.fillStyle = '#20252c';
+  ctx.fillRect(t.x * s + i, t.y * s + i, 2 * s - 2 * i, 2 * s - 2 * i);
+  ctx.restore();
+  ctx.strokeStyle = DEFAULT_COLOR;
+  ctx.lineWidth = Math.min(4, Math.max(1.5, s * 0.12));
+  ctx.strokeRect(t.x * s + 2 * i, t.y * s + 2 * i, 2 * s - 4 * i, 2 * s - 4 * i);
+  // Rivets in the corners.
+  ctx.fillStyle = DEFAULT_COLOR;
+  for (const [dx, dy] of [[0.3, 0.3], [1.7, 0.3], [0.3, 1.7], [1.7, 1.7]]) {
+    ctx.beginPath(); ctx.arc((t.x + dx) * s, (t.y + dy) * s, Math.max(1, s * 0.08), 0, Math.PI * 2); ctx.fill();
+  }
+  const n = t.slots.length;
+  const w = 1.5 / n;
+  t.slots.forEach(([type, grade], k) => drawCrystal(ctx, type, grade, (t.x + 0.25 + w * (k + 0.5)) * s, (t.y + 1) * s, s * Math.min(0.75, w * 1.3)));
 }
 
 /** A relic bearer's mark: a thin gold ring just inside the plate's corners and a bright glint going round it. */

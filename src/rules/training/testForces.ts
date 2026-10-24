@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { Unit } from '../../model/types';
+import type { Relic, Unit } from '../../model/types';
 import { applySelection, normalizeBook } from '../../armyforge/book';
 import { unitFromCatalog } from '../../model/factory';
 
@@ -38,3 +38,24 @@ export const FORCES = BOOKS.flatMap((file) => {
   ];
 });
 export const SEEDS = [1, 2, 3];
+
+const TRAITS = ['Resilient', 'Point Blank', 'Blade Master'];
+const SCARS = ['Damaged Equipment', 'Weakened Armor', 'Faulty Aim'];
+const RELIC_SET: Omit<Relic, 'id'>[] = [
+  { name: 'Terminus Eye', tier: 'Common', profile: '12", A1, AP(4), Deadly(3)' },
+  { name: 'Combat Stimm Injector', tier: 'Common' },
+  { name: 'Auspex Array', tier: 'Common' },
+  { name: 'Korvane Guard Standard', tier: 'Rare' },
+  { name: 'Artisan Bionics', tier: 'Common' },
+  { name: 'Wreck-Core Reactor', tier: 'Rare' },
+];
+
+/** A unit with three traits and a relic. */
+export const veteran = (u: Unit, i: number): Unit => ({
+  ...u,
+  upgrades: TRAITS.map((name, j) => ({ id: `t${j}`, name, unique: false })),
+  relics: [{ id: `r${i}`, ...RELIC_SET[i % RELIC_SET.length] }],
+});
+
+/** A unit with three scars. */
+export const scarred = (u: Unit): Unit => ({ ...u, scars: SCARS.map((name, j) => ({ id: `s${j}`, name })) });

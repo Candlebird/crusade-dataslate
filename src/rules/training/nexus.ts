@@ -52,14 +52,14 @@ export function budgetMul(run: Pick<TrainingRun, 'nexus'>): number {
 }
 
 /** What a new run starts with, the Nexus counted: credits (Supply Convoys), base HP (Bleed), extra cover patches
- *  (Derelict Fleet), extra Shards a draft (Shard Rush) and XP cap (Glory Seekers). */
+ *  (Derelict Fleet), extra draft luck (Shard Rush: grades roll as if luck were higher) and XP cap (Glory Seekers). */
 export function nexusStart(run: Pick<TrainingRun, 'nexus'>) {
   const E = X.events;
   return {
     credits: eventIs(run, 'convoys') ? E.convoys.credits : 0,
     baseHp: hasAffix(run, 'bleed') ? -X.bleed.per * threatOf(run) : 0,
     cover: eventIs(run, 'derelicts') ? E.derelicts.cover : 0,
-    draw: eventIs(run, 'shardRush') ? E.shardRush.draw : 0,
+    luck: eventIs(run, 'shardRush') ? E.shardRush.luck : 0,
     xp: eventIs(run, 'glory') ? E.glory.xp : 0,
   };
 }
@@ -78,7 +78,7 @@ export function affixInfo(id: NexusAffixId, threat: number): { name: string; tex
     case 'vengeful': return { name, text: `An Echo slain makes those within ${X.vengeful.radius} cells rush (${X.vengeful.mul}× as fast) for ${(X.vengeful.secs * t).toFixed(1)} s.` };
     case 'frenzied': return { name, text: `Echoes have ${pc(X.frenzied.per * t)} more wounds.` };
     case 'shrouded': return { name, text: `Shots at Echoes beyond ${pc(shroudFrom(t))} of the gun's reach are at -1 to hit.` };
-    case 'proud': return { name, text: `${pc(X.proud.per * t)} more of the Echoes come as veterans, from wave 1.` };
+    case 'proud': return { name, text: `${pc(X.proud.per * t)} more of the Echoes come as elites, from wave 1.` };
     case 'fierce': return { name, text: `Waves are ${pc(X.fierce.per * t)} bigger.` };
     case 'bleed': return { name, text: `The base starts ${X.bleed.per * t} HP down.` };
   }
@@ -93,7 +93,7 @@ export function eventEffect(id: string): string {
   switch (id) {
     case 'warpCurrents': return `Echoes walk ${pc(E.warpCurrents.walk - 1)} faster.`;
     case 'ionStorm': return `Shots at targets over ${E.ionStorm.from} cells away are at -1 to hit.`;
-    case 'shardRush': return `+${E.shardRush.draw} Shard in every draft.`;
+    case 'shardRush': return `Drafts roll their grades as if luck were ${E.shardRush.luck} higher (at most the top odds).`;
     case 'convoys': return `+${E.convoys.credits} credits to start.`;
     case 'echoSurge': return `Waves are ${pc(E.echoSurge.budget - 1)} bigger.`;
     case 'voidLull': return `Waves are ${pc(1 - E.voidLull.budget)} smaller.`;

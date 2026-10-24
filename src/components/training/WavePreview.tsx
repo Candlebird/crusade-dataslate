@@ -44,7 +44,8 @@ function RealLordTag({ run, w }: { run: TrainingRun; w: number }) {
   return <span className="tag red" title={lordLine(l, w)}>{l.slain ? 'Slain: ' : ''}{l.name} ({l.tier})</span>;
 }
 
-/** What the next wave sends, one icon a kind with a count; hover for what it is. */
+/** What the next wave sends: its one kind (and a boss wave's lord), an icon with a count, the kind's name and how many
+ *  are elites; hover for what it is. */
 export function WavePreview({ run }: WavePreviewProps) {
   // The preview rolls on a copy of the dice: only a new wave (or a load) changes it.
   const groups = useMemo(() => previewGroups(previewWave(run)), [run, run.wave, run.rng]);
@@ -52,22 +53,22 @@ export function WavePreview({ run }: WavePreviewProps) {
     <span className="training-preview row" aria-label="Next wave's enemies">
       {groups.map((g) => (
         <span key={g.kind} className="training-preview-group" title={enemyRundown(TRAINING_ENEMIES[g.kind], g)}>
-          <EnemyIcon def={TRAINING_ENEMIES[g.kind]} vet={g.vets > 0} />
-          <span className="small">×{g.n}</span>
+          <EnemyIcon def={TRAINING_ENEMIES[g.kind]} elite={g.elites > 0} />
+          <span className="small">×{g.n} {TRAINING_ENEMIES[g.kind].name}{g.elites ? <span style={{ color: 'var(--gold)' }}> · {g.elites} elite</span> : null}</span>
         </span>
       ))}
     </span>
   );
 }
 
-export function EnemyIcon({ def, vet }: { def: TrainingEnemyDef; vet: boolean }) {
+export function EnemyIcon({ def, elite }: { def: TrainingEnemyDef; elite: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const ctx = ref.current?.getContext('2d');
     if (!ctx) return;
     ctx.clearRect(0, 0, 48, 48);
-    enemyShape(ctx, def.shape, 24, 24, 13, 0, def.color, vet);
-  }, [def, vet]);
+    enemyShape(ctx, def.shape, 24, 24, 13, 0, def.color, elite);
+  }, [def, elite]);
   return <canvas ref={ref} width={48} height={48} style={{ width: 24, height: 24 }} aria-hidden />;
 }
 
@@ -82,6 +83,6 @@ export function enemyRundown(d: TrainingEnemyDef, g: PreviewGroup): string {
   if (d.meleeMul !== undefined && d.meleeMul !== 1) lines.push(`Takes ×${d.meleeMul} damage in melee`);
   if (d.big) lines.push('Held half as long.');
   lines.push(`Costs the base ${d.leak} HP if it gets through.`);
-  if (g.vets) lines.push(`${g.vets} of them veterans: ×${TRAINING.wave.vetHp} wounds, cost the base ${Math.max(d.leak, TRAINING.leak.vet)}.`);
+  if (g.elites) lines.push(`${g.elites} of them elites (gold outline): ×${TRAINING.wave.eliteHp} wounds, cost the base ${Math.max(d.leak, TRAINING.leak.elite)}.`);
   return lines.join('\n');
 }

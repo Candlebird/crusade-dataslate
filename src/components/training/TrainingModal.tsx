@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Force } from '../../model/types';
 import { unitPortrait } from '../../model/emblem';
 import {
-  ackStale, cardText, clearRubble, clearSave, loadRun, pickCard, rerollCards, pieceAt, pieceById, placeDraft, quitRun, saveRun, staleSave, startWave,
+  ackStale, cardText, clearRubble, defaultByKey, clearSave, loadRun, pickCard, rerollCards, pieceAt, pieceById, placeDraft, quitRun, saveRun, staleSave, startWave,
   type Phase, type SavedRun, type Tile, type TrainingRun,
 } from '../../rules/training';
 import { Modal, confirmAction, toast } from '../ui';
@@ -125,7 +125,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
 
   const build = run.phase === 'build';
   // A craft whose Shards have gone (kept over, crumbled, the wave began) is no craft any more.
-  const craftNow = crafting && build && !run.crafted.includes(crafting.unitId)
+  const craftNow = crafting && build && !(crafting.unitId && run.crafted.includes(crafting.unitId))
     && crafting.uses.every((id) => pieceById(run, id)?.kind === 'shard') ? crafting : null;
   const hand = run.draft.hand;
   const placing = build && !craftNow && run.draft.step === 'place' && pick !== null ? hand[pick] : undefined;
@@ -181,7 +181,8 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     if (cr) setSel(null);
   };
   const over = run.phase === 'over';
-  const craftName = craftNow ? run.recipes.find((r) => r.unitId === craftNow.unitId)?.name ?? 'The unit' : '';
+  const craftName = !craftNow ? '' : craftNow.def ? defaultByKey(craftNow.def)?.name ?? 'The defence'
+    : run.recipes.find((r) => r.unitId === craftNow.unitId)?.name ?? 'The unit';
 
   // The map (with the HUD over it) is the stage; the panels sit beside it, or under it on a phone. The header's ×
   // closes (the run saves between waves); the run summary comes up over the map when the base falls.

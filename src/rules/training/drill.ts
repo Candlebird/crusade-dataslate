@@ -123,8 +123,7 @@ export function unlockText(u: DrillUnlock): { name: string; text: string } {
     reroll: `Re-draw a card offer ${P.reroll} more time a run.`,
     thrift: `Luck costs ${Math.round(P.thrift * 100)}% less.`,
     offer: `${P.offer} more card on offer after a boss.`,
-    draw: `${P.draw} more Shard in each draft.`,
   };
-  const names: Record<DrillPerk, string> = { purse: 'Purse', mend: 'Field mending', reroll: 'Second thoughts', thrift: 'Thrift', offer: 'Wider choice', draw: 'Deep draw' };
+  const names: Record<DrillPerk, string> = { purse: 'Purse', mend: 'Field mending', reroll: 'Second thoughts', thrift: 'Thrift', offer: 'Wider choice' };
   return { name: names[u.perk], text: text[u.perk] };
 }

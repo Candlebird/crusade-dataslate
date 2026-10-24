@@ -4,7 +4,7 @@ import { centreOf, dist, towers } from './board';
 import { pick, hitChance, rand } from './rng';
 import { shardValue } from './shards';
 import {
-  addDot, busy, covered, dmgMul, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, pulse, reach, toGo, unsaved,
+  addDot, busy, covered, dmgMul, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, partsOf, pulse, rangeCells, reach, toGo, unsaved,
 } from './harm';
 import type { Tower, TowerGun, TowerSkill, TrainingRun, UnitTower } from './types';
 
@@ -27,8 +27,12 @@ export function auras(run: TrainingRun, dt: number): void {
   }
   const leaders = all.flatMap((src): { src: Tower; r: number }[] => {
     if (isUnit(src)) return src.category === 'Hero' ? [{ src, r: TRAINING.auraRadius + grown(src) }] : [];
-    const a = SHARD_TYPES[src.type].aura;
-    return a ? [{ src, r: a.radius + a.perGrade * (src.grade - 1) }] : [];
+    // A Command Shard (or a default tower with one): its widest aura.
+    const r = Math.max(-1, ...partsOf(src).map(([type, grade]) => {
+      const a = SHARD_TYPES[type].aura;
+      return a ? a.radius + a.perGrade * (grade - 1) : -1;
+    }));
+    return r >= 0 ? [{ src, r }] : [];
   });
   for (const t of all) {
     const c = centreOf(t);
@@ -75,7 +79,8 @@ export function shieldBoost(run: TrainingRun, t: UnitTower, n: number): boolean 
 /** A barrage: `hits` extra hits at AP `ap` at the enemy furthest along in range, spilling `radius`. */
 export function barrage(run: TrainingRun, t: UnitTower, e: Extract<Effect, { kind: 'barrage' }>): boolean {
   const c = centreOf(t);
-  const r = e.range ?? Math.max(0, ...t.guns.map((g) => reach(t, g)));
+  // A barrage's own range is halved like a gun's, but always reaches as far as a blow.
+  const r = e.range !== undefined ? Math.max(TRAINING.meleeReach, rangeCells(e.range)) : Math.max(0, ...t.guns.map((g) => reach(t, g)));
   const target = enemiesNear(run, c.x, c.y, r).sort((a, b) => toGo(run, a) - toGo(run, b))[0];
   if (!target) return false;
   const shot = { melee: false } as TowerGun;
@@ -135,12 +140,13 @@ function unitSkills(run: TrainingRun, t: UnitTower, dt: number) {
   }
 }
 
-/** Timed skills: bleed fields (heal), damage boosts (shield), barrages, frenzies, fields; Vigor Shards' bleed. */
+/** Timed skills: bleed fields (heal), damage boosts (shield), barrages, frenzies, fields; Vigor Shards' bleed (a
+ *  default tower's Vigor slots add up). */
 export function abilities(run: TrainingRun, dt: number): void {
   const show = ticks(run, dt, TRAINING.abilityRound / 4);
   for (const t of towers(run)) {
     if (isUnit(t)) { unitSkills(run, t, dt); continue; }
-    const bleed = SHARD_TYPES[t.type].bleed;
-    if (bleed) bleedField(run, t, TRAINING.bleedField.radius, bleed * shardValue(t.grade), show);
+    const bleed = partsOf(t).reduce((n, [type, grade]) => n + (SHARD_TYPES[type].bleed ?? 0) * shardValue(grade), 0);
+    if (bleed) bleedField(run, t, TRAINING.bleedField.radius, bleed, show);
   }
 }

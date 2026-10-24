@@ -1,8 +1,8 @@
 import type { EmblemLayer } from '../../model/types';
 import { SHARD_TYPES, TRAINING } from '../../rules/downtimeData';
-import { centreOf, pieceById, reach, type DrawnShard, type Piece, type Tile, type TrainingRun } from '../../rules/training';
+import { centreOf, pieceById, rangeCells, reach, type DrawnShard, type Piece, type Tile, type TrainingRun } from '../../rules/training';
 import { label, roundRect } from './art';
-import { drawCrystal, drawRubble, drawShard, drawUnit } from './drawPieces';
+import { drawCrystal, drawDefault, drawRubble, drawShard, drawUnit } from './drawPieces';
 import { drawCover, drawGround, drawPads, drawRoute } from './drawTerrain';
 
 // Canvas drawing for the Training map: the board under the enemies (ground and pads in drawTerrain.ts, pieces in
@@ -15,7 +15,7 @@ export { bar } from './art';
 /** What the map shows on top of the run itself. */
 export interface Overlay {
   portraits: Record<string, EmblemLayer[]>;
-  /** Shard ids that count toward a ready recipe. */
+  /** Shard ids that count toward a ready recipe or default. */
   glow: ReadonlySet<number>;
   selected?: number;
   /** A placement ghost: what would go down, where, and whether it may. */
@@ -27,6 +27,7 @@ export interface Overlay {
 export function drawPiece(ctx: CanvasRenderingContext2D, p: Piece, s: number, o: Overlay) {
   if (p.kind === 'shard') drawShard(ctx, p, s, o.glow.has(p.id), o.time);
   else if (p.kind === 'rubble') drawRubble(ctx, p, s);
+  else if (p.kind === 'default') drawDefault(ctx, p, s);
   else drawUnit(ctx, p, s, o.portraits[p.unitId], o.time);
 }
 
@@ -64,7 +65,7 @@ export function drawGhost(ctx: CanvasRenderingContext2D, s: number, g: Overlay['
   const { at, ok, shard } = g;
   if (ok && shard) {
     const def = SHARD_TYPES[shard.type];
-    reachRing(ctx, at.x + 1, at.y + 1, def.gun.melee ? TRAINING.meleeReach : def.gun.range, s, 'rgba(111,220,111,0.6)', 'rgba(111,220,111,0.05)');
+    reachRing(ctx, at.x + 1, at.y + 1, def.gun.melee ? TRAINING.meleeReach : rangeCells(def.gun.range), s, 'rgba(111,220,111,0.6)', 'rgba(111,220,111,0.05)');
   }
   roundRect(ctx, at.x * s, at.y * s, 2 * s, 2 * s, s * 0.35);
   ctx.fillStyle = ok ? 'rgba(111,220,111,0.22)' : 'rgba(220,60,50,0.3)';

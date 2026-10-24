@@ -48,8 +48,8 @@ beforeEach(() => {
 });
 
 describe('reach and targeting', () => {
-  it('reaches inches as cells, plus levels and boosts; melee reaches meleeReach', () => {
-    expect(reach(unit({ up: 2 }), gun({ range: 12 }))).toBe(12 + 2 * TRAINING.levels.range);
+  it('reaches inches by rangeMul as cells, plus levels and boosts; melee reaches meleeReach', () => {
+    expect(reach(unit({ up: 2 }), gun({ range: 12 }))).toBe(12 * TRAINING.rangeMul + 2 * TRAINING.levels.range);
     expect(reach(unit({ up: 2 }), gun({ melee: true, range: 0 }))).toBe(TRAINING.meleeReach);
   });
   it('aims at the enemy in reach furthest along the route', () => {

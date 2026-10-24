@@ -1,6 +1,6 @@
 # Training (Gem TD) module contracts
 
-Shared shapes are in `types.ts`; homebrew numbers in `TRAINING` / `SHARD_TYPES` / `TRAINING_ENEMIES` (src/rules/downtimeData.ts).
+Shared shapes are in `types.ts` (the Echoes' — SpawnPlan, Enemy, Dot, NemesisState, RunNemesis, RunBeast — in `enemyTypes.ts`, re-exported from it); homebrew numbers in `TRAINING` / `SHARD_TYPES` / `TRAINING_ENEMIES` (src/rules/downtimeData.ts).
 The run is plain JSON: no classes, functions or Maps on it. Card `apply` functions live in cards.ts code, never on the run.
 Every action that can be refused has a `xxxProblem(...) => string | null` twin; the action itself throws on a problem.
 Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.squadPower`, `recipes.canTrain`, `shards.shardValue`, `save.saveKey`.
@@ -13,6 +13,7 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | rng | rng.ts helpers (anyone may roll through `rand(run)`) |
 | draft, pieces (shard / rubble add, remove, grade, draft flag) | shards.ts |
 | pieces (shard → unit swap on craft) | run.ts (craft, via recipes.unitTower) |
+| pieces (shard → DefaultTower swap on a default craft; key, name, slots) | emplacements.ts (craftDefault, via defaultTower) |
 | UnitTower.up / cap / tough growth | economy.ts (buyLevel, applyLevel) |
 | Tower combat fields (guns clocks, boost, dmgBoost, frenzy, holding, holdLeft, kills, dealt, skills cd) | combat.ts |
 | UnitTower.grit, UnitTower.relics (set at craft), TowerGun.relic | recipes.unitTower (via veterans.gritOf, relics.socketsOf) |
@@ -39,7 +40,9 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | run.nexus.lords[].slain, .by; run.nemesis.by (the crafted unit that landed the killing blow) | tally.ts (a real lord's or the nemesis's kill) |
 | run.honours (records, titles, tales, best: banked once) | records.bankHonours (from useBank.finish, before trainingBest moves) |
 | Enemy.lord (i, next, ward, burst, armed), boss SpawnPlan.lord / hp | lords.ts (lordPlan, lordTick, lordDmg); waves.spawnOne seeds it |
-| Enemy.hard, SpawnPlan.hard / vet / hp (affixes) | affixes.affixPlan; waves.spawnOne copies hard |
+| Enemy.hard, SpawnPlan.hard / elite / hp (affixes) | affixes.affixPlan; waves.spawnOne copies hard |
+| SpawnPlan.elite, Enemy.elite (one kind a wave, every eliteEvery-th from eliteFrom) | waves.planFor via waveKinds.isElite; waves.spawnOne copies it |
+| TowerGun.shard, TowerGun.air (the Shard rule and anti-air a gun carries) | shards.shardGun (Shards and default towers) |
 | Enemy.surge | affixes.ts (onEchoDeath sets it, affixTick wears it) |
 | Unit.trainingRecord, Force.tales | records.bankHonours |
 | Unit.titles (stored ids, oldest first), Unit.title (the one shown; '-' none; unset the latest) | titles.earnTitles (records.bankHonours, downtime.applySortie); titles.pickTitle (UnitSheet via UnitRecord) |
@@ -110,8 +113,10 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 ### shards.ts
 - `shardValue(g: Grade): number` (done) — 2^(g-1).
 - `gradeName(g: Grade): string`
-- `rollGrade(run, r: Rng = run): Grade` — by TRAINING.shards.odds[run.luck], on the dice given (drawDraft passes siege.draftDice).
-- `drawDraft(run): void` — run.draft = { step: 'place', hand: draw× DrawnShard, placed: [] }.
+- `draftLuck(run): number` — run.luck + nexusStart(run).luck (Shard Rush), capped at the odds table.
+- `rollGrade(run, r: Rng = run): Grade` — by TRAINING.shards.odds[draftLuck(run)], on the dice given (drawDraft passes siege.draftDice).
+- `drawSize(run): number` — always TRAINING.shards.draw (no perk, event or siege changes a draft's size).
+- `drawDraft(run): void` — run.draft = { step: 'place', hand: drawSize× DrawnShard, placed: [] }.
 - `shardPiece(id, at: Tile, type: ShardType, grade: Grade, draft: boolean): ShardPiece` — guns/Quality from SHARD_TYPES × value.
 - `placeDraftProblem(run, i, x, y): string | null` — build phase, step 'place', hand[i] exists, board.placeProblem.
 - `placeDraft(run, i, x, y): void` — adds a draft ShardPiece (id run.nextId++); empty hand → step 'keep'.
@@ -138,7 +143,10 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 
 ### combat.ts
 - `type Harm = 'shot' | 'melee' | 'other'`
-- `reach(t: Tower, g: TowerGun): number` — cells (inches = cells), + levels × levels.range, + boost.range; melee meleeReach.
+- `reach(t: Tower, g: TowerGun): number` — cells (inches × TRAINING.rangeMul, via `rangeCells`), + levels × levels.range, + boost.range; melee meleeReach.
+- `rangeCells(inches): number` — inches × rangeMul (0.5 since the playtest pass); every tower, Shard, default and relic shot, and barrage radii.
+- `partsOf(t: Tower): [ShardType, Grade][]` — a Shard's own type and grade, a default's slots, nothing for a unit (auras, Vigor bleed).
+- Damage to a flyer × the gun's `air` (Firepower, Swift: SHARD_TYPES.air); a Shard's or default's wound applies its gun's `shard` rule (daze, slow).
 - `levelDmg(t: Tower, g: TowerGun): number` — 0 for Shards.
 - `auras(run, dt): void` — recompute boost; wear dmgBoost.left.
 - `abilities(run, dt): void` — heal→bleed field, shield→dmgBoost on a random other tower, barrage, frenzy, field, Vigor bleed.
@@ -200,14 +208,14 @@ Numbers in `TRAINING.nexus`. Outside a campaign run.nexus is undefined: threat 0
 - nexusTypes.ts: `NexusAffixId`, `LordTrick`, `RunLord {key, name, tier, trick, from, slain?, by?}`, `RunNexus {threat, affixes, event?, lords}`, `LordState`; re-exported from types.ts.
 - nexus.ts: `nexusOf(c?): RunNexus | undefined` — threat (+ Rising Dark), affixes (one a `affixes.per` levels, at most `affixes.max`, dice seeded by campaign id and round), this round's event only, lords via lordPick.campaignLords.
   `threatOf`, `hasAffix`, `eventIs`, `eventMapped(id)`, `creditMul(run)` (1 + credit × threat), `budgetMul(run)` (Fierce, Echo Surge, Void Lull),
-  `nexusStart(run)` → {credits, baseHp, cover, draw, xp} (Convoys, Bleed, Derelicts, Shard Rush, Glory), `affixInfo(id, threat)`, `shroudFrom(threat)`,
+  `nexusStart(run)` → {credits, baseHp, cover, luck, xp} (Convoys, Bleed, Derelicts, Shard Rush, Glory), `affixInfo(id, threat)`, `shroudFrom(threat)`,
   `eventEffect(id)`, `eventInfo(id)` → {name, desc, effect ('' = flavour)}, `nexusLines(nx, nemesis)` → {threat, affixes[], event, lords[]} for the start screen and HUD.
 - lordPick.ts (pure, no engine imports): `campaignLords(c, r)` — sector guardians (by name, at most lords.max − crisis slot, tier order), then the unwon crisis lord as Legendary;
   keys `nexus:g:<name>` / `nexus:<ECHO_LORDS id>`; tricks by ECHO_LORDS id (tricks.byLord), a guardian's rules (byRule), else one of `plain` by its name.
   `guardianTrick(g)`, `TRICK_NAMES`, `trickText(k)`, `lordWaves(nx, nemesis)` (boss waves from lords.from, skipping the nemesis wave), `lordIndex(run, w)`, `nextLord(run, w?)`, `lordLine(l, wave?)`, `lordsSlain(run)`, `GENERIC_LORD`.
 - lords.ts: `lordOf(run, e)`, `lordPlan(run, plans)` (boss plan not the nemesis's → lord i, hp × lords.hp[tier]), `lordTick(run, dt)`,
   `lordHit(run, g, e)` (Mirror Veil −1 to shots; combat.fire), `lordDmg(run, by, e, dmg, how)` (Umbral Hide, Ward; harm.hurt).
-- affixes.ts: `affixPlan(r, run, plans)` (Frenzied hp, Proud veterans, Armoured hard), `affixPace(run, e)` (Swift, Warp Currents, a Vengeful surge; waves.speedOf),
+- affixes.ts: `affixPlan(r, run, plans)` (Frenzied hp, Proud elites, Armoured hard), `affixPace(run, e)` (Swift, Warp Currents, a Vengeful surge; waves.speedOf),
   `affixTick(run, dt)`, `onEchoDeath(run, dead)` (Vengeful; harm.hurt after payKill), `affixHit(run, g, d, reach)` (Shrouded, Ion Storm; combat.fire, never melee).
 - Elsewhere: harm.unsaved − Enemy.hard; economy payKill / waveCredits × creditMul; shards.`drawSize(run)`; run.`runXpCap(run)` (xpCap + Glory);
   tally beastOf → `real:<i>`, marks slain; bestiary.beastKey `real:<i>` → the lord's key (banked slain, not drill); sortie.beastInfo knows `nexus:` keys
@@ -248,18 +256,39 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 - `sharedPreview(run)` — {text, good} lines for RunSummary.
 - Sortie side: sortie.createRun opts.bled → `bleed(run, n)`: weaken += n × nemesis.bled (capped), tricks dropped, the rest as known omens (need − 1 max), a journal note.
 
+### waveKinds.ts
+- `kindPool(w, flies)` — kinds out by wave w with a TRAINING.wave.kinds weight, never the boss, a flying wave's only main-spawn ones.
+- `waveKind(r, w, flies)` — weighted draw from kindPool (swarm if none). `countFor(kind, budget, max)` — { n: round(budget/cost) in 1..max, hpMul: budget/(n × cost) }.
+- `isElite(w, i)` — i-th spawn (from 0) of wave w: w ≥ eliteFrom and (i + 1) % eliteEvery === 0.
+
+### emplacements.ts (default towers)
+- `DEFAULTS` (TRAINING.defaults.recipes: 13 sets covering each of the 40 Shard kinds once, exact grades), `defaultByKey(key)`, `defaultValue(d)`.
+- `emplacementUses(d, shards)` — ids in slot order, exact type and grade, kept Shards first; null if they can't.
+- `defaultHidden(run, d)` — a unit recipe of the run fills from d's exact Shards (recipes.recipeUses). `defaultsFor(run)`, `readyDefaults(run)` (as readyRecipes).
+- `defaultTower(d, id, at): DefaultTower` — each Shard's gun and rule; Quality best of theirs − qualityBonus (2+ best); attacks × k so dps.towerDps = dpsShare × unitDps × value at dpsDefense. No XP, levels, traits or relics (not a UnitTower: economy, XP and records skip it).
+- `craftDefaultProblem(run, key, uses, onId)`, `craftDefault(run, key, uses, onId)` — as run.craft: stands on onId, other uses → rubble, a draft craft is the keep; any number of each; not in run.crafted.
+
+### dps.ts
+- `gunDps(t, g, defense = 5)`, `towerDps(t, defense = 5)` — expected damage/s (hit, save, Deadly, Blast, atkBonus; no cover, auras, levels or skills). Tuning and default towers.
+
+### clock.ts
+- `gameSeconds(real, speed)` — real × speed × TRAINING.timeScale (0.5: 1× is half the old pace). Only useRunLoop reads it; the engine and bot count sim seconds.
+
+### flightLane.ts
+- `LANE: Leg[]` (spawn → pads → base, centres), `legDist(l, x, y)`, `laneDist(x, y)`, `laneCells()` (cells within flightLane.width, drawn faintly while building before a flying wave), `antiAir(type)`, `spotsBy(l, r)` (buildable spots within r of a leg). Building beside the lane is open (only pads, base and spawn corner are barred).
+
 ### waves.ts
 - `isFlyWave(w)`, `isBossWave(w)`, `isFlyBossWave(w): boolean`
-- `planWave(run, w: number): SpawnPlan[]` — on siege.waveDice (a siege's own dice for wave w, else the run's); via `nexusWave`: planFor(power × nexus.budgetMul) then affixes.affixPlan; budget base × (power/perPoints) × growth^(w-1); flyers; boss + escorts; scouts at pad scoutAt (scoutHp); ambush hp; hp ×hpGrowth past hpFrom; staggered by gap; sorted by `at`.
+- `planWave(run, w: number): SpawnPlan[]` — one kind a wave (waveKinds.waveKind; a boss wave the lord + one escort kind; a flying wave one main-spawn kind), as many as countFor buys (the rest of the budget in their wounds), every eliteEvery-th from eliteFrom an elite (×eliteHp, gold outline); on siege.waveDice (a siege's own dice for wave w, else the run's); via `nexusWave`: planFor(power × nexus.budgetMul) then affixes.affixPlan; budget base × (power/perPoints) × w^curve × growth^(w-1) (count capped at maxCount, flyMax flying); flyers (×flyHpAt(w)); boss + escorts (×bossHpAt(w); a sky boss alone flies, ×flyHpAt × flyBossHp, its escorts walk); scouts at pad scoutAt (scoutHp); ambush hp; hp ×lateHp(w); staggered by gap; sorted by `at`.
 - `previewWave(run): SpawnPlan[]` — planWave(run.wave + 1) on a copy of the dice.
 - `layCover(r: Rng, n: number, route: Tile[]): Tile[]` — n patches, onRoute share centred on route cells, clear of pads/base/spawn.
 - `spawnDue(run): void` — queue entries with at ≤ run.t → enemies (id run.nextId++).
 - `speedOf(run, e: Enemy): number` — cells/s: def.speed × walkMul × slow/daze.
-- `leakCost(e: Enemy): number` — def.leak, or leak.vet for a veteran if more.
+- `leakCost(e: Enemy): number` — def.leak, or leak.elite for an elite if more; a boss ceil(leak × hp/maxHp), never below leak.bossMin.
 - `walk(run, dt): void` — skip held (heldBy) / stunned; walkers by flow field, flyers pad to pad; ambush jump on reaching pad ambushFrom → pad ambushAt; reaching base: remove, baseHp −= leakCost, leaked++.
-- Also (waves agent): `waveTags(w): string[]` ('Flying'/'Boss' for the HUD), `waveBudget(power, w)`, `lateHp(w)`,
-  `planFor(r: Rng, power, w)` (planWave on any dice), `previewGroups(plans): PreviewGroup[]` ({kind, n, vets, hp, flies}
-  for WavePreview), `runCover(r, extra = 0): Tile[]` (createRun's cover, + extra patches for Derelicts: patches range on the empty map's route), `layCover` takes an
+- Also (waves agent): `waveTags(w): string[]` ('Flying'/'Boss' for the HUD), `waveBudget(power, w)`, `lateHp(w)` (hpGrowth from hpFrom to hpTo, lateGrowth after), `flyHpAt(w)`, `bossHpAt(w)`,
+  `planFor(r: Rng, power, w)` (planWave on any dice), `previewGroups(plans): PreviewGroup[]` ({kind, n, elites, hp, flies}
+  for WavePreview), `mainKind(plans)` (the wave's one kind, for the preview and log), `runCover(r, extra = 0): Tile[]` (createRun's cover, + extra patches for Derelicts: patches range on the empty map's route), `layCover` takes an
   optional 4th `taken: Tile[]` to keep clear of, `atBase(e)`, `move(m, e, step)`. New TRAINING keys: `dazeMul`, `wave.bossMin`.
 - `spawnOne(run, plan): Enemy` — one spawn (spawnDue and the nemesis's brood); a nemesis plan gets `nem`; noteMet. speedOf × nem.speed × the lord's Surge × affixes.affixPace; a real lord's plan gets `lord`, an Armoured one `hard`.
 
@@ -276,7 +305,7 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 - `saveKey(forceId): string` (done) — `trainingRun:<forceId>`.
 - `serialize(run): string`, `deserialize(s: string): TrainingRun | null` — JSON; null on bad/old version. fx may be dropped.
 - `saveRun(run): void`, `loadRun(forceId): SavedRun | null` (null for a run already 'over'), `clearSave(forceId): void` — localStorage wrapped in try/catch.
-- `SAVE_VERSION` (6: Drill Honours and the Weekly Siege; 5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
+- `SAVE_VERSION` (7: the playtest pass, default towers and one-kind waves; 6: Drill Honours and the Weekly Siege; 5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
 
 ### run.ts
 - `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus, opts: { drill?: RunDrill; siege?: string } = {}): TrainingRun` — run.drill = a copy of opts.drill (unset: everything open), credits + drill.purseOf; run.siege = opts.siege (the UI then passes no story, nexus or drill, and seed = sortie.weekSeed(week)); run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
@@ -300,11 +329,14 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 
 ### bot.ts (test-only; not in index.ts)
 - `interface MazeSpot { n; x; y }`
-- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (recipe progress, then grade), craft when ready (unit on the used Shard nearest the route), spend (levels cheapest first, then luck, mend when low), pick card 0.
+- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (recipe progress, then grade), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use, spend (levels cheapest first, then luck, mend when low), pick card 0.
 - `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt?; nexus?; drill?; siege? }): TrainingRun`
 
 ### nexusTest.ts (test-only; not in index.ts)
 - `guardian(name, tier, rules?)`, `campaign(threat, guardians?, o?)` — a round-2 campaign for the Nexus tests.
 
 ### index.ts
-Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared, nexus, lordPick, lords, affixes, titles, records, tales, drill, drillBank, siege, siegeBoard (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).
+Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared, nexus, lordPick, lords, affixes, titles, records, tales, drill, drillBank, siege, siegeBoard, dps, clock, emplacements, waveKinds, flightLane (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).
+
+### probe.ts (test-only)
+- `probeRun(units, seed, {maxWaves?, nexus?}): Probe` — a bot run with bot.playRun's `watch` hook: cleared, fell, fellFlying, leaks by wave, each boss's death pad (LEGS if through). Also `flies(w)`, `mean`, `median`. Used by balance.test.ts; never imported by the app.

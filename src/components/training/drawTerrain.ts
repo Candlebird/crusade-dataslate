@@ -1,5 +1,5 @@
 import { TRAINING } from '../../rules/downtimeData';
-import { BASE, N, WAYPOINTS, centreOf, isFlyBossWave, isFlyWave, type TrainingRun } from '../../rules/training';
+import { BASE, N, WAYPOINTS, centreOf, isFlyBossWave, isFlyWave, laneCells, type TrainingRun } from '../../rules/training';
 import { BASE_ICON, COVER_ICONS, bar, drawIcon, label, roundRect } from './art';
 import { walkPath } from './routePath';
 
@@ -64,7 +64,8 @@ const flies = (w: number) => isFlyWave(w) || isFlyBossWave(w);
 
 /**
  * The route walkers take through the maze as it stands, with arrows along it while building (faint during a wave so
- * the enemies stand out), and the flyers' straight lanes pad to pad on a wave that has flyers.
+ * the enemies stand out), and the flyers' straight lanes pad to pad (a faint band while building) on a wave that has
+ * flyers.
  */
 export function drawRoute(ctx: CanvasRenderingContext2D, run: TrainingRun, s: number) {
   const build = run.phase !== 'wave';
@@ -72,6 +73,11 @@ export function drawRoute(ctx: CanvasRenderingContext2D, run: TrainingRun, s: nu
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
   if (flies(wave)) {
+    // While building, a faint band where pieces can shoot what flies (flightLane.ts): anti-air goes beside it.
+    if (build) {
+      ctx.fillStyle = 'rgba(190,150,255,0.06)';
+      for (const c of laneCells()) ctx.fillRect(c.x * s, c.y * s, s, s);
+    }
     const pts = WAYPOINTS.map(centreOf);
     // Round violet dots, so the lane never reads as a second walk route beside the dashed one.
     ctx.strokeStyle = build ? 'rgba(190,150,255,0.75)' : 'rgba(190,150,255,0.3)';

@@ -3,6 +3,7 @@ import { centreOf, placeProblem, routeOf, shardsOnMap, unitTowers } from './boar
 import { pickCard } from './cards';
 import { buyLevel, buyLuck, buyMend, levelCost, levelProblem, luckProblem, mendProblem } from './economy';
 import { N, overlaps } from './map';
+import { craftDefault, readyDefaults } from './emplacements';
 import { readyRecipes } from './recipes';
 import { craft, createRun, endRun, startWave, step } from './run';
 import { keep, keepOptions, placeDraft } from './shards';
@@ -81,13 +82,27 @@ function progress(run: TrainingRun, opt: KeepOption): number {
   return best;
 }
 
-/** Craft every ready recipe, each unit on its used Shard nearest the route. */
+/** Of Shards `uses`, the one nearest the route (where a craft stands). */
+const nearest = (run: TrainingRun, uses: number[]): ShardPiece => {
+  const route = routeOf(run);
+  return shardsOnMap(run).filter((s) => uses.includes(s.id)).sort((a, b) => near(route, a) - near(route, b))[0];
+};
+
+/** Could an uncrafted unit's recipe still use this Shard (its type, at a slot's grade or better)? */
+const wanted = (run: TrainingRun, p: ShardPiece) =>
+  run.recipes.some((r) => !run.crafted.includes(r.unitId) && r.slots.some((s) => s.type === p.type && p.grade >= s.grade));
+
+/** Craft every ready recipe, then every ready default tower none of whose Shards a unit still wants, each on its used
+ *  Shard nearest the route. */
 function craftAll(run: TrainingRun, units: Unit[]): void {
   for (let ready = readyRecipes(run); ready.length; ready = readyRecipes(run)) {
     const { unitId, uses } = ready[0];
-    const route = routeOf(run);
-    const on = shardsOnMap(run).filter((s) => uses.includes(s.id)).sort((a, b) => near(route, a) - near(route, b))[0];
-    craft(run, units.find((u) => u.id === unitId)!, uses, on.id);
+    craft(run, units.find((u) => u.id === unitId)!, uses, nearest(run, uses).id);
+  }
+  const spare = () => readyDefaults(run).filter((d) => !shardsOnMap(run).some((p) => d.uses.includes(p.id) && wanted(run, p)));
+  for (let ready = spare(); ready.length; ready = spare()) {
+    const { key, uses } = ready[0];
+    craftDefault(run, key, uses, nearest(run, uses).id);
   }
 }
 
@@ -125,9 +140,9 @@ export function botBuild(run: TrainingRun, units: Unit[], maze: MazeSpot[], curs
 }
 
 /** Play a run to its end (or `maxWaves` cleared), stepping `dt` (default 0.05) at a time; `nexus`: a campaign's;
- *  `drill`, `siege`: createRun's opts. */
+ *  `drill`, `siege`: createRun's opts; `watch` is called after every step of a wave (the balance tests' probes). */
 export function playRun(units: Unit[], seed: number,
-  opts: { maze?: MazeSpot[]; maxWaves?: number; dt?: number; nexus?: RunNexus; drill?: RunDrill; siege?: string } = {}): TrainingRun {
+  opts: { maze?: MazeSpot[]; maxWaves?: number; dt?: number; nexus?: RunNexus; drill?: RunDrill; siege?: string; watch?: (run: TrainingRun) => void } = {}): TrainingRun {
   const { maze = [], maxWaves = 60, dt = 0.05 } = opts;
   const run = createRun('bot', units, seed, undefined, opts.nexus, { drill: opts.drill, siege: opts.siege });
   let cursor = 0;
@@ -135,7 +150,10 @@ export function playRun(units: Unit[], seed: number,
     cursor = botBuild(run, units, maze, cursor);
     if (run.draft.step !== 'done') { endRun(run, 'The bot is stuck.'); break; }
     startWave(run);
-    while (run.phase === 'wave' && run.t < WAVE_LIMIT) step(run, dt);
+    while (run.phase === 'wave' && run.t < WAVE_LIMIT) {
+      step(run, dt);
+      opts.watch?.(run);
+    }
     if (run.phase === 'wave') endRun(run, 'The wave never ends.');
   }
   return run;

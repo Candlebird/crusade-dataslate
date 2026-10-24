@@ -3,12 +3,14 @@ import { affixPace, affixPlan } from './affixes';
 import { BASE, dist, mapOf } from './board';
 import { LEGS, N, WAYPOINTS, centre, heading, mapFor, route, type MapState } from './map';
 import { budgetMul } from './nexus';
-import { pick, rand, randInt, shuffle, type Rng } from './rng';
+import { pick, rand, randInt, type Rng } from './rng';
 import { waveDice } from './siege';
 import { noteMet } from './tally';
 import type { Enemy, SpawnPlan, Tile, TrainingRun } from './types';
+import { countFor, isElite, waveKind } from './waveKinds';
 
-// Waves: what comes (budget by force points, flyers, bosses, scouts, ambushers, HP scaling), spawning and walking.
+// Waves: what comes (budget by force points, one kind a wave, elites, flyers, bosses, scouts, ambushers, HP scaling),
+// spawning and walking.
 
 const W = TRAINING.wave;
 const R = TRAINING.route;
@@ -19,7 +21,7 @@ export const isFlyWave = (w: number) => w > 0 && w % W.flyEvery === 0;
 /** Every TRAINING.wave.bossEvery-th wave brings an Echo Lord. */
 export const isBossWave = (w: number) => w > 0 && w % W.bossEvery === 0;
 
-/** Every TRAINING.wave.flyBossEvery-th wave the boss and its escorts fly. */
+/** Every TRAINING.wave.flyBossEvery-th wave the boss flies (its escorts walk). */
 export const isFlyBossWave = (w: number) => w > 0 && w % W.flyBossEvery === 0;
 
 /** What wave `w` is, for the HUD: 'Flying', 'Boss', or both. */
@@ -28,74 +30,59 @@ export const waveTags = (w: number): string[] => [
   ...(isBossWave(w) ? ['Boss'] : []),
 ];
 
-/** What wave `w`'s enemies cost in all, for a force of `power` points. */
-export const waveBudget = (power: number, w: number) => W.base * (power / W.perPoints) * W.growth ** (w - 1);
+/** What wave `w`'s enemies cost in all, for a force of `power` points: base a perPoints, × w^curve × growth^(w−1). */
+export const waveBudget = (power: number, w: number) => W.base * (power / W.perPoints) * w ** W.curve * W.growth ** (w - 1);
 
-/** Every enemy's wounds past wave hpFrom grow this many times. */
-export const lateHp = (w: number) => (w > W.hpFrom ? W.hpGrowth ** (w - W.hpFrom) : 1);
+/** How many times its wounds every enemy has on wave `w`: hpGrowth a wave from hpFrom to hpTo, lateGrowth a wave past it. */
+export const lateHp = (w: number) =>
+  W.hpGrowth ** (Math.min(Math.max(w, W.hpFrom), W.hpTo) - W.hpFrom) * W.lateGrowth ** Math.max(0, w - W.hpTo);
 
-/** Enemy kinds that can turn up in wave `w` (not the boss). */
-const poolFor = (w: number) =>
-  (Object.keys(TRAINING_ENEMIES) as TrainingEnemyKind[]).filter((k) => TRAINING_ENEMIES[k].spawn !== 'boss' && TRAINING_ENEMIES[k].from <= w);
+/** How tough a flyer is on wave `w` beside a walker: flyHp, fading flyFade a wave (the guns on the lane grow slower than the maze). */
+export const flyHpAt = (w: number) => W.flyHp * W.flyFade ** (w - 1);
 
-/** Fill `budget` with enemies of the pool, at most `max` of them; Scouts and Ambushers come one try in two. */
-function fill(r: Rng, budget: number, w: number, max: number): TrainingEnemyKind[] {
-  const pool = poolFor(w);
-  const out: TrainingEnemyKind[] = [];
-  for (let guard = 0; guard < 1000 && out.length < max; guard++) {
-    const fits = pool.filter((k) => TRAINING_ENEMIES[k].cost <= budget);
-    if (!fits.length) break;
-    const k = pick(r, fits);
-    if (TRAINING_ENEMIES[k].spawn !== 'main' && rand(r) < 0.5) continue;
-    out.push(k);
-    budget -= TRAINING_ENEMIES[k].cost;
-  }
-  return out;
-}
+/** How tough the Echo Lord is on wave `w`, beside its share of the budget: bossHp by boss wave, the last holding on. */
+export const bossHpAt = (w: number) => W.bossHp[Math.min(W.bossHp.length, Math.max(1, Math.floor(w / W.bossEvery))) - 1];
 
-const costOf = (ks: TrainingEnemyKind[]) => ks.reduce((n, k) => n + TRAINING_ENEMIES[k].cost, 0);
-
-/** Wave `w`'s spawns for a force of `power` points, sorted by time (rolls `r`). */
+/** Wave `w`'s spawns for a force of `power` points, sorted by time (rolls `r`): one kind (waveKinds.ts), as many as
+ *  the budget buys (past maxCount, or flyMax on a flying wave, the rest makes them tougher), every eliteEvery-th an
+ *  elite; a boss wave's escorts take `escorts` of the budget. A flying wave brings flyShare of the budget, its flyers
+ *  flyHpAt as tough; on a boss wave that would fly only the boss flies (flyHpAt × flyBossHp as tough), its escorts walk. */
 export function planFor(r: Rng, power: number, w: number): SpawnPlan[] {
   const boss = isBossWave(w);
-  const flies = isFlyWave(w) || isFlyBossWave(w);
-  // Flyers skip the maze, so a flying wave brings only flyShare of the budget.
+  const skyBoss = boss && (isFlyWave(w) || isFlyBossWave(w));
+  // Flyers skip the maze, so a flying wave brings only flyShare of the budget (a flying boss's escorts walk).
+  const flies = !boss && isFlyWave(w);
   const budget = waveBudget(power, w) * (flies ? W.flyShare : 1);
   const minions = boss ? budget * W.escorts : budget;
-  const max = W.maxCount - (boss ? 1 : 0);
-  let kinds = fill(r, minions, w, max);
-  if (!kinds.length && !boss) kinds = ['swarm'];
-  // Past the cap on numbers, what's left of the budget makes them tougher instead.
-  const tougher = kinds.length >= max ? Math.max(1, minions / costOf(kinds)) : 1;
-  const hpMul = tougher * lateHp(w) * TRAINING.enemyHp;
+  const kind = waveKind(r, w, flies);
+  const { n, hpMul } = countFor(kind, minions, (flies ? W.flyMax : W.maxCount) - (boss ? 1 : 0));
+  const hp = hpMul * lateHp(w) * TRAINING.enemyHp * (flies ? flyHpAt(w) : 1);
   const bossMul = Math.max(W.bossMin, (budget - minions) / TRAINING_ENEMIES.lord.cost);
-  shuffle(r, kinds);
 
   const out: SpawnPlan[] = [];
   let at = 0;
-  for (const kind of kinds) {
-    out.push(spawnPlan(r, kind, at, w, hpMul, flies));
+  for (let i = 0; i < n; i++) {
+    out.push(spawnPlan(r, kind, at, hp, flies, isElite(w, i)));
     at += W.gap * (0.7 + 0.6 * rand(r));
   }
   if (boss) {
-    const s = spawnPlan(r, 'lord', at / 2, w, 1, flies);
-    s.hp = TRAINING_ENEMIES.lord.hp * TRAINING.enemyHp * lateHp(w) * bossMul;
+    const s = spawnPlan(r, 'lord', at / 2, 1, skyBoss, false);
+    s.hp = TRAINING_ENEMIES.lord.hp * TRAINING.enemyHp * lateHp(w) * bossMul * bossHpAt(w) * (skyBoss ? flyHpAt(w) * W.flyBossHp : 1);
     out.push(s);
   }
   return out.sort((a, b) => a.at - b.at);
 }
 
-/** One spawn: where it comes in (Scouts on pad scoutAt), its wounds (Scouts, Ambushers and veterans adjusted). */
-function spawnPlan(r: Rng, kind: TrainingEnemyKind, at: number, w: number, hpMul: number, flies: boolean): SpawnPlan {
+/** One spawn: where it comes in (Scouts on pad scoutAt), its wounds (Scouts, Ambushers and elites adjusted). */
+function spawnPlan(r: Rng, kind: TrainingEnemyKind, at: number, hpMul: number, flies: boolean, elite: boolean): SpawnPlan {
   const def = TRAINING_ENEMIES[kind];
   const leg = def.spawn === 'scout' ? R.scoutAt : 0;
   const c = centre(WAYPOINTS[leg]);
-  const vet = def.spawn !== 'boss' && w >= W.vetFrom && rand(r) < W.vets;
   const share = def.spawn === 'scout' ? W.scoutHp : def.spawn === 'ambush' ? W.ambushHp : 1;
-  const hp = def.hp * hpMul * share * (vet ? W.vetHp : 1);
+  const hp = def.hp * hpMul * share * (elite ? W.eliteHp : 1);
   const x = c.x + (rand(r) - 0.5) * 0.6;
   const y = c.y + (rand(r) - 0.5) * 0.6;
-  return { kind, at, leg, x, y, hp, flies, ...(vet ? { vet } : {}) };
+  return { kind, at, leg, x, y, hp, flies, ...(elite ? { elite } : {}) };
 }
 
 /** Wave `w`'s spawns, sorted by time, rolling `r`: the Nexus's budget and affixes on them (nexus.ts, affixes.ts). */
@@ -107,11 +94,11 @@ export const planWave = (run: TrainingRun, w: number): SpawnPlan[] => nexusWave(
 /** The next wave as startWave will plan it, without touching the run (rolls on a copy of the dice). */
 export const previewWave = (run: TrainingRun): SpawnPlan[] => nexusWave(waveDice(run, run.wave + 1, { rng: run.rng }), run, run.wave + 1);
 
-/** A wave's spawns grouped by kind, for the preview: how many, how many veterans, a plain one's wounds, and if they fly. */
+/** A wave's spawns grouped by kind, for the preview: how many, how many elites, a plain one's wounds, and if they fly. */
 export interface PreviewGroup {
   kind: TrainingEnemyKind;
   n: number;
-  vets: number;
+  elites: number;
   hp: number;
   flies: boolean;
 }
@@ -119,15 +106,19 @@ export interface PreviewGroup {
 export function previewGroups(plans: SpawnPlan[]): PreviewGroup[] {
   const groups = new Map<TrainingEnemyKind, PreviewGroup>();
   for (const s of plans) {
-    const g = groups.get(s.kind) ?? { kind: s.kind, n: 0, vets: 0, hp: 0, flies: s.flies };
+    const g = groups.get(s.kind) ?? { kind: s.kind, n: 0, elites: 0, hp: 0, flies: s.flies };
     g.n += 1;
-    if (s.vet) g.vets += 1;
+    if (s.elite) g.elites += 1;
     else g.hp = Math.round(s.hp);
-    if (!g.hp) g.hp = Math.round(s.hp / W.vetHp);
+    if (!g.hp) g.hp = Math.round(s.hp / W.eliteHp);
     groups.set(s.kind, g);
   }
   return [...groups.values()];
 }
+
+/** The wave's one kind (not the boss), for the preview and the log. */
+export const mainKind = (plans: SpawnPlan[]): TrainingEnemyKind | undefined =>
+  plans.find((s) => TRAINING_ENEMIES[s.kind].spawn !== 'boss')?.kind;
 
 /** Does the size×size patch at `a` share a cell with the 2×2 area at `t`? */
 const touches = (a: Tile, s: number, t: Tile) => a.x <= t.x + 1 && t.x <= a.x + s - 1 && a.y <= t.y + 1 && t.y <= a.y + s - 1;
@@ -160,7 +151,7 @@ export function spawnOne(run: TrainingRun, s: SpawnPlan): Enemy {
   const next = centre(WAYPOINTS[Math.min(LEGS, s.leg + 1)]);
   const e: Enemy = {
     id: run.nextId++, kind: s.kind, x: s.x, y: s.y, leg: s.leg, face: Math.atan2(next.y - s.y, next.x - s.x),
-    hp: s.hp, maxHp: s.hp, flies: s.flies, ...(s.vet ? { vet: true } : {}), status: {}, dots: [], regrab: 0,
+    hp: s.hp, maxHp: s.hp, flies: s.flies, ...(s.elite ? { elite: true } : {}), status: {}, dots: [], regrab: 0,
     ...(s.nemesis ? { nem: { born: run.t, speed: 1, hard: 0, next: 0, regen: 0 } } : {}),
     ...(s.lord !== undefined ? { lord: { i: s.lord, next: 0, ward: 0, burst: 0 } } : {}),
     ...(s.hard ? { hard: s.hard } : {}),
@@ -184,8 +175,13 @@ export function speedOf(run: TrainingRun, e: Enemy): number {
   return TRAINING_ENEMIES[e.kind].speed * TRAINING.walkMul * slow * daze * (e.nem?.speed ?? 1) * surge * affixPace(run, e);
 }
 
-/** Base HP an enemy costs if it gets through. */
-export const leakCost = (e: Enemy): number => Math.max(TRAINING_ENEMIES[e.kind].leak, e.vet ? TRAINING.leak.vet : 0);
+/** Base HP an enemy costs if it gets through: its own leak, or leak.elite for an elite; a boss its leak × the share
+ *  of its wounds left (rounded up), never below leak.bossMin. */
+export function leakCost(e: Enemy): number {
+  const def = TRAINING_ENEMIES[e.kind];
+  if (def.spawn !== 'boss') return Math.max(def.leak, e.elite ? TRAINING.leak.elite : 0);
+  return Math.max(TRAINING.leak.bossMin, Math.ceil(def.leak * Math.min(1, Math.max(0, e.hp) / e.maxHp)));
+}
 
 /** Is it standing still this step: held, stunned or dead. */
 const still = (e: Enemy) => e.hp <= 0 || e.heldBy !== undefined || (e.status.stun ?? 0) > 0;

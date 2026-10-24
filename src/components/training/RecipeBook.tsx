@@ -1,16 +1,19 @@
 import type { EmblemLayer, Unit } from '../../model/types';
 import { SHARD_TYPES } from '../../rules/downtimeData';
-import { craft, craftProblem, gradeName, readyRecipes, type Recipe, type TrainingRun } from '../../rules/training';
+import { craft, craftDefault, craftProblem, gradeName, readyRecipes, type Recipe, type TrainingRun } from '../../rules/training';
 import { EmblemBadge } from '../Emblem';
 import { Icon } from '../Icon';
 import { act } from './act';
+import { DefaultsBook } from './DefaultsBook';
 import { countable, recipeProgress } from './recipeView';
 import { RecordBadges } from './RecordBadges';
 import { ShardBadge } from './ShardBadge';
 
-/** A craft under way: the recipe chosen, waiting for a tap on one of the Shards it uses (where the unit will stand). */
+/** A craft under way: the unit's recipe or the default (`def`, its key) chosen, waiting for a tap on one of the Shards
+ *  it uses (where it will stand). */
 export interface Crafting {
-  unitId: string;
+  unitId?: string;
+  def?: string;
   uses: number[];
 }
 
@@ -30,12 +33,14 @@ export interface RecipeBookProps {
  * refused; the shell then stays in craft mode, or leaves it on true.
  */
 export function finishCraft(run: TrainingRun, units: Unit[], c: Crafting, pieceId: number, onChange: () => void): boolean {
+  if (c.def) return act(() => craftDefault(run, c.def!, c.uses, pieceId), onChange);
   const unit = units.find((u) => u.id === c.unitId);
   if (!unit) return false;
   return act(() => craft(run, unit, c.uses, pieceId), onChange);
 }
 
-/** Every unit's recipe: the Shards it takes, which are on the map already, and a Craft button on the ready ones. */
+/** Every unit's recipe: the Shards it takes, which are on the map already, and a Craft button on the ready ones; then
+ *  the default towers (DefaultsBook). */
 export function RecipeBook({ run, units, portraits, crafting, onCraft }: RecipeBookProps) {
   const ready = new Map(readyRecipes(run).map((r) => [r.unitId, r.uses]));
   const shards = countable(run);
@@ -65,6 +70,7 @@ export function RecipeBook({ run, units, portraits, crafting, onCraft }: RecipeB
           <Icon name="g:check-mark" /> Crafted: {done.map((r) => r.name).join(', ')}
         </div>
       )}
+      <DefaultsBook run={run} crafting={crafting} onCraft={onCraft} />
     </div>
   );
 }

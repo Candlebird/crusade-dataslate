@@ -1,6 +1,5 @@
 import { SHARD_TYPES, TRAINING, type ShardType } from '../downtimeData';
 import { hitChance, pick, saveChance, weighted, type Rng } from './rng';
-import { perkOf } from './drill';
 import { draftDice } from './siege';
 import { pieceById, placeProblem } from './board';
 import { nexusStart } from './nexus';
@@ -17,14 +16,17 @@ const TOP: Grade = 5;
 /** "Cracked" … "Pristine". */
 export const gradeName = (g: Grade): string => TRAINING.shards.grades[g - 1];
 
-/** A grade by the odds for the run's luck level (`r`: the dice, default the run's). */
+/** The luck a draft rolls its grades at: the run's, + a Shard Rush's (nexus.ts), capped at the odds table. */
+export const draftLuck = (run: TrainingRun): number =>
+  Math.max(0, Math.min(TRAINING.shards.odds.length - 1, run.luck + nexusStart(run).luck));
+
+/** A grade by the odds for the draft's luck (draftLuck; `r`: the dice, default the run's). */
 export function rollGrade(run: TrainingRun, r: Rng = run): Grade {
-  const odds = TRAINING.shards.odds[Math.max(0, Math.min(TRAINING.shards.odds.length - 1, run.luck))];
-  return (weighted(r, odds) + 1) as Grade;
+  return (weighted(r, TRAINING.shards.odds[draftLuck(run)]) + 1) as Grade;
 }
 
-/** Shards a draft draws: TRAINING.shards.draw, more in a Shard Rush (nexus.ts), and the Drill Honours draw perk. */
-export const drawSize = (run: TrainingRun) => TRAINING.shards.draw + nexusStart(run).draw + perkOf(run, 'draw');
+/** Shards a draft draws: always TRAINING.shards.draw. No perk, event or siege changes it. */
+export const drawSize = (_run: TrainingRun) => TRAINING.shards.draw;
 
 /** Start the build phase's draft: draw drawSize Shards into run.draft.hand, step 'place' (a siege's from the week's dice). */
 export function drawDraft(run: TrainingRun): void {
@@ -36,13 +38,16 @@ export function drawDraft(run: TrainingRun): void {
   run.draft = { step: 'place', hand, placed: [] };
 }
 
-/** A Shard's weapon at a grade: SHARD_TYPES' attacks per point of value (at least 1), range in inches = cells. */
+/** A Shard's weapon at a grade: SHARD_TYPES' attacks per point of value (at least 1), its range in inches (reach
+ *  makes it cells), the type's rule and anti-air with it. */
 export function shardGun(type: ShardType, grade: Grade): TowerGun {
-  const g = SHARD_TYPES[type].gun;
+  const def = SHARD_TYPES[type];
+  const g = def.gun;
   return {
-    name: `${SHARD_TYPES[type].name} Shard`, melee: !!g.melee, range: g.melee ? 0 : g.range,
+    name: `${def.name} Shard`, melee: !!g.melee, range: g.melee ? 0 : g.range,
     attacks: Math.max(1, Math.round(g.attacks * shardValue(grade))), ap: g.ap, hitMod: 0, blast: g.blast ?? 0,
     deadly: 0, rending: false, reliable: false, bane: false, cd: 0, pending: 0, gap: 0, next: 0,
+    shard: type, ...(def.air ? { air: def.air } : {}),
   };
 }
 
