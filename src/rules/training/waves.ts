@@ -30,8 +30,10 @@ export const waveTags = (w: number): string[] => [
   ...(isBossWave(w) ? ['Boss'] : []),
 ];
 
-/** What wave `w`'s enemies cost in all, for a force of `power` points: base a perPoints, × w^curve × growth^(w−1). */
-export const waveBudget = (power: number, w: number) => W.base * (power / W.perPoints) * w ** W.curve * W.growth ** (w - 1);
+/** What wave `w`'s enemies cost in all, for a force of `power` points: base a perPoints, × w^curve × growth^(w−1),
+ *  × earlyBudget[w−1] on the first waves (fewer of them, while a Shard or two holds the maze). */
+export const waveBudget = (power: number, w: number) =>
+  W.base * (power / W.perPoints) * w ** W.curve * W.growth ** (w - 1) * (W.earlyBudget[w - 1] ?? 1);
 
 /** How many times its wounds every enemy has on wave `w`: hpGrowth a wave from hpFrom to hpTo, lateGrowth a wave past it. */
 export const lateHp = (w: number) =>
@@ -40,11 +42,14 @@ export const lateHp = (w: number) =>
 /** How tough a flyer is on wave `w` beside a walker: flyHp, fading flyFade a wave (the guns on the lane grow slower than the maze). */
 export const flyHpAt = (w: number) => W.flyHp * W.flyFade ** (w - 1);
 
-/** How many times tougher everything is on a ground wave `w` (no flying wave nor sky boss): groundGrowth a wave from
- *  groundFrom to groundTo, groundLate a wave after; the early waves (before units are crafted) as they were. */
+/** How many times tougher everything is on a ground wave `w` (no flying wave nor sky boss): earlyHp[w−1] on the first
+ *  waves (a gentle start), groundGrowth a wave from groundFrom to groundTo, groundLate a wave after, and ease a wave
+ *  less from easeFrom to easeTo (the run-up to the wave-25 Lord), held after. */
 export const groundHpAt = (w: number) =>
   isFlyWave(w) || isFlyBossWave(w) ? 1
-    : W.groundGrowth ** Math.max(0, Math.min(w, W.groundTo) - W.groundFrom + 1) * W.groundLate ** Math.max(0, w - W.groundTo);
+    : (W.earlyHp[w - 1] ?? 1)
+      * W.groundGrowth ** Math.max(0, Math.min(w, W.groundTo) - W.groundFrom + 1) * W.groundLate ** Math.max(0, w - W.groundTo)
+      * W.ease ** Math.max(0, Math.min(w, W.easeTo) - W.easeFrom + 1);
 
 /** How tough the Echo Lord is on wave `w`, beside its share of the budget: bossHp by boss wave, the last holding on. */
 export const bossHpAt = (w: number) => W.bossHp[Math.min(W.bossHp.length, Math.max(1, Math.floor(w / W.bossEvery))) - 1];
@@ -172,13 +177,13 @@ export function spawnDue(run: TrainingRun): void {
   while (run.queue.length && run.queue[0].at <= run.t) spawnOne(run, run.queue.shift()!);
 }
 
-/** An enemy's speed now, in cells a second (slow, daze; a nemesis's rage and Vengeful; a real lord's Surge; the
+/** An enemy's speed now, in cells a second (earlyPace on the first waves; slow, daze; a nemesis's rage and Vengeful; a real lord's Surge; the
  *  Nexus's Swift, Warp Currents and Vengeful rushes). */
 export function speedOf(run: TrainingRun, e: Enemy): number {
   const slow = (e.status.slow ?? 0) > 0 ? TRAINING.slowMul : 1;
   const daze = (e.status.daze ?? 0) > 0 ? TRAINING.dazeMul : 1;
   const surge = (e.lord?.burst ?? 0) > 0 ? TRAINING.nexus.tricks.burst.mul : 1;
-  return TRAINING_ENEMIES[e.kind].speed * TRAINING.walkMul * slow * daze * (e.nem?.speed ?? 1) * surge * affixPace(run, e);
+  return TRAINING_ENEMIES[e.kind].speed * TRAINING.walkMul * (W.earlyPace[run.wave - 1] ?? 1) * slow * daze * (e.nem?.speed ?? 1) * surge * affixPace(run, e);
 }
 
 /** Base HP an enemy costs if it gets through: its own leak, or leak.elite for an elite; a boss its leak × the share

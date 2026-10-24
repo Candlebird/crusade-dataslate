@@ -50,7 +50,10 @@ describe('wave kinds', () => {
 
 describe('planWave', () => {
   it('spends a budget that grows by curve and growth a wave and scales with the force', () => {
-    expect(waveBudget(1000, 2) / waveBudget(1000, 1)).toBeCloseTo(W.growth * 2 ** W.curve);
+    expect(waveBudget(1000, 5) / waveBudget(1000, 4)).toBeCloseTo(W.growth * (5 / 4) ** W.curve);
+    for (const [i, m] of W.earlyBudget.entries()) {
+      expect(waveBudget(1000, i + 1)).toBeCloseTo(W.base * (i + 1) ** W.curve * W.growth ** i * m);
+    }
     expect(waveBudget(2000, 3)).toBeCloseTo(2 * waveBudget(1000, 3));
     const run = blankRun();
     const cost = (w: number) => planWave(run, w).reduce((n, s) => n + costOf(s.kind), 0);
@@ -111,9 +114,13 @@ describe('planWave', () => {
   });
 
   it('toughens ground waves groundGrowth a wave from groundFrom to groundTo, groundLate after; never early or flying ones', () => {
-    for (let w = 1; w < W.groundFrom; w++) expect(groundHpAt(w)).toBe(1);
+    for (let w = 1; w < W.groundFrom; w++) expect(groundHpAt(w)).toBe(W.earlyHp[w - 1] ?? 1);
+    expect(W.earlyHp.every((m) => m < 1)).toBe(true);
     expect(groundHpAt(W.groundFrom + 1)).toBeCloseTo(W.groundGrowth ** 2);
     expect(groundHpAt(W.groundTo + 2) / groundHpAt(W.groundTo - 1)).toBeCloseTo(W.groundGrowth * W.groundLate ** 2);
+    // Eased from easeFrom to easeTo (23 to 25: both ground waves), then climbing at groundLate again from there.
+    expect(groundHpAt(W.easeTo) / groundHpAt(W.easeTo - 2)).toBeCloseTo((W.groundLate * W.ease) ** 2);
+    expect(groundHpAt(W.easeTo + 2) / groundHpAt(W.easeTo + 1)).toBeCloseTo(W.groundLate);
     for (const w of [12, 16, 20, 24]) expect(groundHpAt(w)).toBe(1);
     expect(isFlyWave(12) && isFlyBossWave(20)).toBe(true);
   });

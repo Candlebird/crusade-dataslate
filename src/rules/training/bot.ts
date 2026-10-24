@@ -1,5 +1,5 @@
 import type { Unit } from '../../model/types';
-import { TRAINING } from '../downtimeData';
+import { SHARD_TYPES, TRAINING } from '../downtimeData';
 import { centreOf, placeProblem, routeOf, shardsOnMap, unitTowers } from './board';
 import { pickCard } from './cards';
 import { buyLevel, buyLuck, buyMend, levelCost, levelProblem, luckProblem, mendProblem } from './economy';
@@ -84,6 +84,16 @@ function progress(run: TrainingRun, opt: KeepOption): number {
   return best;
 }
 
+/** How much a keep's Shard shoots at walkers on its own: its attacks × the route cells in its reach. The first keep
+ *  goes by it (a gun that covers the route, as a player's would be), every later one only as a tie-break. */
+function gunOf(run: TrainingRun, opt: KeepOption): number {
+  const p = shardsOnMap(run).find((s) => s.id === opt.pieceId)!;
+  const g = SHARD_TYPES[p.type].gun;
+  const reach = g.melee ? TRAINING.meleeReach : g.range * TRAINING.rangeMul;
+  const c = centreOf(p);
+  return g.attacks * routeOf(run).filter((r) => Math.hypot(r.x + 0.5 - c.x, r.y + 0.5 - c.y) <= reach).length;
+}
+
 /** Of Shards `uses`, the one nearest the route (where a craft stands). */
 const nearest = (run: TrainingRun, uses: number[]): ShardPiece => {
   const route = routeOf(run);
@@ -148,8 +158,9 @@ export function* botMoves(run: TrainingRun, units: Unit[], maze: MazeSpot[], cur
   yield* craftAll(run, units);
   if (run.draft.step === 'keep') {
     // The bot never keeps a Shard a grade down (it only crafts units, whose recipes take a grade or better).
-    const opts = keepOptions(run).filter((o) => !o.down).map((o) => ({ o, p: progress(run, o) }));
-    opts.sort((a, b) => b.p - a.p || b.o.grade - a.o.grade || a.o.with.length - b.o.with.length);
+    const opts = keepOptions(run).filter((o) => !o.down).map((o) => ({ o, p: progress(run, o), g: gunOf(run, o) }));
+    const first = !shardsOnMap(run, false).length && !unitTowers(run).length;
+    opts.sort((a, b) => (first ? b.g - a.g : 0) || b.p - a.p || b.o.grade - a.o.grade || b.g - a.g || a.o.with.length - b.o.with.length);
     keep(run, opts[0].o);
     yield 'keeps a Shard';
   }

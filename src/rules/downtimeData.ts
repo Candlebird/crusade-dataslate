@@ -556,8 +556,10 @@ export const TRAINING = {
    * `hpGrowth` times more wounds a wave from wave `hpFrom` to `hpTo`, `lateGrowth` times a wave after (waves.ts lateHp).
    * Ground waves (not a flying wave nor the sky boss's) are tougher again from `groundFrom`, about when the first units
    * are crafted: `groundGrowth` times a wave to `groundTo`, `groundLate` a wave after (waves.ts groundHpAt), since crafted
-   * units with long guns rake the whole maze while flyers only cross their reach once. Waves 1 to `groundFrom` − 1 and
-   * every flying wave are as they were. Every `flyEvery`th wave flies, with `flyShare` of the budget (flyers skip the maze), its flyers `flyHp` × `flyFade`^(w-1)
+   * units with long guns rake the whole maze while flyers only cross their reach once; from `easeFrom` to `easeTo` they
+   * are `ease` times as tough a wave (the run-up to the wave-25 Lord, held after: later waves climb as before from there).
+   * The first waves, while a Shard or two holds the maze, are gentler: wave w has `earlyBudget`[w-1] of its budget (fewer
+   * enemies), `earlyHp`[w-1] of its wounds and walks at `earlyPace`[w-1]. Every flying wave is as it was. Every `flyEvery`th wave flies, with `flyShare` of the budget (flyers skip the maze), its flyers `flyHp` × `flyFade`^(w-1)
    * as tough (thinner as the maze grows). Every `bossEvery`th brings an Echo Lord with `escorts` of its budget as escorts
    * (the rest toughens the boss, never below `bossMin` of its wounds), the Lord `bossHp` times tougher again (one entry a
    * boss wave, the last holding on); every `flyBossEvery`th the Lord flies (`flyBossHp` as tough; its escorts walk).
@@ -584,6 +586,12 @@ export const TRAINING = {
     groundTo: 16,
     groundGrowth: 1.07,
     groundLate: 1.02,
+    earlyHp: [0.5, 0.65, 0.8] as number[],
+    earlyPace: [0.5, 0.7, 0.9] as number[],
+    earlyBudget: [0.4, 0.6, 1] as number[],
+    easeFrom: 21,
+    easeTo: 25,
+    ease: 0.9,
     flyEvery: 4,
     flyShare: 0.4,
     flyMax: 48,
@@ -593,7 +601,7 @@ export const TRAINING = {
     flyBossEvery: 20,
     escorts: 0.5,
     bossMin: 0.1,
-    bossHp: [2.0, 2.6, 3.5, 1.7, 0.6, 0.5] as number[],
+    bossHp: [2.0, 2.6, 3.5, 1.7, 0.45, 0.375] as number[],
     flyBossHp: 0.5,
     scoutHp: 0.8,
     ambushHp: 0.65,

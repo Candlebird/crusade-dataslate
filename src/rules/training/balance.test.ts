@@ -43,6 +43,10 @@ describe('training balance (bot)', () => {
     }
   });
 
+  it('leaks nothing on waves 1-2 (a sensible first Shard holds them)', () => {
+    for (const p of runs) expect(p.leaks.slice(1, 3).map((l) => l ?? 0)).toEqual([0, 0]);
+  });
+
   it('leaks now and then in waves 8-15, but not every wave', () => {
     const mid = runs.map((p) => p.leaks.slice(8, 16).filter((l) => l > 0).length);
     expect(mid.filter((n) => n > 0).length / runs.length).toBeGreaterThanOrEqual(0.3);
