@@ -780,7 +780,22 @@ fieldset.fields:disabled { opacity: 0.6; }
 
 /* Training sim */
 .training { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 12px; }
-.training-board canvas { display: block; width: 100%; aspect-ratio: 1; border: 1px solid var(--line); border-radius: 4px; cursor: crosshair; touch-action: manipulation; }
+.training-map { position: relative; width: 100%; aspect-ratio: 1; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; background: #0c0d0f; }
+.training-map canvas { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; user-select: none; }
+.training-map-fit { position: absolute; top: 6px; right: 6px; padding: 2px 10px; }
+/* Training shell: HUD over the map and panels; the modal goes wider so the map gets room. */
+.modal:has(> .modal-body > .training-game) { max-width: min(1280px, 100%) !important; }
+.training-game .training { grid-template-columns: minmax(0, 1fr) 320px; }
+.training-game .training-side { max-height: min(78vh, 900px); overflow-y: auto; padding-right: 2px; }
+.training-game .training-map { max-width: 78vh; margin: 0 auto; }
+.training-next { gap: 8px; margin-top: 6px; flex-wrap: wrap; }
+.training-info { padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
+.training-info .ghost { padding: 0 6px; }
+@media (max-width: 700px) {
+  .training-game .training { grid-template-columns: 1fr; }
+  .training-game .training-side { max-height: none; overflow: visible; }
+  .training-game .training-map { max-width: none; }
+}
 .training-side { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .training-unit { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 6px; }
 .training-ups { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 4px 0; }
@@ -791,6 +806,44 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-summary th:first-child, .training-summary td:first-child { text-align: left; }
 .training-summary th { color: var(--muted-2); font-weight: 600; }
 .training-summary tr.mvp td { color: var(--gold); }
+
+/* Training panels: HUD, draft, recipe book, shop, wave preview (components/training). */
+.training-hud { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 6px; }
+.training-hud-stat { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.training-hud-stat .tag { margin: 0 0 0 4px; }
+.training-speed { display: inline-flex; }
+.training-speed button { padding: 2px 8px; border-radius: 0; }
+.training-speed button:first-child { border-radius: 4px 0 0 4px; }
+.training-speed button:last-child { border-radius: 0 4px 4px 0; }
+.training-panel-title { margin: 6px 0 4px; }
+.training-draft, .training-recipes, .training-shop { display: flex; flex-direction: column; gap: 4px; }
+.training-draft-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.training-shard { display: inline-flex; padding: 3px 5px; }
+.training-shard.placed { padding: 3px 5px; border: 1px dashed var(--line); border-radius: 4px; }
+.training-keep { display: flex; flex-direction: column; gap: 3px; }
+.training-keep-opt { display: flex; align-items: center; gap: 6px; width: 100%; padding: 3px 6px; }
+.training-keep-opt .tag { margin: 0; }
+.training-crafting { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--gold); border-radius: 4px; background: rgba(201, 162, 74, 0.1); }
+.training-recipe { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; }
+.training-recipe.ready { border-color: var(--gold); box-shadow: 0 0 10px rgba(201, 162, 74, 0.35); }
+.training-recipe.active { background: rgba(201, 162, 74, 0.12); }
+.training-recipe-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.training-recipe-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.training-recipe-slots { display: flex; flex-wrap: wrap; gap: 4px; }
+.training-recipes-done { display: flex; align-items: center; gap: 4px; }
+.training-shop-row { display: flex; align-items: center; gap: 6px; }
+.training-shop-row.lit .training-shop-unit { border-color: var(--gold); }
+.training-shop-unit { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; padding: 3px 6px; text-align: left; }
+.training-shop-row button { white-space: nowrap; }
+.training-preview { gap: 8px; flex-wrap: wrap; }
+.training-preview-group { display: inline-flex; align-items: center; gap: 2px; cursor: help; }
+.shard-badge { display: inline-flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1; }
+.shard-badge .icon { width: 1em; height: 1em; filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.8)); }
+.shard-badge.faded { opacity: 0.35; }
+.shard-badge.glow .icon { filter: drop-shadow(0 0 3px var(--shard)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.8)); }
+.shard-pips { display: inline-flex; gap: 1px; }
+.shard-pips i { width: 3px; height: 3px; border-radius: 50%; background: var(--line); }
+.shard-pips i.on { background: var(--shard); }
 
 /* Training cards: a full-screen offer, the cards rising from below. */
 .training-cards {

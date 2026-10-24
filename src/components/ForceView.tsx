@@ -593,7 +593,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const trainingRow = (
     <div className="span-all row">
       <span className="grow small">
-        <b>Training sim:</b> hold a base against endless waves with up to {TRAINING.squadMax} units for up to {TRAINING.xpCap} XP each. <span className="muted">Any time, as often as you like; a unit banks at most {OFF_TABLE_XP.perRound} XP a {c ? 'round' : 'week'} from Training and free Sorties together. Units don't become busy.{f.trainingBest ? ` Best: ${f.trainingBest} waves.` : ''}</span>
+        <b>Training sim:</b> draft Shards into a maze, craft your units from them, and hold the base against endless waves; each crafted unit earns {TRAINING.xpPerWave} XP every {TRAINING.xpEvery} waves (up to {TRAINING.xpCap}). <span className="muted">Any time, as often as you like; a unit banks at most {OFF_TABLE_XP.perRound} XP a {c ? 'round' : 'week'} from Training and free Sorties together. Units don't become busy.{f.trainingBest ? ` Best: ${f.trainingBest} waves.` : ''}</span>
       </span>
       <button disabled={!f.units.some(canTrain)} onClick={() => setTraining(true)}>Train…</button>
       {training && <TrainingModal force={f} c={c} onClose={() => setTraining(false)} />}

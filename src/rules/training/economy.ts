@@ -1,0 +1,107 @@
+import type { Unit } from '../../model/types';
+import { levelForXp } from '../engine';
+import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
+import { pieceById } from './board';
+import type { Enemy, TrainingRun, UnitTower } from './types';
+
+// Credits in (kills, waves), credits out (levels, luck, base mends). Spending is only in the build phase.
+
+/** A force's power: its points, with each veteran level adding a share. Sorties scale by it too. */
+export function squadPower(units: Unit[]): number {
+  return units.reduce((n, u) => n + u.points * (1 + TRAINING.levelPower * levelForXp(u.xp)), 0);
+}
+
+/** The most level-ups a unit of these points may have (TRAINING.levels.caps). */
+export const levelCap = (points: number): number => (TRAINING.levels.caps.find((c) => points <= c.upTo) ?? TRAINING.levels.caps[TRAINING.levels.caps.length - 1]).cap;
+
+/** What a crafted unit's next level-up costs: base × points / perPoints (at least base), growth times more each level. */
+export function levelCost(t: UnitTower): number {
+  const L = TRAINING.levels;
+  return Math.round(Math.max(L.base, (L.base * t.points) / L.perPoints) * L.growth ** t.up);
+}
+
+const unitPiece = (run: TrainingRun, id: number): UnitTower | undefined => {
+  const p = pieceById(run, id);
+  return p?.kind === 'unit' ? p : undefined;
+};
+
+/** Why unit piece `id` can't level up now, or null. */
+export function levelProblem(run: TrainingRun, id: number): string | null {
+  if (run.phase !== 'build') return 'Levels are bought between waves.';
+  const t = unitPiece(run, id);
+  if (!t) return 'Only crafted units level up.';
+  if (t.up >= t.cap) return `${t.name} is at its cap (${t.cap}).`;
+  if (run.credits < levelCost(t)) return 'Not enough credits.';
+  return null;
+}
+
+/** Buy a level-up for unit piece `id`. Throws on a problem. */
+export function buyLevel(run: TrainingRun, id: number): void {
+  const why = levelProblem(run, id);
+  if (why) throw new Error(why);
+  const t = unitPiece(run, id)!;
+  run.credits -= levelCost(t);
+  applyLevel(t);
+}
+
+/** Give a level-up for free (cards too): +1 up and +1 Tough; false, and nothing, at its cap. */
+export function applyLevel(t: UnitTower): boolean {
+  if (t.up >= t.cap) return false;
+  t.up++;
+  t.tough++;
+  return true;
+}
+
+/** The next luck level's cost, or null at the top. */
+export const luckCost = (run: TrainingRun): number | null => TRAINING.shards.luckCost[run.luck] ?? null;
+
+/** Why luck can't go up now, or null. */
+export function luckProblem(run: TrainingRun): string | null {
+  if (run.phase !== 'build') return 'Luck is bought between waves.';
+  const c = luckCost(run);
+  if (c === null) return 'Luck is at its best.';
+  if (run.credits < c) return 'Not enough credits.';
+  return null;
+}
+
+/** Buy the next luck level: better grade odds from the next draft. Throws on a problem. */
+export function buyLuck(run: TrainingRun): void {
+  const why = luckProblem(run);
+  if (why) throw new Error(why);
+  run.credits -= luckCost(run)!;
+  run.luck++;
+}
+
+/** What the next base mend costs (each mend this run `growth` times dearer). */
+export const mendCost = (run: TrainingRun): number => Math.round(TRAINING.mend.cost * TRAINING.mend.growth ** run.mends);
+
+/** Why the base can't be mended now (not build phase, full, short of credits), or null. */
+export function mendProblem(run: TrainingRun): string | null {
+  if (run.phase !== 'build') return 'The base is mended between waves.';
+  if (run.baseHp >= TRAINING.baseHp) return 'The base is whole.';
+  if (run.credits < mendCost(run)) return 'Not enough credits.';
+  return null;
+}
+
+/** +TRAINING.mend.hp base HP, never above TRAINING.baseHp. Throws on a problem. */
+export function buyMend(run: TrainingRun): void {
+  const why = mendProblem(run);
+  if (why) throw new Error(why);
+  run.credits -= mendCost(run);
+  run.baseHp = Math.min(TRAINING.baseHp, run.baseHp + TRAINING.mend.hp);
+  run.mends++;
+}
+
+/** Credits a kill pays, before run.mods.bounty: its cost × perCost, at least 1. */
+export const killCredits = (e: Enemy): number => Math.max(1, Math.round(TRAINING_ENEMIES[e.kind].cost * TRAINING.credits.perCost));
+
+/** Pay a kill into run.credits, with the bounty (rounded). */
+export function payKill(run: TrainingRun, e: Enemy): void {
+  run.credits += Math.round(killCredits(e) * run.mods.bounty);
+}
+
+/** Credits for clearing wave run.wave: the wave bonus, and the no-leak bonus when run.leaked is 0. */
+export function waveCredits(run: TrainingRun): number {
+  const C = TRAINING.credits;
+  return C.wave + C.perWave * run.wave + (run.leaked === 0 ? C.noLeak : 0);
+}
