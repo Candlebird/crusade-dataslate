@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useStore } from '../model/store';
 import type { Campaign } from '../model/types';
 import { chronicle, chronicleOf, type ChronicleEntry } from '../rules/chronicle';
 import { factionColor } from '../rules/nexus';
@@ -9,7 +10,8 @@ import { Glyph } from './Icon';
 /** The Campaign Chronicle: the war's history round by round, as the viewer knows it. An entry with a game or a sector jumps to it. */
 export default function ChroniclePanel({ c, viewer, onJump }: { c: Campaign; viewer?: string; onJump: (e: ChronicleEntry) => void }) {
   const [only, setOnly] = useState<string>();
-  const all = useMemo(() => chronicle(c, viewer), [c, viewer]);
+  const { state } = useStore();
+  const all = useMemo(() => chronicle(c, viewer, state.forces), [c, viewer, state.forces]);
   const rounds = chronicleOf(all, only);
   return (
     <Panel id="campaign.chronicle" title="Campaign Chronicle" extra={

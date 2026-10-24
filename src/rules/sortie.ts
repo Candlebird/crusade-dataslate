@@ -6,6 +6,7 @@ import { effects, type Ability, type Status } from './abilities';
 import { hasRule, ruleRating } from './engine';
 import { BIG_UNIT, randomSelection } from './echoForce';
 import { squadPower } from './training/economy';
+import { shownTitle } from './training/titles';
 import { unitName } from './battle';
 import {
   SORTIE, SORTIE_BOONS, SORTIE_EVENTS, SORTIE_QUIRKS, SORTIE_TRINKETS, TRAINING, type SortieGoal,
@@ -606,15 +607,8 @@ export function weeklyScore(run: SortieRun): number {
   return run.depth * w.depth + run.won * w.won + (run.bossDown ? w.boss : 0) + run.party.filter(memberUp).length * w.alive;
 }
 
-/** A unit's veteran title from its Sortie record, if it has earned one. */
-export function veteranTitle(u: Unit): string | undefined {
-  const r = u.sortieRecord;
-  if (!r) return undefined;
-  const v = SORTIE.veteran;
-  const runs = [...v.titles].reverse().find(([n]) => r.runs >= n)?.[1];
-  const lord = r.lords >= v.lords ? v.lordTitle : undefined;
-  return [runs, lord].filter(Boolean).join(', ') || undefined;
-}
+/** The title a unit shows (training/titles.ts: one list for Sorties and Training), if it has earned one. */
+export const veteranTitle = (u: Unit): string | undefined => shownTitle(u)?.name;
 
 /**
  * What a run earns toward Sortie relics (RelicDef.sortie), if the party gets home or wins: a finished thread its

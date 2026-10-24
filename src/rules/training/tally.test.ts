@@ -61,4 +61,22 @@ describe('tally', () => {
     holds(run, 0.05);
     expect(t.tally?.holds).toBe(1);
   });
+
+  it('names the unit that slays the nemesis or a real lord (records.ts), none for other harm', () => {
+    const run = blankRun();
+    const t = testUnit({ unitId: 'a' });
+    run.nemesis = { id: 'butcher', name: 'Gorrhul', grudge: 1, rematch: 0, sig: 'rage', sigName: 'Mounting Rage' };
+    run.nexus = { threat: 1, affixes: [], lords: [{ key: 'g', name: 'Vex', tier: 'Rare', trick: 'ward', from: 'guardian' }, { key: 'h', name: 'Ool', tier: 'Rare', trick: 'ward', from: 'guardian' }] } as unknown as typeof run.nexus;
+    const nem = testEnemy({ kind: 'lord', hp: 1, maxHp: 1, nem: {} as never });
+    const lord = testEnemy({ kind: 'lord', hp: 1, maxHp: 1, lord: { i: 0, next: 0, ward: 0, burst: 0 } });
+    const other = testEnemy({ kind: 'lord', hp: 1, maxHp: 1, lord: { i: 1, next: 0, ward: 0, burst: 0 } });
+    run.enemies.push(nem, lord, other);
+    hurt(run, t, nem, 5, 'shot');
+    hurt(run, t, lord, 5, 'melee');
+    hurt(run, undefined, other, 5, 'other');
+    expect(run.nemesis).toMatchObject({ slain: true, by: 'a' });
+    expect(run.nexus!.lords[0]).toMatchObject({ slain: true, by: 'a' });
+    expect(run.nexus!.lords[1].slain).toBe(true);
+    expect(run.nexus!.lords[1].by).toBeUndefined();
+  });
 });

@@ -5,7 +5,8 @@ import { EXPEDITION, EXPEDITION_SITES, OFF_TABLE_XP, SOLO_PATROL, SORTIE, SORTIE
 import { applyScar, levelForXp } from './engine';
 import { awardFeats, type FeatId } from './feats';
 import { currentRound } from './nexus';
-import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicsOf, runXp, threadDone, tierOf, trinketInfo, unlockedBoons, markHeat, veteranTitle, weekKey, weeklyScore, type SortieRun } from './sortie';
+import { earnTitles, heldTitles, sortieTitles, titleInfo } from './training/titles';
+import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicsOf, runXp, threadDone, tierOf, trinketInfo, unlockedBoons, markHeat, weekKey, weeklyScore, type SortieRun } from './sortie';
 
 type Rand = () => number;
 
@@ -310,16 +311,24 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
     const id = rand() < SORTIE.quirks.region ? `${up ? 'native' : 'haunted'}:${run.region}` : (up ? goods : bads)[Math.floor(rand() * (up ? goods : bads).length)];
     if (addQuirk(u, id)) bits.push(`${u.name || u.unitType} is now ${quirkInfo(id)!.name}`);
   }
-  // Every unit's Sortie record: runs it came back from standing, and lords slain; a new title is worth a line.
+  // Every unit's Sortie record: runs it came back from standing, and lords slain; then the titles its record and this
+  // run earn (training/titles.ts, one list with Training), each new one worth a line.
+  const standing = run.party.filter(memberUp).length;
+  const slainHeat = run.bossDown ? markHeat(run) : 0;
   for (const m of run.party) {
     const u = units.find((x) => x.id === m.unit.id);
     if (!u) continue;
-    const before = veteranTitle(u);
+    const before = heldTitles(u);
     const rec = (u.sortieRecord ??= { runs: 0, lords: 0 });
-    if (memberUp(m) && run.over !== 'fell') rec.runs++;
+    const up = memberUp(m) && run.over !== 'fell';
+    if (up) rec.runs++;
     if (run.bossDown) rec.lords++;
-    const after = veteranTitle(u);
-    if (after && after !== before) bits.push(`${u.name || u.unitType} is now known as ${after}`);
+    const won = run.over === 'won';
+    const deeds = sortieTitles({
+      up, won, deep: !!run.deep, top: tierOf(run) === SORTIE.tiers.length - 1, ascension: run.ascension ?? 0, heat: slainHeat,
+      nemesis: !!run.bossDown && grudgeBefore > 0, alone: won && up && standing === 1 && run.party.length > 1,
+    });
+    for (const id of earnTitles(u, deeds, before)) bits.push(`${u.name || u.unitType} is now known as ${titleInfo(id)!.name}`);
   }
   // The bestiary: every Echo met adds to the force's count, and the first one slain unlocks its lore.
   const beasts = (story.bestiary ??= {});

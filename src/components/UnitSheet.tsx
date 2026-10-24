@@ -39,7 +39,9 @@ import {
 } from '../rules/engine';
 import { nexusAccess } from '../rules/nexus';
 import { unitName } from '../rules/battle';
-import { quirkInfo, trinketInfo, veteranTitle } from '../rules/sortie';
+import { quirkInfo, trinketInfo } from '../rules/sortie';
+import { pickTitle } from '../rules/training/titles';
+import { UnitRecord } from './training/UnitRecord';
 import { unitBookUrl } from '../armyforge/book';
 import { go, href } from '../route';
 import { EmblemButton } from './Emblem';
@@ -481,14 +483,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                 </div>
               ))}
             </Panel>
-            {u.sortieRecord && (u.sortieRecord.runs || u.sortieRecord.lords) ? (
-              <Panel id="unit.sortieRecord" title="Sortie record" h={3}>
-                {veteranTitle(u) && <div><b className="sortie-title">{veteranTitle(u)}</b></div>}
-                <div className="muted small">
-                  {u.sortieRecord.runs} run{u.sortieRecord.runs === 1 ? '' : 's'} come back from standing · {u.sortieRecord.lords} Echo lord{u.sortieRecord.lords === 1 ? '' : 's'} slain
-                </div>
-              </Panel>
-            ) : null}
+            <UnitRecord f={f} u={u} onPick={theirs ? undefined : (id) => set((d) => pickTitle(d, id))} />
             {u.quirks?.length ? (
               <Panel id="unit.quirks" title="Sortie quirks" h={3}>
                 <p className="muted small" style={{ marginTop: 0 }}>Picked up on Sorties. They apply on Sorties and in Training; morale quirks only on Sorties.</p>

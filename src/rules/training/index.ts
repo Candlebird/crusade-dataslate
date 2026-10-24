@@ -24,3 +24,6 @@ export * from './nexus';
 export * from './lordPick';
 export * from './lords';
 export * from './affixes';
+export * from './titles';
+export * from './records';
+export * from './tales';

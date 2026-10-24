@@ -820,6 +820,11 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-summary th:first-child, .training-summary td:first-child { text-align: left; }
 .training-summary th { color: var(--muted-2); font-weight: 600; }
 .training-summary tr.mvp td { color: var(--gold); }
+.training-honours { margin-top: 6px; }
+.training-tale { margin: 6px 0 0; font-style: italic; color: var(--muted-2); white-space: normal; }
+.unit-record .title-list { margin: 4px 0 0; padding-left: 18px; }
+.unit-record .title-list li.held { color: var(--gold); }
+.unit-record .title-list li:not(.held) { color: var(--muted-2); }
 /* The wave line keeps its height in every phase, so the panels under it stay put. */
 .training-status { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 64px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: rgba(255, 255, 255, 0.02); }
 .training-status-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }

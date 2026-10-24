@@ -863,7 +863,12 @@ describe('sortie hidden nodes and veterans', () => {
     u.sortieRecord = { runs: 3, lords: 0 };
     expect(veteranTitle(u)).toBe('Road-worn');
     u.sortieRecord = { runs: 10, lords: 3 };
-    expect(veteranTitle(u)).toBe('Hollow-sworn, Lordbane');
+    // One list with Training (training/titles.ts): every title is held, the latest shows unless one is picked.
+    expect(veteranTitle(u)).toBe('Lordbane');
+    u.title = 'roadWorn';
+    expect(veteranTitle(u)).toBe('Road-worn');
+    u.title = '-';
+    expect(veteranTitle(u)).toBeUndefined();
     let n = 0;
     const id = () => `id${n++}`;
     const f = newForce();
@@ -871,7 +876,9 @@ describe('sortie hidden nodes and veterans', () => {
     f.units.push(...party);
     for (let i = 0; i < 3; i++) applySortie(f, Object.assign(createRun(party, i + 1), { over: 'won' as const, bossDown: true }), '2026-01-01', id, () => 0.99);
     expect(f.units.every((x) => x.sortieRecord?.runs === 3 && x.sortieRecord.lords === 3)).toBe(true);
-    expect(f.sortie!.recaps![0].gained).toContain('is now known as Road-worn, Lordbane');
+    expect(f.sortie!.recaps![0].gained).toContain('is now known as Road-worn');
+    expect(f.sortie!.recaps![0].gained).toContain('is now known as Lordbane');
+    expect(f.units.every((x) => x.titles?.includes('roadWorn') && x.titles.includes('lordbane'))).toBe(true);
     const fell = createRun(party, 7);
     for (const m of fell.party) m.models.forEach((x) => (x.hp = 0));
     applySortie(f, Object.assign(fell, { over: 'fell' as const }), '2026-01-02', id, () => 0.99);

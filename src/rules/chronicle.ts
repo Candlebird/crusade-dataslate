@@ -1,4 +1,4 @@
-import type { Campaign, CampaignEvent, TurnReportLine } from '../model/types';
+import type { Campaign, CampaignEvent, Force, TurnReportLine } from '../model/types';
 import { rememberedBy, visibleTo } from './fog';
 import { journalStatus } from './journal';
 import { ECHOES, eventById, factionName } from './nexus';
@@ -6,9 +6,10 @@ import { reportFor } from './report';
 
 // The Campaign Chronicle (Nexus Wars): the war's story, round by round. It weaves the games in the log, the turn
 // reports, the Galactic Events, the Warlords named and the Crossroads Journals into one history, told through a
-// faction's eyes (fog of war, as the log and reports already are) or in full for the GM.
+// faction's eyes (fog of war, as the log and reports already are) or in full for the GM. Training tales
+// (training/records.ts) told in a campaign round join it for the forces linked to its factions.
 
-export type ChronicleKind = 'game' | 'raid' | 'event' | 'journal' | 'warlord' | 'map' | 'news';
+export type ChronicleKind = 'game' | 'raid' | 'event' | 'journal' | 'warlord' | 'map' | 'news' | 'training';
 
 export interface ChronicleEntry {
   round: number;
@@ -55,8 +56,9 @@ export function gameLine(c: Campaign, e: CampaignEvent): Pick<ChronicleEntry, 'i
 const KIND_BY_ICON: Record<string, ChronicleKind> = { '🏴': 'raid', '☄': 'event', '✧': 'map', '✦': 'map', '♛': 'map', '☠': 'map' };
 const BATTLE_ICONS = new Set(['⚔', '🛡', '⚖']);
 
-/** The history the viewer may read (all of it with no viewer, none for '-'), newest round first. */
-export function chronicle(c: Campaign, viewer?: string): ChronicleRound[] {
+/** The history the viewer may read (all of it with no viewer, none for '-'), newest round first. `forces`: for their
+ *  Training tales (a faction's own only, under fog, as with journals). */
+export function chronicle(c: Campaign, viewer?: string, forces: Force[] = []): ChronicleRound[] {
   if (viewer === '-') return [];
   const rounds = new Map<number, ChronicleRound>();
   const add = (round: number, e: Omit<ChronicleEntry, 'round'>) => {
@@ -116,6 +118,14 @@ export function chronicle(c: Campaign, viewer?: string): ChronicleRound[] {
       icon: '⚔', kind: 'game', factions: sides,
       text: `Duel: ${factionName(c, sides[0])} vs ${factionName(c, sides[1])} — ${d.winner ? `${factionName(c, d.winner)} won the wager` : 'a draw'}.`,
     });
+  }
+
+  for (const f of forces) {
+    const fid = f.nexus?.factionId;
+    if (!isFaction(c, fid) || (viewer && fid !== viewer)) continue;
+    for (const t of f.tales ?? []) {
+      if (t.round !== undefined) add(t.round, { icon: '🎖', kind: 'training', factions: [fid], text: `${f.name} in Training: ${t.text}` });
+    }
   }
 
   return [...rounds.values()].filter((r) => r.entries.length).sort((a, b) => b.round - a.round);

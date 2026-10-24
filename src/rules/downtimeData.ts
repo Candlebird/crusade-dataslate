@@ -810,6 +810,43 @@ export const TRAINING = {
       plain: ['teleport', 'shield', 'summon', 'burst'],
     },
   },
+  /**
+   * Unit titles (F4, training/titles.ts), ONE list shared by Training and Sorties: a unit keeps every title it earns and
+   * shows the one its player picks (the latest, until then). Each title's `n` is its threshold (see titles.ts for what
+   * it counts). Sortie: `roadWorn` / `ashWalker` / `hollowSworn` runs come home standing; `curseborn` a win at this
+   * Ascension or higher; `pyreWalker` a lord slain under this pact heat. Training: `echoReaper` kills and `unmoved`
+   * holds in one run; `wallWarden` waves cleared in a run; `gatekeeper` the first waves cleared with nothing getting through;
+   * `unbowed` the MVP of a run of `n` waves with `scars` or more scars; `drillmaster` MVPs, `legionBane` kills and
+   * `mazeHardened` runs over its Training record. Both: `lordbane` Echo lords slain on Sorties and in Training
+   * together; `twiceTested` Sorties come home from and Training runs, each.
+   */
+  titles: {
+    roadWorn: { name: 'Road-worn', n: 3 },
+    ashWalker: { name: 'Ash-walker', n: 6 },
+    hollowSworn: { name: 'Hollow-sworn', n: 10 },
+    lordbane: { name: 'Lordbane', n: 3 },
+    grudgebreaker: { name: 'Grudgebreaker', n: 1 },
+    deepstrider: { name: 'Deepstrider', n: 1 },
+    lastStanding: { name: 'Last One Standing', n: 1 },
+    peakwalker: { name: 'Peakwalker', n: 1 },
+    curseborn: { name: 'Curse-born', n: 4 },
+    pyreWalker: { name: 'Pyre-walker', n: 6 },
+    echoReaper: { name: 'Echo-reaper', n: 300 },
+    unmoved: { name: 'the Unmoved', n: 150 },
+    lordslayer: { name: 'Lordslayer', n: 1 },
+    wallWarden: { name: 'Wall-warden', n: 30 },
+    gatekeeper: { name: 'Gatekeeper', n: 15 },
+    unbowed: { name: 'Unbowed', n: 20, scars: 2 },
+    drillmaster: { name: 'Drillmaster', n: 5 },
+    legionBane: { name: 'Legion-bane', n: 2500 },
+    mazeHardened: { name: 'Maze-hardened', n: 15 },
+    twiceTested: { name: 'Twice-tested', n: 5 },
+  },
+  /**
+   * Training records and tales (F4, training/records.ts, tales.ts): a run tells at most `tales` stories (a new best,
+   * a real lord slain, the nemesis slain, a title earned; one each), and the force keeps its last `keep`.
+   */
+  records: { tales: 3, keep: 30 },
   /** A force's power (squadPower, which Sorties scale by too): its points, with each veteran level adding this share. */
   levelPower: 0.05,
   /** Legacy: only the old rules text and force page read these, until their rework. Nothing in the run uses them. */
@@ -1065,8 +1102,6 @@ export const SORTIE = {
   /** Hidden nodes: this share of the middle rows shows as '?' until the party can see it. It sees `sight` steps
    * ahead, one more with a scout (Scout, Strider or Ambush) in the party. */
   hidden: { share: 0.35, sight: 1 },
-  /** Veteran titles, by runs a unit came back from standing; slaying `lords` Echo lords adds the lord title. */
-  veteran: { titles: [[3, 'Road-worn'], [6, 'Ash-walker'], [10, 'Hollow-sworn']] as [number, string][], lords: 3, lordTitle: 'Lordbane' },
   /** Ambushes: stepping onto a fight that started hidden, the Echoes may strike first (`init` more initiative in the
    * first round), `odds` of the time. A scout in the party, or the lantern, stops it. */
   ambush: { odds: 0.25, init: 10 },

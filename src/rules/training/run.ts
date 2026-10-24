@@ -22,7 +22,7 @@ import type { RunNexus, ShardPiece, TrainingRun, UnitTower } from './types';
 export function createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus): TrainingRun {
   const force = units.filter(canTrain);
   const run: TrainingRun = {
-    v: 4, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
+    v: 5, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
     power: force.reduce((n, u) => n + u.points, 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
     mends: 0, leaked: 0, nextId: 1, pieces: [], draft: { step: 'done', hand: [], placed: [] }, recipes: recipesFor(force),
     crafted: [], enemies: [], queue: [], cover: [], cards: [], mods: { bounty: 1, holdMul: 1, regrabAdd: 0 }, banked: {},
@@ -98,6 +98,7 @@ export function step(run: TrainingRun, dt: number): void {
 /** The wave is beaten: credits, XP, and back to building with a fresh draft. */
 function waveCleared(run: TrainingRun): void {
   run.cleared += 1;
+  if (!run.leaked && (run.clean ?? 0) === run.cleared - 1) run.clean = run.cleared;
   const pay = waveCredits(run);
   run.credits += pay;
   run.phase = 'build';

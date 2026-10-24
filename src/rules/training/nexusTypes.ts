@@ -17,6 +17,8 @@ export interface RunLord {
   trick: LordTrick;
   from: 'crisis' | 'guardian';
   slain?: boolean;
+  /** The crafted unit (id) that landed the killing blow, if one did (tally.ts; records.ts). */
+  by?: string;
 }
 
 /** The campaign as a run meets it: threat, its affixes, this round's Galactic Event (GALACTIC_EVENTS id) and the

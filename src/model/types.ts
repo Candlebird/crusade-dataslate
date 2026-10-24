@@ -77,8 +77,14 @@ export interface Unit {
   quirks?: string[];
   /** The Sortie trinket it carries (SORTIE_TRINKETS, downtimeData.ts); it counts on a Sortie and in Training. */
   trinket?: string;
-  /** Its Sortie record: runs it came back from standing, and Echo lords slain (rules/sortie.ts veteranTitle). */
+  /** Its Sortie record: runs it came back from standing, and Echo lords slain (rules/training/titles.ts). */
   sortieRecord?: { runs: number; lords: number };
+  /** Its Training record (rules/training/records.ts): best wave, kills, real lords and nemeses it slew, runs, MVPs. */
+  trainingRecord?: TrainingRecord;
+  /** Titles it has earned, oldest first (TRAINING.titles ids, rules/training/titles.ts), shared by Sorties and Training. */
+  titles?: string[];
+  /** The title it shows: one it holds, '-' for none; unset = the latest earned. */
+  title?: string;
   /** Off-table XP banked from free Sorties and Training, and the round (or week) it was banked in (OFF_TABLE_XP). */
   offTableXp?: { key: string; n: number };
   relics: Relic[];
@@ -249,6 +255,30 @@ export interface SortieBeast {
   drill?: number;
 }
 
+/** A unit's Training record, over every run it was crafted in. */
+export interface TrainingRecord {
+  /** Most waves cleared in a run it stood in. */
+  best: number;
+  kills: number;
+  /** Real Echo Lords and the force's nemesis it landed the killing blow on. */
+  lords: number;
+  runs: number;
+  /** Runs it led the defence in. */
+  mvps: number;
+}
+
+/** A story from Training (rules/training/tales.ts): only highlights. Told in the campaign chronicle when `round` is set. */
+export interface ForceTale {
+  id: string;
+  date: string;
+  /** The campaign round it happened in (a force in a campaign). */
+  round?: number;
+  kind: 'best' | 'lord' | 'nemesis' | 'title';
+  text: string;
+  /** The units it tells of. */
+  units: string[];
+}
+
 /** A run looked back on: where it went, how it ended and what it brought home. */
 export interface SortieRecap {
   id: string;
@@ -309,6 +339,8 @@ export interface Force {
   lists?: ArmyList[];
   /** Most waves cleared in one training run (rules/training.ts). */
   trainingBest?: number;
+  /** Training highlights, newest first (rules/training/tales.ts; TRAINING.records.keep). */
+  tales?: ForceTale[];
   /** Feats earned, by id, with the date (rules/feats.ts): each pays once. */
   feats?: Record<string, string>;
   /** Furthest any unit got on one Sortie: nodes cleared (rules/sortie.ts). */

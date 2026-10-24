@@ -113,6 +113,23 @@ describe('training run', () => {
     expect(mvp(run)?.unitId).toBe(r.unitId);
   });
 
+  it('counts the waves cleared from the first with nothing through, and stops at the first leak (Gatekeeper)', () => {
+    const run = createRun('f1', FORCE, 2);
+    const clear = (leaked: number) => {
+      run.phase = 'wave';
+      run.wave += 1;
+      run.leaked = leaked;
+      step(run, 0.05);
+    };
+    clear(0);
+    clear(0);
+    expect(run.clean).toBe(2);
+    clear(1);
+    clear(0);
+    expect(run.cleared).toBe(4);
+    expect(run.clean).toBe(2);
+  });
+
   it('ends when the base falls, and a quit ends it once', () => {
     const run = createRun('f1', FORCE, 4);
     run.phase = 'wave';

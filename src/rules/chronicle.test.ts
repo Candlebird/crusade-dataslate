@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Campaign, CampaignEvent } from '../model/types';
+import type { Campaign, CampaignEvent, Force } from '../model/types';
 import { chronicle, chronicleOf, gameLine, logFor } from './chronicle';
 
 // The Campaign Chronicle (Nexus Wars): the war's history, round by round, through a faction's eyes.
@@ -95,5 +95,19 @@ describe('chronicle', () => {
     expect(chronicleOf(chronicle(c), 'A')[0].entries.map((e) => e.eventId)).toEqual(['g1']);
     expect(chronicleOf(chronicle(c), 'C')).toEqual([]);
     expect(chronicleOf(chronicle(c))[0].entries).toHaveLength(2);
+  });
+
+  it('tells the Training tales of linked forces in their round, a faction’s own only under fog', () => {
+    const c = campaign();
+    const tale = (round?: number) => ({ id: `t${round}`, date: '2026-10-24', round, kind: 'lord' as const, text: 'Vex fell.', units: ['u'] });
+    const forces = [
+      { id: 'f', name: 'Iron Hand', nexus: { factionId: 'A' }, tales: [tale(2), tale()] },
+      { id: 'g', name: 'Loose', tales: [tale(2)] },
+    ] as unknown as Force[];
+    const all = chronicle(c, undefined, forces);
+    expect(all[0].entries).toEqual([{ round: 2, icon: '🎖', kind: 'training', factions: ['A'], text: 'Iron Hand in Training: Vex fell.' }]);
+    expect(chronicle(c, 'A', forces)[0].entries).toHaveLength(1);
+    expect(chronicle(c, 'B', forces)).toEqual([]);
+    expect(chronicle(c)).toEqual([]);
   });
 });

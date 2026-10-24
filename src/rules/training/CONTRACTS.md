@@ -22,6 +22,7 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | credits, luck, mends | economy.ts |
 | baseHp | waves.ts (leaks), economy.ts (mends), cards.ts (base cards) |
 | leaked, queue, enemies (add, move, leg, jumped, face) | waves.ts |
+| clean (waves cleared in a row from the first with nothing through; set at each wave cleared) | run.ts |
 | enemies (hp, status, dots, heldBy, regrab; removal of the dead) | combat.ts |
 | cover | run.ts at create (via waves.layCover), cards.ts (cover card) |
 | offer, cards, mods | cards.ts |
@@ -35,10 +36,13 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | run.trinket, CardDraw.trinket | trinkets.ts |
 | run.shared | shared.bankShared (the force's Sortie layer banked once) |
 | run.nexus (threat, affixes, event, lords; set at create, a JSON copy) | run.ts via nexus.nexusOf(campaign) (the UI passes it; bots pass none) |
-| run.nexus.lords[].slain | tally.ts (a real lord's kill) |
+| run.nexus.lords[].slain, .by; run.nemesis.by (the crafted unit that landed the killing blow) | tally.ts (a real lord's or the nemesis's kill) |
+| run.honours (records, titles, tales, best: banked once) | records.bankHonours (from useBank.finish, before trainingBest moves) |
 | Enemy.lord (i, next, ward, burst, armed), boss SpawnPlan.lord / hp | lords.ts (lordPlan, lordTick, lordDmg); waves.spawnOne seeds it |
 | Enemy.hard, SpawnPlan.hard / vet / hp (affixes) | affixes.affixPlan; waves.spawnOne copies hard |
 | Enemy.surge | affixes.ts (onEchoDeath sets it, affixTick wears it) |
+| Unit.trainingRecord, Force.tales | records.bankHonours |
+| Unit.titles (stored ids, oldest first), Unit.title (the one shown; '-' none; unset the latest) | titles.earnTitles (records.bankHonours, downtime.applySortie); titles.pickTitle (UnitSheet via UnitRecord) |
 | Force.sortie.bestiary (incl. SortieBeast.drill), Unit.quirks / trinket, sortie.trinkets, sortie.bled | shared.ts (bankShared, bestiary.bankBeasts) on finish; sortie.ts / downtime.applySortie as before; applySortie clears bled[lord] once a Sortie meets it |
 
 ## run.step(dt) call order
@@ -62,7 +66,7 @@ quirks.watchBosses(run)        // units a live boss walks past in reach
 combat.reap(run)               // drop the dead (and leaked ones waves already removed)
 if (run.baseHp <= 0) endRun(run, 'The base falls.')   // endRun → quirks.rollGains once
 else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, private):
-    run.cleared++, run.credits += economy.waveCredits(run), XP to crafted units, phase 'build',
+    run.cleared++, run.clean = run.cleared while nothing has leaked, run.credits += economy.waveCredits(run), XP to crafted units, phase 'build',
     shards.drawDraft(run), log line. (The UI saves the run whenever it sees a new build phase.)
 ```
 
@@ -169,7 +173,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `applyTrinket(t, id)` — a trinket taken mid-run straight onto the tower.
 
 ### tally.ts
-- `tallyHarm(run, by, e, dealt, how, killed)` — UnitTower.tally shot/melee, watch[boss].hit, beasts slain, nemesis slain. `tallyHold(t)`.
+- `tallyHarm(run, by, e, dealt, how, killed)` — UnitTower.tally shot/melee, watch[boss].hit, beasts slain, nemesis / real lord slain (with `by` = the killing unit). `tallyHold(t)`.
 - `noteMet(run, e)` — beasts[kind].met once a wave. `beastOf(e)` ('nemesis' for one with nem), `watchOf(run, e)`.
 
 ### nemesis.ts (the Sortie nemesis as wave TRAINING.shared.nemesis.wave's boss)
@@ -188,7 +192,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 
 ### Nexus (F3): nexusTypes.ts, nexus.ts, lordPick.ts, lords.ts, affixes.ts
 Numbers in `TRAINING.nexus`. Outside a campaign run.nexus is undefined: threat 0, no affixes or event, every boss the generic lord.
-- nexusTypes.ts: `NexusAffixId`, `LordTrick`, `RunLord {key, name, tier, trick, from, slain?}`, `RunNexus {threat, affixes, event?, lords}`, `LordState`; re-exported from types.ts.
+- nexusTypes.ts: `NexusAffixId`, `LordTrick`, `RunLord {key, name, tier, trick, from, slain?, by?}`, `RunNexus {threat, affixes, event?, lords}`, `LordState`; re-exported from types.ts.
 - nexus.ts: `nexusOf(c?): RunNexus | undefined` — threat (+ Rising Dark), affixes (one a `affixes.per` levels, at most `affixes.max`, dice seeded by campaign id and round), this round's event only, lords via lordPick.campaignLords.
   `threatOf`, `hasAffix`, `eventIs`, `eventMapped(id)`, `creditMul(run)` (1 + credit × threat), `budgetMul(run)` (Fierce, Echo Surge, Void Lull),
   `nexusStart(run)` → {credits, baseHp, cover, draw, xp} (Convoys, Bleed, Derelicts, Shard Rush, Glory), `affixInfo(id, threat)`, `shroudFrom(threat)`,
@@ -203,6 +207,21 @@ Numbers in `TRAINING.nexus`. Outside a campaign run.nexus is undefined: threat 0
 - Elsewhere: harm.unsaved − Enemy.hard; economy payKill / waveCredits × creditMul; shards.`drawSize(run)`; run.`runXpCap(run)` (xpCap + Glory);
   tally beastOf → `real:<i>`, marks slain; bestiary.beastKey `real:<i>` → the lord's key (banked slain, not drill); sortie.beastInfo knows `nexus:` keys
   (Sortie goals and rematches ignore them); feats.trainingFeats(cleared, lords) → 'trainLord' (Lordfall).
+
+### Names, records and titles (F4): titles.ts, records.ts, tales.ts, taleText.ts
+Numbers in `TRAINING.titles` (each `{name, n}`, Unbowed also `scars`) and `TRAINING.records` (`tales` a run, `keep` on the force). `SORTIE.veteran` is gone.
+- titles.ts (pure: no engine imports; sortie.ts and downtime.ts use it): `TitleId`, `TitleDef {id, name, where, text}`, `TITLES` (20, one list with Sorties), `titleInfo(id)`.
+  `TrainDeed {cleared, kills, holds, lords, nemesis, mvp, scars, clean}`, `SortieDeed {up, won, deep, top, ascension, heat, nemesis, alone}`.
+  `recordTitles(u)` (from sortieRecord / trainingRecord, so old saves hold theirs unstored), `trainingTitles(d)`, `sortieTitles(d)`,
+  `heldTitles(u)` (stored, then record ones), `titlesOf(u)`, `earnTitles(u, ids, before): TitleId[]` (stores, returns the new ones in list order),
+  `shownTitle(u)`, `pickTitleProblem(u, id)`, `pickTitle(u, id)`. sortie.`veteranTitle(u)` = shownTitle's name.
+- records.ts: `blankRecord()`, `deedOf(run, t, u?)` (lords: real ones it landed the killing blow on; mvp: run.mvp with kills > 0; scars less veterans.notScars),
+  `recordAfter(rec, d)` (lords + 1 for the nemesis), `runHonours(run, force, best?)` (pure: records, titles, `best`, tales; RunSummary shows it before banking),
+  `bankHonours(f, run, date, newId, round?): string[]` (once via run.honours; tales prepended, `records.keep` kept, `round` = campaign round), `recordLine(r)`, `talesFor(f, unitId)`.
+- tales.ts: `Highlight {kind, units, vars}`, `taleText(h, seed, i)` (seeded pick from taleText.TALE_TEXT), `talesOf(hs, seed)` — priority nemesis, best, lord, title; at most `records.tales`.
+- Sortie side: downtime.applySortie builds a SortieDeed per party member (heat = sortie.markHeat when the lord fell; nemesis = a lord slain with grudgeBefore > 0; alone = the only one standing at a win) and earns titles with a line each.
+- Chronicle: chronicle.`chronicle(c, viewer?, forces = [])` adds kind 'training' (🎖) entries for tales with a round, from forces linked to the campaign's factions (a viewer sees only its own).
+- UI: training/RunHonours.tsx (record table, titles, tales in RunSummary once over), training/UnitRecord.tsx (title picker, records, the title list, tales on UnitSheet).
 
 ### trinkets.ts
 - `TRINKET_CARD`, `isTrinketCard(d)`, `trinketDice(run)` (its own dice from seed and wave: never moves run.rng).
@@ -240,7 +259,7 @@ Numbers in `TRAINING.nexus`. Outside a campaign run.nexus is undefined: threat 0
 - `saveKey(forceId): string` (done) — `trainingRun:<forceId>`.
 - `serialize(run): string`, `deserialize(s: string): TrainingRun | null` — JSON; null on bad/old version. fx may be dropped.
 - `saveRun(run): void`, `loadRun(forceId): SavedRun | null` (null for a run already 'over'), `clearSave(forceId): void` — localStorage wrapped in try/catch.
-- `SAVE_VERSION` (4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
+- `SAVE_VERSION` (5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
 
 ### run.ts
 - `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus): TrainingRun` — run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
@@ -271,4 +290,4 @@ Numbers in `TRAINING.nexus`. Outside a campaign run.nexus is undefined: threat 0
 - `guardian(name, tier, rules?)`, `campaign(threat, guardians?, o?)` — a round-2 campaign for the Nexus tests.
 
 ### index.ts
-Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared, nexus, lordPick, lords, affixes (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).
+Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared, nexus, lordPick, lords, affixes, titles, records, tales (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).

@@ -199,7 +199,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
             {over && (
               <div className="training-over">
                 <div className="training-over-card">
-                  <RunSummary run={run} best={best.current} />
+                  <RunSummary run={run} best={best.current} force={force} />
                   <div className="training-over-actions">
                     <button onClick={again}>Train again</button>
                     <button className="primary" onClick={onClose}>Done</button>

@@ -4,6 +4,7 @@ import type { AuraStat, Effect, Status } from '../abilities';
 import type { ShardType, TrainingEnemyKind } from '../downtimeData';
 import type { Tile } from './map';
 import type { LordState, RunNexus } from './nexusTypes';
+import type { ForceTale, TrainingRecord } from '../../model/types';
 
 export type { LordState, LordTrick, NexusAffixId, RunLord, RunNexus } from './nexusTypes';
 
@@ -268,6 +269,8 @@ export interface RunNemesis {
   sig: string;
   sigName: string;
   slain?: boolean;
+  /** The crafted unit (id) that landed the killing blow, if one did (tally.ts; records.ts). */
+  by?: string;
 }
 
 /** Echoes met (waves met in; `at` the last wave counted) and slain this run, by Training kind or 'nemesis'. */
@@ -321,9 +324,25 @@ export interface RunMods {
   regrabAdd: number;
 }
 
+/** A title a crafted unit earned this run (records.ts). */
+export interface TitleGain {
+  unitId: string;
+  name: string;
+  title: string;
+}
+
+/** What a run hands the force's records (records.ts runHonours): each crafted unit's Training record after it, the
+ *  titles earned, the tales told (at most TRAINING.records.tales), and whether it was the force's new best. */
+export interface RunHonours {
+  records: Record<string, TrainingRecord>;
+  titles: TitleGain[];
+  tales: Omit<ForceTale, 'id' | 'date' | 'round'>[];
+  best: boolean;
+}
+
 export interface TrainingRun {
   /** Save format version (save.ts SAVE_VERSION). */
-  v: 4;
+  v: 5;
   forceId: string;
   seed: number;
   /** mulberry32 state: the same seed and the same moves play out the same. */
@@ -374,11 +393,15 @@ export interface TrainingRun {
   shared?: boolean;
   /** The Nexus (F3, nexus.ts): the campaign's threat, affixes, event and real lords; none outside a campaign. */
   nexus?: RunNexus;
+  /** Waves cleared in a row from the first with nothing getting through (run.ts), for the Gatekeeper title. */
+  clean?: number;
+  /** Records, titles and tales the run handed the force (F4, records.ts bankHonours), once. */
+  honours?: RunHonours;
 }
 
 /** What a saved run looks like on disk (save.ts). */
 export interface SavedRun {
-  v: 4;
+  v: 5;
   savedAt: string;
   run: TrainingRun;
 }

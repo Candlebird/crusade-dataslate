@@ -1,15 +1,20 @@
 import { mvp, runXp, sharedPreview, towers, unitTowers, type TrainingRun } from '../../rules/training';
+import type { Force } from '../../model/types';
 import { Icon } from '../Icon';
+import { RunHonoursView } from './RunHonours';
 
 export interface RunSummaryProps {
   run: TrainingRun;
   /** The force's best before this run (force.trainingBest), to call a new best. */
   best?: number;
+  /** The force, for each unit's Training record, titles and tales once the run is over (RunHonours). */
+  force?: Force;
 }
 
 /** How the run went: waves cleared, and each crafted unit's kills, damage, levels and XP (the standout starred), with
- *  the kept Shards as one row; then what it hands the Sortie side (quirks, trinket, nemesis, bestiary). */
-export function RunSummary({ run, best }: RunSummaryProps) {
+ *  the kept Shards as one row; then records, titles and tales, and what it hands the Sortie side (quirks, trinket,
+ *  nemesis, bestiary). */
+export function RunSummary({ run, best, force }: RunSummaryProps) {
   const lead = mvp(run);
   const xp = runXp(run);
   const units = [...unitTowers(run)].sort((a, b) => b.kills - a.kills || b.dealt - a.dealt);
@@ -52,6 +57,7 @@ export function RunSummary({ run, best }: RunSummaryProps) {
           </tbody>
         </table>
       )}
+      {force && run.phase === 'over' && <RunHonoursView run={run} force={force} best={best} />}
       {shared.length > 0 && (
         <ul className="training-shared">
           {shared.map((l, i) => (

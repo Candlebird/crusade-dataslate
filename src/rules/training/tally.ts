@@ -16,7 +16,8 @@ const beast = (run: TrainingRun, k: string): RunBeast => ((run.beasts ??= {})[k]
 export const watchOf = (run: TrainingRun, e: Enemy) => ((run.watch ??= {})[String(e.id)] ??= { passed: [], hit: [] });
 
 /** Damage `dealt` to `e` by `by`: a unit's shots and blows count to its tally, any hit on a boss to the boss's watch, a
- *  kill to the bestiary (and a nemesis slain is marked on run.nemesis, a real lord on run.nexus.lords). */
+ *  kill to the bestiary (and a nemesis slain is marked on run.nemesis, a real lord on run.nexus.lords, each with the
+ *  crafted unit that landed the blow as `by`). */
 export function tallyHarm(run: TrainingRun, by: Tower | undefined, e: Enemy, dealt: number, how: Harm, killed: boolean): void {
   if (by?.kind === 'unit') {
     if (how !== 'other') tallyOf(by)[how] += dealt;
@@ -27,13 +28,16 @@ export function tallyHarm(run: TrainingRun, by: Tower | undefined, e: Enemy, dea
   }
   if (!killed) return;
   beast(run, beastOf(e)).slain += 1;
+  const killer = by?.kind === 'unit' ? by.unitId : undefined;
   if (e.nem && run.nemesis && !run.nemesis.slain) {
     run.nemesis.slain = true;
+    if (killer) run.nemesis.by = killer;
     run.log.push(`${run.nemesis.name} falls: it will meet your next Sortie hurt, and a trick short.`);
   }
   const lord = e.lord && run.nexus?.lords[e.lord.i];
   if (lord && !lord.slain) {
     lord.slain = true;
+    if (killer) lord.by = killer;
     run.log.push(`${lord.name} falls: slain in the bestiary.`);
   }
 }
