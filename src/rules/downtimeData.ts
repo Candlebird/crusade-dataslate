@@ -594,9 +594,20 @@ export const TRAINING = {
   executeAt: 0.25,
   /** A field's slow or daze lingers this many seconds after an enemy leaves it. */
   fieldLinger: 0.5,
-  /** Sortie quirks and trinkets count here too: each point of initiative attacks this much faster; Jumpy attacks at
-   *  `jumpyMul` for the first `jumpySecs` of a wave; Short-sighted is -1 to hit past `myopicFrom` of a gun's reach. */
-  habits: { rate: 0.1, jumpySecs: 5, jumpyMul: 0.6, myopicFrom: 2 / 3 },
+  /**
+   * Sortie quirks and trinkets count here too (habits.ts): each point of initiative attacks `rate` faster; Jumpy attacks
+   * at `jumpyMul` for the first `jumpySecs` of a wave; Short-sighted is -1 to hit past `myopicFrom` of a gun's reach.
+   * Morale becomes hold time: Steady holds `steady` longer, Shaky `shaky`; wounds become Tough: Hardy `hardy`, Frail
+   * `frail` (never below 1). A region quirk is about cover: `native` times the cover penalty on its shots (none),
+   * `haunted` times (twice). A trinket's Defense holds `def` longer a point, its morale `morale` a point, its stress
+   * `stress` longer for each share of stress it takes off (shorter for each it adds), and its wounds are Tough at `hp`
+   * a wound, rounded away from nothing.
+   */
+  habits: {
+    rate: 0.1, jumpySecs: 5, jumpyMul: 0.6, myopicFrom: 2 / 3,
+    steady: 0.1, shaky: -0.1, hardy: 1, frail: -1, native: 0, haunted: 2,
+    trinket: { def: 0.15, morale: 0.05, stress: 0.2, hp: 0.5 },
+  },
   /**
    * Shards. Each build phase `draw` are drawn, each of a random type and grade, the grade by the odds for the luck level
    * (bought with credits, `luckCost` each step). A grade's value is 2^(grade-1): a merge of two alike keeps the value
@@ -691,6 +702,46 @@ export const TRAINING = {
     status: { max: 6 },
     field: { secs: 3 },
     bleed: { mul: 2 },
+  },
+  /**
+   * The Sortie layer shared with Training (quirks.ts, bestiary.ts, trinkets.ts, nemesis.ts). Quirks: a run reaching
+   * wave `goodFrom` gives its MVP a good quirk `good` of the time, picked by what it did most (`goods`: shots, blows or
+   * holds, a hold counting as `holdDmg` damage; the first it hasn't got); a crafted unit a boss walked past in its
+   * reach without taking a hit from it picks up a bad one (`bads`, the same way) `bad` of the time. Bestiary: each
+   * Training kind counts as this Echo of the Sortie bestiary. Trinkets: a boss kill offers a trinket as a 4th card
+   * (of `trinkets.rarity`) `trinkets.odds` of the time, until one is offered (one a run). Nemesis: see `nemesis`.
+   */
+  shared: {
+    quirks: {
+      goodFrom: 10, good: 0.3, bad: 0.2, holdDmg: 8,
+      goods: { shot: ['eagle', 'quick', 'steady'], melee: ['brute', 'quick', 'hardy'], holds: ['hardy', 'steady', 'quick'] },
+      bads: { shot: ['myopic', 'jumpy', 'shaky'], melee: ['clumsy', 'jumpy', 'frail'], holds: ['frail', 'shaky', 'jumpy'] },
+    } as { goodFrom: number; good: number; bad: number; holdDmg: number; goods: Record<'shot' | 'melee' | 'holds', string[]>; bads: Record<'shot' | 'melee' | 'holds', string[]> },
+    beasts: {
+      swarm: 'Fang Swarms', drone: 'Scourges', spitter: 'Spectres', outrider: 'Shadow Hounds', carapace: 'Reapers',
+      mirror: 'Phantoms', stalker: 'Fiends', brute: 'Butchers', lord: 'Terror Beast',
+    } as Record<TrainingEnemyKind, string>,
+    trinkets: { odds: 0.35, rarity: 'Rare' as 'Common' | 'Rare' | 'Legendary' },
+    /**
+     * A force's Sortie nemesis (the lord with the biggest grudge) is the boss of wave `wave`: `hp` more wounds per grudge
+     * level, and its tricks. Rage: walks `rage.per` faster a second it lives, up to `rage.max`. Dive: every `dive.every`
+     * seconds it leaps `dive.cells` cells on (out of any hold). Dirge: for `dirge.secs` of every `dirge.every` towers
+     * within `dirge.radius` cells are at -1 to hit. Tremor: every `tremor.every` seconds the base takes `tremor.dmg`.
+     * Dread: nothing can hold it. Brood: every `brood.every` seconds `brood.n` Swarmlings, `brood.hp` × as tough as the
+     * wave's own, crawl out where it stands (`brood.spread` cells apart). Rematch tricks (one per time the force has slain it on a Sortie): Hardened +1 to
+     * its saves, Vengeful `vengeful` × as fast, Regenerating mends `regen` of its wounds every `regenEvery` seconds.
+     * Slain here, it starts the next Sortie fight against the force `bled` of its wounds down, a trick short.
+     */
+    nemesis: {
+      wave: 25, hp: 0.2,
+      rage: { per: 0.02, max: 0.6 },
+      dive: { every: 8, cells: 5 },
+      dirge: { every: 8, secs: 4, radius: 6 },
+      tremor: { every: 6, dmg: 1 },
+      brood: { every: 6, n: 2, hp: 1.5, spread: 0.3 },
+      vengeful: 1.25, regen: 0.05, regenEvery: 2,
+      bled: 0.15,
+    },
   },
   /** A force's power (squadPower, which Sorties scale by too): its points, with each veteran level adding this share. */
   levelPower: 0.05,

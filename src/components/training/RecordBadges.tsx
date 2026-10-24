@@ -1,6 +1,6 @@
 import type { Unit } from '../../model/types';
 import { SHARD_TYPES } from '../../rules/downtimeData';
-import { recordBadges, relicText, type RecordBadge, type RelicSocket } from '../../rules/training';
+import { habitBadges, recordBadges, relicText, type RecordBadge, type RelicSocket } from '../../rules/training';
 import { ShardBadge } from './ShardBadge';
 
 /** One trait (green, with its Shard type) or scar (red) as a tag. */
@@ -48,6 +48,23 @@ export function RelicList({ relics }: { relics: RelicSocket[] }) {
         <div key={i} className="training-record-row">
           <span className="tag gold" title={`${s.tier} relic`}>{s.name}</span>
           <span className="muted">{relicText(s)} · every {s.every}s</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** A unit's Sortie quirks and trinket on the tower card: each as a tag (green good, red bad, gold a trinket) with what
+ *  it does here. */
+export function HabitBadges({ unit }: { unit: Pick<Unit, 'quirks' | 'trinket'> }) {
+  const badges = habitBadges(unit);
+  if (!badges.length) return null;
+  return (
+    <div className="training-record">
+      {badges.map((b, i) => (
+        <div key={i} className="training-record-row">
+          <span className={`tag ${b.kind === 'trinket' ? 'gold' : b.good ? 'green' : 'red'}`} title={b.kind === 'trinket' ? 'Sortie trinket' : 'Sortie quirk'}>{b.name}</span>
+          <span className="muted">{b.text}</span>
         </div>
       ))}
     </div>

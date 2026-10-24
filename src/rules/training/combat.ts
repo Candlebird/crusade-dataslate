@@ -40,7 +40,8 @@ export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): bo
   const target = targetFor(run, t, g);
   if (!target) return false;
   const c = centreOf(t);
-  const cover = covered(run, g, target) ? TRAINING.cover.hit : 0;
+  // Region quirks change the cover penalty on a unit's shots (habits.ts coverMul).
+  const cover = covered(run, g, target) ? TRAINING.cover.hit * (isUnit(t) ? t.coverMul ?? 1 : 1) : 0;
   const far = !g.melee && isUnit(t) && t.myopic && dist(c.x, c.y, target.x, target.y) > reach(t, g) * TRAINING.habits.myopicFrom ? -1 : 0;
   const p = g.reliable ? hitChance(2, cover) : hitChance(t.quality, g.hitMod + (g.melee ? t.hitMelee : t.hitShoot) + t.boost.hit + cover + far);
   const r = rand(run);

@@ -7,7 +7,7 @@ import {
 } from '../../rules/training';
 import { Modal, confirmAction, toast } from '../ui';
 import { act } from './act';
-import { CardOffer, TIER_TAG } from './CardOffer';
+import { CardOffer, cardTag } from './CardOffer';
 import { DraftPanel } from './DraftPanel';
 import { HudBar, type Speed } from './HudBar';
 import { MapView } from './MapView';
@@ -81,7 +81,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
       bank.reset();
       end(saved.run);
     }
-    begin(createRun(force.id, force.units, newSeed()));
+    begin(createRun(force.id, force.units, newSeed(), force.sortie));
   };
 
   const onPhase = (r: TrainingRun, _was: Phase) => {
@@ -171,7 +171,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     act(() => pickCard(run, i), refresh);
     setPeek(false);
   };
-  const again = () => begin(createRun(force.id, force.units, newSeed()));
+  const again = () => begin(createRun(force.id, force.units, newSeed(), force.sortie));
   /** Start (or cancel) a craft; the floating piece card makes way for the craft banner. */
   const craftMode = (cr: Crafting | null) => {
     setCrafting(cr);
@@ -221,7 +221,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
               <b>Cards</b>{' '}
               {run.cards.map((d, i) => {
                 const t = cardText(run, d);
-                return <span key={i} className={`tag ${TIER_TAG[d.rarity]}`} title={`${t.name}: ${t.text}`}>{t.name}</span>;
+                return <span key={i} className={`tag ${cardTag(d)}`} title={`${t.name}: ${t.text}`}>{t.name}</span>;
               })}
             </div>
           )}

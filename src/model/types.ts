@@ -234,6 +234,9 @@ export interface ForceSortie {
   bestiary?: Record<string, SortieBeast>;
   /** Counts across every run, for boon unlocks (seeded from the recaps when first needed). */
   stats?: { runs: number; wins: number; flawless: number; deepest: number };
+  /** Lords (nemeses) slain in Training since the force last met them on a Sortie, by lord id: each time, it starts that
+   *  meeting hurt and a trick (or omen) short. */
+  bled?: Record<string, number>;
 }
 
 /** A bestiary entry: fights it was met in, and squads of it slain (the first slain unlocks its lore). */
@@ -242,6 +245,8 @@ export interface SortieBeast {
   slain: number;
   /** For a lord: the most pact-mark heat it was slain under. */
   mark?: number;
+  /** For a lord: times it was slain in Training (as the force's nemesis). It unlocks the lore, but adds no rematch trick. */
+  drill?: number;
 }
 
 /** A run looked back on: where it went, how it ended and what it brought home. */

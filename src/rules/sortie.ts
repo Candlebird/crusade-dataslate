@@ -5,10 +5,10 @@ import { fighter, type Fighter, type Gun } from './autoBattle';
 import { effects, type Ability, type Status } from './abilities';
 import { hasRule, ruleRating } from './engine';
 import { BIG_UNIT, randomSelection } from './echoForce';
-import { squadPower } from './training';
+import { squadPower } from './training/economy';
 import { unitName } from './battle';
 import {
-  SORTIE, SORTIE_BOONS, SORTIE_EVENTS, SORTIE_QUIRKS, SORTIE_TRINKETS, type SortieGoal,
+  SORTIE, SORTIE_BOONS, SORTIE_EVENTS, SORTIE_QUIRKS, SORTIE_TRINKETS, TRAINING, type SortieGoal,
   type SortieAffix, type SortieBoonId, type SortieChoice, type SortieEvent, type SortieLength, type SortieMode, type SortieOutcome,
   type SortieCurseId, type SortieMarkId, type SortieScarId,
 } from './downtimeData';
@@ -384,7 +384,7 @@ export function createRun(
   units: Unit[], seed: number, mode: SortieMode = 'free', length: SortieLength = 'short',
   opts: {
     nemesis?: Record<string, number>; deep?: string[]; tier?: number; weekly?: string; ascension?: number; slain?: Record<string, number>; boons?: string[];
-    marks?: SortieMarkId[]; raiders?: Raider[];
+    marks?: SortieMarkId[]; raiders?: Raider[]; bled?: Record<string, number>;
   } = {},
 ): SortieRun {
   const line = [...units.filter((u) => !isFort(u)), ...units.filter(isFort)];
@@ -472,6 +472,7 @@ export function createRun(
   note(run, `${listText(run.party.map(memberName))} set out${mode === 'shard' ? ' on a Shard run' : ''} into ${regionName(run)}.`, 'info');
   note(run, run.deep ? regionOf(run).deep.intro : regionOf(run).intro, 'info');
   if (run.nemesis) note(run, `${bossOf(run).name} remembers you, and waits at the end of the road.`, 'bad');
+  if (opts.bled?.[run.boss]) bleed(run, opts.bled[run.boss]);
   if (run.rematch) {
     const before = opts.slain?.[run.boss] ? 'has been slain by this force before, and comes back changed' : 'bears the Mark of the Scarred';
     note(run, `${bossOf(run).name} ${before}: ${listText(rematchTricks(run).map((t) => t.name))}.`, 'bad');
@@ -681,7 +682,7 @@ export function goalProgress(story: ForceSortie | undefined, goal: SortieGoal): 
     case 'deepest': return st?.deepest ?? 0;
     case 'lords': return beasts.filter(([k]) => k.startsWith('lord:')).reduce((n, [, b]) => n + b.slain, 0);
     case 'beasts': return beasts.filter(([k]) => !k.startsWith('lord:')).length;
-    case 'lore': return beasts.filter(([, b]) => b.slain).length;
+    case 'lore': return beasts.filter(([, b]) => b.slain || b.drill).length;
     case 'tier': return story?.tier ?? 0;
     case 'deep': return story?.deep?.length ?? 0;
     case 'relics': return story?.relics?.length ?? 0;
@@ -813,6 +814,22 @@ export function enterNode(run: SortieRun, book: CatalogBook, node: SortieNode) {
   run.seen.push(ev.id);
   run.event = { id: ev.id };
   run.screen = 'event';
+}
+
+/** A lord slain `n` times in Training (ForceSortie.bled) since this force last met it: it starts the fight
+ *  TRAINING.shared.nemesis.bled down a time (to SORTIE.maxWeaken), and each time costs it a rematch trick or, with none
+ *  left, an omen the party already knows (never the last one: that is still read on the road). */
+function bleed(run: SortieRun, n: number) {
+  const boss = bossOf(run);
+  run.weaken = Math.min(SORTIE.maxWeaken, run.weaken + n * TRAINING.shared.nemesis.bled);
+  const tricks = Math.min(n, run.rematch ?? 0);
+  if (tricks) run.rematch = (run.rematch ?? 0) - tricks || undefined;
+  const omens = Math.min(n - tricks, SORTIE.omens.need - 1 - (run.omens ?? 0));
+  if (omens > 0) run.omens = (run.omens ?? 0) + omens;
+  const bits = [`${boss.name} still bears the wounds your force gave it in Training: it starts ${Math.round(run.weaken * 100)}% down`];
+  if (tricks) bits.push(`${tricks === 1 ? 'a rematch trick' : `${tricks} rematch tricks`} short`);
+  if (omens > 0) bits.push(`with ${omens === 1 ? 'an omen' : `${omens} omens`} of it already known`);
+  note(run, `${bits.join(', ')}.`, 'good');
 }
 
 /** Read an omen at a node: enough of them take away one of the lord's tricks. */

@@ -301,6 +301,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
       ? createRun(lineUp(units as Unit[]), weekSeed(week), mode, SORTIE.weekly.length, { tier: SORTIE.weekly.tier, weekly: week })
       : createRun(lineUp(units as Unit[]), Math.floor(Math.random() * 2 ** 31), mode, length, {
         nemesis: force.sortie?.nemesis,
+        bled: force.sortie?.bled,
         slain: Object.fromEntries(Object.entries(force.sortie?.bestiary ?? {}).filter(([k]) => k.startsWith('lord:')).map(([k, b]) => [k.slice(5), b.slain])),
         boons: unlockedBoons(force.sortie),
         deep: deepOn ? force.sortie?.deep : undefined,
@@ -536,7 +537,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
         {story?.bestiary && Object.keys(story.bestiary).length ? (
           <div className="sortie-choice">
             <button className="ghost small sortie-recap-row" onClick={() => setBestiaryOpen(!bestiaryOpen)}>
-              <b>Bestiary</b> <span className="muted">· {Object.keys(story.bestiary).length} met · {Object.values(story.bestiary).filter((b) => b.slain).length} lore learned <Icon name={bestiaryOpen ? 'l:chevron-up' : 'l:chevron-down'} /></span>
+              <b>Bestiary</b> <span className="muted">· {Object.keys(story.bestiary).length} met · {Object.values(story.bestiary).filter((b) => b.slain || b.drill).length} lore learned <Icon name={bestiaryOpen ? 'l:chevron-up' : 'l:chevron-down'} /></span>
             </button>
             {bestiaryOpen && (
               <div className="sortie-bestiary">
@@ -547,9 +548,9 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                     <div key={k} className={`sortie-beast${info.lord ? ' lord' : ''}`}>
                       <div>
                         <b>{info.name}</b>{info.lord && <span className="muted small"> · Echo lord, {info.unit}</span>}
-                        <span className="muted small"> · met in {b.met} fight{b.met === 1 ? '' : 's'} · {b.slain} slain{b.mark ? ` · best pact heat ${b.mark}` : ''}</span>
+                        <span className="muted small"> · met in {b.met} fight{b.met === 1 ? '' : 's'} · {b.slain} slain{b.drill ? ` · ${b.drill} slain in Training` : ''}{b.mark ? ` · best pact heat ${b.mark}` : ''}{story.bled?.[k.slice(5)] && info.lord ? ' · wounded, waiting' : ''}</span>
                       </div>
-                      <div className="small">{b.slain ? <i>{info.lore}</i> : <span className="muted">Slay one to learn more.</span>}</div>
+                      <div className="small">{b.slain || b.drill ? <i>{info.lore}</i> : <span className="muted">Slay one to learn more.</span>}</div>
                     </div>
                   ))}
               </div>

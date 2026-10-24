@@ -1,6 +1,7 @@
 import { TRAINING } from '../downtimeData';
 import { centreOf, unitTowers } from './board';
 import { enemiesNear, enemyDef, FX_COLOR, hurt, isBoss, skillsOf, toGo } from './harm';
+import { tallyHold } from './tally';
 import type { Enemy, TrainingRun, UnitTower } from './types';
 
 // Holds: a tough crafted unit grabs a walker in its melee reach and keeps it there a moment while the rest pass.
@@ -11,11 +12,11 @@ const sheetTough = (t: UnitTower) => t.tough - t.up;
 /** Can it hold walkers at all: not an Aircraft, datasheet Tough above 1. */
 export const canHold = (t: UnitTower) => t.category !== 'Aircraft' && sheetTough(t) > 1;
 
-/** How long unit `t` holds enemy `e` (0 if it can't: a flyer, or canHold fails). Bosses and big ones are held `bigMul`
- *  as long; hold cards and the unit's record (grit) lengthen every hold. */
+/** How long unit `t` holds enemy `e` (0 if it can't: a flyer, a nemesis with Dread, or canHold fails). Bosses and big
+ *  ones are held `bigMul` as long; hold cards, the unit's record and its habits (grit) lengthen every hold. */
 export function holdTime(run: TrainingRun, t: UnitTower, e: Enemy): number {
   const H = TRAINING.holds;
-  if (e.flies || !canHold(t)) return 0;
+  if (e.flies || e.nem?.free || !canHold(t)) return 0;
   const big = isBoss(e) || enemyDef(e).big ? H.bigMul : 1;
   return Math.min(H.max, H.perTough * t.tough) * big * run.mods.holdMul * (t.grit ?? 1);
 }
@@ -68,6 +69,7 @@ export function holds(run: TrainingRun, dt: number): void {
     t.holdLeft = holdTime(run, t, e) * (t.brace && t.brace > 0 ? t.brace : 1);
     t.brace = 0;
     e.heldBy = t.id;
+    tallyHold(t);
     const c = centreOf(t);
     run.fx.push({ x1: c.x, y1: c.y, x2: e.x, y2: e.y, t: t.holdLeft, color: FX_COLOR.hold, kind: 'hold' });
   }

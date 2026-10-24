@@ -79,7 +79,7 @@ export function barrage(run: TrainingRun, t: UnitTower, e: Extract<Effect, { kin
   const target = enemiesNear(run, c.x, c.y, r).sort((a, b) => toGo(run, a) - toGo(run, b))[0];
   if (!target) return false;
   const shot = { melee: false } as TowerGun;
-  const p = hitChance(t.quality, t.boost.hit + (covered(run, shot, target) ? TRAINING.cover.hit : 0));
+  const p = hitChance(t.quality, t.boost.hit + (covered(run, shot, target) ? TRAINING.cover.hit * (t.coverMul ?? 1) : 0));
   let landed = 0;
   for (let i = 0; i < e.hits; i++) {
     if (rand(run) >= p) continue;

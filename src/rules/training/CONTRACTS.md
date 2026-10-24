@@ -26,6 +26,15 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | cover | run.ts at create (via waves.layCover), cards.ts (cover card) |
 | offer, cards, mods | cards.ts |
 | fx | combat.ts pushes (relics.ts too, recoloured gold); run.step decays |
+| UnitTower.quirks, UnitTower.trinket, UnitTower.coverMul; grit / tough / init / hit from habits | recipes.unitTower (via habits.habitsOf); habits.applyTrinket for a trinket card taken mid-run |
+| UnitTower.tally, run.beasts, run.watch[].hit | tally.ts (from harm.hurt, holds.holds, waves.spawnOne) |
+| run.watch[].passed | quirks.watchBosses |
+| run.gains | quirks.rollGains (once, from endRun) |
+| run.nemesis (set at create; slain by tally) | run.ts via nemesis.pickNemesis; tally.ts marks slain |
+| Enemy.nem (speed, hard, free, next, regen, armed), boss SpawnPlan.nemesis / hp | nemesis.ts (nemesisPlan, nemesisTick); waves.spawnOne seeds it |
+| run.trinket, CardDraw.trinket | trinkets.ts |
+| run.shared | shared.bankShared (the force's Sortie layer banked once) |
+| Force.sortie.bestiary (incl. SortieBeast.drill), Unit.quirks / trinket, sortie.trinkets, sortie.bled | shared.ts (bankShared, bestiary.bankBeasts) on finish; sortie.ts / downtime.applySortie as before; applySortie clears bled[lord] once a Sortie meets it |
 
 ## run.step(dt) call order
 
@@ -35,14 +44,16 @@ if (run.phase !== 'wave') return
 run.t += dt
 waves.spawnDue(run)
 combat.auras(run, dt)          // boosts from auras; dmgBoost wears down
+nemesis.nemesisTick(run, dt)   // the nemesis's signature and tricks (dirge -1 hit after auras; dive, tremor, brood, regen)
 combat.abilities(run, dt)      // timed skills, fields, bleed fields, Vigor bleed
 relics.relics(run, dt)         // rush wears down; each socket's clock; one that goes off restarts it (fx gold)
 combat.holds(run, dt)          // grab / release (before walking, so held enemies stand still)
 combat.fireAll(run, dt)        // volleys; hurt() pays kills, death-blasts, boss → cards.offerCards
 combat.tickEnemies(run, dt)    // statuses, dots, regrab cooldowns
 waves.walk(run, dt)            // move, ambush jump, leaks → baseHp, leaked
+quirks.watchBosses(run)        // units a live boss walks past in reach
 combat.reap(run)               // drop the dead (and leaked ones waves already removed)
-if (run.baseHp <= 0) endRun(run, 'The base falls.')
+if (run.baseHp <= 0) endRun(run, 'The base falls.')   // endRun → quirks.rollGains once
 else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, private):
     run.cleared++, run.credits += economy.waveCredits(run), XP to crafted units, phase 'build',
     shards.drawDraft(run), log line. (The UI saves the run whenever it sees a new build phase.)
@@ -145,6 +156,38 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `resetSockets(t)` — every clock back to its first go (startWave). `relicText(s): string` — for the tower card.
 - New fields: `UnitTower.relics?: RelicSocket[]`, `UnitTower.grit?` (hold-time share), `UnitTower.brace?` (next hold ×), `Tower.rush?: {mul, left}` (rateOf × (1 + mul)), `TowerGun.relic?` (fires gold).
 
+### habits.ts (Sortie quirks and trinkets in Training)
+- `interface Habits { shoot; melee; init; jumpy; myopic; hold; tough; cover }`; `quirkHabit(id)`, `trinketHabit(k)` — every SORTIE_QUIRKS id (region ones by prefix) and SORTIE_TRINKETS entry, numbers in TRAINING.habits.
+- `habitsOf(u)`, `coverMulOf(h)` (cover hit × this, floor 0), `habitText(h)`, `habitBadges(u): HabitBadge[]` ({name, kind, good, text}), `habitNames(u)`.
+- `applyTrinket(t, id)` — a trinket taken mid-run straight onto the tower.
+
+### tally.ts
+- `tallyHarm(run, by, e, dealt, how, killed)` — UnitTower.tally shot/melee, watch[boss].hit, beasts slain, nemesis slain. `tallyHold(t)`.
+- `noteMet(run, e)` — beasts[kind].met once a wave. `beastOf(e)` ('nemesis' for one with nem), `watchOf(run, e)`.
+
+### nemesis.ts (the Sortie nemesis as wave TRAINING.shared.nemesis.wave's boss)
+- `pickNemesis(story?): RunNemesis | undefined` — highest grudge (ties in SORTIE_BOSSES order); rematch = min(tricks, bestiary lord slain).
+- `isNemesisWave(run, w)`, `nemesisPlan(run, plans)` — the boss plan marked nemesis, hp × (1 + hp × grudge), a log line.
+- `nemesisTricks(n)`, `sigText(sig)`, `dirgeOn(run, e)`.
+- `nemesisTick(run, dt)` — arms clocks; speed (rage × vengeful), hard (Hardened), free (dread: no holds), dirge −1 hit near it, dive out of a hold, tremor base damage, brood Swarmlings (spawnOne), regen with the third trick.
+
+### quirks.ts (quirk gains)
+- `watchBosses(run)`, `topStat(t)`, `snubbed(run): Set<unitId>` (passed, never hit).
+- `rollGains(run): QuirkGain[]` — idempotent via run.gains: the MVP of a run reaching quirks.goodFrom a good quirk (goods[topStat]) at `good`; each snubbed unit a bad one (bads[topStat]) at `bad`; addQuirk rules (max 3).
+
+### bestiary.ts
+- `beastKey(run, k)` — kind → Echo name (TRAINING.shared.beasts), 'nemesis' → `lord:<id>`. `loreKnown(b)` — slain or drill.
+- `bankBeasts(story, run): string[]` — met / slain added (a lord killed here → drill, not slain); lines for first meetings and lore.
+
+### trinkets.ts
+- `TRINKET_CARD`, `isTrinketCard(d)`, `trinketDice(run)` (its own dice from seed and wave: never moves run.rng).
+- `trinketOffer(run)` — each boss kill at trinkets.odds until one is offered (then never again); to the crafted unit with most kills and none, else spares. `trinketCardText`, `takeTrinket`.
+
+### shared.ts
+- `bankShared(f, run): string[]` — once (run.shared): gains via addQuirk, the trinket (equipped, else spares within SORTIE.trinkets.spares), the bestiary, a slain nemesis → sortie.bled[id]++. Called inside useBank's updateForce.
+- `sharedPreview(run)` — {text, good} lines for RunSummary.
+- Sortie side: sortie.createRun opts.bled → `bleed(run, n)`: weaken += n × nemesis.bled (capped), tricks dropped, the rest as known omens (need − 1 max), a journal note.
+
 ### waves.ts
 - `isFlyWave(w)`, `isBossWave(w)`, `isFlyBossWave(w): boolean`
 - `planWave(run, w: number): SpawnPlan[]` — budget base × (power/perPoints) × growth^(w-1); flyers; boss + escorts; scouts at pad scoutAt (scoutHp); ambush hp; hp ×hpGrowth past hpFrom; staggered by gap; sorted by `at`.
@@ -158,11 +201,12 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
   `planFor(r: Rng, power, w)` (planWave on any dice), `previewGroups(plans): PreviewGroup[]` ({kind, n, vets, hp, flies}
   for WavePreview), `runCover(r): Tile[]` (createRun's cover: patches range on the empty map's route), `layCover` takes an
   optional 4th `taken: Tile[]` to keep clear of, `atBase(e)`, `move(m, e, step)`. New TRAINING keys: `dazeMul`, `wave.bossMin`.
+- `spawnOne(run, plan): Enemy` — one spawn (spawnDue and the nemesis's brood); a nemesis plan gets `nem`; noteMet. speedOf × nem.speed.
 
 ### cards.ts
 - `interface TrainingCard { id; name; rarity; text; unit?(t); apply(run, t?) }`, `CARDS: TrainingCard[]`
 - `drawCards(run): CardDraw[]`, `cardById(id)`
-- `offerCards(run): void` — sets run.offer unless one is on offer.
+- `offerCards(run): void` — sets run.offer unless one is on offer; trinkets.trinketOffer may add a 4th (trinket) card. cardText / pickCard branch on isTrinketCard.
 - `cardText(run, d: CardDraw): { name; text }`
 - `pickCard(run, i: number): void` — apply, push to run.cards, clear offer, log.
 - `autoCardIndex(run): number`
@@ -171,12 +215,12 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `saveKey(forceId): string` (done) — `trainingRun:<forceId>`.
 - `serialize(run): string`, `deserialize(s: string): TrainingRun | null` — JSON; null on bad/old version. fx may be dropped.
 - `saveRun(run): void`, `loadRun(forceId): SavedRun | null` (null for a run already 'over'), `clearSave(forceId): void` — localStorage wrapped in try/catch.
-- `SAVE_VERSION` (2: living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
+- `SAVE_VERSION` (3: the Sortie layer; 2 was living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
 
 ### run.ts
-- `createRun(forceId: string, units: Unit[], seed: number): TrainingRun` — power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
+- `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie): TrainingRun` — run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
 - `startProblem(run): string | null` — build phase, draft step 'done', no card offer pending.
-- `startWave(run): void` — wave++, phase 'wave', t 0, leaked 0, queue = waves.planWave; gun clocks reset.
+- `startWave(run): void` — wave++, phase 'wave', t 0, leaked 0, queue = nemesis.nemesisPlan(run, waves.planWave(...)); gun clocks reset.
 - `step(run, dt): void` — see the order above.
 - `craftProblem(run, unitId, uses: number[], onId: number): string | null` — build phase, not crafted, `uses` satisfy the recipe (recipeUses-style check), onId ∈ uses; if any of `uses` is a draft piece the draft must be at step 'keep' (the craft is then this draft's keep).
 - `craft(run, unit: Unit, uses: number[], onId: number): void` — Shard onId becomes recipes.unitTower (same id/cell); other uses → rubble; draft pieces used → shards.crumbleDraft(run, []) after; push unitId to crafted.
@@ -191,6 +235,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 
 ### testRun.ts (test-only; not in index.ts)
 - `blankRun(seed = 1): TrainingRun` — an empty build-phase run (no recipes, cover or draft; mods bounty 1, holdMul 1) for module tests.
+- `testUnit(o)`, `testEnemy(o)` — a UnitTower at 20,30 (12-cell rifle) and a 100 hp drone at 21.5,31.5.
 
 ### bot.ts (test-only; not in index.ts)
 - `interface MazeSpot { n; x; y }`
@@ -198,4 +243,4 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt? }): TrainingRun`
 
 ### index.ts
-Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, run (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).
+Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).

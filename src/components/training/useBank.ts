@@ -5,11 +5,11 @@ import { localDate } from '../../model/date';
 import { uid } from '../../model/factory';
 import { bankOffTableXp, offTableKey } from '../../rules/downtime';
 import { awardFeats, trainingFeats } from '../../rules/feats';
-import { mvp, takeXp, type TrainingRun } from '../../rules/training';
+import { bankShared, mvp, takeXp, type TrainingRun } from '../../rules/training';
 import { toast } from '../ui';
 
-// Paying a run out to the force: XP as it lands (within the off-table limit), then at the end the best score, feats
-// and who led the defence.
+// Paying a run out to the force: XP as it lands (within the off-table limit), then at the end the best score, feats,
+// who led the defence, and the Sortie layer (shared.ts bankShared).
 
 /** XP a unit earned this session, and what the off-table limit let it bank. */
 interface Gain { name: string; earned: number; got: number }
@@ -48,14 +48,17 @@ export function useBank(force: Force, c?: Campaign) {
     bankXp(run);
     const lead = mvp(run);
     let feats: string[] = [];
+    let shared: string[] = [];
     updateForce(force.id, (f) => {
       if (run.cleared > (f.trainingBest ?? 0)) f.trainingBest = run.cleared;
       feats = awardFeats(f, trainingFeats(run.cleared), run.crafted, localDate(), uid);
+      // Quirks, the trinket, the bestiary and a slain nemesis go to the Sortie side with the XP.
+      shared = bankShared(f, run);
     });
     const got = Object.values(gains.current).filter((g) => g.earned > 0);
     const led = lead && lead.kills > 0 ? `${lead.name} led the defence with ${lead.kills} kill${lead.kills === 1 ? '' : 's'}. ` : '';
     const xp = got.length ? `XP banked: ${got.map((g) => `${g.name} +${g.got}`).join(', ')}.` : 'No XP this time.';
-    toast(`${led}${run.cleared} wave${run.cleared === 1 ? '' : 's'} cleared. ${xp}${feats.length ? ` ${feats.join('. ')}.` : ''}`);
+    toast(`${led}${run.cleared} wave${run.cleared === 1 ? '' : 's'} cleared. ${xp}${feats.length ? ` ${feats.join('. ')}.` : ''}${shared.length ? ` ${shared.join('. ')}.` : ''}`);
   }, [force.id, updateForce, bankXp]);
 
   /** A new run: forget the last one's tally. */

@@ -2,6 +2,7 @@ import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyKind } from '../downtimeD
 import { BASE, dist, mapOf } from './board';
 import { LEGS, N, WAYPOINTS, centre, heading, mapFor, route, type MapState } from './map';
 import { pick, rand, randInt, shuffle, type Rng } from './rng';
+import { noteMet } from './tally';
 import type { Enemy, SpawnPlan, Tile, TrainingRun } from './types';
 
 // Waves: what comes (budget by force points, flyers, bosses, scouts, ambushers, HP scaling), spawning and walking.
@@ -147,23 +148,30 @@ export function layCover(r: Rng, n: number, route: Tile[], taken: Tile[] = []): 
 export const runCover = (r: Rng): Tile[] =>
   layCover(r, randInt(r, TRAINING.cover.patches[0], TRAINING.cover.patches[1]), route(mapFor([])));
 
-/** Move due spawns from run.queue into run.enemies. */
-export function spawnDue(run: TrainingRun): void {
-  while (run.queue.length && run.queue[0].at <= run.t) {
-    const s = run.queue.shift()!;
-    const next = centre(WAYPOINTS[s.leg + 1]);
-    run.enemies.push({
-      id: run.nextId++, kind: s.kind, x: s.x, y: s.y, leg: s.leg, face: Math.atan2(next.y - s.y, next.x - s.x),
-      hp: s.hp, maxHp: s.hp, flies: s.flies, ...(s.vet ? { vet: true } : {}), status: {}, dots: [], regrab: 0,
-    });
-  }
+/** An enemy on the field from a spawn plan (id run.nextId++), met for the bestiary. A nemesis plan gets its tricks
+ *  through `nem` (nemesis.ts sets them up). */
+export function spawnOne(run: TrainingRun, s: SpawnPlan): Enemy {
+  const next = centre(WAYPOINTS[Math.min(LEGS, s.leg + 1)]);
+  const e: Enemy = {
+    id: run.nextId++, kind: s.kind, x: s.x, y: s.y, leg: s.leg, face: Math.atan2(next.y - s.y, next.x - s.x),
+    hp: s.hp, maxHp: s.hp, flies: s.flies, ...(s.vet ? { vet: true } : {}), status: {}, dots: [], regrab: 0,
+    ...(s.nemesis ? { nem: { born: run.t, speed: 1, hard: 0, next: 0, regen: 0 } } : {}),
+  };
+  run.enemies.push(e);
+  noteMet(run, e);
+  return e;
 }
 
-/** An enemy's speed now, in cells a second (slow, daze). */
+/** Move due spawns from run.queue into run.enemies. */
+export function spawnDue(run: TrainingRun): void {
+  while (run.queue.length && run.queue[0].at <= run.t) spawnOne(run, run.queue.shift()!);
+}
+
+/** An enemy's speed now, in cells a second (slow, daze; a nemesis's rage and Vengeful). */
 export function speedOf(_run: TrainingRun, e: Enemy): number {
   const slow = (e.status.slow ?? 0) > 0 ? TRAINING.slowMul : 1;
   const daze = (e.status.daze ?? 0) > 0 ? TRAINING.dazeMul : 1;
-  return TRAINING_ENEMIES[e.kind].speed * TRAINING.walkMul * slow * daze;
+  return TRAINING_ENEMIES[e.kind].speed * TRAINING.walkMul * slow * daze * (e.nem?.speed ?? 1);
 }
 
 /** Base HP an enemy costs if it gets through. */

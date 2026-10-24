@@ -1,4 +1,4 @@
-import { mvp, runXp, towers, unitTowers, type TrainingRun } from '../../rules/training';
+import { mvp, runXp, sharedPreview, towers, unitTowers, type TrainingRun } from '../../rules/training';
 import { Icon } from '../Icon';
 
 export interface RunSummaryProps {
@@ -8,7 +8,7 @@ export interface RunSummaryProps {
 }
 
 /** How the run went: waves cleared, and each crafted unit's kills, damage, levels and XP (the standout starred), with
- *  the kept Shards as one row. */
+ *  the kept Shards as one row; then what it hands the Sortie side (quirks, trinket, nemesis, bestiary). */
 export function RunSummary({ run, best }: RunSummaryProps) {
   const lead = mvp(run);
   const xp = runXp(run);
@@ -16,6 +16,7 @@ export function RunSummary({ run, best }: RunSummaryProps) {
   const shards = towers(run).filter((t) => t.kind === 'shard');
   const n = (x: number) => Math.round(x);
   const record = best !== undefined && run.cleared > best;
+  const shared = run.phase === 'over' ? sharedPreview(run) : [];
   return (
     <div className="training-summary small">
       <div style={{ marginBottom: 4 }}>
@@ -50,6 +51,13 @@ export function RunSummary({ run, best }: RunSummaryProps) {
             )}
           </tbody>
         </table>
+      )}
+      {shared.length > 0 && (
+        <ul className="training-shared">
+          {shared.map((l, i) => (
+            <li key={i} style={{ color: l.good ? 'var(--green)' : 'var(--red)' }}>{l.text}</li>
+          ))}
+        </ul>
       )}
     </div>
   );

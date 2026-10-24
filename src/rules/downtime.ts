@@ -328,9 +328,15 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
   for (const [k, v] of Object.entries(run.met ?? {})) {
     const b = (beasts[k] ??= { met: 0, slain: 0 });
     if (!b.met && v.met) fresh.push(beastInfo(k).name);
-    if (!b.slain && v.slain) learned.push(beastInfo(k).name);
+    if (!b.slain && !b.drill && v.slain) learned.push(beastInfo(k).name);
     b.met += v.met;
     b.slain += v.slain;
+  }
+  // Wounds from Training (ForceSortie.bled) are spent once the party meets that lord (not on the weekly, which never
+  // brings them).
+  if (story.bled?.[run.boss] && !run.weekly && run.met?.[`lord:${run.boss}`]?.met) {
+    delete story.bled[run.boss];
+    if (!Object.keys(story.bled).length) delete story.bled;
   }
   // The most pact-mark heat a lord was slain under.
   const heat = markHeat(run);

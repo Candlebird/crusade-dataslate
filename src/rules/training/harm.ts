@@ -5,6 +5,7 @@ import { offerCards } from './cards';
 import { payKill } from './economy';
 import { centre, remaining, upstream, WAYPOINTS } from './map';
 import { rand, saveChance } from './rng';
+import { tallyHarm } from './tally';
 import type { Enemy, Tower, TowerGun, TowerSkill, TrainingRun, UnitTower } from './types';
 
 // The pieces of combat every part of it shares: reach, damage, statuses, dots, and the fx a hit leaves.
@@ -59,8 +60,8 @@ export const busy = (run: TrainingRun, t: Tower) => t.guns.some((g) => targetFor
 /** Is the enemy at -1 to be hit by this weapon: a shot at one standing in cover. */
 export const covered = (run: TrainingRun, g: TowerGun, e: Enemy) => !g.melee && inCover(run, e.x, e.y);
 
-/** Did a hit get through the enemy's save (Defense + AP)? */
-export const unsaved = (run: TrainingRun, e: Enemy, ap: number) => rand(run) >= saveChance(enemyDef(e).defense, ap);
+/** Did a hit get through the enemy's save (Defense + AP; a Hardened nemesis saves better)? */
+export const unsaved = (run: TrainingRun, e: Enemy, ap: number) => rand(run) >= saveChance(enemyDef(e).defense - (e.nem?.hard ?? 0), ap);
 
 /** A ring of `r` cells swelling out from a point. */
 export const pulse = (run: TrainingRun, x: number, y: number, r: number, color: string) =>
@@ -82,6 +83,7 @@ export function dmgMul(t: Tower): number {
 /**
  * Damage to an enemy from tower `by` (undefined: no one). A shot or blow on a marked enemy deals more; some enemies take
  * less from shots or more from blows. A kill credits `by`, pays out, sets off death-blasts, and a boss kill offers cards.
+ * The run's tallies (tally.ts) note it all for the Sortie layer.
  * `chain`: whether this kill may set off a death-blast (a blast's own kills don't).
  */
 export function hurt(run: TrainingRun, by: Tower | undefined, e: Enemy, dmg: number, how: Harm, chain = true): void {
@@ -91,7 +93,9 @@ export function hurt(run: TrainingRun, by: Tower | undefined, e: Enemy, dmg: num
   const mark = how !== 'other' && e.status.mark ? TRAINING.markDmg : 0;
   const before = e.hp;
   e.hp -= (dmg + mark) * mul;
-  if (by) by.dealt += before - Math.max(0, e.hp);
+  const dealt = before - Math.max(0, e.hp);
+  if (by) by.dealt += dealt;
+  tallyHarm(run, by, e, dealt, how, e.hp <= 0);
   if (e.hp > 0) return;
   if (by) by.kills += 1;
   payKill(run, e);

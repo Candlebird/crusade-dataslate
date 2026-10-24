@@ -1,5 +1,5 @@
 import { TRAINING } from '../../rules/downtimeData';
-import { startProblem, type TrainingRun } from '../../rules/training';
+import { nemesisTricks, startProblem, type TrainingRun } from '../../rules/training';
 import { Icon } from '../Icon';
 
 export type Speed = 1 | 2 | 4;
@@ -19,7 +19,7 @@ export interface HudBarProps {
   onPause?: () => void;
 }
 
-/** The strip over the map: wave, base, credits, luck, speed, and Start wave / End run. */
+/** The strip over the map: wave, base, credits, luck, the Sortie nemesis waiting (if any), speed, and Start wave / End run. */
 export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onPause }: HudBarProps) {
   const low = run.baseHp <= TRAINING.baseHp / 3;
   const why = run.phase === 'build' ? startProblem(run) : null;
@@ -41,6 +41,14 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
       <span className="training-hud-stat" title="Luck: better Shard grades in each draft">
         <Icon name="g:sparkles" /> {run.luck}/{TRAINING.shards.luckCost.length}
       </span>
+      {run.nemesis && !run.nemesis.slain && run.wave <= TRAINING.shared.nemesis.wave && (
+        <span
+          className="training-hud-stat"
+          title={`Your Sortie nemesis comes as the Echo Lord of wave ${TRAINING.shared.nemesis.wave}. ${nemesisTricks(run.nemesis).map((t) => `${t.name}: ${t.text}`).join(' ')}`}
+        >
+          <Icon name="g:crown" /> <b style={{ color: 'var(--red)' }}>{run.nemesis.name}</b> <span className="muted">· wave {TRAINING.shared.nemesis.wave}</span>
+        </span>
+      )}
       <span className="grow" />
       {run.phase !== 'over' && (
         <span className="training-hud-actions">

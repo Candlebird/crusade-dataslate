@@ -3,46 +3,21 @@ import { fighter, type Fighter } from '../autoBattle';
 import { abilitiesOf } from '../abilities';
 import { unitName } from '../battle';
 import { hasRule, levelForXp, ruleRating } from '../engine';
-import { SHARD_TYPES, SORTIE_QUIRKS, SORTIE_TRINKETS, TRAINING, type ShardType, type SortieTrinket } from '../downtimeData';
+import { SHARD_TYPES, TRAINING, type ShardType } from '../downtimeData';
 import { shardsOnMap } from './board';
 import { levelCap } from './economy';
+import { coverMulOf, habitsOf } from './habits';
 import { socketRuns, socketsOf } from './relics';
 import { adjustSlots, gritOf, rangeBonus, recordBudget } from './veterans';
 import type { Grade, Recipe, RecipeSlot, ShardPiece, Tile, TowerSkill, TrainingRun, UnitTower } from './types';
 
 // Recipes: every unit in the force gets one, a multiset of Shard types with minimum grades, from its datasheet. And a
-// crafted unit's tower stats (autoBattle fighter(), Sortie habits, abilities as skills).
+// crafted unit's tower stats (autoBattle fighter(), Sortie habits from habits.ts, abilities as skills).
 
 const TYPES = Object.keys(SHARD_TYPES) as ShardType[];
 
 /** Can this unit train? Any active unit can, even one busy on a task: training is only drill. */
 export const canTrain = (u: Unit) => u.status === 'active';
-
-/** What a unit's Sortie quirks and trinket do here: to hit shooting/melee, initiative, Jumpy, Short-sighted. */
-export function habitsOf(u: Unit): { shoot: number; melee: number; init: number; jumpy: boolean; myopic: boolean } {
-  const q = new Set(u.quirks ?? []);
-  const k: Partial<SortieTrinket> = (u.trinket && SORTIE_TRINKETS[u.trinket]) || {};
-  const n = (id: string) => (q.has(id) ? 1 : 0);
-  return {
-    shoot: n('eagle') + (k.shoot ?? 0),
-    melee: n('brute') - n('clumsy') + (k.melee ?? 0),
-    init: n('quick') + (k.init ?? 0),
-    jumpy: q.has('jumpy'),
-    myopic: q.has('myopic'),
-  };
-}
-
-/** Quirks that do nothing in Training (morale, wounds). */
-const IDLE_QUIRKS = ['steady', 'shaky', 'hardy', 'frail'];
-
-/** The Sortie quirks and trinket a unit brings to Training, by name (only those that do something here). */
-export function habitNames(u: Unit): string[] {
-  const k = u.trinket ? SORTIE_TRINKETS[u.trinket] : undefined;
-  return [
-    ...(u.quirks ?? []).filter((id) => SORTIE_QUIRKS[id] && !IDLE_QUIRKS.includes(id)).map((id) => SORTIE_QUIRKS[id].name),
-    ...(k && (k.shoot || k.melee || k.init) ? [k.name] : []),
-  ];
-}
 
 const fighterOf = (u: Unit): Fighter => {
   const size = Math.max(1, u.size);
@@ -216,12 +191,13 @@ export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): Uni
   const f = fighterOf(u);
   const h = habitsOf(u);
   const g = gritOf(u);
+  const grit = h.hold ? Math.max(TRAINING.veterans.minHold, g.hold + h.hold) : g.hold;
   const relics = socketsOf(u);
   const relicGuns = new Set(u.relics.filter((r) => r.profile).map((r) => r.name));
   const skills = skillsOf(u).filter((s) => !relics.some((r) => socketRuns(r, s.source, s.effect.kind)));
   return {
     kind: 'unit', id, x: at.x, y: at.y, unitId: u.id, name: unitName(u), category: u.category, points: u.points,
-    rank: levelForXp(u.xp), tough: f.tough + g.tough, size: f.size, impact: f.impact, skills,
+    rank: levelForXp(u.xp), tough: Math.max(1, f.tough + g.tough + h.tough), size: f.size, impact: f.impact, skills,
     quality: f.quality,
     guns: f.guns.map((x) => ({
       ...x, range: x.melee ? x.range : x.range + rangeBonus(u, x.name), cd: 0, pending: 0, gap: 0, next: 0,
@@ -231,6 +207,8 @@ export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): Uni
     boost: { hit: 0, save: 0, rate: 0, range: 0 }, dmgBoost: { mul: 0, left: 0 }, kills: 0, dealt: 0,
     up: 0, cap: levelCap(u.points), holdLeft: 0, frenzy: 0, frenzyMul: 1, craftedAt, xp: 0,
     init: h.init + g.init, jumpy: h.jumpy, myopic: h.myopic,
-    ...(g.hold !== 1 ? { grit: g.hold } : {}), ...(relics.length ? { relics } : {}),
+    ...(grit !== 1 ? { grit } : {}), ...(relics.length ? { relics } : {}),
+    ...(u.quirks?.length ? { quirks: [...u.quirks] } : {}), ...(u.trinket ? { trinket: u.trinket } : {}),
+    ...(coverMulOf(h) !== 1 ? { coverMul: coverMulOf(h) } : {}),
   };
 }

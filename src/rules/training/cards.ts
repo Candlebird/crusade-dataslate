@@ -4,6 +4,7 @@ import { TRAINING } from '../downtimeData';
 import { routeOf, unitTowers } from './board';
 import { applyLevel, levelCost } from './economy';
 import { pick, rand } from './rng';
+import { isTrinketCard, takeTrinket, trinketCardText, trinketOffer } from './trinkets';
 import { layCover } from './waves';
 import type { CardDraw, TrainingRun, UnitTower } from './types';
 
@@ -102,15 +103,19 @@ export function drawCards(run: TrainingRun): CardDraw[] {
   return out;
 }
 
-/** Put a draw on offer (a boss died). Does nothing while one is already on offer. */
+/** Put a draw on offer (a boss died), maybe with a trinket card as well (trinkets.ts). Does nothing while one is
+ *  already on offer. */
 export function offerCards(run: TrainingRun): void {
   if (run.offer?.length) return;
   const d = drawCards(run);
+  const k = trinketOffer(run);
+  if (k) d.push(k);
   if (d.length) run.offer = d;
 }
 
 /** A drawn card's name and text, its unit named. */
 export function cardText(run: TrainingRun, d: CardDraw): { name: string; text: string } {
+  if (isTrinketCard(d)) return trinketCardText(run, d);
   const c = cardById(d.id);
   const t = unitTowers(run).find((u) => u.unitId === d.unitId);
   return { name: c?.name ?? d.id, text: (c?.text ?? '').replace('{unit}', t?.name ?? '') };
@@ -120,9 +125,12 @@ export function cardText(run: TrainingRun, d: CardDraw): { name: string; text: s
 export function pickCard(run: TrainingRun, i: number): void {
   const d = run.offer?.[i];
   if (!d) throw new Error('No such card on offer.');
-  const c = cardById(d.id);
-  if (!c) throw new Error('No such card.');
-  c.apply(run, unitTowers(run).find((u) => u.unitId === d.unitId));
+  if (isTrinketCard(d)) takeTrinket(run, d);
+  else {
+    const c = cardById(d.id);
+    if (!c) throw new Error('No such card.');
+    c.apply(run, unitTowers(run).find((u) => u.unitId === d.unitId));
+  }
   run.cards.push(d);
   run.offer = undefined;
   const { name, text } = cardText(run, d);

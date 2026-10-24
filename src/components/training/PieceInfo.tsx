@@ -2,7 +2,7 @@ import type { Unit } from '../../model/types';
 import { SHARD_TYPES } from '../../rules/downtimeData';
 import { describe } from '../../rules/abilities';
 import { gradeName, levelDmg, reach, type Piece, type Tower, type TowerGun } from '../../rules/training';
-import { RecordBadges, RelicList } from './RecordBadges';
+import { HabitBadges, RecordBadges, RelicList } from './RecordBadges';
 import { ShardBadge } from './ShardBadge';
 
 export interface PieceInfoProps {
@@ -22,7 +22,8 @@ function gunLine(t: Tower, g: TowerGun): string {
   return `${g.name}: ${r1(g.attacks)} attack${g.attacks === 1 ? '' : 's'}, ${g.melee ? 'melee' : `${r1(reach(t, g))} cells`}, ${dmg} dmg${rules ? ` · ${rules}` : ''}`;
 }
 
-/** What the selected piece is: a crafted unit's weapons, skills, record, relics and tally, or a Shard's type and grade. */
+/** What the selected piece is: a crafted unit's weapons, skills, record, Sortie quirks and trinket, relics and tally, or
+ *  a Shard's type and grade. */
 export function PieceInfo({ piece, record, onClose }: PieceInfoProps) {
   if (piece.kind === 'rubble') return null;
   const unit = piece.kind === 'unit' ? piece : null;
@@ -40,6 +41,7 @@ export function PieceInfo({ piece, record, onClose }: PieceInfoProps) {
       {piece.guns.map((g, i) => <div key={i}>{gunLine(piece, g)}</div>)}
       {unit?.skills.map((k, i) => <div key={`k${i}`} className="muted">{k.gun ? `${k.gun} · ` : ''}{k.source}: {describe(k.effect)}</div>)}
       {unit && record && <RecordBadges unit={record} full />}
+      {unit && <HabitBadges unit={unit} />}
       {unit?.relics?.length ? <RelicList relics={unit.relics} /> : null}
       <div className="muted">Quality {piece.quality}+ · {piece.kills} kill{piece.kills === 1 ? '' : 's'} · {Math.round(piece.dealt)} damage{unit ? ` · ${unit.xp} XP` : ''}</div>
     </div>

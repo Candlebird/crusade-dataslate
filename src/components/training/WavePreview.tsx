@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyDef } from '../../rules/downtimeData';
-import { previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
+import { isNemesisWave, nemesisTricks, previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
 import { enemyShape } from './drawLive';
 
 export interface WavePreviewProps {
@@ -24,6 +24,11 @@ export function WaveStatus({ run }: WavePreviewProps) {
       <div className="training-status-head">
         <b>{live ? `Wave ${n} under way` : `Next: wave ${n}`}</b>
         {waveTags(n).map((t) => <span key={t} className="tag">{t}</span>)}
+        {run.nemesis && isNemesisWave(run, n) && (
+          <span className="tag red" title={`Your Sortie nemesis is this wave's Echo Lord. ${nemesisTricks(run.nemesis).map((t) => `${t.name}: ${t.text}`).join(' ')}`}>
+            Nemesis: {run.nemesis.name}
+          </span>
+        )}
       </div>
       {live ? <div className="muted">{left} enem{left === 1 ? 'y' : 'ies'} left</div> : <WavePreview run={run} />}
     </div>

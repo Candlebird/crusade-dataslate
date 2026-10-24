@@ -4,7 +4,8 @@ import type { Unit, Weapon } from '../../model/types';
 import { applySelection, normalizeBook } from '../../armyforge/book';
 import { newUnit, unitFromCatalog } from '../../model/factory';
 import { TRAINING } from '../downtimeData';
-import { habitNames, habitsOf, readyRecipes, recipesFor, recipeUses, typeScores, unitTower } from './recipes';
+import { habitNames, habitsOf } from './habits';
+import { readyRecipes, recipesFor, recipeUses, typeScores, unitTower } from './recipes';
 import { shardPiece } from './shards';
 import { blankRun } from './testRun';
 import type { Grade, Recipe } from './types';
@@ -131,11 +132,11 @@ describe('training unit towers', () => {
 
   it('brings Sortie habits that do something here', () => {
     const u = newUnit({ quirks: ['eagle', 'clumsy', 'quick', 'hardy', 'myopic'], trinket: 'knuckles', weapons: [gun('Rifles', 24, 1, 5)] });
-    expect(habitsOf(u)).toEqual({ shoot: 0, melee: 0, init: 1, jumpy: false, myopic: true });
-    expect(habitNames(u)).toEqual(['Eagle-eyed', 'Clumsy', 'Quick', 'Short-sighted', 'Spiked Knuckles']);
+    expect(habitsOf(u)).toEqual({ shoot: 0, melee: 0, init: 1, jumpy: false, myopic: true, hold: 0, tough: 1, cover: 0 });
+    expect(habitNames(u)).toEqual(['Eagle-eyed', 'Clumsy', 'Quick', 'Hardy', 'Short-sighted', 'Spiked Knuckles']);
     const t = unitTower(u, 1, { x: 0, y: 0 }, 0);
     expect(t.init).toBe(1);
     expect(t.myopic).toBe(true);
-    expect(habitNames(newUnit({ trinket: 'flask' }))).toEqual([]);
+    expect(habitNames(newUnit({ trinket: 'flask' }))).toEqual(['Calming Flask']);
   });
 });

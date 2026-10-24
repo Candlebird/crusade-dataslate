@@ -110,6 +110,19 @@ export interface UnitTower extends PieceBase, Armed {
   brace?: number;
   /** Its relics, each going off by itself on its own clock during waves (relics.ts). */
   relics?: RelicSocket[];
+  /** Its Sortie quirks and trinket as crafted (habits.ts), and a trinket taken this run (trinkets.ts). */
+  quirks?: string[];
+  trinket?: string;
+  /** Times the cover penalty on its shots (region quirks; 1 if unset). */
+  coverMul?: number;
+  /** What it did this run, for the quirk it may pick up (tally.ts): damage by shots and blows, and holds. */
+  tally?: Tally;
+}
+
+export interface Tally {
+  shot: number;
+  melee: number;
+  holds: number;
 }
 
 /** What a relic does when it goes off (relics.ts). */
@@ -184,6 +197,8 @@ export interface SpawnPlan {
   hp: number;
   flies: boolean;
   vet?: boolean;
+  /** The force's Sortie nemesis (nemesis.ts): the wave's boss is it. */
+  nemesis?: boolean;
 }
 
 /** Damage over time on an enemy, credited to piece `by`. */
@@ -214,6 +229,48 @@ export interface Enemy {
   /** The unit holding it (piece id), and seconds before anyone can grab it again once let go. */
   heldBy?: number;
   regrab: number;
+  /** The nemesis's tricks at work (nemesis.ts). */
+  nem?: NemesisState;
+}
+
+/** A nemesis on the field: when it came, its walking speed share (rage, Vengeful), better saves (Hardened), whether
+ *  anything can hold it (Dread), and the clocks of its timed tricks. */
+export interface NemesisState {
+  born: number;
+  speed: number;
+  hard: number;
+  free?: boolean;
+  next: number;
+  regen: number;
+  /** Its clocks are set (on its first tick). */
+  armed?: boolean;
+}
+
+/** The force's Sortie nemesis, waiting for wave TRAINING.shared.nemesis.wave: which lord, its name, its grudge, the
+ *  rematch tricks it brings (times the force has slain it on a Sortie), its signature, and whether it fell here. */
+export interface RunNemesis {
+  id: string;
+  name: string;
+  grudge: number;
+  rematch: number;
+  sig: string;
+  sigName: string;
+  slain?: boolean;
+}
+
+/** Echoes met (waves met in; `at` the last wave counted) and slain this run, by Training kind or 'nemesis'. */
+export interface RunBeast {
+  met: number;
+  slain: number;
+  at?: number;
+}
+
+/** A quirk a unit picks up from the run, applied when it is banked. */
+export interface QuirkGain {
+  unitId: string;
+  name: string;
+  quirk: string;
+  good: boolean;
 }
 
 /** A shot, blow or effect, drawn for a moment. */
@@ -239,6 +296,8 @@ export interface CardDraw {
   id: string;
   rarity: RelicTier;
   unitId?: string;
+  /** A trinket card (trinkets.ts, id 'trinket'): the Sortie trinket it gives. */
+  trinket?: string;
 }
 
 /** Run-wide modifiers cards give. */
@@ -252,7 +311,7 @@ export interface RunMods {
 
 export interface TrainingRun {
   /** Save format version (save.ts SAVE_VERSION). */
-  v: 2;
+  v: 3;
   forceId: string;
   seed: number;
   /** mulberry32 state: the same seed and the same moves play out the same. */
@@ -291,11 +350,21 @@ export interface TrainingRun {
   banked: Record<string, number>;
   fx: Fx[];
   log: string[];
+  /** The Sortie layer (F2): the nemesis waiting at its wave; Echoes met and slain for the bestiary; the units each boss
+   *  walked past in reach and those that hit it (by enemy id); the trinket card offered (and to whom, if taken); and
+   *  the quirks the run gives, rolled once at its end. */
+  nemesis?: RunNemesis;
+  beasts?: Record<string, RunBeast>;
+  watch?: Record<string, { passed: string[]; hit: string[] }>;
+  trinket?: { offered: boolean; id?: string; unitId?: string };
+  gains?: QuirkGain[];
+  /** The Sortie layer has been banked into the force (shared.ts bankShared). */
+  shared?: boolean;
 }
 
 /** What a saved run looks like on disk (save.ts). */
 export interface SavedRun {
-  v: 2;
+  v: 3;
   savedAt: string;
   run: TrainingRun;
 }

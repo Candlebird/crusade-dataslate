@@ -1,8 +1,12 @@
 import type { EmblemLayer } from '../../model/types';
-import { autoCardIndex, cardText, unitTowers, type CardDraw, type TrainingRun } from '../../rules/training';
+import { autoCardIndex, cardText, isTrinketCard, unitTowers, type CardDraw, type TrainingRun } from '../../rules/training';
+import { TRAINING } from '../../rules/downtimeData';
 import { EmblemBadge } from '../Emblem';
 
 export const TIER_TAG: Record<CardDraw['rarity'], string> = { Common: '', Rare: 'red', Legendary: 'gold' };
+
+/** A card's tag colour: by rarity, gold for a trinket. */
+export const cardTag = (d: CardDraw) => (isTrinketCard(d) ? 'gold' : TIER_TAG[d.rarity]);
 
 export interface CardOfferProps {
   run: TrainingRun;
@@ -15,7 +19,8 @@ export interface CardOfferProps {
   onPeek: () => void;
 }
 
-/** The cards on offer after a boss falls: they rise up one after another, and glow by rarity. */
+/** The cards on offer after a boss falls: they rise up one after another, and glow by rarity. A trinket card (a Sortie
+ *  trinket the unit keeps) is tagged as one. */
 export function CardOffer({ run, offer, portraits, auto, onPick, onPeek }: CardOfferProps) {
   const best = autoCardIndex(run);
   const top = offer.some((d) => d.rarity === 'Legendary') ? 'legendary' : offer.some((d) => d.rarity === 'Rare') ? 'rare' : 'common';
@@ -23,7 +28,7 @@ export function CardOffer({ run, offer, portraits, auto, onPick, onPeek }: CardO
   return (
     <div className={`training-cards ${top}`} role="dialog" aria-label="Choose a card">
       <div className="training-cards-title">
-        <div className="training-cards-kicker">The Echo Lord falls · wave {run.wave}</div>
+        <div className="training-cards-kicker">{run.nemesis?.slain && run.wave === TRAINING.shared.nemesis.wave ? run.nemesis.name : 'The Echo Lord'} falls · wave {run.wave}</div>
         <h2>Choose a boon</h2>
       </div>
       <div className="training-cards-row">
@@ -40,7 +45,7 @@ export function CardOffer({ run, offer, portraits, auto, onPick, onPeek }: CardO
               onClick={() => onPick(i)}
             >
               <span className="training-card-shine" aria-hidden />
-              <span className={`tag ${TIER_TAG[d.rarity]}`}>{d.rarity}</span>
+              <span className={`tag ${cardTag(d)}`}>{isTrinketCard(d) ? 'Trinket' : d.rarity}</span>
               <span className="training-card-name">{c.name}</span>
               {unit && <span className="training-card-unit">{face ? <EmblemBadge emblem={face} size={18} /> : null} {unit.name}</span>}
               <span className="training-card-text">{c.text}</span>

@@ -1,4 +1,4 @@
-import type { Unit } from '../../model/types';
+import type { ForceSortie, Unit } from '../../model/types';
 import { TRAINING } from '../downtimeData';
 import { pieceById, unitTowers } from './board';
 import { abilities, auras, fireAll, holds, reap, tickEnemies } from './combat';
@@ -6,21 +6,26 @@ import { waveCredits } from './economy';
 import { canTrain, recipesFor, recipeUses, unitTower } from './recipes';
 import { crumbleDraft, drawDraft, toRubble } from './shards';
 import { relics, resetSockets } from './relics';
+import { nemesisPlan, nemesisTick, pickNemesis } from './nemesis';
+import { rollGains, watchBosses } from './quirks';
 import { planWave, runCover, spawnDue, walk } from './waves';
 import type { ShardPiece, TrainingRun, UnitTower } from './types';
 
 // A run's life: create, build-phase actions, waves, step(), XP, the end.
 
-/** A new run for a force: recipes for every unit that can train, cover, credits, and the first draft drawn ('build'). */
-export function createRun(forceId: string, units: Unit[], seed: number): TrainingRun {
+/** A new run for a force: recipes for every unit that can train, cover, credits, and the first draft drawn ('build').
+ *  `story`: the force's Sortie record, for its nemesis (nemesis.ts). */
+export function createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie): TrainingRun {
   const force = units.filter(canTrain);
   const run: TrainingRun = {
-    v: 2, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
+    v: 3, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
     power: force.reduce((n, u) => n + u.points, 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
     mends: 0, leaked: 0, nextId: 1, pieces: [], draft: { step: 'done', hand: [], placed: [] }, recipes: recipesFor(force),
     crafted: [], enemies: [], queue: [], cover: [], cards: [], mods: { bounty: 1, holdMul: 1, regrabAdd: 0 }, banked: {},
     fx: [], log: [],
   };
+  const nemesis = pickNemesis(story);
+  if (nemesis) run.nemesis = nemesis;
   run.cover = runCover(run);
   drawDraft(run);
   return run;
@@ -43,7 +48,7 @@ export function startWave(run: TrainingRun): void {
   run.phase = 'wave';
   run.t = 0;
   run.leaked = 0;
-  run.queue = planWave(run, run.wave);
+  run.queue = nemesisPlan(run, planWave(run, run.wave));
   for (const p of run.pieces) {
     if (p.kind === 'rubble') continue;
     p.guns.forEach((g) => Object.assign(g, { cd: 0, pending: 0, next: 0 }));
@@ -67,12 +72,14 @@ export function step(run: TrainingRun, dt: number): void {
   run.t += dt;
   spawnDue(run);
   auras(run, dt);
+  nemesisTick(run, dt);
   abilities(run, dt);
   relics(run, dt);
   holds(run, dt);
   fireAll(run, dt);
   tickEnemies(run, dt);
   walk(run, dt);
+  watchBosses(run);
   reap(run);
   if (run.baseHp <= 0) endRun(run, 'The base falls.');
   else if (!run.queue.length && !run.enemies.length) waveCleared(run);
@@ -164,6 +171,7 @@ export function endRun(run: TrainingRun, why: string): void {
   run.queue = [];
   run.offer = undefined;
   run.log.push(`${why} Waves cleared: ${run.cleared}.`);
+  rollGains(run);
 }
 
 /** Give up the run where it stands. */
