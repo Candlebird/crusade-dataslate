@@ -1,7 +1,7 @@
 import { SHARD_TYPES, type ShardType } from '../../rules/downtimeData';
 import { gradeName, type Grade } from '../../rules/training';
 import { Icon } from '../Icon';
-import { SHARD_ICON, gradeTint } from './art';
+import { SHARD_ICON, gradeTint, shardColor } from './art';
 
 export interface ShardBadgeProps {
   type: ShardType;
@@ -19,12 +19,13 @@ export interface ShardBadgeProps {
 /** One Shard for the panels: its type's crystal, tinted dull (Cracked) to bright (Pristine), with 1–5 grade pips. */
 export function ShardBadge({ type, grade, size = 22, faded, glow, noPips }: ShardBadgeProps) {
   const def = SHARD_TYPES[type];
+  const color = shardColor(type);
   const title = `${gradeName(grade)} ${def.name}`;
   return (
     <span
       className={`shard-badge${faded ? ' faded' : ''}${glow ? ' glow' : ''}`}
       title={title}
-      style={{ ['--shard' as string]: def.color, color: gradeTint(def.color, grade), fontSize: size }}
+      style={{ ['--shard' as string]: color, color: gradeTint(color, grade), fontSize: size }}
     >
       <Icon name={SHARD_ICON[type]} title={title} />
       {!noPips && <GradePips grade={grade} />}

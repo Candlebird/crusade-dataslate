@@ -17,7 +17,7 @@ import { glowIds } from './recipeView';
 import { RunSummary } from './RunSummary';
 import { ShopPanel } from './ShopPanel';
 import { StartScreen } from './StartScreen';
-import { WavePreview } from './WavePreview';
+import { WaveStatus } from './WavePreview';
 import { useBank } from './useBank';
 import { useRunLoop } from './useRunLoop';
 
@@ -91,6 +91,8 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
       bank.finish(r);
       clearSave(r.forceId);
       setCrafting(null);
+      setSel(null);
+      setFocus(null);
     }
   };
   useRunLoop(run, { speed, paused, onTick: () => setTick((n) => n + 1), onPhase });
@@ -158,6 +160,8 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   const quit = () => {
     if (!confirmAction('End this run? XP already earned stays banked.')) return;
     end(run);
+    setCrafting(null);
+    setSel(null);
     refresh();
   };
   const take = (i: number) => {
@@ -165,40 +169,63 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     setPeek(false);
   };
   const again = () => begin(createRun(force.id, force.units, newSeed()));
+  /** Start (or cancel) a craft; the floating piece card makes way for the craft banner. */
+  const craftMode = (cr: Crafting | null) => {
+    setCrafting(cr);
+    if (cr) setSel(null);
+  };
+  const over = run.phase === 'over';
+  const craftName = craftNow ? run.recipes.find((r) => r.unitId === craftNow.unitId)?.name ?? 'The unit' : '';
 
+  // The map (with the HUD over it) is the stage; the panels sit beside it, or under it on a phone. The header's ×
+  // closes (the run saves between waves); the run summary comes up over the map when the base falls.
   return (
-    <Modal title="Training sim" onClose={close} wide footer={
-      run.phase === 'over'
-        ? <><button onClick={again}>Train again</button><button className="primary" onClick={onClose}>Done</button></>
-        : <button onClick={close} title={build ? 'The run is saved: resume it later.' : 'Leaving mid-wave ends the run.'}>Close</button>
-    }>
+    <Modal title="Training sim" onClose={close}>
       <div className="training-game">
-        <HudBar run={run} best={best.current} speed={speed} onSpeed={setSpeed} onStart={start} onQuit={quit} paused={paused} onPause={() => setPaused(!paused)} />
-        <div className="training">
+        <div className="training-stage">
+          <HudBar run={run} best={best.current} speed={speed} onSpeed={setSpeed} onStart={start} onQuit={quit} paused={paused} onPause={() => setPaused(!paused)} />
           <div className="training-board">
-            <MapView run={run} portraits={portraits} glow={glow} selected={sel ?? undefined} placing={placing} onCell={onCell} />
-            {build && <div className="row small training-next"><span className="muted">Next wave:</span><WavePreview run={run} /></div>}
-            <div className="training-log muted small">{run.log.slice(-3).map((l, i) => <div key={i}>{l}</div>)}</div>
-          </div>
-          <div className="training-side small">
-            {build && run.offer && peek && <button className="primary" onClick={() => setPeek(false)}>Pick a card</button>}
-            {run.phase === 'wave' && run.offer && <div className="muted">The Echo Lord fell: pick a card after this wave.</div>}
-            {selPiece && <PieceInfo piece={selPiece} onClose={() => setSel(null)} />}
-            <DraftPanel run={run} pick={pick} onPick={setPick} onFocus={setFocus} onChange={refresh} />
-            {run.phase !== 'over' && <RecipeBook run={run} units={force.units} portraits={portraits} crafting={craftNow} onCraft={setCrafting} />}
-            {run.phase !== 'over' && <ShopPanel run={run} portraits={portraits} sel={sel} onSelect={setSel} onChange={refresh} />}
-            {run.cards.length > 0 && (
-              <div>
-                <b>Cards</b>{' '}
-                {run.cards.map((d, i) => {
-                  const t = cardText(run, d);
-                  return <span key={i} className={`tag ${TIER_TAG[d.rarity]}`} title={t.text}>{t.name}</span>;
-                })}
+            <MapView run={run} portraits={portraits} glow={glow} selected={sel ?? undefined} placing={placing} paused={paused} onCell={onCell} />
+            {selPiece && !over && <PieceInfo piece={selPiece} onClose={() => setSel(null)} />}
+            {craftNow && (
+              <div className="training-map-banner small" role="status">
+                <span className="grow">Tap one of the glowing Shards: {craftName} stands there, the rest turn to rubble.</span>
+                <button onClick={() => setCrafting(null)}>Cancel</button>
+              </div>
+            )}
+            {over && (
+              <div className="training-over">
+                <div className="training-over-card">
+                  <RunSummary run={run} best={best.current} />
+                  <div className="training-over-actions">
+                    <button onClick={again}>Train again</button>
+                    <button className="primary" onClick={onClose}>Done</button>
+                  </div>
+                </div>
               </div>
             )}
           </div>
         </div>
-        {run.phase === 'over' && <RunSummary run={run} best={best.current} />}
+        <div className="training-side small">
+          <WaveStatus run={run} />
+          {build && run.offer && peek && <button className="primary" onClick={() => setPeek(false)}>Pick a card</button>}
+          {run.phase === 'wave' && run.offer && <div className="muted">The Echo Lord fell: pick a card after this wave.</div>}
+          <DraftPanel run={run} pick={pick} sel={sel} onPick={setPick} onFocus={setFocus} onChange={refresh} />
+          {!over && <RecipeBook run={run} units={force.units} portraits={portraits} crafting={craftNow} onCraft={craftMode} />}
+          {!over && <ShopPanel run={run} portraits={portraits} sel={sel} onSelect={setSel} onChange={refresh} />}
+          {run.cards.length > 0 && (
+            <div className="training-held">
+              <b>Cards</b>{' '}
+              {run.cards.map((d, i) => {
+                const t = cardText(run, d);
+                return <span key={i} className={`tag ${TIER_TAG[d.rarity]}`} title={`${t.name}: ${t.text}`}>{t.name}</span>;
+              })}
+            </div>
+          )}
+          <div className="training-log muted small" aria-label="Run log, newest first">
+            {run.log.slice(-20).reverse().map((l, i) => <div key={i}>{l}</div>)}
+          </div>
+        </div>
       </div>
       {build && run.offer && !peek && <CardOffer run={run} offer={run.offer} portraits={portraits} onPick={take} onPeek={() => setPeek(true)} />}
     </Modal>

@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EmblemLayer } from '../../model/types';
 import { N, placeProblem, type DrawnShard, type Tile, type TrainingRun } from '../../rules/training';
-import { drawBoard, type Overlay } from './draw';
+import { drawBoard, drawVeil, type Overlay } from './draw';
 import { drawEnemies, drawFx } from './drawLive';
+import { burstsLive, drawBursts, trackBursts } from './fxBursts';
 
 // The Training map on a canvas: fit to its box, wheel zoom about the cursor, drag to pan, pinch and one-finger pan on
 // touch, and a click or tap reports the cell. The run is read live every frame it redraws (the shell mutates it).
+// Placing by touch takes two taps: the first shows the ghost there (zooming in if the map is small), a second tap on
+// it or Place puts it down.
 
 export interface MapViewProps {
   run: TrainingRun;
@@ -21,12 +24,19 @@ export interface MapViewProps {
   onCell: (cell: Tile, place: Tile) => void;
   /** The pointer moved to another cell (null: off the map). */
   onHover?: (cell: Tile | null, place: Tile | null) => void;
+  /** The wave is paused: the map dims with "Paused". Left out, a wave whose clock stops for a moment counts as paused. */
+  paused?: boolean;
   className?: string;
 }
 
 /** Most it zooms in, times the fit; and how far a press moves (pixels) before it is a drag, not a click. */
 const MAX_ZOOM = 8;
 const DRAG_PX = 6;
+/** Below this many pixels a cell, a first tap to place zooms in to TAP_ZOOM_PX a cell around it. */
+const TAP_ZOOM_BELOW = 9;
+const TAP_ZOOM_PX = 14;
+/** A wave clock still for this long (ms) shows as paused. */
+const STILL_MS = 300;
 const NONE = new Set<number>();
 
 interface View { k: number; ox: number; oy: number; w: number; h: number; fit: number }
@@ -55,7 +65,17 @@ export function MapView(props: MapViewProps) {
   const hover = useRef<{ x: number; y: number } | null>(null);
   const dirty = useRef(true);
   const [zoomed, setZoomed] = useState(false);
+  /** A touch placement waiting to be confirmed: where, and whether it may go there. */
+  const [pending, setPending] = useState<{ cell: Tile; place: Tile; ok: boolean } | null>(null);
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
+  /** The spot a piece just went down on: no ghost there until the pointer moves on. */
+  const justPlaced = useRef('');
   dirty.current = true;
+
+  // A new thing to place, a new layout or the end of placing drops a waiting touch placement.
+  const layout = `${props.run.pieces.length},${props.run.nextId},${props.run.phase}`;
+  useEffect(() => { setPending(null); }, [props.placing, layout]);
 
   const setView = (v: View) => {
     view.current = clamp(v);
@@ -104,12 +124,15 @@ export function MapView(props: MapViewProps) {
     let raf = 0;
     let ghostKey = '';
     let ghostOk = false;
+    let clock = { t: -1, at: 0 };
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const p = live.current;
       const run = p.run;
       const glow = p.glow ?? NONE;
-      if (!dirty.current && run.phase !== 'wave' && !run.fx.length && !glow.size) return;
+      const sec = now / 1000;
+      trackBursts(run, sec);
+      if (!dirty.current && run.phase !== 'wave' && !run.fx.length && !glow.size && !burstsLive(run, sec)) return;
       dirty.current = false;
       const cv = canvas.current;
       const ctx = cv?.getContext('2d');
@@ -122,20 +145,22 @@ export function MapView(props: MapViewProps) {
       ctx.translate(v.ox, v.oy);
       let ghost: Overlay['ghost'];
       const at = p.placing && run.phase !== 'over' && hover.current ? cellsAt(hover.current.x, hover.current.y) : null;
-      if (at) {
+      if (at && `${at.place.x},${at.place.y}` !== justPlaced.current) {
         // Legality walks the whole maze, so only ask again when the spot or the pieces change.
         const key = `${at.place.x},${at.place.y},${run.pieces.length},${run.nextId}`;
         if (key !== ghostKey) { ghostKey = key; ghostOk = !placeProblem(run, at.place.x, at.place.y); }
         ghost = { at: at.place, ok: ghostOk, shard: p.placing === true ? undefined : p.placing };
       }
       const s = v.k;
-      drawBoard(ctx, run, s, { portraits: p.portraits, glow, selected: p.selected, ghost, time: now / 1000 });
-      drawEnemies(ctx, run, s);
+      drawBoard(ctx, run, s, { portraits: p.portraits, glow, selected: p.selected, ghost, time: sec });
+      drawEnemies(ctx, run, s, sec);
       drawFx(ctx, run, s);
-      if (run.phase === 'over') {
-        ctx.fillStyle = 'rgba(12,13,15,0.55)';
-        ctx.fillRect(0, 0, N * s, N * s);
-      }
+      drawBursts(ctx, run, s, sec);
+      if (run.t !== clock.t || run.phase !== 'wave') clock = { t: run.t, at: now };
+      const paused = p.paused ?? now - clock.at > STILL_MS;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      if (run.phase === 'over') drawVeil(ctx, v.w, v.h, 'Run over');
+      else if (paused && run.phase === 'wave') drawVeil(ctx, v.w, v.h, 'Paused', 0.4);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
@@ -148,6 +173,8 @@ export function MapView(props: MapViewProps) {
       e.preventDefault();
       const at = local(e);
       zoomAt(at.x, at.y, Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : 0.0015)));
+      // The same spot on screen is another cell now: move the ghost with it.
+      if (!pendingRef.current) reportHover(at);
     };
     cv.addEventListener('wheel', wheel, { passive: false });
     return () => cv.removeEventListener('wheel', wheel);
@@ -163,6 +190,7 @@ export function MapView(props: MapViewProps) {
     hover.current = pt ? toMap(pt.x, pt.y) : null;
     dirty.current = true;
     const at = hover.current ? cellsAt(hover.current.x, hover.current.y) : null;
+    if (`${at?.place.x},${at?.place.y}` !== justPlaced.current) justPlaced.current = '';
     const key = at ? `${at.cell.x},${at.cell.y},${at.place.x},${at.place.y}` : '';
     if (key === lastCell.current) return;
     lastCell.current = key;
@@ -214,10 +242,47 @@ export function MapView(props: MapViewProps) {
     }
     if (pointers.current.size || press.current.moved || press.current.pinched || e.type === 'pointercancel') return;
     const at = local(e);
-    reportHover(at);
     const m = toMap(at.x, at.y);
     const hit = cellsAt(m.x, m.y);
-    if (hit) live.current.onCell(hit.cell, hit.place);
+    if (!hit) return;
+    const p = live.current;
+    if (p.placing && e.pointerType !== 'mouse' && p.run.phase !== 'over') {
+      const was = pendingRef.current;
+      // A second tap on the waiting ghost confirms it; anywhere else moves it there.
+      if (was && hit.cell.x >= was.place.x && hit.cell.x <= was.place.x + 1 && hit.cell.y >= was.place.y && hit.cell.y <= was.place.y + 1) {
+        confirm();
+        return;
+      }
+      setPending({ ...hit, ok: !placeProblem(p.run, hit.place.x, hit.place.y) });
+      const v = view.current;
+      // Zoom in on it, with the ghost brought to the middle (an edge tap would leave it under the bar).
+      if (v.k < TAP_ZOOM_BELOW) {
+        const k = Math.min(v.fit * MAX_ZOOM, TAP_ZOOM_PX);
+        setView({ ...v, k, ox: v.w / 2 - (hit.place.x + 1) * k, oy: v.h / 2 - (hit.place.y + 1) * k });
+      }
+      // Aim the ghost at the middle of the footprint, wherever the view went.
+      hover.current = { x: hit.place.x + 1, y: hit.place.y + 1 };
+      dirty.current = true;
+      return;
+    }
+    reportHover(at);
+    place(hit.cell, hit.place);
+  };
+  const place = (cell: Tile, at: Tile) => {
+    if (live.current.placing) justPlaced.current = `${at.x},${at.y}`;
+    live.current.onCell(cell, at);
+  };
+  const confirm = () => {
+    const was = pendingRef.current;
+    if (!was) return;
+    setPending(null);
+    hover.current = null;
+    place(was.cell, was.place);
+  };
+  const cancel = () => {
+    setPending(null);
+    hover.current = null;
+    dirty.current = true;
   };
   const leave = (e: React.PointerEvent<HTMLCanvasElement>) => {
     if (e.pointerType === 'mouse' && !pointers.current.size) reportHover(null);
@@ -236,6 +301,24 @@ export function MapView(props: MapViewProps) {
         onContextMenu={(e) => e.preventDefault()}
       />
       {zoomed && <button type="button" className="training-map-fit small" onClick={fit}>Fit</button>}
+      {pending && (
+        <div role="group" aria-label="Place here?" style={barAt(pending.place, view.current)}>
+          {pending.ok ? (
+            <button type="button" className="primary small" onClick={confirm}>Place</button>
+          ) : (
+            <span className="small" style={{ color: '#ff9d92' }}>Can't go there</span>
+          )}
+          <button type="button" className="small" onClick={cancel}>Cancel</button>
+        </div>
+      )}
     </div>
   );
 }
+
+/** The touch Place / Cancel bar along the map's foot, or its head when the ghost sits low (styled inline: it is the
+ *  map's own control). */
+const barAt = (at: Tile, v: View): React.CSSProperties => ((at.y + 2) * v.k + v.oy > v.h - 64 ? { ...BAR, bottom: undefined, top: 8 } : BAR);
+const BAR: React.CSSProperties = {
+  position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', display: 'flex', gap: 8, alignItems: 'center',
+  padding: '6px 8px', borderRadius: 6, background: 'rgba(12,13,15,0.88)', border: '1px solid #2c333d', whiteSpace: 'nowrap',
+};

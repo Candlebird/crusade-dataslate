@@ -1,5 +1,5 @@
 import { TRAINING } from '../../rules/downtimeData';
-import { startProblem, waveTags, type TrainingRun } from '../../rules/training';
+import { startProblem, type TrainingRun } from '../../rules/training';
 import { Icon } from '../Icon';
 
 export type Speed = 1 | 2 | 4;
@@ -24,14 +24,13 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
   const low = run.baseHp <= TRAINING.baseHp / 3;
   const why = run.phase === 'build' ? startProblem(run) : null;
   const next = run.wave + 1;
-  const tags = waveTags(run.phase === 'wave' ? run.wave : next);
-  const left = run.enemies.length + run.queue.length;
+  const live = run.phase === 'wave';
+  // What the next wave brings is on the wave line beside the map; the HUD only counts.
   return (
     <div className="training-hud small" role="toolbar" aria-label="Training run">
-      <span className="training-hud-stat" title="Waves cleared">
-        <Icon name="g:crossed-swords" /> Wave <b>{run.phase === 'wave' ? run.wave : run.cleared}</b>
+      <span className="training-hud-stat" title={live ? 'The wave under way' : 'Waves cleared'}>
+        <Icon name="g:crossed-swords" /> {live ? 'Wave' : 'Cleared'} <b>{live ? run.wave : run.cleared}</b>
         {best ? <span className="muted"> · best {Math.max(best, run.cleared)}</span> : null}
-        {tags.map((t) => <span key={t} className="tag">{t}</span>)}
       </span>
       <span className="training-hud-stat" title="Base HP: each enemy that gets through costs some">
         <Icon name="g:castle" /> <b style={{ color: low ? 'var(--red)' : undefined }}>{run.baseHp}/{TRAINING.baseHp}</b>
@@ -42,18 +41,21 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
       <span className="training-hud-stat" title="Luck: better Shard grades in each draft">
         <Icon name="g:sparkles" /> {run.luck}/{TRAINING.shards.luckCost.length}
       </span>
-      {run.phase === 'wave' && <span className="muted">{left} enem{left === 1 ? 'y' : 'ies'} left</span>}
       <span className="grow" />
-      <span className="training-speed" role="group" aria-label="Speed">
-        {SPEEDS.map((s) => (
-          <button key={s} className={s === speed ? 'primary' : ''} aria-pressed={s === speed} onClick={() => onSpeed(s)}>{s}×</button>
-        ))}
-      </span>
-      {onPause && run.phase === 'wave' && <button onClick={onPause}>{paused ? 'Resume' : 'Pause'}</button>}
-      {run.phase === 'build' && (
-        <button className="primary" disabled={!!why} title={why ?? undefined} onClick={onStart}>Start wave {next}</button>
+      {run.phase !== 'over' && (
+        <span className="training-hud-actions">
+          <span className="training-speed" role="group" aria-label="Speed">
+            {SPEEDS.map((s) => (
+              <button key={s} className={s === speed ? 'primary' : ''} aria-pressed={s === speed} onClick={() => onSpeed(s)}>{s}×</button>
+            ))}
+          </span>
+          {onPause && live && <button className="training-hud-go" onClick={onPause}>{paused ? 'Resume' : 'Pause'}</button>}
+          {run.phase === 'build' && (
+            <button className="primary training-hud-go" disabled={!!why} title={why ?? undefined} onClick={onStart}>Start wave {next}</button>
+          )}
+          <button onClick={onQuit}>End run</button>
+        </span>
       )}
-      {run.phase !== 'over' && <button onClick={onQuit}>End run</button>}
     </div>
   );
 }

@@ -778,39 +778,83 @@ fieldset.fields:disabled { opacity: 0.6; }
 .spinner { width: 14px; height: 14px; border: 2px solid var(--line); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Training sim */
-.training { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 12px; }
+/* Training sim: the map (with its HUD) is the stage, the panels sit beside it; under 860px they stack, the stage
+   sticking to the top while the panels scroll under it. --map is the map's side: as big as the viewport allows. */
+.modal-back:has(> .modal > .modal-body > .training-game) { padding: 12px 16px; }
+.modal:has(> .modal-body > .training-game) { width: auto; max-width: 100% !important; }
+.modal-body:has(> .training-game) { padding: 10px 12px 12px; }
+.training-game {
+  --side: 360px;
+  --map: max(320px, min(calc(100vh - 150px), calc(100vw - var(--side) - 80px)));
+  display: grid; grid-template-columns: var(--map) var(--side); gap: 12px;
+}
+.training-stage { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.training-board { position: relative; width: var(--map); max-width: 100%; }
 .training-map { position: relative; width: 100%; aspect-ratio: 1; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; background: #0c0d0f; }
 .training-map canvas { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; user-select: none; }
 .training-map-fit { position: absolute; top: 6px; right: 6px; padding: 2px 10px; }
-/* Training shell: HUD over the map and panels; the modal goes wider so the map gets room. */
-.modal:has(> .modal-body > .training-game) { max-width: min(1280px, 100%) !important; }
-.training-game .training { grid-template-columns: minmax(0, 1fr) 320px; }
-.training-game .training-side { max-height: min(78vh, 900px); overflow-y: auto; padding-right: 2px; }
-.training-game .training-map { max-width: 78vh; margin: 0 auto; }
-.training-next { gap: 8px; margin-top: 6px; flex-wrap: wrap; }
-.training-info { padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; }
-.training-info .ghost { padding: 0 6px; }
-@media (max-width: 700px) {
-  .training-game .training { grid-template-columns: 1fr; }
-  .training-game .training-side { max-height: none; overflow: visible; }
-  .training-game .training-map { max-width: none; }
+/* The side panel takes the stage's height (contain: size keeps it from setting it) and scrolls on its own. */
+.training-side { contain: size; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-right: 4px; }
+.training-side > * { flex-shrink: 0; }
+/* Over the map: the picked piece (top left), the craft banner (bottom), the run summary (centre). The piece card hides its
+   scrollbar: a sub-pixel overflow would show one on every short card; a long one still scrolls. */
+.training-board .training-info {
+  position: absolute; top: 8px; left: 8px; z-index: 2; width: min(340px, calc(100% - 80px)); max-height: calc(100% - 16px); overflow: hidden auto; scrollbar-width: none;
+  padding: 6px 8px; display: flex; flex-direction: column; gap: 2px;
+  background: rgba(24, 27, 32, 0.94); border-color: var(--gold-dim); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
 }
-.training-side { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.training-unit { display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 6px; }
-.training-ups { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 4px 0; }
-.training-log { margin-top: 8px; border-top: 1px solid var(--line); padding-top: 4px; }
-.training-summary { margin-top: 12px; overflow-x: auto; }
+.training-info .ghost { padding: 0 6px; }
+.training-map-banner {
+  position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2; display: flex; align-items: center; gap: 8px; padding: 6px 8px;
+  border: 1px solid var(--gold); border-radius: 4px; background: rgba(42, 35, 19, 0.95); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+.training-over { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; padding: 12px; background: rgba(6, 7, 9, 0.5); }
+.training-over-card {
+  width: min(540px, 100%); max-height: 100%; overflow-y: auto; padding: 14px 16px; border: 1px solid var(--gold-dim); border-radius: 6px;
+  background: var(--panel); box-shadow: 0 10px 40px rgba(0, 0, 0, 0.75);
+}
+.training-over-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+.training-summary { overflow-x: auto; }
 .training-summary table { width: 100%; border-collapse: collapse; }
 .training-summary th, .training-summary td { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; }
 .training-summary th:first-child, .training-summary td:first-child { text-align: left; }
 .training-summary th { color: var(--muted-2); font-weight: 600; }
 .training-summary tr.mvp td { color: var(--gold); }
+/* The wave line keeps its height in every phase, so the panels under it stay put. */
+.training-status { display: flex; flex-direction: column; justify-content: center; gap: 4px; min-height: 64px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 4px; background: rgba(255, 255, 255, 0.02); }
+.training-status-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.training-status-head .tag { margin: 0; }
+.training-log { margin-top: auto; border-top: 1px solid var(--line); padding-top: 4px; height: 5.6em; overflow-y: auto; }
+.training-log > div:first-child { color: var(--text); }
+.training-held { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.training-held .tag { margin: 0; cursor: help; }
+@media (max-width: 860px) {
+  .training-game { --map: min(calc(100vw - 24px), 60vh); display: flex; flex-direction: column; gap: 10px; }
+  .training-stage {
+    position: sticky; top: 0; z-index: 4; margin: -10px -12px 0; padding: 8px 12px 6px; background: var(--panel);
+    border-bottom: 1px solid var(--line); box-shadow: 0 6px 12px rgba(0, 0, 0, 0.45);
+  }
+  .training-board { margin: 0 auto; }
+  .training-side { contain: none; overflow: visible; padding: 0 0 24px; }
+  .training-board .training-info { top: auto; bottom: 6px; left: 6px; right: 6px; width: auto; max-height: 45%; }
+  .training-map-banner { left: 6px; right: 6px; bottom: 6px; }
+  .modal-back:has(> .modal > .modal-body > .training-game) { padding: 0; }
+  /* Stats on one line, the controls on the next, Start wave taking the room left. */
+  .training-hud-actions { flex: 1 1 100%; }
+  .training-hud-actions > button { padding-left: 10px; padding-right: 10px; }
+  .training-hud-actions > button.training-hud-go { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .training-hud button { min-height: 38px; white-space: nowrap; }
+  .training-speed button { min-width: 40px; }
+  .training-game .training-shard { min-width: 48px; min-height: 52px; }
+  .training-game .training-keep-opt, .training-game .training-shop-unit { min-height: 42px; }
+}
 
 /* Training panels: HUD, draft, recipe book, shop, wave preview (components/training). */
-.training-hud { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 6px; }
+.training-hud { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; min-height: 30px; }
 .training-hud-stat { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-.training-hud-stat .tag { margin: 0 0 0 4px; }
+.training-hud-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+/* Start wave and Pause swap in one place: a shared width keeps the speed buttons from jumping. */
+.training-hud-go { min-width: 8.5em; justify-content: center; text-align: center; }
 .training-speed { display: inline-flex; }
 .training-speed button { padding: 2px 8px; border-radius: 0; }
 .training-speed button:first-child { border-radius: 4px 0 0 4px; }
@@ -818,12 +862,15 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-panel-title { margin: 6px 0 4px; }
 .training-draft, .training-recipes, .training-shop { display: flex; flex-direction: column; gap: 4px; }
 .training-draft-row { display: flex; flex-wrap: wrap; gap: 4px; }
-.training-shard { display: inline-flex; padding: 3px 5px; }
-.training-shard.placed { padding: 3px 5px; border: 1px dashed var(--line); border-radius: 4px; }
-.training-keep { display: flex; flex-direction: column; gap: 3px; }
-.training-keep-opt { display: flex; align-items: center; gap: 6px; width: 100%; padding: 3px 6px; }
-.training-keep-opt .tag { margin: 0; }
-.training-crafting { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--gold); border-radius: 4px; background: rgba(201, 162, 74, 0.1); }
+.training-shard { position: relative; display: inline-flex; align-items: center; justify-content: center; min-width: 42px; min-height: 46px; padding: 4px 6px; }
+.training-shard.placed { border: 1px dashed var(--line); border-radius: 4px; }
+.training-shard.placed .shard-badge { opacity: 0.35; }
+.training-shard-check { position: absolute; right: 2px; bottom: 2px; width: 13px; height: 13px; color: var(--gold); filter: drop-shadow(0 0 1px #000); }
+.training-keep { display: flex; flex-direction: column; gap: 4px; }
+.training-keep-opt { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 4px 8px; text-transform: none; letter-spacing: normal; font-size: 0.85rem; }
+.training-keep-opt.lit { border-color: var(--gold-dim); }
+.training-keep-label { text-align: left; }
+.training-keep-for { color: var(--gold); white-space: nowrap; font-size: 0.9em; }
 .training-recipe { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; }
 .training-recipe.ready { border-color: var(--gold); box-shadow: 0 0 10px rgba(201, 162, 74, 0.35); }
 .training-recipe.active { background: rgba(201, 162, 74, 0.12); }
@@ -831,6 +878,7 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-recipe-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .training-recipe-slots { display: flex; flex-wrap: wrap; gap: 4px; }
 .training-recipes-done { display: flex; align-items: center; gap: 4px; }
+.training-recipe-crafting { color: var(--gold); font-style: italic; white-space: nowrap; }
 .training-shop-row { display: flex; align-items: center; gap: 6px; }
 .training-shop-row.lit .training-shop-unit { border-color: var(--gold); }
 .training-shop-unit { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; padding: 3px 6px; text-align: left; }
@@ -841,9 +889,20 @@ fieldset.fields:disabled { opacity: 0.6; }
 .shard-badge .icon { width: 1em; height: 1em; filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.8)); }
 .shard-badge.faded { opacity: 0.35; }
 .shard-badge.glow .icon { filter: drop-shadow(0 0 3px var(--shard)) drop-shadow(0 0 1px rgba(0, 0, 0, 0.8)); }
-.shard-pips { display: inline-flex; gap: 1px; }
-.shard-pips i { width: 3px; height: 3px; border-radius: 50%; background: var(--line); }
-.shard-pips i.on { background: var(--shard); }
+.shard-pips { display: inline-flex; gap: max(1px, 0.05em); }
+.shard-pips i { width: max(4px, 0.17em); height: max(4px, 0.17em); border-radius: 50%; background: var(--line); }
+.shard-pips i.on { background: var(--shard); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); }
+/* Training start screen: three steps beside a sketch of the route, then the units. */
+.training-intro { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 14px; align-items: start; margin-bottom: 10px; }
+.training-steps { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 3px; }
+.training-thumb { display: block; width: 150px; height: 150px; }
+.training-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 12px; }
+.training-roster-unit { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.training-roster-xp { display: block; }
+@media (max-width: 700px) {
+  .training-intro { grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }
+  .training-thumb { width: 96px; height: 96px; }
+}
 
 /* Training cards: a full-screen offer, the cards rising from below. */
 .training-cards {
@@ -893,18 +952,20 @@ fieldset.fields:disabled { opacity: 0.6; }
 @keyframes cards-fade { from { opacity: 0; } }
 @keyframes cards-rays { to { rotate: 360deg; } }
 @keyframes cards-drop { from { opacity: 0; transform: translateY(-30px) scale(0.9); } }
-@keyframes card-rise { from { opacity: 0; transform: translateY(100vh) rotate(-6deg) scale(0.85); } 70% { opacity: 1; } }
+@keyframes card-rise { from { opacity: 0; transform: translateY(70px) scale(0.92); } 60% { opacity: 1; } }
 @keyframes card-shine { from { left: -60%; } to { left: 130%; } }
 @keyframes card-glow { from { box-shadow: 0 0 14px rgba(201, 162, 74, 0.4), 0 10px 30px rgba(0, 0, 0, 0.7); } to { box-shadow: 0 0 38px rgba(232, 197, 90, 0.95), 0 10px 30px rgba(0, 0, 0, 0.7); } }
+/* On a phone the cards sit in one row that scrolls sideways, centred when they fit. */
 @media (max-width: 700px) {
-  .training-cards { justify-content: flex-start; overflow-y: auto; }
-  .training-card { width: 100%; max-width: 340px; min-height: 0; }
+  .training-cards { padding: 16px 0; gap: 12px; }
+  .training-cards-row { flex-wrap: nowrap; justify-content: flex-start; gap: 12px; max-width: 100%; overflow-x: auto; scroll-snap-type: x mandatory; padding: 16px 16px 20px; }
+  .training-card { flex: 0 0 160px; width: 160px; min-height: 210px; padding: 14px 10px; scroll-snap-align: center; }
+  .training-card:first-child { margin-left: auto; }
+  .training-card:last-child { margin-right: auto; }
+  .training-card-text { font-size: 0.85rem; }
 }
 @media (prefers-reduced-motion: reduce) {
   .training-cards, .training-cards::before, .training-cards-title, .training-card, .training-card-shine { animation: none !important; }
-}
-@media (max-width: 700px) {
-  .training { grid-template-columns: 1fr; }
 }
 
 /* Sortie: one unit on a branching map, turn-based fights at Close, Mid and Far. */

@@ -1,11 +1,15 @@
 import type { Status } from '../../rules/abilities';
 import { TRAINING_ENEMIES, type TrainingEnemyShape } from '../../rules/downtimeData';
 import { FX_COLOR, FX_TIME, centreOf, pieceById, type Enemy, type Fx, type TrainingRun } from '../../rules/training';
-import { bar } from './draw';
+import { bar, shade } from './art';
+import { HOLD_COLOR } from './drawPieces';
 
 // Canvas drawing for what moves on the Training map: enemies (the old modal's shapes) and fx. Same frame as draw.ts.
 
-/** An enemy shape, `r` pixels round, centred on (x, y) and turned to `facing`. A veteran gets a gold dashed ring. */
+/**
+ * An enemy shape, `r` pixels round, centred on (x, y) and turned to `facing`, with a dark outline so it stands off the
+ * route and pads. A veteran gets a gold dashed ring.
+ */
 export function enemyShape(ctx: CanvasRenderingContext2D, shape: TrainingEnemyShape, x: number, y: number, r: number, facing: number, color: string, vet?: boolean) {
   // Points of a regular polygon, or a star alternating between two radii.
   const ring = (n: number, r1: number, r2 = r1, turn = 0) =>
@@ -28,22 +32,30 @@ export function enemyShape(ctx: CanvasRenderingContext2D, shape: TrainingEnemySh
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(facing);
-  ctx.fillStyle = color;
   ctx.beginPath();
   pts[shape].forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
   ctx.closePath();
+  // Lit from the front: a lighter nose, the base colour behind.
+  const g = ctx.createLinearGradient(r, 0, -r, 0);
+  g.addColorStop(0, shade(color, 0.35));
+  g.addColorStop(1, color);
+  ctx.fillStyle = g;
   ctx.fill();
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+  ctx.lineWidth = Math.max(1, r * 0.12);
+  ctx.stroke();
   // Armour shows as a thick dark rim, a mirrored hide as a bright one; the boss gets a gold one.
   if (shape === 'hexagon' || shape === 'crown' || shape === 'shield') {
-    ctx.strokeStyle = shape === 'crown' ? '#c9a24a' : shape === 'shield' ? '#f2fbff' : '#2a3038';
-    ctx.lineWidth = Math.max(2, r * 0.18);
+    ctx.strokeStyle = shape === 'crown' ? '#e8c55a' : shape === 'shield' ? '#f2fbff' : '#2a3038';
+    ctx.lineWidth = Math.max(1.5, r * 0.16);
     ctx.stroke();
   }
   if (vet) {
     ctx.strokeStyle = '#e8c55a';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 1.5;
     ctx.setLineDash([3, 2]);
-    ctx.beginPath(); ctx.arc(0, 0, r + 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, r * 1.3 + 3, 0, Math.PI * 2); ctx.stroke();
     ctx.setLineDash([]);
   }
   ctx.restore();
@@ -54,40 +66,74 @@ const TINTS: [Status, string][] = [['stun', '#ffe066'], ['slow', '#5ab0ff'], ['d
 const statusTint = (e: Enemy) => TINTS.find(([k]) => e.status[k])?.[1] ?? (e.dots.length ? FX_COLOR.bleed : undefined);
 
 /** How high a flyer is drawn above its shadow, in cells. */
-const LIFT = 0.3;
+const LIFT = 0.35;
+/** The least an enemy is drawn round, in pixels, however far out the map is; and how much bigger the boss is. */
+const MIN_R = 4;
+const BOSS_SCALE = 1.5;
 
-/** Every enemy: walkers on the ground, flyers lifted over a shadow with pale wings, held ones gripped. */
-export function drawEnemies(ctx: CanvasRenderingContext2D, run: TrainingRun, s: number) {
-  // Walkers first, so flyers pass over them.
-  const order = [...run.enemies].sort((a, b) => Number(a.flies) - Number(b.flies));
+const isBossKind = (e: Enemy) => TRAINING_ENEMIES[e.kind].spawn === 'boss';
+
+/** How many pixels round an enemy is drawn at `s` pixels a cell. */
+export const enemyRadius = (e: Enemy, s: number) =>
+  Math.max(MIN_R * (isBossKind(e) ? 1.5 : 1), TRAINING_ENEMIES[e.kind].size * s * (isBossKind(e) ? BOSS_SCALE : 1));
+
+/**
+ * Every enemy: walkers on the ground, flyers lifted over a shadow with pale wings, held ones gripped by a cyan line,
+ * the boss big with a pulsing gold aura. HP bars once hurt (always on the boss).
+ */
+export function drawEnemies(ctx: CanvasRenderingContext2D, run: TrainingRun, s: number, time = performance.now() / 1000) {
+  // Walkers first, so flyers pass over them; the boss over everything.
+  const rank = (e: Enemy) => (isBossKind(e) ? 2 : Number(e.flies));
+  const order = [...run.enemies].sort((a, b) => rank(a) - rank(b));
   for (const e of order) {
     const d = TRAINING_ENEMIES[e.kind];
-    const r = d.size * s;
+    const boss = isBossKind(e);
+    const r = enemyRadius(e, s);
     const x = e.x * s;
     let y = e.y * s;
     if (e.flies) {
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
-      ctx.beginPath(); ctx.ellipse(x, y, r, r * 0.55, 0, 0, Math.PI * 2); ctx.fill();
-      y -= LIFT * s;
-      ctx.strokeStyle = 'rgba(220,225,255,0.75)';
-      ctx.lineWidth = Math.max(1, r * 0.15);
+      ctx.beginPath(); ctx.ellipse(x, y, r * 0.9, r * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+      y -= Math.max(3, LIFT * s);
+      const flap = Math.sin(time * 14 + e.id) * r * 0.25;
+      ctx.strokeStyle = 'rgba(225,230,255,0.85)';
+      ctx.lineWidth = Math.max(1.2, r * 0.18);
+      ctx.lineCap = 'round';
       ctx.beginPath();
-      ctx.moveTo(x - r * 1.7, y - r * 0.5); ctx.quadraticCurveTo(x - r * 0.8, y - r * 1.2, x, y - r * 0.3);
-      ctx.quadraticCurveTo(x + r * 0.8, y - r * 1.2, x + r * 1.7, y - r * 0.5);
+      ctx.moveTo(x - r * 1.7, y - r * 0.5 - flap); ctx.quadraticCurveTo(x - r * 0.8, y - r * 1.25 - flap, x, y - r * 0.3);
+      ctx.quadraticCurveTo(x + r * 0.8, y - r * 1.25 - flap, x + r * 1.7, y - r * 0.5 - flap);
       ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
+    if (boss) {
+      const pulse = 0.5 + 0.5 * Math.sin(time * 4);
+      const g = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * (1.9 + 0.3 * pulse));
+      g.addColorStop(0, 'rgba(255,214,90,0.45)');
+      g.addColorStop(1, 'rgba(255,214,90,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.arc(x, y, r * (1.9 + 0.3 * pulse), 0, Math.PI * 2); ctx.fill();
     }
     const holder = e.heldBy === undefined ? undefined : pieceById(run, e.heldBy);
     if (holder) {
       const c = centreOf(holder);
-      ctx.strokeStyle = FX_COLOR.hold;
+      ctx.strokeStyle = HOLD_COLOR;
       ctx.lineWidth = Math.max(1.5, s * 0.12);
+      ctx.setLineDash([Math.max(2, s * 0.3), Math.max(2, s * 0.15)]);
+      ctx.lineDashOffset = -time * 20;
       ctx.beginPath(); ctx.moveTo(c.x * s, c.y * s); ctx.lineTo(x, y); ctx.stroke();
-      ctx.beginPath(); ctx.arc(x, y, r + Math.max(3, s * 0.25), 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.lineDashOffset = 0;
+      ctx.lineWidth = Math.max(2, s * 0.15);
+      ctx.beginPath(); ctx.arc(x, y, r * 1.25 + Math.max(2, s * 0.15), 0, Math.PI * 2); ctx.stroke();
     }
     enemyShape(ctx, d.shape, x, y, r, e.face ?? 0, d.color, e.vet);
     const tint = statusTint(e);
-    if (tint) { ctx.strokeStyle = tint; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r + 3, 0, Math.PI * 2); ctx.stroke(); }
-    if (e.hp < e.maxHp) bar(ctx, x - r, y - r - 5, r * 2, e.hp / e.maxHp, '#b3352b', Math.max(2, Math.min(4, s * 0.3)));
+    if (tint) { ctx.strokeStyle = tint; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r * 1.25 + 2, 0, Math.PI * 2); ctx.stroke(); }
+    if (boss || e.hp < e.maxHp) {
+      const w = Math.max(12, r * 2.2) * (boss ? 1.3 : 1);
+      const h = boss ? Math.max(4, Math.min(6, s * 0.4)) : Math.max(3, Math.min(5, s * 0.3));
+      bar(ctx, x - w / 2, y - r * 1.3 - h - 3, w, e.hp / e.maxHp, boss ? '#ff6a8a' : undefined, h);
+    }
   }
 }
 
@@ -143,6 +189,13 @@ export function drawFx(ctx: CanvasRenderingContext2D, run: TrainingRun, s: numbe
       if (f.kind === 'heal') ctx.setLineDash([3, 3]);
       ctx.beginPath(); ctx.moveTo(f.x1 * s, f.y1 * s); ctx.lineTo(f.x2 * s, f.y2 * s); ctx.stroke();
       ctx.setLineDash([]);
+      if (!f.miss && f.kind !== 'heal') {
+        // A spark where it lands, swelling as it fades.
+        const life = f.kind === 'bolt' ? FX_TIME.bolt : FX_TIME.shot;
+        const k = 1 - Math.max(0, f.t) / life;
+        ctx.fillStyle = f.color;
+        ctx.beginPath(); ctx.arc(f.x2 * s, f.y2 * s, Math.max(1.5, s * (0.1 + 0.12 * k)) * (f.kind === 'bolt' ? 1.5 : 1), 0, Math.PI * 2); ctx.fill();
+      }
       if (f.blocked) {
         // A puff of dust where the cover took the shot.
         ctx.globalAlpha = Math.min(1, f.t / 0.1);

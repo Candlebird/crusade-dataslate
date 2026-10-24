@@ -20,7 +20,7 @@ export interface RecipeBookProps {
   /** Portraits by unit id (model/emblem unitPortrait). */
   portraits: Record<string, EmblemLayer[]>;
   crafting: Crafting | null;
-  /** Start (or cancel, with null) a craft; the map then asks for a tap on one of `uses`. */
+  /** Start a craft; the map then asks for a tap on one of `uses` (its banner cancels, with null). */
   onCraft: (c: Crafting | null) => void;
 }
 
@@ -46,12 +46,6 @@ export function RecipeBook({ run, units, portraits, crafting, onCraft }: RecipeB
       <div className="training-panel-title">
         <b>Recipes</b> <span className="muted">· {run.crafted.length}/{run.recipes.length} crafted</span>
       </div>
-      {crafting && (
-        <div className="training-crafting">
-          <span className="grow">Tap one of the glowing Shards: {nameOf(run, crafting.unitId)} stands there, the rest turn to rubble.</span>
-          <button onClick={() => onCraft(null)}>Cancel</button>
-        </div>
-      )}
       {sorted.map((r) => (
         <RecipeRow
           key={r.unitId}
@@ -73,8 +67,6 @@ export function RecipeBook({ run, units, portraits, crafting, onCraft }: RecipeB
     </div>
   );
 }
-
-const nameOf = (run: TrainingRun, unitId: string) => run.recipes.find((r) => r.unitId === unitId)?.name ?? 'The unit';
 
 function RecipeRow({ run, recipe, portrait, progress, uses, active, onCraft, known }: {
   run: TrainingRun;
@@ -102,14 +94,16 @@ function RecipeRow({ run, recipe, portrait, progress, uses, active, onCraft, kno
           ))}
         </span>
       </span>
-      {uses && (
+      {/* Crafting: the banner over the map has the one Cancel. */}
+      {uses && active && <span className="training-recipe-crafting">Crafting…</span>}
+      {uses && !active && (
         <button
-          className={active ? '' : 'primary'}
-          disabled={!known || (!!why && !active)}
+          className="primary"
+          disabled={!known || !!why}
           title={why ?? 'Then tap one of its Shards on the map'}
-          onClick={() => onCraft(active ? null : { unitId: recipe.unitId, uses })}
+          onClick={() => onCraft({ unitId: recipe.unitId, uses })}
         >
-          {active ? 'Cancel' : 'Craft'}
+          Craft
         </button>
       )}
     </div>

@@ -7,14 +7,35 @@ export interface WavePreviewProps {
   run: TrainingRun;
 }
 
+/**
+ * The wave line at the top of the side panel: what the next wave is and sends, or how the one under way is going. It
+ * keeps its place (and height) in every phase so the panels under it don't jump.
+ */
+export function WaveStatus({ run }: WavePreviewProps) {
+  if (run.phase === 'over') {
+    const n = run.cleared;
+    return <div className="training-status"><div className="training-status-head"><b>Run over</b><span className="muted">· {n} wave{n === 1 ? '' : 's'} cleared</span></div></div>;
+  }
+  const live = run.phase === 'wave';
+  const n = live ? run.wave : run.wave + 1;
+  const left = run.enemies.length + run.queue.length;
+  return (
+    <div className="training-status">
+      <div className="training-status-head">
+        <b>{live ? `Wave ${n} under way` : `Next: wave ${n}`}</b>
+        {waveTags(n).map((t) => <span key={t} className="tag">{t}</span>)}
+      </div>
+      {live ? <div className="muted">{left} enem{left === 1 ? 'y' : 'ies'} left</div> : <WavePreview run={run} />}
+    </div>
+  );
+}
+
 /** What the next wave sends, one icon a kind with a count; hover for what it is. */
 export function WavePreview({ run }: WavePreviewProps) {
   // The preview rolls on a copy of the dice: only a new wave (or a load) changes it.
   const groups = useMemo(() => previewGroups(previewWave(run)), [run, run.wave, run.rng]);
-  const tags = waveTags(run.wave + 1);
   return (
     <span className="training-preview row" aria-label="Next wave's enemies">
-      <span className="small muted">Next{tags.length ? ` (${tags.join(', ')})` : ''}:</span>
       {groups.map((g) => (
         <span key={g.kind} className="training-preview-group" title={enemyRundown(TRAINING_ENEMIES[g.kind], g)}>
           <EnemyIcon def={TRAINING_ENEMIES[g.kind]} vet={g.vets > 0} />
