@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { TRAINING_ENEMIES, type TrainingEnemyKind } from '../../rules/downtimeData';
-import { nextRound, previewWave, type TrainingRun } from '../../rules/training';
+import { useEffect, useMemo, useRef } from 'react';
+import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyKind } from '../../rules/downtimeData';
+import { nextRound, previewGroups, previewWave, type NextRound, type PreviewGroup, type TrainingRun } from '../../rules/training';
+import { Tip } from '../Tooltip';
 import { bossGlow, enemyShape, flyerWings } from './drawLive';
 
 /** A wave's enemy as drawn on the map: its shape and colour, the gold rim of an elite, a flyer's wings, a boss's glow. */
@@ -20,47 +21,60 @@ function MarkIcon({ kind, elite, flies, boss }: { kind: TrainingEnemyKind; elite
   return <canvas ref={ref} width={48} height={48} style={{ width: 24, height: 24 }} aria-hidden />;
 }
 
-/** The HUD's next-round icon: the next wave's kind (and its boss), as drawn on the map. Tap toggles a popover of one
- *  line each on what they do; a mouse hover shows it too. */
+/** One enemy kind's numbers in the next wave: count, wounds, speed, Defense, armour and what a leak costs the base. */
+function StatRow({ g }: { g: PreviewGroup }) {
+  const d = TRAINING_ENEMIES[g.kind];
+  const speed = Math.round(d.speed * TRAINING.walkMul * 10) / 10;
+  const boss = d.spawn === 'boss';
+  return (
+    <div className="training-next-kind">
+      <span className="training-next-name">
+        <MarkIcon kind={g.kind} elite={g.elites > 0} flies={g.flies} boss={boss} />
+        <b>{d.name}</b> <span className="muted">×{g.n}{g.flies ? ' · flies' : ''}{g.elites ? ` · ${g.elites} elite` : ''}</span>
+      </span>
+      <span className="training-next-stats">
+        <span>Wounds <b>{g.hp}</b></span>
+        <span>Speed <b>{speed}</b></span>
+        <span>Defense <b>{d.defense}+</b></span>
+        {d.armor ? <span>Armour <b>{d.armor}</b></span> : null}
+        <span>Leak <b>{d.leak}</b>{g.elites ? <span className="muted"> (elite {Math.max(d.leak, TRAINING.leak.elite)})</span> : null}</span>
+      </span>
+    </div>
+  );
+}
+
+/** The next wave's popover: each kind's numbers, then one line each on what it does (its tricks, the boss's, the
+ *  campaign's affixes). */
+function WaveStats({ nr, groups }: { nr: NextRound; groups: PreviewGroup[] }) {
+  return (
+    <span className="training-next-pop">
+      <b>Wave {nr.wave}</b>
+      {groups.map((g) => <StatRow key={g.kind} g={g} />)}
+      {nr.lines.map((l, i) => <span key={i} className="training-next-line">{l}</span>)}
+    </span>
+  );
+}
+
+/** The HUD's next-wave icons: its kind (and its boss), as drawn on the map. Hover, focus or tap opens a popover under
+ *  them with each one's numbers and tricks. */
 export function NextRoundIcon({ run }: { run: TrainingRun }) {
-  const [open, setOpen] = useState(false);
-  const [hover, setHover] = useState(false);
-  const box = useRef<HTMLSpanElement>(null);
   // As the wave preview: a copy of the dice, so only a new wave (or a load) changes it.
-  const nr = useMemo(() => nextRound(run, previewWave(run)), [run, run.wave, run.rng]);
-  useEffect(() => {
-    if (!open) return;
-    const away = (e: PointerEvent) => { if (!box.current?.contains(e.target as Node)) setOpen(false); };
-    document.addEventListener('pointerdown', away);
-    return () => document.removeEventListener('pointerdown', away);
-  }, [open]);
-  useEffect(() => setOpen(false), [run.wave]);
+  const plans = useMemo(() => previewWave(run), [run, run.wave, run.rng]);
+  const nr = useMemo(() => nextRound(run, plans), [run, plans]);
+  const groups = useMemo(() => previewGroups(plans), [plans]);
   if (!nr) return null;
   const lone = nr.kind === 'lord';
-  const shown = open || hover;
   return (
-    <span
-      ref={box}
-      className="training-hud-stat training-next"
-      onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(true)}
-      onPointerLeave={(e) => e.pointerType === 'mouse' && setHover(false)}
-    >
-      <button
-        className="ghost training-next-btn"
-        aria-expanded={shown}
-        aria-label={`Next round: wave ${nr.wave}, ${TRAINING_ENEMIES[nr.kind].name}${nr.boss ? `, boss ${nr.boss}` : ''}. Show what it does`}
-        onClick={() => setOpen(!open)}
+    <Tip place="below" content={<WaveStats nr={nr} groups={groups} />}>
+      <span
+        className="training-hud-stat training-next"
+        tabIndex={0}
+        role="img"
+        aria-label={`Next wave ${nr.wave}: ${groups.map((g) => `${g.n} ${TRAINING_ENEMIES[g.kind].name}`).join(', ')}${nr.boss ? `, boss ${nr.boss}` : ''}`}
       >
-        <span className="muted">Next</span>
         <MarkIcon kind={nr.kind} elite={nr.elite} flies={nr.flies} boss={lone} />
         {nr.boss && !lone && <MarkIcon kind="lord" elite={false} flies={nr.bossFlies} boss />}
-      </button>
-      {shown && (
-        <span className="training-next-pop small" role="tooltip">
-          <b>Wave {nr.wave}: {lone ? nr.boss : TRAINING_ENEMIES[nr.kind].name}</b>
-          {nr.lines.map((l, i) => <span key={i}>{l}</span>)}
-        </span>
-      )}
-    </span>
+      </span>
+    </Tip>
   );
 }
