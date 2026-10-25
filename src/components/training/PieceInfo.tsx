@@ -1,15 +1,21 @@
 import type { Unit } from '../../model/types';
 import { SHARD_TYPES } from '../../rules/downtimeData';
 import { describe } from '../../rules/abilities';
-import { defaultByKey, gradeName, levelDmg, reach, type Piece, type Tower, type TowerGun } from '../../rules/training';
+import { defaultByKey, gradeName, levelDmg, reach, type Piece, type Tower, type TowerGun, type TrainingRun } from '../../rules/training';
+import { PieceActions, type MoveRule } from './PieceActions';
 import { HabitBadges, RecordBadges, RelicList } from './RecordBadges';
 import { ShardBadge } from './ShardBadge';
 
 export interface PieceInfoProps {
+  run: TrainingRun;
   piece: Piece;
   /** The crafted unit's datasheet and record (its trait and scar badges). */
   record?: Unit;
   onClose: () => void;
+  /** After a level up or upgrade: the shell refreshes (and saves). */
+  onChange: () => void;
+  /** Start a Scout move or Ambush swap (the shell waits for a tap on the map). */
+  onMove?: (rule: MoveRule) => void;
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -20,12 +26,13 @@ function gunLine(t: Tower, g: TowerGun): string {
     .filter(Boolean).join(', ');
   const dmg = Math.max(1, g.deadly) + levelDmg(t, g);
   const air = g.air && g.air !== 1 ? ` · ×${g.air} to flyers` : '';
-  return `${g.name}: ${r1(g.attacks)} attack${g.attacks === 1 ? '' : 's'}, ${g.melee ? 'melee' : `${r1(reach(t, g))} cells`}, ${dmg} dmg${rules ? ` · ${rules}` : ''}${air}`;
+  const only = g.only === 'air' ? ' · flyers only' : g.only === 'land' ? ' · walkers only' : '';
+  return `${g.name}: ${r1(g.attacks)} attack${g.attacks === 1 ? '' : 's'}, ${g.melee ? 'melee' : `${r1(reach(t, g))} cells`}, ${dmg} dmg${rules ? ` · ${rules}` : ''}${air}${only}`;
 }
 
 /** What the selected piece is: a crafted unit's weapons, skills, record, Sortie quirks and trinket, relics and tally, a
  *  default tower's Shards, or a Shard's type and grade. */
-export function PieceInfo({ piece, record, onClose }: PieceInfoProps) {
+export function PieceInfo({ run, piece, record, onClose, onChange, onMove }: PieceInfoProps) {
   if (piece.kind === 'rubble') return null;
   const unit = piece.kind === 'unit' ? piece : null;
   return (
@@ -35,11 +42,12 @@ export function PieceInfo({ piece, record, onClose }: PieceInfoProps) {
         {piece.kind === 'default' && piece.slots.map(([t, g], i) => <ShardBadge key={i} type={t} grade={g} size={18} />)}
         <b className="grow">
           {piece.kind === 'shard' ? `${gradeName(piece.grade)} ${SHARD_TYPES[piece.type].name} Shard` : piece.name}
-          {piece.kind === 'default' && <span className="muted"> · defence</span>}
+          {piece.kind === 'default' && <span className="muted"> · defence{piece.upgraded ? ' · upgraded' : ''}</span>}
           {unit && <span className="muted"> · {unit.category} · Lv {unit.up}/{unit.cap} · Tough {unit.tough}</span>}
         </b>
         <button className="ghost small" onClick={onClose} aria-label="Deselect">×</button>
       </div>
+      {piece.kind !== 'shard' && <PieceActions run={run} piece={piece} onChange={onChange} onMove={onMove} />}
       {piece.kind === 'shard' && <div className="muted">{SHARD_TYPES[piece.type].text}{piece.draft ? ' From this draft: keep it or it crumbles.' : ''}</div>}
       {piece.kind === 'default' && <div className="muted">{defaultByKey(piece.key)?.text} No XP, levels, traits or relics.</div>}
       {piece.guns.map((g, i) => <div key={i}>{gunLine(piece, g)}</div>)}

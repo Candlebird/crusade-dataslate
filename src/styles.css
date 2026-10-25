@@ -796,7 +796,7 @@ fieldset.fields:disabled { opacity: 0.6; }
 }
 .modal:has(> .modal-body > .training-game) > .modal-head { padding: 0.4rem 0.8rem; }
 .modal-body:has(> .training-game) { flex: 1; min-height: 0; padding: 8px 10px 10px; }
-.training-game { --side: 360px; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) var(--side); grid-template-rows: minmax(0, 1fr); gap: 12px; }
+.training-game { --side: 440px; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) var(--side); grid-template-rows: minmax(0, 1fr); gap: 12px; }
 .training-stage { display: flex; flex-direction: column; gap: 6px; min-width: 0; min-height: 0; }
 .training-board { position: relative; flex: 1; min-height: 0; width: 100%; }
 .training-map { position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; background: #0c0d0f; }
@@ -842,10 +842,23 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-log > div:first-child { color: var(--text); }
 .training-held { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .training-held .tag { margin: 0; cursor: help; }
-/* The side panel's tabs are a phone's (below); a wide screen shows every section, stacked, the wave line first. */
-.training-tabs { display: none; }
-.training-sec { display: contents; }
-.training-sec-wave > .training-status { order: -1; }
+/* The side panel's tabs: Build, Recipes, Shop (and Wave on a phone). A wide screen keeps the wave line at the top and
+   the cards and log at the foot, round the tabbed section. */
+.training-tabs { display: flex; position: sticky; top: 0; z-index: 1; gap: 4px; padding-bottom: 4px; background: var(--panel); }
+.training-tabs > button { position: relative; flex: 1; min-width: 0; padding: 2px 4px; }
+.training-tab-dot { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px var(--gold); }
+.training-sec { display: none; }
+.training-sec.on { display: flex; flex-direction: column; gap: 6px; }
+@media (min-width: 861px) and (min-height: 561px) {
+  .training-tab-wave { display: none; }
+  .training-sec-wave { display: contents; }
+  .training-sec-wave > .training-status { order: -2; }
+  .training-tabs { order: -1; }
+  .training-side.tab-wave > .training-sec-draft { display: flex; flex-direction: column; gap: 6px; }
+}
+/* The picked piece's card: level up, upgrade, Scout / Ambush. */
+.training-info-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0; }
+.training-info-actions button { white-space: nowrap; }
 .training-map canvas { -webkit-touch-callout: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
 /* Phones and small windows: the game fills the screen and the page never scrolls. The map stays in view; under it (or
    beside it, held sideways) the HUD, then the panels one tab at a time, scrolling on their own. Touch targets 42px. */
@@ -875,11 +888,7 @@ fieldset.fields:disabled { opacity: 0.6; }
   .training-game .training-shard { min-width: 48px; min-height: 52px; }
   .training-map-fit { min-width: 52px; }
   .training-side { contain: none; min-height: 0; overflow-y: auto; scrollbar-gutter: auto; padding: 0 2px 8px 0; gap: 6px; }
-  .training-tabs { display: flex; position: sticky; top: 0; z-index: 1; gap: 4px; padding-bottom: 4px; background: var(--panel); }
-  .training-tabs > button { position: relative; flex: 1; min-width: 0; padding: 0 4px; }
-  .training-tab-dot { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px var(--gold); }
-  .training-sec { display: none; }
-  .training-sec.on { display: flex; flex-direction: column; gap: 6px; }
+  .training-tabs > button { padding: 0 4px; }
   .training-sec-wave .training-log { margin-top: 0; height: auto; }
   .training-board .training-info { top: auto; bottom: 6px; left: 6px; right: 6px; width: auto; max-height: 55%; }
   .training-map-banner { left: 6px; right: 6px; bottom: 6px; }
