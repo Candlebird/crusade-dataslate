@@ -14,6 +14,7 @@ const BattleWizard = lazy(() => import('./components/BattleWizard'));
 const BooksPage = lazy(() => import('./components/BooksPage'));
 const CampaignPage = lazy(() => import('./components/CampaignPage'));
 const ListPage = lazy(() => import('./components/ListPage'));
+const LedgerPage = lazy(() => import('./components/Ledger'));
 const SettingsPage = lazy(() => import('./components/SettingsPage'));
 const BattleTracker = lazy(() => import('./components/BattleTracker'));
 const SideSheet = lazy(() => import('./components/SideSheet'));
@@ -33,7 +34,7 @@ export default function App() {
           </span>
         </a>
         <nav>
-          <a className={route.page === 'forces' || route.page === 'force' || route.page === 'unit' || route.page === 'battle' || route.page === 'list' ? 'active' : ''} href={href.forces()}>
+          <a className={route.page === 'forces' || route.page === 'force' || route.page === 'unit' || route.page === 'battle' || route.page === 'list' || route.page === 'ledger' ? 'active' : ''} href={href.forces()}>
             Forces
           </a>
           <a className={route.page === 'tracker' || route.page === 'sideSheet' || route.page === 'missions' ? 'active' : ''} href={href.tracker()}>
@@ -66,6 +67,7 @@ export default function App() {
           {route.page === 'unit' && <UnitSheet forceId={route.forceId} unitId={route.unitId} />}
           {route.page === 'battle' && <BattleWizard key={`${route.forceId}/${route.battleId}/${route.sideId}`} forceId={route.forceId} battleId={route.battleId} sideId={route.sideId} />}
           {route.page === 'list' && <ListPage forceId={route.forceId} listId={route.listId} />}
+          {route.page === 'ledger' && <LedgerPage forceId={route.forceId} />}
           {route.page === 'tracker' && <BattleTracker key={`${route.sectorId}/${route.attacker}/${route.forceId}/${route.crisis}`} crisis={route.crisis} sectorId={route.sectorId} attacker={route.attacker} forceId={route.forceId} />}
           {route.page === 'sideSheet' && <SideSheet sideId={route.sideId} />}
           {route.page === 'missions' && <MissionLibrary />}

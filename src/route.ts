@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 
-/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/battle[/sector/:sectorId[/:attacker[/:forceId]]] , #/battle/crisis , #/battle/sheet/:sideId , #/missions , #/campaign[/gm] , #/campaign/:tab[/:at] , #/books , #/settings , #/rules[/nexus|traits|relics] , #/guide */
+/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/force/:id/ledger , #/battle[/sector/:sectorId[/:attacker[/:forceId]]] , #/battle/crisis , #/battle/sheet/:sideId , #/missions , #/campaign[/gm] , #/campaign/:tab[/:at] , #/books , #/settings , #/rules[/nexus|traits|relics] , #/guide */
 export type Route =
   | { page: 'forces' }
   | { page: 'force'; forceId: string }
   | { page: 'unit'; forceId: string; unitId: string }
   | { page: 'battle'; forceId: string; battleId?: string; sideId?: string }
   | { page: 'list'; forceId: string; listId: string }
+  | { page: 'ledger'; forceId: string }
   | { page: 'tracker'; sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean }
   | { page: 'sideSheet'; sideId: string }
   | { page: 'missions' }
@@ -25,6 +26,7 @@ export function parseRoute(hash: string): Route {
   if (parts[0] === 'force' && parts[1]) {
     if (parts[2] === 'unit' && parts[3]) return { page: 'unit', forceId: parts[1], unitId: parts[3] };
     if (parts[2] === 'list' && parts[3]) return { page: 'list', forceId: parts[1], listId: parts[3] };
+    if (parts[2] === 'ledger') return { page: 'ledger', forceId: parts[1] };
     if (parts[2] === 'battle') return { page: 'battle', forceId: parts[1], battleId: parts[3], sideId: parts[4] };
     return { page: 'force', forceId: parts[1] };
   }
@@ -47,6 +49,8 @@ export const href = {
   /** The record wizard; with a past battle and side, filled in from it to claim that side's rewards. */
   battle: (forceId: string, battleId?: string, sideId?: string) => `#/force/${forceId}/battle${battleId && sideId ? `/${battleId}/${sideId}` : ''}`,
   list: (forceId: string, listId: string) => `#/force/${forceId}/list/${listId}`,
+  /** The force's whole Requisition ledger. */
+  ledger: (forceId: string) => `#/force/${forceId}/ledger`,
   /** The battle tracker; with a sector, a new battle is set up to be fought over it (by this attacking faction and detachment). */
   tracker: (sectorId?: string, attacker?: string, forceId?: string) =>
     (sectorId ? `#/battle/sector/${sectorId}${attacker ? `/${attacker}${forceId ? `/${forceId}` : ''}` : ''}` : '#/battle'),

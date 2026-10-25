@@ -15,6 +15,7 @@ import PatrolModal from './PatrolModal';
 import UnitTaskModal from './UnitTaskModal';
 import TrainingModal from './TrainingModal';
 import SortieModal from './SortieModal';
+import { LEDGER_RECENT, LedgerTable } from './Ledger';
 import type { Campaign, Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
 import { SOLO_PATROL } from '../rules/downtimeData';
@@ -289,34 +290,12 @@ export default function ForceView({ forceId }: { forceId: string }) {
             {f.ledger.length === 0 ? (
               <p className="muted small">No entries. Starting Supply Limit is {f.startingSupply}.</p>
             ) : (
-              <div className="table-wrap">
-                <table className="stack">
-                  <thead>
-                    <tr><th>Date</th><th>Entry</th><th className="num">RP</th><th className="num">Supply</th><th className="num">US</th><th /></tr>
-                  </thead>
-                  <tbody>
-                    {f.ledger.map((e, i) => edit ? (
-                      <tr key={e.id}>
-                        <td className="s-2" data-label="Date"><input type="date" value={e.date} onChange={(ev) => set((d) => void (d.ledger[i].date = ev.target.value))} /></td>
-                        <td className="s-full" data-label="Entry"><TextField className="wide" value={e.label} onCommit={(v) => set((d) => void (d.ledger[i].label = v))} /></td>
-                        <td className="num" data-label="RP"><input type="number" value={e.rp} onChange={(ev) => set((d) => void (d.ledger[i].rp = Number(ev.target.value) || 0))} /></td>
-                        <td className="num" data-label="Supply"><input type="number" step={50} value={e.supply} onChange={(ev) => set((d) => void (d.ledger[i].supply = Number(ev.target.value) || 0))} /></td>
-                        <td className="num small" data-label="US" data-tip="Umbra Shards (history only; set the balance in Force details)">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
-                        <td className="s-end"><button className="ghost icon" onClick={() => set((d) => void d.ledger.splice(i, 1))} aria-label="Delete entry"><Icon name="l:x" /></button></td>
-                      </tr>
-                    ) : (
-                      <tr key={e.id}>
-                        <td className="s-2 small muted" data-label="Date">{e.date}</td>
-                        <td className="s-full" data-label="Entry">{e.label}</td>
-                        <td className="num" data-label="RP">{e.rp}</td>
-                        <td className="num" data-label="Supply">{e.supply}</td>
-                        <td className="num small" data-label="US">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
-                        <td className="s-end" />
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                <LedgerTable f={f} edit={edit} set={set} limit={LEDGER_RECENT} />
+                {f.ledger.length > LEDGER_RECENT && (
+                  <div className="row ledger-all"><a href={href.ledger(f.id)}>See all {f.ledger.length} entries</a></div>
+                )}
+              </>
             )}
           </Panel>
 
