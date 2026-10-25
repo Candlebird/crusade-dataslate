@@ -33,14 +33,26 @@ export function emplacementUses(d: DefaultRecipeDef, shards: ShardPiece[]): numb
   return out;
 }
 
-/** Is default `d` hidden for this run: one of the force's unit recipes can be filled from its exact Shards. */
-export function defaultHidden(run: Pick<TrainingRun, 'recipes'>, d: DefaultRecipeDef): boolean {
-  const fake = d.slots.map(([type, grade], i) => shardPiece(i + 1, { x: 0, y: 0 }, type, grade as Grade, false));
-  return run.recipes.some((r) => recipeUses(r, fake) !== null);
-}
+/** The run's recipes and (optionally) the units crafted so far: all defaultHidden needs. */
+type RecipeBook = Pick<TrainingRun, 'recipes'> & Partial<Pick<TrainingRun, 'crafted'>>;
 
-/** The defaults this run shows in its recipe book (not hidden by a unit recipe). */
-export const defaultsFor = (run: Pick<TrainingRun, 'recipes'>): DefaultRecipeDef[] => DEFAULTS.filter((d) => !defaultHidden(run, d));
+/** Could one of these unit recipes be filled from default `d`'s exact Shards? */
+const fillsFrom = (recipes: TrainingRun['recipes'], d: DefaultRecipeDef): boolean => {
+  const fake = d.slots.map(([type, grade], i) => shardPiece(i + 1, { x: 0, y: 0 }, type, grade as Grade, false));
+  return recipes.some((r) => recipeUses(r, fake) !== null);
+};
+
+/** Is default `d` hidden for this run: one of the force's unit recipes not yet crafted can be filled from its exact
+ *  Shards. Once that unit is crafted the default is freed (buildable for the rest of the run). */
+export const defaultHidden = (run: RecipeBook, d: DefaultRecipeDef): boolean =>
+  fillsFrom(run.recipes.filter((r) => !run.crafted?.includes(r.unitId)), d);
+
+/** Defaults a unit recipe hid that are buildable again because that unit is crafted (freedDefaults ⊆ defaultsFor). */
+export const freedDefaults = (run: RecipeBook): DefaultRecipeDef[] =>
+  DEFAULTS.filter((d) => fillsFrom(run.recipes, d) && !defaultHidden(run, d));
+
+/** The defaults this run shows in its recipe book (not hidden by an uncrafted unit's recipe). */
+export const defaultsFor = (run: RecipeBook): DefaultRecipeDef[] => DEFAULTS.filter((d) => !defaultHidden(run, d));
 
 /** Defaults the run can craft now, with the Shards each would use: kept ones, and this draft's once all placed. */
 export function readyDefaults(run: TrainingRun): { key: string; uses: number[] }[] {

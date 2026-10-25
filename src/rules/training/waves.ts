@@ -61,10 +61,10 @@ export const groundHpAt = (w: number, lv = w) =>
 export const levelOf = (w: number) => Math.min(w, F.from);
 
 /** How many times tougher wave `w` is than its level, in a run whose Final is `final`: climb a wave past finale.from up
- *  to the Final, then (Endless) endless a wave, rise more for every riseEvery waves gone. */
+ *  to the Final, then (Endless) endless a wave, rise more for every riseEvery waves gone, endlessMax at most. */
 export function climbAt(w: number, final: number = F.from): number {
   let m = 1;
-  for (let k = F.from + 1; k <= w; k++) m *= k <= final ? F.climb : F.endless + F.rise * Math.floor((k - final - 1) / F.riseEvery);
+  for (let k = F.from + 1; k <= w; k++) m *= k <= final ? F.climb : Math.min(F.endlessMax, F.endless + F.rise * Math.floor((k - final - 1) / F.riseEvery));
   return m;
 }
 
@@ -91,7 +91,9 @@ export function planFor(r: Rng, power: number, w: number, final: number = F.from
   const kind = waveKind(r, w, flies);
   const { n, hpMul } = countFor(kind, minions, (flies ? W.flyMax : W.maxCount) - (boss ? 1 : 0));
   const tough = climbHp(w, final) * groundHpAt(w, lv) * TRAINING.enemyHp;
-  const hp = hpMul * tough * (flies ? flyHpAt(lv) : 1);
+  // Endless lords and flyers climb faster still (a wave's walking escorts are what keeps the climb free of cliffs).
+  const deep = Math.max(0, w - final);
+  const hp = hpMul * tough * (flies ? flyHpAt(lv) * F.endlessFly ** deep : 1);
   const bossMul = Math.max(W.bossMin, (budget * (1 - W.escorts)) / costOf('lord'));
 
   const out: SpawnPlan[] = [];
@@ -102,7 +104,7 @@ export function planFor(r: Rng, power: number, w: number, final: number = F.from
   }
   if (boss) {
     const s = spawnPlan(r, 'lord', at / 2, 1, skyBoss, false);
-    s.hp = TRAINING_ENEMIES.lord.hp * tough * bossMul * bossHpAt(w) * (skyBoss ? flyHpAt(lv) * W.flyBossHp : 1);
+    s.hp = TRAINING_ENEMIES.lord.hp * tough * bossMul * bossHpAt(w) * F.endlessBoss ** deep * (skyBoss ? flyHpAt(lv) * W.flyBossHp : 1);
     out.push(s);
   }
   return out.sort((a, b) => a.at - b.at);

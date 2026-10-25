@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { SHARD_TYPES, TRAINING } from '../downtimeData';
 import { towerDps } from './dps';
 import {
-  craftDefault, craftDefaultProblem, defaultHidden, defaultsFor, DEFAULTS, defaultTower, defaultValue, emplacementUses,
+  craftDefault, craftDefaultProblem, defaultHidden, defaultsFor, DEFAULTS, freedDefaults, defaultTower, defaultValue, emplacementUses,
   readyDefaults,
 } from './emplacements';
 import { recipesFor, unitTower } from './recipes';
@@ -48,6 +48,18 @@ describe('default recipes', () => {
     expect(defaultHidden({ recipes: [recipe([[t0, g0 as Grade], [t1, g1 as Grade]])] }, picket)).toBe(true);
     expect(defaultHidden({ recipes: [recipe([[t0, (g0 + 1) as Grade]])] }, picket)).toBe(false);
     expect(defaultsFor({ recipes: [] })).toHaveLength(DEFAULTS.length);
+  });
+
+  it('are freed once the unit whose recipe hid them is crafted', () => {
+    const picket = DEFAULTS.find((x) => x.key === 'picket')!;
+    const [t0, g0] = picket.slots[0];
+    const [t1, g1] = picket.slots[1];
+    const r = { ...recipe([[t0, g0 as Grade], [t1, g1 as Grade]]), unitId: 'hider' };
+    expect(defaultHidden({ recipes: [r], crafted: [] }, picket)).toBe(true);
+    expect(freedDefaults({ recipes: [r], crafted: [] })).toEqual([]);
+    expect(defaultHidden({ recipes: [r], crafted: ['hider'] }, picket)).toBe(false);
+    expect(freedDefaults({ recipes: [r], crafted: ['hider'] }).map((d) => d.key)).toContain('picket');
+    expect(defaultsFor({ recipes: [r], crafted: ['hider'] })).toHaveLength(DEFAULTS.length);
   });
 });
 

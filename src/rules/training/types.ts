@@ -193,7 +193,7 @@ export interface KeepOption {
   down?: boolean;
 }
 
-/** One Shard a recipe needs: its type, at this grade or better. */
+/** One Shard a recipe needs: its type, at exactly this grade. */
 export interface RecipeSlot {
   type: ShardType;
   grade: Grade;

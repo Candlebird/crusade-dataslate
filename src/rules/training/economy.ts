@@ -3,6 +3,7 @@ import { levelForXp } from '../engine';
 import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { pieceById } from './board';
 import { luckCap, mendPerk, thrifty } from './drill';
+import { inEndless } from './finaleCore';
 import { creditMul } from './nexus';
 import type { Enemy, TrainingRun, UnitTower } from './types';
 
@@ -105,14 +106,18 @@ export function killCredits(e: Enemy): number {
   return Math.max(1, Math.round(def.cost * TRAINING.credits.perCost)) / (def.spawn === 'boss' ? 1 : TRAINING.wave.crowd);
 }
 
-/** Pay a kill into run.credits, with the bounty and the Nexus's threat (nexus.ts creditMul). Credits may be fractional
- *  (the screens show them rounded down). */
+/** What the run's credits in are worth: the Nexus's threat (nexus.ts creditMul), and finale.endlessCredits in Endless. */
+const payMul = (run: TrainingRun) => creditMul(run) * (inEndless(run) ? TRAINING.finale.endlessCredits : 1);
+
+/** Pay a kill into run.credits, with the bounty and payMul. Credits may be fractional (the screens show them rounded
+ *  down). */
 export function payKill(run: TrainingRun, e: Enemy): void {
-  run.credits = Math.round((run.credits + killCredits(e) * run.mods.bounty * creditMul(run)) * 1e6) / 1e6;
+  run.credits = Math.round((run.credits + killCredits(e) * run.mods.bounty * payMul(run)) * 1e6) / 1e6;
 }
 
-/** Credits for clearing wave run.wave: the wave bonus, and the no-leak bonus when run.leaked is 0; × creditMul. */
+/** Credits for clearing wave run.wave: the wave bonus, and the no-leak bonus when run.leaked is 0; × creditMul, and
+ *  finale.endlessCredits in Endless. */
 export function waveCredits(run: TrainingRun): number {
   const C = TRAINING.credits;
-  return Math.round((C.wave + C.perWave * run.wave + (run.leaked === 0 ? C.noLeak : 0)) * creditMul(run));
+  return Math.round((C.wave + C.perWave * run.wave + (run.leaked === 0 ? C.noLeak : 0)) * payMul(run));
 }

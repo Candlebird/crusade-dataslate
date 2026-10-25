@@ -111,7 +111,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `habitNames(u: Unit): string[]`
 - `typeScores(u: Unit, force: Unit[]): Record<ShardType, number>` — rank-based fit of each Shard type.
 - `recipesFor(units: Unit[]): Recipe[]` — one unique recipe per trainable unit; deterministic.
-- `recipeUses(recipe: Recipe, shards: ShardPiece[]): number[] | null` — ids (slot order) satisfying it, lowest grades first.
+- `recipeUses(recipe: Recipe, shards: ShardPiece[]): number[] | null` — ids (slot order) satisfying it: each slot its type at exactly its grade, kept Shards first.
 - `readyRecipes(run): { unitId: string; uses: number[] }[]` — craftable now (not crafted; kept + this draft's Shards).
 - `unitTower(u: Unit, id: number, at: Tile, craftedAt: number): UnitTower` — fighter() + habits + abilities skills; cap from economy.levelCap.
 
@@ -144,7 +144,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `mendCost(run): number`, `mendProblem(run): string | null`, `buyMend(run): void` — +mend.hp (+ the Field mending perk), cap baseHp; run.mends++.
 - `killCredits(e: Enemy): number` — max(1, round(cost × perCost)) / wave.crowd (the Lord's not divided): a fraction; the UI floors credits.
 - `payKill(run, e: Enemy): void` — run.credits += killCredits × run.mods.bounty (rounded to 1e-6).
-- `waveCredits(run): number` — wave + perWave × run.wave, + noLeak if run.leaked === 0.
+- `waveCredits(run): number` — wave + perWave × run.wave, + noLeak if run.leaked === 0. In Endless (finaleCore.inEndless) payKill and waveCredits pay × finale.endlessCredits.
 
 ### combat.ts
 - `type Harm = 'shot' | 'melee' | 'other'`
@@ -253,7 +253,7 @@ Numbers in `TRAINING.drill` (luckAtStart, cardsAtStart, groups of boss cards, pe
 - UI: training/freshRun.ts (`freshRun(force, c, siege)`: a drill run with story and Nexus, or a siege on the week's seed), training/useSiegeSettle.ts (`thisWeek()`, `useSiegeSettle(c)`), training/DrillTrack.tsx, training/SiegePanel.tsx; StartScreen toggles Your own / Weekly Siege; CardOffer's Re-draw; useBank.finish banks the drill, posts the siege and settles.
 
 ### Final waves (finaleCore.ts, finale.ts, veterancy.ts)
-Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEvery, escorts, lords, bossHp, trick, siegeHp). Types `RunFinale` (nexusTypes.ts), `ForceFinale` (model/types.ts).
+Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEvery, endlessMax, endlessBoss, endlessFly, endlessCarry, endlessCredits, escorts, lords, bossHp, trick, siegeHp). Endless: climbAt rises to endlessMax a wave; each wave deep multiplies flyer HP by endlessFly and boss HP by endlessBoss; continueEndless leaves behind credits past endlessCarry. Types `RunFinale` (nexusTypes.ts), `ForceFinale` (model/types.ts).
 - finaleCore.ts (no imports): `finalOf(run)`, `inEndless(run)`, `endlessDepth(run)` (waves cleared past the Final in Endless).
 - finale.ts: `SIEGE_BOSS`, `finalSteps()`, `finalLord(final)`, `newFinale(final, siege)`, `isFinalWave(run, w)`, `finalBoss(run)` (name: colossus, nemesis on its wave, a campaign lord, else finale.lord),
   `finalePlan(run, plans)` (boss marked final, × bossHp[final], a named lord lord −1 × lords.hp[tier]; a siege's a lone boss of siegeHp), `throughText(run)`. lords.ts: a Final boss's Ward and Regrowth are finale.trick as much.
@@ -281,7 +281,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 ### emplacements.ts (default towers)
 - `DEFAULTS` (TRAINING.defaults.recipes: 13 sets covering each of the 40 Shard kinds once, exact grades), `defaultByKey(key)`, `defaultValue(d)`.
 - `emplacementUses(d, shards)` — ids in slot order, exact type and grade, kept Shards first; null if they can't.
-- `defaultHidden(run, d)` — a unit recipe of the run fills from d's exact Shards (recipes.recipeUses). `defaultsFor(run)`, `readyDefaults(run)` (as readyRecipes).
+- `defaultHidden(run, d)` — an uncrafted unit recipe of the run fills from d's exact Shards (recipes.recipeUses). `freedDefaults(run)` — the defaults a recipe hid whose unit is now crafted (buildable again). `defaultsFor(run)`, `readyDefaults(run)` (as readyRecipes).
 - `defaultTower(d, id, at): DefaultTower` — each Shard's gun and rule; Quality best of theirs − qualityBonus (2+ best); attacks × k so dps.towerDps = dpsShare × unitDps × value at dpsDefense. No XP, levels, traits or relics (not a UnitTower: economy, XP and records skip it).
 - `craftDefaultProblem(run, key, uses, onId)`, `craftDefault(run, key, uses, onId)` — as run.craft: stands on onId, other uses → rubble, a draft craft is the keep; any number of each; not in run.crafted.
 
@@ -327,7 +327,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 ### run.ts
 - `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus, opts: { drill?: RunDrill; siege?: string; final?: number } = {}): TrainingRun` — run.finale = finale.newFinale(opts.final ?? finale.from, siege); — run.drill = a copy of opts.drill (unset: everything open), credits + drill.purseOf; run.siege = opts.siege (the UI then passes no story, nexus or drill, and seed = sortie.weekSeed(week)); run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
 - `startProblem(run): string | null` — build phase, draft step 'done', no card offer pending, no Victory pending.
-- `victoryProblem(run)`, `continueEndless(run)` (victory 'endless'), `bankVictory(run)` (victory 'banked', endRun).
+- `victoryProblem(run)`, `continueEndless(run)` (victory 'endless'; credits past finale.endlessCarry are left behind), `bankVictory(run)` (victory 'banked', endRun).
 - `startWave(run): void` — wave++, phase 'wave', t 0, leaked 0, queue = finale.finalePlan(run, lords.lordPlan(run, nemesis.nemesisPlan(run, waves.planWave(...)))); gun clocks reset.
 - `step(run, dt): void` — see the order above.
 - `craftProblem(run, unitId, uses: number[], onId: number): string | null` — build phase, not crafted, `uses` satisfy the recipe (recipeUses-style check), onId ∈ uses; if any of `uses` is a draft piece the draft must be at step 'keep' (the craft is then this draft's keep).
@@ -347,7 +347,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 
 ### bot.ts (not in index.ts: the tests, and the app's Auto (debug) button via components/training/useAuto, import it directly)
 - `interface MazeSpot { n; x; y }`
-- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (recipe progress, then grade), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use, spend (levels cheapest first, then luck, mend when low), pick card 0 (`BOT_CARD`).
+- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (waves 1-2: the gun that covers most route, never a grade down; then exact-grade recipe progress, a grade-down keep included, then grade), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use, spend (levels cheapest first, then luck, mend when low), pick card 0 (`BOT_CARD`).
 - `botMoves(run, units, maze, cursor): Generator<string, number>` — botBuild a move at a time (each yield one move, a few words saying it; returns the cursor); botBuild runs it straight through, so headless results are the same.
 - `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt?; nexus?; drill?; siege? }): TrainingRun`
 

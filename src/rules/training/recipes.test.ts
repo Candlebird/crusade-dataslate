@@ -96,8 +96,11 @@ describe('training recipe checks', () => {
   const at = { x: 20, y: 20 };
   const s = (id: number, type: 'firepower' | 'swift' | 'blast', grade: Grade, draft = false) => shardPiece(id, at, type, grade, draft);
 
-  it('spends the lowest grades that do, in slot order', () => {
-    expect(recipeUses(recipe, [s(1, 'firepower', 5), s(2, 'firepower', 3), s(3, 'firepower', 2), s(4, 'swift', 4)])).toEqual([3, 2, 4]);
+  it('takes each slot at exactly its grade, in slot order', () => {
+    expect(recipeUses(recipe, [s(1, 'firepower', 5), s(2, 'firepower', 3), s(3, 'firepower', 2), s(4, 'swift', 2)])).toEqual([3, 2, 4]);
+    // A grade too high no longer fills a slot.
+    expect(recipeUses(recipe, [s(2, 'firepower', 3), s(3, 'firepower', 2), s(4, 'swift', 4)])).toBeNull();
+    expect(recipeUses(recipe, [s(1, 'firepower', 3), s(2, 'firepower', 3), s(4, 'swift', 2)])).toBeNull();
     expect(recipeUses(recipe, [s(1, 'firepower', 5), s(2, 'firepower', 1), s(4, 'swift', 4)])).toBeNull();
     expect(recipeUses(recipe, [s(1, 'firepower', 3), s(2, 'firepower', 3), s(3, 'blast', 5)])).toBeNull();
   });

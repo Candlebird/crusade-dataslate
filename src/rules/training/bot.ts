@@ -68,24 +68,24 @@ function progress(run: TrainingRun, opt: KeepOption): number {
   const kept = shardsOnMap(run, false);
   const p = shardsOnMap(run).find((s) => s.id === opt.pieceId)!;
   const pool: ShardPiece[] = [...kept, { ...p, grade: opt.grade }];
-  let best = 0;
-  for (const r of run.recipes) {
-    if (run.crafted.includes(r.unitId)) continue;
-    // Slots filled: the largest sub-recipe the pool satisfies, slot by slot (greedy is close enough for a bot).
+  // Slots filled: each slot an exact Shard of the pool, greedy (close enough for a bot); counted only if this Shard
+  // is part of what fills it.
+  const share = (slots: { type: string; grade: number }[]): number => {
     let n = 0;
     const used = new Set<number>();
-    for (const s of [...r.slots].sort((a, b) => b.grade - a.grade)) {
-      const m = pool.filter((x) => !used.has(x.id) && x.type === s.type && x.grade >= s.grade).sort((a, b) => a.grade - b.grade)[0];
+    for (const s of slots) {
+      const m = pool.find((x) => !used.has(x.id) && x.type === s.type && x.grade === s.grade);
       if (m) { used.add(m.id); n++; }
     }
-    // Only count it if this Shard is part of what fills it.
-    if (used.has(opt.pieceId)) best = Math.max(best, n / r.slots.length);
-  }
+    return used.has(opt.pieceId) ? n / slots.length : 0;
+  };
+  let best = 0;
+  for (const r of run.recipes) if (!run.crafted.includes(r.unitId)) best = Math.max(best, share(r.slots));
   return best;
 }
 
-/** How much a keep's Shard shoots at walkers on its own: its attacks × the route cells in its reach. The first keep
- *  goes by it (a gun that covers the route, as a player's would be), every later one only as a tie-break. */
+/** How much a keep's Shard shoots at walkers on its own: its attacks × the route cells in its reach. The keeps for
+ *  waves 1-2 go by it (a gun that covers the route, as a player's would be), every later one only as a tie-break. */
 function gunOf(run: TrainingRun, opt: KeepOption): number {
   const p = shardsOnMap(run).find((s) => s.id === opt.pieceId)!;
   const g = SHARD_TYPES[p.type].gun;
@@ -100,9 +100,9 @@ const nearest = (run: TrainingRun, uses: number[]): ShardPiece => {
   return shardsOnMap(run).filter((s) => uses.includes(s.id)).sort((a, b) => near(route, a) - near(route, b))[0];
 };
 
-/** Could an uncrafted unit's recipe still use this Shard (its type, at a slot's grade or better)? */
+/** Could an uncrafted unit's recipe still use this Shard (its type, at exactly a slot's grade)? */
 const wanted = (run: TrainingRun, p: ShardPiece) =>
-  run.recipes.some((r) => !run.crafted.includes(r.unitId) && r.slots.some((s) => s.type === p.type && p.grade >= s.grade));
+  run.recipes.some((r) => !run.crafted.includes(r.unitId) && r.slots.some((s) => s.type === p.type && p.grade === s.grade));
 
 /** Craft every ready recipe, then every ready default tower none of whose Shards a unit still wants, each on its used
  *  Shard nearest the route; a move a yield. */
@@ -157,9 +157,10 @@ export function* botMoves(run: TrainingRun, units: Unit[], maze: MazeSpot[], cur
   }
   yield* craftAll(run, units);
   if (run.draft.step === 'keep') {
-    // The bot never keeps a Shard a grade down (it only crafts units, whose recipes take a grade or better).
-    const opts = keepOptions(run).filter((o) => !o.down).map((o) => ({ o, p: progress(run, o), g: gunOf(run, o) }));
-    const first = !shardsOnMap(run, false).length && !unitTowers(run).length;
+    // A grade-down keep counts when it hits a recipe's exact grade (progress); otherwise the grade sort ranks it last.
+    // The keeps for waves 1-2 hold the opening waves: guns that cover the route, never a grade down.
+    const first = run.cleared < 2 && !unitTowers(run).length;
+    const opts = keepOptions(run).filter((o) => !first || !o.down).map((o) => ({ o, p: progress(run, o), g: gunOf(run, o) }));
     opts.sort((a, b) => (first ? b.g - a.g : 0) || b.p - a.p || b.o.grade - a.o.grade || b.g - a.g || a.o.with.length - b.o.with.length);
     keep(run, opts[0].o);
     yield 'keeps a Shard';

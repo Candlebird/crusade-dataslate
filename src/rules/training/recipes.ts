@@ -149,16 +149,15 @@ export function recipesFor(units: Unit[]): Recipe[] {
   });
 }
 
-/** The Shards (ids, one per slot, in slot order) that satisfy a recipe out of these, spending the lowest grades that
- *  do (kept Shards before draft ones at the same grade); null if they can't. */
+/** The Shards (ids, one per slot, in slot order) that satisfy a recipe out of these: each slot its type at exactly its
+ *  grade, kept Shards before draft ones; null if they can't. */
 export function recipeUses(recipe: Recipe, shards: ShardPiece[]): number[] | null {
   const free = [...shards].sort((a, b) => a.grade - b.grade || Number(a.draft) - Number(b.draft) || a.id - b.id);
   const used = new Set<number>();
   const out: number[] = new Array(recipe.slots.length);
-  // The dearest slot takes the cheapest Shard that does: whatever fits a dearer slot fits a cheaper one too.
   const order = recipe.slots.map((s, i) => ({ s, i })).sort((a, b) => b.s.grade - a.s.grade);
   for (const { s, i } of order) {
-    const p = free.find((x) => !used.has(x.id) && x.type === s.type && x.grade >= s.grade);
+    const p = free.find((x) => !used.has(x.id) && x.type === s.type && x.grade === s.grade);
     if (!p) return null;
     used.add(p.id);
     out[i] = p.id;

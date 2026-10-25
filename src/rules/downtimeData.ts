@@ -1006,7 +1006,10 @@ export const TRAINING = {
    * off-table 5 (OFF_TABLE_XP.perRound: Training and Sorties), so about 7-8 XP; a force of about 8 units banks some 60
    * a round. A season of about 12 rounds is some 700: `to` opens near its end, a step every two rounds or so.
    * Past wave `from` every wave is planned at that wave's level (budget, wounds) and `climb` times tougher a wave up to
-   * the Final; past the Final (Endless) `endless` a wave, `rise` more for every `riseEvery` waves gone. From `from` on a
+   * the Final; past the Final (Endless) `endless` a wave, `rise` more for every `riseEvery` waves gone, never more than
+   * `endlessMax` a wave (so no wave is a cliff); its Echo Lords `endlessBoss` and its flyers `endlessFly` tougher a wave past the Final (on
+   * top of the climb: neither is an escort the cliff check weighs). Going into Endless keeps at most `endlessCarry` of
+   * the run's credits (a purse saved up is no road to wave 40), and Endless kills and waves pay `endlessCredits` as much. From `from` on a
    * boss wave's escorts take `escorts` of its budget (the boss keeps its old share), so a boss wave weighs about as
    * much as the waves round it and the one after is no cliff. The Final boss: the nemesis at `from`, the Nexus Crisis
    * lord at `to` (in a campaign), else `lords[N]` (ECHO_LORDS ids, its trick by TRAINING.nexus.tricks.byLord), with
@@ -1020,9 +1023,14 @@ export const TRAINING = {
     to: 50,
     bars: { 30: 120, 35: 250, 40: 400, 45: 550, 50: 700 } as Record<number, number>,
     climb: 1.06,
-    endless: 1.12,
-    rise: 0.01,
-    riseEvery: 5,
+    endless: 1.2,
+    rise: 0.03,
+    riseEvery: 2,
+    endlessMax: 1.23,
+    endlessBoss: 1.3,
+    endlessFly: 1.25,
+    endlessCarry: 60,
+    endlessCredits: 0.5,
     escorts: 0.85,
     lords: { 25: 'whisperer', 30: 'hollowKing', 35: 'stormHerald', 40: 'umbralTitan', 45: 'mirrorWraith', 50: 'shardEater' } as Record<number, string>,
     bossHp: { 25: 0.5, 30: 0.8, 35: 1.4, 40: 4, 45: 3, 50: 3 } as Record<number, number>,

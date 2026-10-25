@@ -93,10 +93,10 @@ describe('training run', () => {
   it('gives crafted units XP every xpEvery waves cleared, banked once', () => {
     const run = createRun('f1', FORCE, 2);
     const r = run.recipes[0];
-    const p = shardPiece(run.nextId++, maze[0], r.slots[0].type, 5, false);
+    const p = shardPiece(run.nextId++, maze[0], r.slots[0].type, r.slots[0].grade, false);
     run.pieces.push(p);
     const ids = [p.id, ...r.slots.slice(1).map((s, i) => {
-      const q = shardPiece(run.nextId++, maze[(i + 1) * 3], s.type, 5, false);
+      const q = shardPiece(run.nextId++, maze[(i + 1) * 3], s.type, s.grade, false);
       run.pieces.push(q);
       return q.id;
     })];

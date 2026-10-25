@@ -130,12 +130,15 @@ function waveCleared(run: TrainingRun): void {
 export const victoryProblem = (run: TrainingRun): string | null =>
   run.phase === 'over' ? 'The run is over.' : run.finale?.victory !== 'pending' ? 'No Victory to choose for.' : null;
 
-/** Go on past the Final into Endless (bosses every bossEvery waves, the climb steepening). Throws on a problem. */
+/** Go on past the Final into Endless (bosses every bossEvery waves, the climb steepening): credits past
+ *  finale.endlessCarry are left behind. Throws on a problem. */
 export function continueEndless(run: TrainingRun): void {
   const why = victoryProblem(run);
   if (why) throw new Error(why);
   run.finale!.victory = 'endless';
-  run.log.push('On into Endless: no Final ahead, only deeper waves.');
+  const lost = Math.floor(Math.max(0, run.credits - TRAINING.finale.endlessCarry));
+  if (lost > 0) run.credits -= lost;
+  run.log.push(`On into Endless: no Final ahead, only deeper waves${lost > 0 ? ` (${lost} credits left behind)` : ''}.`);
 }
 
 /** Bank the Victory and end the run. Throws on a problem. */
