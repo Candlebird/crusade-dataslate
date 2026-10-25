@@ -53,7 +53,7 @@ const errorText = (err: unknown) => (err instanceof Error ? err.message : String
 
 /** Signs in with Google and keeps the app state in step with the shared Firestore database. */
 export function CloudProvider({ children }: { children: ReactNode }) {
-  const { state, update } = useStore();
+  const { state, update, setSignedIn } = useStore();
   const [fb, setFb] = useState<Firebase | null>(null);
   const [user, setUser] = useState<{ email: string; name: string | null } | null | undefined>(undefined);
   const [status, setStatus] = useState<CloudStatus>('loading');
@@ -90,6 +90,7 @@ export function CloudProvider({ children }: { children: ReactNode }) {
 
   const email = user?.email ?? null;
   const isGm = email === GM_EMAIL;
+  useEffect(() => setSignedIn(email), [email, setSignedIn]);
 
   // Is this account in the campaign? The GM always is; anyone else once the GM lets them in.
   useEffect(() => {

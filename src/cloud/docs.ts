@@ -6,6 +6,7 @@
 import type { AppState, Force, Settings } from '../model/types';
 import type { FinishedBattle } from '../rules/tracker';
 import type { LocalDoc } from './sync';
+import { canWriteForce } from '../model/owner';
 
 export const IMG_PREFIX = 'img:';
 
@@ -75,7 +76,7 @@ export function localDocs(state: AppState, who: Who, images: Map<string, string>
   const docs: LocalDoc[] = [];
   for (const f of state.forces) {
     if (!f.owner) continue;
-    docs.push({ path: `forces/${f.id}`, json: toCloudJson(f, images), updatedAt: f.updatedAt, canWrite: f.owner === who.email, fields: { owner: f.owner } });
+    docs.push({ path: `forces/${f.id}`, json: toCloudJson(f, images), updatedAt: f.updatedAt, canWrite: canWriteForce(f, who.email), fields: { owner: f.owner } });
   }
   const c = state.campaign;
   if (c) {

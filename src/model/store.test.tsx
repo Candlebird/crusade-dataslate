@@ -200,6 +200,45 @@ describe('update', () => {
   });
 });
 
+describe('noting veterancy', () => {
+  const force = (name: string, owner?: string) => ({ ...newForce(name), owner, units: [newUnit({ name: 'U', xp: 7 })] });
+
+  it('notes it only on forces this device may change: no owner, or owned by the signed-in account', () => {
+    const mine = force('Mine', 'me@x.com');
+    const theirs = force('Theirs', 'them@x.com');
+    const local = force('Local');
+    storage.set(KEY, JSON.stringify({ ...baseState(), forces: [mine, theirs, local] }));
+    const store = render();
+    store.setSignedIn('me@x.com');
+    store.update((d) => void (d.settings.supplyPerRp = 1));
+    const [a, b, c] = render().state.forces;
+    expect(a.finale?.vet).toBe(7);
+    expect(c.finale?.vet).toBe(7);
+    // Another player's force is left exactly as the cloud sent it, or the sync would undo the change, over and over.
+    expect(b.finale).toBeUndefined();
+    expect(b).toEqual(theirs);
+  });
+
+  it('leaves every owned force alone while signed out', () => {
+    const owned = force('Owned', 'me@x.com');
+    storage.set(KEY, JSON.stringify({ ...baseState(), forces: [owned, force('Local')] }));
+    const store = render();
+    store.update((d) => void (d.settings.supplyPerRp = 1));
+    const [a, b] = render().state.forces;
+    expect(a.finale).toBeUndefined();
+    expect(b.finale?.vet).toBe(7);
+  });
+
+  it('changes nothing once noted', () => {
+    storage.set(KEY, JSON.stringify({ ...baseState(), forces: [force('Local')] }));
+    const store = render();
+    store.update(() => {});
+    const once = JSON.stringify(render().state.forces);
+    store.update(() => {});
+    expect(JSON.stringify(render().state.forces)).toBe(once);
+  });
+});
+
 describe('updateForce and updateUnit', () => {
   it('change one force and stamp it as updated', () => {
     const f = { ...newForce('A'), updatedAt: '2000-01-01T00:00:00.000Z', units: [newUnit({ name: 'U' })] };

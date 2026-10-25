@@ -5,6 +5,7 @@ import { migrateForce } from '../rules/migrate';
 import { migrateBattle } from '../rules/tracker';
 import { noteVeterancy } from '../rules/training/veterancy';
 import { nowIso } from './factory';
+import { canWriteForce } from './owner';
 import { toast } from '../components/ui';
 
 const STORAGE_KEY = 'opr-crusade-tracker:v1';
@@ -47,6 +48,8 @@ interface Store {
   updateUnit: (forceId: string, unitId: string, fn: (u: Unit) => void) => void;
   addBook: (book: CatalogBook) => void;
   replaceState: (s: AppState) => void;
+  /** The signed-in account (null: none). Tidy steps touch only the forces it may change (canWriteForce). */
+  setSignedIn: (email: string | null) => void;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -56,6 +59,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // The latest state, so update() can apply a change right away: a handler can read what it just wrote, and two
   // changes in the same tick both land.
   const latest = useRef(state);
+  // Who is signed in: another player's force is read-only here, and the sync undoes any change made to it.
+  const me = useRef<string | null>(null);
 
   useEffect(() => {
     try {
@@ -69,9 +74,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const update = useCallback((fn: (d: AppState) => void) => {
     const draft = structuredClone(latest.current);
     // Veterancy never drops: noted before a change (a unit removed keeps its XP in it) and after (XP just earned).
-    draft.forces.forEach(noteVeterancy);
+    // Only on forces this device may change: noting it on another player's force would be undone by the sync, again
+    // and again.
+    const tidy = () => draft.forces.forEach((f) => canWriteForce(f, me.current) && noteVeterancy(f));
+    tidy();
     fn(draft);
-    draft.forces.forEach(noteVeterancy);
+    tidy();
     latest.current = draft;
     setState(draft);
   }, []);
@@ -113,8 +121,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     setState(s);
   }, []);
 
+  const setSignedIn = useCallback((email: string | null) => void (me.current = email), []);
+
   return (
-    <Ctx.Provider value={{ state, update, updateForce, updateUnit, addBook, replaceState }}>{children}</Ctx.Provider>
+    <Ctx.Provider value={{ state, update, updateForce, updateUnit, addBook, replaceState, setSignedIn }}>
+      {children}
+    </Ctx.Provider>
   );
 }
 
