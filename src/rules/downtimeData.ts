@@ -1253,6 +1253,8 @@ export const SORTIE = {
   cost: 3,
   /** Every model's wounds are its Tough times this. */
   hpMul: 3,
+  /** Sortie fights only: every attack (party and Echoes) rolls to hit twice and keeps the better, shown as one roll. */
+  hitTwice: true,
   /**
    * Distances: 1 Close, 2 Mid, 3 Far, and each slot back in the party's line adds one. How far a gun reaches by its
    * range: up to 12" one step, up to 24" two, up to 36" three, longer four (so the Back is for the longest guns).

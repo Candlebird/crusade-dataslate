@@ -305,6 +305,8 @@ function rand(run: { rng: number }): number {
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 const d6 = (run: SortieRun) => 1 + Math.floor(rand(run) * 6);
+/** A to-hit roll: in a Sortie, the better of two dice (SORTIE.hitTwice), shown as the one roll kept. */
+const hitRoll = (run: SortieRun) => (SORTIE.hitTwice ? Math.max(d6(run), d6(run)) : d6(run));
 /** 2.3 → 2 or 3, 3 30% of the time. */
 const stoch = (run: SortieRun, n: number) => Math.floor(n) + (rand(run) < n - Math.floor(n) ? 1 : 0);
 const pickOf = <T,>(run: SortieRun, xs: readonly T[]): T => xs[Math.floor(rand(run) * xs.length)];
@@ -1654,7 +1656,7 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
     for (let i = 0; i < n; i++) {
       if (!standing(def)) break;
       const need = g.reliable ? 2 : clamp(att.quality - mod, 2, 6);
-      const r = d6(run);
+      const r = hitRoll(run);
       if (r < need) continue;
       const six = r === 6;
       const six6 = six ? sixes.filter((e) => appliesTo(e, g)) : [];
@@ -2000,7 +2002,8 @@ function expect(run: SortieRun, att: SortieSquad, guns: Gun[], def: SortieSquad,
   let n = 0;
   for (const g of guns) {
     const a: Strike = { melee, guns: [g], dist, loose };
-    const hit = g.reliable ? 5 / 6 : clamp((7 - att.quality + hitMod(run, att, def, g, a)) / 6, 1 / 6, 5 / 6);
+    const once = g.reliable ? 5 / 6 : clamp((7 - att.quality + hitMod(run, att, def, g, a)) / 6, 1 / 6, 5 / 6);
+    const hit = SORTIE.hitTwice ? 1 - (1 - once) ** 2 : once;
     const ap = g.ap + (melee && !att.echo ? (has(run, 'blades') ? 1 : 0) + (has(run, 'fury') ? 2 : 0) : 0) - (def.fortified ? 1 : 0);
     const fail = 1 - clamp((7 - def.defense - Math.max(0, ap) + def.defMod) / 6, 0, 5 / 6);
     const per = Math.min(g.deadly, def.models[0]?.max ?? 1);

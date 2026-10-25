@@ -348,7 +348,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
           A party of 3 crosses a branching map of Echo fights, camps, shrines and caches to an Echo lord. The party stands Front, Middle and Back,
           and shifts every round: Middle to Front, Front to Back, Back to Middle. A Fortification always holds the Back. Echo squads stand Close, Mid
           or Far, and each slot behind the Front adds 1 step of distance. Blades and Charges work only from the Front. Guns reach as far as their range allows.
-          Wounds carry over between fights.
+          Every attack, yours and the Echoes', rolls to hit twice and keeps the better. Wounds carry over between fights.
         </p>
         <div className="small" style={{ marginBottom: 4 }}><b>Party</b> <span className="muted">({picked.length}/3)</span></div>
         {fit.length < 3 && <p className="muted small">A Sortie needs 3 active units.</p>}
