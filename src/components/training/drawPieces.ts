@@ -45,8 +45,9 @@ export function drawCrystal(ctx: CanvasRenderingContext2D, type: ShardType, grad
   ctx.restore();
 }
 
-/** A Shard: its type's crystal on a type-rimmed plate, with bright grade pips. Draft pieces get a dashed rim and a corner tag. */
-export function drawShard(ctx: CanvasRenderingContext2D, p: ShardPiece, s: number, glow: boolean, time: number) {
+/** A Shard: its type's crystal on a type-rimmed plate, with bright grade pips. Draft pieces get a dashed rim and a corner
+ *  tag with their number in the keep table (`num`). */
+export function drawShard(ctx: CanvasRenderingContext2D, p: ShardPiece, s: number, glow: boolean, time: number, num = 0) {
   const color = shardColor(p.type);
   platePath(ctx, p, s);
   ctx.fillStyle = '#262c35';
@@ -77,8 +78,15 @@ export function drawShard(ctx: CanvasRenderingContext2D, p: ShardPiece, s: numbe
     // A small white corner tag: not kept yet.
     const t = Math.max(3, s * 0.45);
     ctx.fillStyle = 'rgba(240,240,240,0.9)';
-    ctx.beginPath(); ctx.moveTo(p.x * s + 1, p.y * s + 1); ctx.lineTo(p.x * s + 1 + t, p.y * s + 1); ctx.lineTo(p.x * s + 1, p.y * s + 1 + t); ctx.closePath();
-    ctx.fill();
+    if (num && s >= 7) {
+      // A round tag with the number, big enough to read.
+      const r = Math.max(5, s * 0.36);
+      ctx.beginPath(); ctx.arc(p.x * s + r + 1, p.y * s + r + 1, r, 0, Math.PI * 2); ctx.fill();
+      label(ctx, String(num), p.x * s + r + 1, p.y * s + r + 1.5, r * 1.5, '#15181d');
+    } else {
+      ctx.beginPath(); ctx.moveTo(p.x * s + 1, p.y * s + 1); ctx.lineTo(p.x * s + 1 + t, p.y * s + 1); ctx.lineTo(p.x * s + 1, p.y * s + 1 + t); ctx.closePath();
+      ctx.fill();
+    }
   }
 }
 

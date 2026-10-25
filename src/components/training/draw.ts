@@ -24,8 +24,9 @@ export interface Overlay {
   time: number;
 }
 
-export function drawPiece(ctx: CanvasRenderingContext2D, p: Piece, s: number, o: Overlay) {
-  if (p.kind === 'shard') drawShard(ctx, p, s, o.glow.has(p.id), o.time);
+/** `num`: a draft Shard's number in the keep table (1 up), or 0. */
+export function drawPiece(ctx: CanvasRenderingContext2D, p: Piece, s: number, o: Overlay, num = 0) {
+  if (p.kind === 'shard') drawShard(ctx, p, s, o.glow.has(p.id), o.time, num);
   else if (p.kind === 'rubble') drawRubble(ctx, p, s);
   else if (p.kind === 'default') drawDefault(ctx, p, s);
   else drawUnit(ctx, p, s, o.portraits[p.unitId], o.time);
@@ -87,7 +88,7 @@ export function drawBoard(ctx: CanvasRenderingContext2D, run: TrainingRun, s: nu
   drawRoute(ctx, run, s);
   drawCover(ctx, run, s);
   drawPads(ctx, run, s);
-  for (const p of run.pieces) drawPiece(ctx, p, s, o);
+  for (const p of run.pieces) drawPiece(ctx, p, s, o, run.draft.placed.indexOf(p.id) + 1);
   drawSelection(ctx, run, s, o.selected);
   drawGhost(ctx, s, o.ghost);
 }

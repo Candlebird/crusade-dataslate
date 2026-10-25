@@ -930,15 +930,22 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-shard.placed { border: 1px dashed var(--line); border-radius: 4px; }
 .training-shard.placed .shard-badge { opacity: 0.35; }
 .training-shard-check { position: absolute; right: 2px; bottom: 2px; width: 13px; height: 13px; color: var(--gold); filter: drop-shadow(0 0 1px #000); }
-.training-keep { display: flex; flex-direction: column; gap: 4px; }
-.training-keep-opt { display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px; padding: 4px 8px; text-transform: none; letter-spacing: normal; font-size: 0.85rem; }
-.training-keep-opt.lit { border-color: var(--gold-dim); }
-/* A keep row: the keep (or merge) itself, then its grade-down twin. */
-.training-keep-row { display: flex; gap: 4px; }
-.training-keep-row > .training-keep-opt { flex: 1; min-width: 0; }
-.training-keep-down { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; min-height: 36px; padding: 4px 6px; white-space: nowrap; text-transform: none; letter-spacing: normal; font-size: 0.75rem; }
-.training-keep-label { text-align: left; }
-.training-keep-for { color: var(--gold); white-space: nowrap; font-size: 0.9em; }
+.training-shard-num { position: absolute; left: 3px; top: 1px; font-weight: 700; font-size: 0.8rem; color: var(--text); }
+.shard-unknown { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; line-height: 1; color: var(--muted-2); border: 1px dashed var(--line-2); border-radius: 4px; }
+/* The keep table: a numbered row a draft Shard, a column each for keep, combine and downgrade, every cell one size. */
+.training-keep-table { display: grid; grid-template-columns: 1.8em repeat(3, minmax(0, 1fr)); gap: 4px; }
+.training-keep-head, .training-keep-tr { display: contents; }
+.training-keep-head > span { color: var(--muted-2); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; }
+.training-keep-num { display: flex; align-items: center; justify-content: center; font-weight: 700; border-radius: 4px; background: rgba(255, 255, 255, 0.05); }
+.training-keep-tr.lit > .training-keep-num { background: var(--gold-dim); color: var(--text); }
+.training-keep-cell {
+  display: flex; align-items: center; gap: 6px; min-width: 0; height: 48px; padding: 3px 6px; overflow: hidden;
+  text-transform: none; letter-spacing: normal; font-size: 0.8rem; text-align: left;
+}
+.training-keep-cell.off { justify-content: center; border: 1px dashed var(--line); border-radius: 4px; opacity: 0.5; }
+.training-keep-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.training-keep-name, .training-keep-for { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.training-keep-for { color: var(--gold); font-size: 0.9em; }
 .training-recipe { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; }
 .training-recipe.ready { border-color: var(--gold); box-shadow: 0 0 10px rgba(201, 162, 74, 0.35); }
 .training-recipe.active { background: rgba(201, 162, 74, 0.12); }

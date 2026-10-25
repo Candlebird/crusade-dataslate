@@ -153,7 +153,8 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   const craftNow = crafting && build && !(crafting.unitId && run.crafted.includes(crafting.unitId))
     && crafting.uses.every((id) => pieceById(run, id)?.kind === 'shard') ? crafting : null;
   const hand = run.draft.hand;
-  const placing = build && !craftNow && run.draft.step === 'place' && pick !== null ? hand[pick] : undefined;
+  // A hand Shard is unknown until it is down: the ghost is a bare footprint.
+  const placing = build && !craftNow && run.draft.step === 'place' && pick !== null && hand[pick] ? true : undefined;
   const glow = craftNow ? new Set(craftNow.uses) : focus ? new Set(focus) : build ? glowIds(run) : undefined;
   const selPiece = sel !== null ? pieceById(run, sel) : undefined;
 

@@ -14,20 +14,22 @@ export interface ShardBadgeProps {
   glow?: boolean;
   /** Hide the grade pips. */
   noPips?: boolean;
+  /** No tooltip of its own (it sits in a control that has one). */
+  quiet?: boolean;
 }
 
 /** One Shard for the panels: its type's crystal, tinted dull (Cracked) to bright (Pristine), with 1–5 grade pips. */
-export function ShardBadge({ type, grade, size = 22, faded, glow, noPips }: ShardBadgeProps) {
+export function ShardBadge({ type, grade, size = 22, faded, glow, noPips, quiet }: ShardBadgeProps) {
   const def = SHARD_TYPES[type];
   const color = shardColor(type);
   const title = `${gradeName(grade)} ${def.name}`;
   return (
     <span
       className={`shard-badge${faded ? ' faded' : ''}${glow ? ' glow' : ''}`}
-      title={title}
+      data-tip={quiet ? undefined : title}
       style={{ ['--shard' as string]: color, color: gradeTint(color, grade), fontSize: size }}
     >
-      <Icon name={SHARD_ICON[type]} title={title} />
+      <Icon name={SHARD_ICON[type]} title={quiet ? undefined : title} />
       {!noPips && <GradePips grade={grade} />}
     </span>
   );
