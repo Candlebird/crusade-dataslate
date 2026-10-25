@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import maze from '../trainingTestMaze.json';
-import { playRun } from './bot';
-import { endlessDepth, inEndless } from './finaleCore';
+import { runBots } from './botPool';
 import { FORCES, SEEDS, scarred, veteran } from './testForces';
 
 // Balance: the same sample forces as veterans (traits and relics) and as scarred wrecks, against themselves fresh.
@@ -10,20 +8,14 @@ import { FORCES, SEEDS, scarred, veteran } from './testForces';
 const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 
 describe('veteran balance (bot)', () => {
-  it('a veteran force goes a few waves further than fresh, a scarred one a few less', () => {
-    const fresh: number[] = [];
-    const vets: number[] = [];
-    const scars: number[] = [];
-    const rows: string[] = [];
-    for (const f of FORCES) {
-      for (const seed of SEEDS) {
-        const a = playRun(f.units, seed, { maze, maxWaves: 60 }).cleared;
-        const b = playRun(f.units.map(veteran), seed, { maze, maxWaves: 60 }).cleared;
-        const c = playRun(f.units.map(scarred), seed, { maze, maxWaves: 60 }).cleared;
-        fresh.push(a); vets.push(b); scars.push(c);
-        rows.push(`${f.name.padEnd(22)} seed ${seed}: fresh ${a}  veteran ${b}  scarred ${c}`);
-      }
-    }
+  it('a veteran force goes a few waves further than fresh, a scarred one a few less', async () => {
+    const cases = FORCES.flatMap((f) => SEEDS.map((seed) => ({ f, seed })));
+    const outs = await runBots(cases.flatMap(({ f, seed }) => [f.units, f.units.map(veteran), f.units.map(scarred)]
+      .map((units) => ({ units, seed, maxWaves: 60 }))));
+    const fresh = cases.map((_, k) => outs[3 * k].cleared);
+    const vets = cases.map((_, k) => outs[3 * k + 1].cleared);
+    const scars = cases.map((_, k) => outs[3 * k + 2].cleared);
+    const rows = cases.map(({ f, seed }, k) => `${f.name.padEnd(22)} seed ${seed}: fresh ${fresh[k]}  veteran ${vets[k]}  scarred ${scars[k]}`);
     rows.push(`mean: fresh ${mean(fresh).toFixed(1)}  veteran ${mean(vets).toFixed(1)}  scarred ${mean(scars).toFixed(1)}`);
     console.log(rows.join('\n'));
     expect(mean(vets) - mean(fresh)).toBeGreaterThanOrEqual(0);
@@ -34,21 +26,18 @@ describe('veteran balance (bot)', () => {
 });
 
 describe('Endless (bot)', () => {
-  it('a strong force that wins its Final ends within about 5-8 waves of Endless, even with credits banked', () => {
+  it('a strong force that wins its Final ends within about 5-8 waves of Endless, even with credits banked', async () => {
+    // The Final wave hands the run a big purse, as a player who saved up for Endless would carry.
+    const cases = FORCES.filter((x) => x.name.endsWith(' A')).flatMap((f) => SEEDS.map((seed) => ({ f, seed })));
+    const outs = await runBots(cases.map(({ f, seed }) => ({ units: f.units.map(veteran), seed, maxWaves: 80, bankAtFinal: 1000 })));
     const depths: number[] = [];
     const rows: string[] = [];
-    for (const f of FORCES.filter((x) => x.name.endsWith(' A'))) {
-      for (const seed of SEEDS) {
-        let banked = false;
-        // The Final wave hands the run a big purse, as a player who saved up for Endless would carry.
-        const run = playRun(f.units.map(veteran), seed, { maze, maxWaves: 80, watch: (r) => {
-          if (!banked && r.wave === r.finale?.final) { banked = true; r.credits += 1000; }
-        } });
-        if (!inEndless(run)) continue;
-        depths.push(endlessDepth(run));
-        rows.push(`${f.name.padEnd(22)} seed ${seed}: Endless ${endlessDepth(run)} waves past ${run.cleared - endlessDepth(run)}`);
-      }
-    }
+    cases.forEach(({ f, seed }, k) => {
+      const { endless, cleared } = outs[k];
+      if (endless === null) return;
+      depths.push(endless);
+      rows.push(`${f.name.padEnd(22)} seed ${seed}: Endless ${endless} waves past ${cleared - endless}`);
+    });
     console.log(rows.join('\n'));
     expect(depths.length).toBeGreaterThan(0);
     expect(mean(depths)).toBeGreaterThanOrEqual(3);

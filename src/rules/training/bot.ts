@@ -3,7 +3,7 @@ import { SHARD_TYPES, TRAINING, type ShardType } from '../downtimeData';
 import { centreOf, placeProblem, routeOf, shardsOnMap, unitTowers } from './board';
 import { pickCard } from './cards';
 import { buyLevel, buyLuck, buyMend, levelCost, levelProblem, luckProblem, mendProblem } from './economy';
-import { N, overlaps } from './map';
+import { N } from './map';
 import { craftDefault, defaultByKey, defaultUpgradeCost, defaultUpgradeProblem, readyDefaults, upgradeDefault } from './emplacements';
 import { readyRecipes } from './recipes';
 import { continueEndless, craft, createRun, endRun, startWave, step } from './run';
@@ -45,10 +45,17 @@ function offMaze(run: TrainingRun): Tile[] {
     if (x < N - 1) gap[i] = Math.min(gap[i], gap[i + 1] + 1);
     if (y < N - 1) gap[i] = Math.min(gap[i], gap[i + N] + 1);
   }
+  // The spots a piece already overlaps (overlaps(): within 1 either way), marked once rather than asked of every spot.
+  const taken = new Uint8Array(N * N);
+  for (const p of run.pieces) {
+    for (let y = Math.max(0, p.y - 1); y <= Math.min(N - 1, p.y + 1); y++) {
+      for (let x = Math.max(0, p.x - 1); x <= Math.min(N - 1, p.x + 1); x++) taken[y * N + x] = 1;
+    }
+  }
   const out: { t: Tile; d: number }[] = [];
   for (let y = 0; y < N - 1; y++) for (let x = 0; x < N - 1; x++) {
     const d = Math.min(gap[y * N + x], gap[y * N + x + 1], gap[(y + 1) * N + x], gap[(y + 1) * N + x + 1]);
-    if (d >= 1 && !run.pieces.some((p) => overlaps(p, { x, y }))) out.push({ t: { x, y }, d });
+    if (d >= 1 && !taken[y * N + x]) out.push({ t: { x, y }, d });
   }
   return out.sort((a, b) => a.d - b.d).map((o) => o.t);
 }

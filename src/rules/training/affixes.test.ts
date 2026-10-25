@@ -1,15 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import maze from '../trainingTestMaze.json';
 import { TRAINING } from '../downtimeData';
 import { affixHit, affixPace, affixPlan, affixTick, onEchoDeath } from './affixes';
-import { playRun } from './bot';
 import { unsaved } from './harm';
-import { FORCES } from './testForces';
 import { blankRun, testEnemy } from './testRun';
 import type { NexusAffixId, SpawnPlan, TowerGun, TrainingRun } from './types';
 import { planWave, speedOf } from './waves';
 
-// Threat affixes at work, and a run under threat still goes the distance.
+// Threat affixes at work (affixes.balance.test.ts: a run under threat still goes the distance).
 
 const X = TRAINING.nexus;
 
@@ -94,12 +91,4 @@ describe('threat affixes', () => {
     expect(affixHit(ion, gun(), X.events.ionStorm.from + 1, 30)).toBe(-1);
     expect(affixHit(ion, gun(), X.events.ionStorm.from - 1, 30)).toBe(0);
   });
-
-  it('a force under threat 4 with two affixes still goes the distance (bot)', () => {
-    const nexus = { threat: 4, affixes: ['swift', 'armoured'] as NexusAffixId[], lords: [] };
-    const waves = FORCES.slice(0, 4).map((f) => playRun(f.units, 1, { maze, maxWaves: 40, nexus }).cleared);
-    const mean = waves.reduce((a, b) => a + b, 0) / waves.length;
-    console.log(`threat 4 (swift, armoured): ${waves.join(', ')}; mean ${mean.toFixed(1)}`);
-    expect(mean).toBeGreaterThanOrEqual(15);
-  }, 120_000);
 });

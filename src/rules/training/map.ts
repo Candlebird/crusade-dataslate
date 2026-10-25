@@ -56,50 +56,65 @@ function steps(blocked: Uint8Array, x: number, y: number): [number, number, numb
   return out;
 }
 
-/** Every cell's walking distance to the 2×2 area at `goal` (Infinity where it can't get there). */
+/** Every cell's walking distance to the 2×2 area at `goal` (Infinity where it can't get there). Dijkstra over steps(),
+ *  written out without allocating (it runs for every layout the bot weighs); the distances don't depend on the order. */
 function flowField(blocked: Uint8Array, goal: Tile): Float64Array {
   const d = new Float64Array(N * N).fill(Infinity);
-  // A binary heap of [distance, cell].
-  const heap: [number, number][] = [];
-  const push = (v: [number, number]) => {
-    heap.push(v);
-    for (let i = heap.length - 1; i > 0;) {
+  // A binary heap of (distance, cell), as two arrays.
+  const hk: number[] = [];
+  const hv: number[] = [];
+  const push = (k: number, v: number) => {
+    let i = hk.length;
+    hk.push(k); hv.push(v);
+    while (i > 0) {
       const p = (i - 1) >> 1;
-      if (heap[p][0] <= heap[i][0]) break;
-      [heap[p], heap[i]] = [heap[i], heap[p]];
+      if (hk[p] <= k) break;
+      hk[i] = hk[p]; hv[i] = hv[p];
       i = p;
     }
-  };
-  const pop = () => {
-    const top = heap[0];
-    const last = heap.pop()!;
-    if (heap.length) {
-      heap[0] = last;
-      for (let i = 0; ;) {
-        const l = 2 * i + 1;
-        const r = l + 1;
-        let m = i;
-        if (l < heap.length && heap[l][0] < heap[m][0]) m = l;
-        if (r < heap.length && heap[r][0] < heap[m][0]) m = r;
-        if (m === i) break;
-        [heap[m], heap[i]] = [heap[i], heap[m]];
-        i = m;
-      }
-    }
-    return top;
+    hk[i] = k; hv[i] = v;
   };
   for (const c of cells(goal)) {
     d[idx(c.x, c.y)] = 0;
-    push([0, idx(c.x, c.y)]);
+    push(0, idx(c.x, c.y));
   }
-  while (heap.length) {
-    const [du, u] = pop();
+  while (hk.length) {
+    const du = hk[0];
+    const u = hv[0];
+    const lk = hk.pop()!;
+    const lv = hv.pop()!;
+    const n = hk.length;
+    if (n) {
+      let i = 0;
+      for (;;) {
+        const l = 2 * i + 1;
+        const r = l + 1;
+        let m = -1;
+        let mk = lk;
+        if (l < n && hk[l] < mk) { m = l; mk = hk[l]; }
+        if (r < n && hk[r] < mk) { m = r; mk = hk[r]; }
+        if (m < 0) break;
+        hk[i] = hk[m]; hv[i] = hv[m];
+        i = m;
+      }
+      hk[i] = lk; hv[i] = lv;
+    }
     if (du > d[u]) continue;
-    for (const [nx, ny, c] of steps(blocked, u % N, Math.floor(u / N))) {
-      const v = idx(nx, ny);
-      if (du + c < d[v]) {
-        d[v] = du + c;
-        push([d[v], v]);
+    const x = u % N;
+    const y = (u - x) / N;
+    for (let k = 0; k < 8; k++) {
+      const dx = DIRS[k][0];
+      const dy = DIRS[k][1];
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= N || ny >= N) continue;
+      const v = ny * N + nx;
+      if (blocked[v]) continue;
+      if (dx && dy && (blocked[y * N + nx] || blocked[ny * N + x])) continue;
+      const nd = du + DIRS[k][2];
+      if (nd < d[v]) {
+        d[v] = nd;
+        push(nd, v);
       }
     }
   }
@@ -150,9 +165,9 @@ export function open(pieces: Tile[]): boolean {
     const u = q.pop()!;
     const x = u % N;
     const y = Math.floor(u / N);
-    for (const [dx, dy] of DIRS.slice(0, 4)) {
-      const nx = x + dx;
-      const ny = y + dy;
+    for (let k = 0; k < 4; k++) {
+      const nx = x + DIRS[k][0];
+      const ny = y + DIRS[k][1];
       if (!inMap(nx, ny)) continue;
       const v = idx(nx, ny);
       if (seen[v] || blocked[v]) continue;

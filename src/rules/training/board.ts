@@ -35,7 +35,12 @@ const last = new WeakMap<TrainingRun, { at: number[]; m: MapState }>();
 export function mapOf(run: TrainingRun): MapState {
   const ps = run.pieces;
   const hit = last.get(run);
-  if (hit && hit.at.length === ps.length * 2 && ps.every((p, i) => hit.at[2 * i] === p.x && hit.at[2 * i + 1] === p.y)) return hit.m;
+  // Hot (every gun's aim asks): a plain loop over the pieces against where they stood last time.
+  if (hit && hit.at.length === ps.length * 2) {
+    let same = true;
+    for (let i = 0; i < ps.length && same; i++) same = hit.at[2 * i] === ps[i].x && hit.at[2 * i + 1] === ps[i].y;
+    if (same) return hit.m;
+  }
   const m = mapFor(ps);
   last.set(run, { at: ps.flatMap((p) => [p.x, p.y]), m });
   return m;

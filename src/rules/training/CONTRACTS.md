@@ -352,7 +352,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `score(run): number` — waves cleared (trainingBest, trainingFeats).
 
 ### testForces.ts (test-only; not in index.ts)
-- `bookUnits(file)`, `FORCES` (two ~750 pt sample forces a book), `SEEDS` — shared by training.test.ts and veteranBalance.test.ts.
+- `bookUnits(file)`, `FORCES` (two ~750 pt sample forces a book), `SEEDS` — shared by the balance bot's tests (*.balance.test.ts, smoke.test.ts).
 
 ### testRun.ts (test-only; not in index.ts)
 - `blankRun(seed = 1): TrainingRun` — an empty build-phase run (no recipes, cover or draft; mods bounty 1, holdMul 1) for module tests.
@@ -371,4 +371,9 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared, nexus, lordPick, lords, affixes, titles, records, tales, drill, drillBank, siege, siegeBoard, dps, clock, emplacements, waveKinds, flightLane (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).
 
 ### probe.ts (test-only)
-- `probeRun(units, seed, {maxWaves?, nexus?}): Probe` — a bot run with bot.playRun's `watch` hook: cleared, fell, fellFlying, leaks by wave, each boss's death pad (LEGS if through). Also `flies(w)`, `mean`, `median`. Used by balance.test.ts; never imported by the app.
+- `probeRun(units, seed, {maxWaves?, nexus?}): Probe` — a bot run with bot.playRun's `watch` hook: cleared, fell, fellFlying, leaks by wave, each boss's death pad (LEGS if through). `prober()` is the same probe as a `{watch, done}` pair. Also `flies(w)`, `mean`, `median`. Never imported by the app.
+
+### botJobs.ts, botWorker.ts, botPool.ts, recruitSweep.ts (test-only)
+- `BotJob { units, seed, maxWaves?, final?, nexus?, probe?, bankAtFinal? }` → `playJob(job): BotOut { cleared, crafted, luck, endless (depth or null), ms, probe? }` — one bot run on the test maze as plain data.
+- `runBots(jobs, threads?): Promise<BotOut[]>` — plays the jobs on worker threads (botWorker.ts bundled by esbuild), a core each; seeded, so the same as playJob one by one (smoke.test.ts checks). The balance sweeps (*.balance.test.ts, `npm run test:balance`, not in `npm test`) use it.
+- `recruitRuns(ns, vet, final, rows): Promise<number[]>` — the recruits sweep, a mean a recruit count.
