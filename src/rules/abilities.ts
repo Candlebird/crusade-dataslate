@@ -200,6 +200,8 @@ const TABLE: Record<string, Effect[]> = {
   'nanite hive field': [heal(1, 1, 2)],
   'chrono-disruptor matrix': [field('slow', 2.5)],
   'celestial nullification matrix': [shield(4, 2), field('daze', 2)],
+  // Training feat relics (the Splinter is a weapon).
+  'crown of the last lord': [onHit('mark', 0.5)],
   // Nexus relics.
   'shadesplinter cloak': [shield(1, 1)],
   'umbra echo plating': [thorns(1, 0.5)],

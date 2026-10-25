@@ -7,13 +7,13 @@ import { bankOffTableXp, offTableKey } from '../../rules/downtime';
 import { awardFeats, trainingFeats } from '../../rules/feats';
 import { weekKey } from '../../rules/sortie';
 import {
-  bankDrill, bankFinale, bankHonours, bankShared, drillNews, lordsSlain, mvp, postSiege, settleSieges, siegeDmg, siegeScore, takeXp, type TrainingRun,
+  bankDrill, bankFinale, bankHonours, bankShared, drillNews, featFacts, lordsSlain, mvp, postSiege, settleSieges, siegeDmg, siegeScore, takeXp, type TrainingRun,
 } from '../../rules/training';
 import { toast } from '../ui';
 import { siegeWinLine } from './useSiegeSettle';
 
 // Paying a run out to the force: XP as it lands (within the off-table limit), then at the end the best score, feats,
-// who led the defence, records, titles and tales (records.ts bankHonours), the Final-wave ladder (veterancy.ts bankFinale), the Sortie layer (shared.ts bankShared), the
+// who led the defence, records, titles and tales (records.ts bankHonours), the Final-wave ladder (veterancy.ts bankFinale) and the feats it earns (featFacts.ts), the Sortie layer (shared.ts bankShared), the
 // Drill Honours (drillBank.ts) and, for a Weekly Siege in a campaign, its board (siegeBoard.ts postSiege). A run the
 // Auto (debug) button played (run.auto) banks nothing more.
 
@@ -70,11 +70,12 @@ export function useBank(force: Force, c?: Campaign) {
       const round = f.nexus?.factionId && c ? c.round ?? 1 : undefined;
       honours = bankHonours(f, run, localDate(), uid, round);
       if (run.cleared > (f.trainingBest ?? 0)) f.trainingBest = run.cleared;
-      feats = awardFeats(f, trainingFeats(run.cleared, lordsSlain(run)), run.crafted, localDate(), uid);
       // Quirks, the trinket, the bestiary and a slain nemesis go to the Sortie side with the XP.
       shared = bankShared(f, run);
       // The Victory, Endless depth and the Final it opens, before the Drill's news (Win at N goals read it).
       if (!run.siege) finale = bankFinale(f, run, localDate());
+      // Feats after the ladder: opening a Final or winning every one counts this run.
+      feats = awardFeats(f, trainingFeats(run.cleared, lordsSlain(run), featFacts(f, run)), run.crafted, localDate(), uid);
       drill = [...finale, ...drillNews(f, run, before)];
     });
     const dmg = siegeDmg(run);

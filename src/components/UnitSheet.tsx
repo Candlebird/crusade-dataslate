@@ -154,6 +154,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
     if (picker.kind === 'scar') return [{ key: 'scar', label: 'Battle scars', entries: SCAR_TABLE, rollable: true }];
     const held = relicHolders(state.forces, state.campaign);
     const earned = f.sortie?.relics ?? [];
+    const won = f.trainingRelics ?? [];
     const relicGroup = (key: string, label: string, list: typeof RELICS): PickGroup => ({
       key,
       label,
@@ -165,15 +166,17 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       })),
     });
     return [
-      ...TIERS.map((t) => relicGroup(t, t, RELICS.filter((r) => r.tier === t && !r.nexus))),
+      ...TIERS.map((t) => relicGroup(t, t, RELICS.filter((r) => r.tier === t && !r.nexus && !r.training))),
       relicGroup('nexus', 'Nexus', RELICS.filter((r) => r.nexus)),
       ...(earned.length ? [relicGroup('sortie', 'Sortie (free)', RELICS.filter((r) => r.sortie && earned.includes(r.sortie)))] : []),
+      ...(won.length ? [relicGroup('training', 'Training feats (free)', RELICS.filter((r) => r.training && won.includes(r.name)))] : []),
     ];
   };
 
   /** Relics are bought with RP at their tier's requisition price, unless taken free (e.g. as a reward). */
   const relicCheck = (e: PickEntry | null, free: boolean): string | null => {
-    if (!e || free || (e.meta as (typeof RELICS)[number] | undefined)?.sortie) return null;
+    const meta = e?.meta as (typeof RELICS)[number] | undefined;
+    if (!e || free || meta?.sortie || meta?.training) return null;
     const cost = relicCost((e.meta as (typeof RELICS)[number] | undefined)?.tier ?? 'Common');
     return cost > rp ? `Needs ${cost} RP (the force has ${rp}).` : null;
   };
@@ -204,7 +207,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
     } else {
       const def = p.meta as (typeof RELICS)[number] | undefined;
       const tier = def?.tier ?? 'Common';
-      const cost = p.free || def?.sortie ? 0 : relicCost(tier);
+      const cost = p.free || def?.sortie || def?.training ? 0 : relicCost(tier);
       updateForce(f.id, (fd) => {
         fd.units.find((x) => x.id === u.id)?.relics.push({ id: uid(), name: p.name, tier, profile: def?.profile, note: def?.note });
         if (cost) fd.ledger.push({ id: uid(), date: localDate(), label: `${tier} Relic — ${unitName(u)}: ${p.name}`, rp: -cost, supply: 0 });

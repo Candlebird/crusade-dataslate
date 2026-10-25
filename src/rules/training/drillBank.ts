@@ -13,7 +13,7 @@ import { finaleAfter } from './veterancy';
 const killsOf = (run: TrainingRun) => run.pieces.reduce((n, p) => n + ('kills' in p ? p.kills : 0), 0);
 
 /** Bosses slain this run: generic lords, real lords and the nemesis (the run's bestiary tally). */
-const bossesOf = (run: TrainingRun) =>
+export const bossesOf = (run: TrainingRun) =>
   Object.entries(run.beasts ?? {}).filter(([k]) => k === 'lord' || k === 'nemesis' || k.startsWith('real:')).reduce((n, [, b]) => n + b.slain, 0);
 
 /** Real lords and the nemesis slain this run. */

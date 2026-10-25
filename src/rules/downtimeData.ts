@@ -793,18 +793,23 @@ export const TRAINING = {
    * `actMul` for what it does, the first time at `first` of that into the wave. A weapon relic keeps its gun and fires a
    * special shot: `shot.attacks` attacks at once. A relic with a mapped effect uses it; any other does what its kind
    * does: wargear a damage pulse (`pulse.share[tier]` of each enemy's wounds within `pulse.radius` cells, a boss
-   * `pulse.bossShare` of that), armour a longer next hold (`brace.mul` ×; a unit that can't hold deals `brace.ward` more
+   * `pulse.bossShare` of that; the Weekly Siege's colossus counts as `pulse.siegeBase` wounds, about a 750 pt force's
+   * wave-25 Final boss), armour a longer next hold (`brace.mul` ×; a unit that can't hold deals `brace.ward` more
    * for `brace.secs`), an artefact marks the enemies in its reach (+markDmg a hit), a banner or icon makes towers within
    * `rally.radius` attack `rally.mul` faster for `rally.secs`. A mapped hit status lands on up to `status.max` enemies in
    * reach; a mapped field holds its status on what is in it for `field.secs`; a mapped heal bleeds (as bleedField) with
-   * `bleed.mul` × its wounds.
+   * `bleed.mul` × its wounds. A relic named in `named` does that act instead: a sunder (the Crown of the Last Lord)
+   * picks one enemy in reach, a boss first, else the furthest along, and every hit on it has AP(+`sunder.ap`) for
+   * `sunder.secs`.
    */
   relics: {
     cd: { Common: 20, Rare: 12, Legendary: 6 } as Record<string, number>,
     first: 0.25,
-    actMul: { shot: 1, pulse: 1, brace: 0.75, mark: 0.75, rally: 1, barrage: 1, shield: 0.75, frenzy: 1.25, field: 1, bleed: 0.75, status: 0.75 } as Record<string, number>,
+    actMul: { shot: 1, pulse: 1, brace: 0.75, mark: 0.75, rally: 1, barrage: 1, shield: 0.75, frenzy: 1.25, field: 1, bleed: 0.75, status: 0.75, sunder: 1 } as Record<string, number>,
+    named: { 'Crown of the Last Lord': 'sunder' } as Record<string, string>,
+    sunder: { ap: 1, secs: 6 },
     shot: { attacks: 4 },
-    pulse: { radius: 4, share: { Common: 0.35, Rare: 0.45, Legendary: 0.55 } as Record<string, number>, bossShare: 0.25 },
+    pulse: { radius: 4, share: { Common: 0.35, Rare: 0.45, Legendary: 0.55 } as Record<string, number>, bossShare: 0.25, siegeBase: 1100 },
     brace: { mul: 1.5, ward: 0.3, secs: 4 },
     rally: { radius: 4, mul: 0.5, secs: 5 },
     status: { max: 6 },

@@ -4,7 +4,9 @@ import { buildSeedState, withBuiltinBooks } from './seed';
 import { migrateForce } from '../rules/migrate';
 import { migrateBattle } from '../rules/tracker';
 import { noteVeterancy } from '../rules/training/veterancy';
-import { nowIso } from './factory';
+import { nowIso, uid } from './factory';
+import { localDate } from './date';
+import { clawbackFeats } from '../rules/feats';
 import { canWriteForce } from './owner';
 import { toast } from '../components/ui';
 
@@ -75,8 +77,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const draft = structuredClone(latest.current);
     // Veterancy never drops: noted before a change (a unit removed keeps its XP in it) and after (XP just earned).
     // Only on forces this device may change: noting it on another player's force would be undone by the sync, again
-    // and again.
-    const tidy = () => draft.forces.forEach((f) => canWriteForce(f, me.current) && noteVeterancy(f));
+    // and again. Feats paid at older, higher rewards give the difference back here too, once (clawbackFeats).
+    const tidy = () => draft.forces.forEach((f) => {
+      if (!canWriteForce(f, me.current)) return;
+      noteVeterancy(f);
+      clawbackFeats(f, localDate(), uid);
+    });
     tidy();
     fn(draft);
     tidy();

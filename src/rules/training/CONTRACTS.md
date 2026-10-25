@@ -183,10 +183,11 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 
 ### relics.ts (relic sockets)
 - `relicKind(name): 'wargear' | 'armour' | 'artefact' | 'banner'` — by name, then RELICS desc, else wargear.
-- `socketOf(r): RelicSocket` — act: 'shot' for a profiled relic (gun = its name), a mapped effect's act, else its kind's (pulse / brace / mark / rally); every = cd[tier] × actMul[act]; cd = every × first.
+- `socketOf(r): RelicSocket` — act: 'shot' for a profiled relic (gun = its name; the Colossus Splinter too), one named in relics.named (the Crown of the Last Lord: 'sunder'), a mapped effect's act, else its kind's (pulse / brace / mark / rally); every = cd[tier] × actMul[act]; cd = every × first.
 - `socketsOf(u): RelicSocket[]`; `socketRuns(s, source, kind)` — a timed relic skill (barrage/shield/frenzy) the socket runs (dropped from skills).
-- `relics(run, dt): void` — wear Tower.rush; tick every socket; a go that finds nothing to do tries again next step.
+- `relics(run, dt): void` — wear Enemy.sunder and Tower.rush; tick every socket; a go that finds nothing to do tries again next step.
 - `resetSockets(t)` — every clock back to its first go (startWave). `relicText(s): string` — for the tower card.
+- A pulse on a siege's Final boss counts from min(maxHp, pulse.siegeBase) wounds, not its millions. A sunder marks one enemy in reach (a boss first): `Enemy.sunder` (secs left, owned by relics.ts) adds relics.sunder.ap to the AP of every hit in harm.unsaved.
 - New fields: `UnitTower.relics?: RelicSocket[]`, `UnitTower.grit?` (hold-time share), `UnitTower.brace?` (next hold ×), `Tower.rush?: {mul, left}` (rateOf × (1 + mul)), `TowerGun.relic?` (fires gold).
 
 ### habits.ts (Sortie quirks and trinkets in Training)
@@ -374,6 +375,9 @@ Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, card
 - `probeRun(units, seed, {maxWaves?, nexus?}): Probe` — a bot run with bot.playRun's `watch` hook: cleared, fell, fellFlying, leaks by wave, each boss's death pad (LEGS if through). `prober()` is the same probe as a `{watch, done}` pair. Also `flies(w)`, `mean`, `median`. Never imported by the app.
 
 ### botJobs.ts, botWorker.ts, botPool.ts, recruitSweep.ts (test-only)
-- `BotJob { units, seed, maxWaves?, final?, nexus?, probe?, bankAtFinal? }` → `playJob(job): BotOut { cleared, crafted, luck, endless (depth or null), ms, probe? }` — one bot run on the test maze as plain data.
+- `BotJob { units, seed, maxWaves?, final?, nexus?, probe?, bankAtFinal?, siege? }` → `playJob(job): BotOut { cleared, crafted, luck, endless (depth or null), ms, probe?, dmg? (siegeDmg) }` — one bot run on the test maze as plain data.
 - `runBots(jobs, threads?): Promise<BotOut[]>` — plays the jobs on worker threads (botWorker.ts bundled by esbuild), a core each; seeded, so the same as playJob one by one (smoke.test.ts checks). The balance sweeps (*.balance.test.ts, `npm run test:balance`, not in `npm test`) use it.
 - `recruitRuns(ns, vet, final, rows): Promise<number[]>` — the recruits sweep, a mean a recruit count.
+
+### featFacts.ts (Training feats)
+- `featFacts(f, run): TrainingFeatFacts` — what feats.trainingFeats reads beyond waves and campaign lords: a Final lord or nemesis slain (not in a siege), runWon, drillBank.bossesOf (exported for it), endlessDepth, finaleOpen(f), the Finals won, siegeDmg. useBank.finish calls it after bankFinale, so the ladder it reads is the new one, then feats.awardFeats (a relic feat adds to Force.trainingRelics).

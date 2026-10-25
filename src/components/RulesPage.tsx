@@ -13,6 +13,7 @@ import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
 import { EXPEDITION_SITES } from '../rules/downtimeData';
 import { rewardText } from '../rules/downtime';
 import { relicSource } from '../rules/sortie';
+import { featInfo } from '../rules/feats';
 import { relicHolderText, relicHolders } from '../rules/engine';
 import { Panel } from './ui';
 import { IconText } from './Icon';
@@ -273,6 +274,7 @@ const RELIC_PAGES = [
   ['crusade', 'Crusade Relics'],
   ['nexus', 'Nexus Relics'],
   ['sortie', 'Sortie Relics'],
+  ['training', 'Training Relics'],
 ] as const;
 type RelicPage = (typeof RELIC_PAGES)[number][0];
 
@@ -286,7 +288,7 @@ function RelicRules() {
       </div>
       {page === 'crusade' ? (
         <Section id="x-crusade" title="Crusade relics">
-          <RelicCase relics={RELICS.filter((r) => !r.nexus && !r.sortie)} />
+          <RelicCase relics={RELICS.filter((r) => !r.nexus && !r.sortie && !r.training)} />
         </Section>
       ) : page === 'nexus' ? (
         <Section id="x-nexus" title="Nexus relics">
@@ -297,6 +299,11 @@ function RelicRules() {
         <Section id="x-sortie" title="Sortie relics">
           <p className="small">Brought home from Sorties, each once per force: a region's story finished, its deep version won, a flawless win, a full grudge settled, and every Echo lord slain on a high tier. Any unit of the force that can carry a relic takes it for free.</p>
           <RelicCase relics={RELICS.filter((r) => r.sortie)} source={(r) => relicSource(r.sortie!)} />
+        </Section>
+      ) : page === 'training' ? (
+        <Section id="x-training" title="Training relics">
+          <p className="small">Won by the hardest Training feats, each once per force. Any unit of the force that can carry a relic takes it for free. In Training, a relic on a crafted unit goes off by itself, as every relic does.</p>
+          <RelicCase relics={RELICS.filter((r) => r.training)} source={(r) => `Feat: ${featInfo(r.training!)?.name ?? r.training} (${featInfo(r.training!)?.text.replace(/\.$/, '') ?? ''}).`} />
         </Section>
       ) : <RelicBasics />}
     </>

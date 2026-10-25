@@ -65,6 +65,8 @@ export interface Enemy {
   surge?: number;
   /** The Final wave's boss (finale.ts): its damage counts to RunFinale.dealt. */
   final?: true;
+  /** Seconds left of a sundering relic's mark (relics.ts, the Crown of the Last Lord): every hit on it has AP(+sunder.ap). */
+  sunder?: number;
 }
 
 /** A nemesis on the field: when it came, its walking speed share (rage, Vengeful), better saves (Hardened), whether

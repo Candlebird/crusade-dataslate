@@ -164,7 +164,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
                   {tier} relic
                   <select value={choice} onChange={(e) => setChoice(e.target.value)}>
                     <option value="">— choose —</option>
-                    {RELICS.filter((r) => r.tier === tier && !r.nexus && !r.sortie).map((r) => <RelicOption key={r.name} name={r.name} taken={relicTaken(held, r.name)} />)}
+                    {RELICS.filter((r) => r.tier === tier && !r.nexus && !r.sortie && !r.training).map((r) => <RelicOption key={r.name} name={r.name} taken={relicTaken(held, r.name)} />)}
                   </select>
                 </label>
               )}

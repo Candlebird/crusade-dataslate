@@ -83,9 +83,10 @@ export const busy = (run: TrainingRun, t: Tower) => t.guns.some((g) => targetFor
 /** Is the enemy at -1 to be hit by this weapon: a shot at one standing in cover. */
 export const covered = (run: TrainingRun, g: TowerGun, e: Enemy) => !g.melee && inCover(run, e.x, e.y);
 
-/** Did a hit get through the enemy's save (Defense + AP; a Hardened nemesis and an Armoured Echo save better)? */
+/** Did a hit get through the enemy's save (Defense + AP; a Hardened nemesis and an Armoured Echo save better, a
+ *  sundered one worse)? */
 export const unsaved = (run: TrainingRun, e: Enemy, ap: number) =>
-  rand(run) >= saveChance(enemyDef(e).defense - (e.nem?.hard ?? 0) - (e.hard ?? 0), ap);
+  rand(run) >= saveChance(enemyDef(e).defense - (e.nem?.hard ?? 0) - (e.hard ?? 0), ap + ((e.sunder ?? 0) > 0 ? TRAINING.relics.sunder.ap : 0));
 
 /** A ring of `r` cells swelling out from a point. */
 export const pulse = (run: TrainingRun, x: number, y: number, r: number, color: string) =>

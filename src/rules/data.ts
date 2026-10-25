@@ -277,6 +277,8 @@ export interface RelicDef {
    * `flawless` for a win with no unit wiped out, `nemesis` for slaying a lord with a full grudge.
    */
   sortie?: string;
+  /** Won by a Training feat (its id, rules/feats.ts), once, and only then: never in a random or bought pool. */
+  training?: string;
 }
 
 export const RELICS: RelicDef[] = [
@@ -333,6 +335,9 @@ export const RELICS: RelicDef[] = [
   { name: 'Heart of the Blind Mountain', tier: 'Legendary', sortie: 'lord:behemoth', desc: 'This model gets Tough(+3). Once per round, when activated, every enemy unit within 6" takes 3 hits with AP(1).' },
   { name: "Vashkar's Dread Mask", tier: 'Legendary', sortie: 'lord:terror', desc: 'Enemy units within 12" get -1 to morale tests. Once per game, when activated, every enemy unit within 12" must take a morale test.' },
   { name: 'The Hollow Crown', tier: 'Legendary', sortie: 'lord:ascended', note: 'Casters only', desc: 'Gets Caster(+2). Once per round, after this model casts a spell, it may cast the same spell again, at the same or another target.' },
+  // Training feat relics
+  { name: 'Crown of the Last Lord', tier: 'Legendary', training: 'trainFinal50', desc: "Once per round, when this model's unit is activated, pick one enemy unit within 18\". It gets -1 to Defense rolls until the end of the round." },
+  { name: 'Colossus Splinter', tier: 'Legendary', training: 'siege25', profile: '24", A3, AP(3), Rending' },
   { name: 'Shadesplinter Cloak', tier: 'Common', nexus: true, desc: 'After this model and its unit use an Advance action, they count as being in cover.' },
   { name: 'Umbra Echo Plating', tier: 'Common', nexus: true, desc: "Once per round, when this model's unit takes wounds, ignore D3 of them." },
   { name: 'Warp-infusion', tier: 'Common', nexus: true, desc: 'Pick one non-relic melee weapon, which gets Quake.' },

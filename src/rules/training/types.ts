@@ -155,7 +155,7 @@ export interface Tally {
 }
 
 /** What a relic does when it goes off (relics.ts). */
-export type RelicAct = 'shot' | 'pulse' | 'brace' | 'mark' | 'rally' | 'barrage' | 'shield' | 'frenzy' | 'field' | 'bleed' | 'status';
+export type RelicAct = 'shot' | 'pulse' | 'brace' | 'mark' | 'rally' | 'barrage' | 'shield' | 'frenzy' | 'field' | 'bleed' | 'status' | 'sunder';
 
 /** A relic on a crafted unit: what it does, every how many seconds, and its clock. */
 export interface RelicSocket {

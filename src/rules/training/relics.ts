@@ -3,11 +3,11 @@ import { effectsOf, type Effect } from '../abilities';
 import { RELICS } from '../data';
 import { TRAINING } from '../downtimeData';
 import { centreOf, dist, towers, unitTowers } from './board';
-import { afflict, busy, enemiesNear, FX_COLOR, hurt, isBoss, pulse, reach, targetFor, toGo } from './harm';
+import { afflict, busy, enemiesNear, FX_COLOR, FX_TIME, hurt, isBoss, pulse, reach, targetFor, toGo } from './harm';
 import { canHold } from './holds';
 import { fire } from './combat';
 import { barrage, bleedField, grown, shieldBoost } from './skills';
-import type { RelicAct, RelicSocket, TrainingRun, UnitTower } from './types';
+import type { Enemy, RelicAct, RelicSocket, TrainingRun, UnitTower } from './types';
 
 // Relic sockets: every relic on a crafted unit goes off by itself on its own clock during waves, drawn in gold.
 
@@ -38,8 +38,9 @@ const EFFECT_ACT: Partial<Record<Effect['kind'], RelicAct>> = {
 
 /** A relic in its socket: a weapon relic's special shot, a mapped effect's act, or its kind's; its clock set. */
 export function socketOf(r: Pick<Relic, 'name' | 'tier' | 'profile'>): RelicSocket {
-  const effect = r.profile ? undefined : (effectsOf(r.name, true) ?? []).find((e) => EFFECT_ACT[e.kind]);
-  const act: RelicAct = r.profile ? 'shot' : effect ? EFFECT_ACT[effect.kind]! : KIND_ACT[relicKind(r.name)];
+  const named = R.named[r.name] as RelicAct | undefined;
+  const effect = r.profile || named ? undefined : (effectsOf(r.name, true) ?? []).find((e) => EFFECT_ACT[e.kind]);
+  const act: RelicAct = r.profile ? 'shot' : named ?? (effect ? EFFECT_ACT[effect.kind]! : KIND_ACT[relicKind(r.name)]);
   const every = Math.round((R.cd[r.tier] ?? R.cd.Common) * (R.actMul[act] ?? 1) * 10) / 10;
   return { name: r.name, tier: r.tier, act, every, cd: every * R.first, ...(effect ? { effect } : {}), ...(r.profile ? { gun: r.name } : {}) };
 }
@@ -62,6 +63,10 @@ function shot(run: TrainingRun, t: UnitTower, s: RelicSocket): boolean {
   return true;
 }
 
+/** The wounds a pulse takes its share of: the enemy's own, but the siege colossus counts as an ordinary Final boss
+ *  (pulse.siegeBase), or a share of its millions would end the siege in a few goes. */
+const pulseBase = (run: TrainingRun, e: Enemy) => (run.siege && e.final ? Math.min(e.maxHp, R.pulse.siegeBase) : e.maxHp);
+
 /** A damage pulse: a share of each nearby enemy's wounds (less on a boss). */
 function blast(run: TrainingRun, t: UnitTower, s: RelicSocket): boolean {
   const c = centreOf(t);
@@ -69,7 +74,7 @@ function blast(run: TrainingRun, t: UnitTower, s: RelicSocket): boolean {
   const near = enemiesNear(run, c.x, c.y, r);
   if (!near.length) return false;
   const share = R.pulse.share[s.tier] ?? R.pulse.share.Common;
-  for (const e of near) hurt(run, t, e, e.maxHp * share * (isBoss(e) ? R.pulse.bossShare : 1), 'other');
+  for (const e of near) hurt(run, t, e, pulseBase(run, e) * share * (isBoss(e) ? R.pulse.bossShare : 1), 'other');
   pulse(run, c.x, c.y, r, FX_COLOR.relic);
   return true;
 }
@@ -110,6 +115,19 @@ function status(run: TrainingRun, t: UnitTower, s: RelicSocket): boolean {
   return true;
 }
 
+/** Sunder: one enemy in reach (a boss first, else the furthest along, one not already sundered before one that is)
+ *  takes AP(+sunder.ap) on every hit for sunder.secs. */
+function sunder(run: TrainingRun, t: UnitTower): boolean {
+  const near = inReach(run, t);
+  const e = near.find((x) => isBoss(x) && !(x.sunder! > 0)) ?? near.find((x) => !(x.sunder! > 0)) ?? near[0];
+  if (!e) return false;
+  e.sunder = R.sunder.secs;
+  const c = centreOf(t);
+  run.fx.push({ x1: c.x, y1: c.y, x2: e.x, y2: e.y, t: FX_TIME.shot, color: FX_COLOR.relic });
+  pulse(run, e.x, e.y, 1, FX_COLOR.relic);
+  return true;
+}
+
 /** One go of a relic: true if it went (its clock restarts), false to try again next step. */
 function go(run: TrainingRun, t: UnitTower, s: RelicSocket): boolean {
   const e = s.effect;
@@ -120,6 +138,7 @@ function go(run: TrainingRun, t: UnitTower, s: RelicSocket): boolean {
     case 'brace': return brace(run, t);
     case 'rally': return rally(run, t);
     case 'mark': case 'status': return status(run, t, s);
+    case 'sunder': return sunder(run, t);
     case 'barrage': return e?.kind === 'barrage' ? barrage(run, t, e) : blast(run, t, s);
     case 'shield': return shieldBoost(run, t, e?.kind === 'shield' ? e.n : 1);
     case 'frenzy': {
@@ -149,6 +168,7 @@ function go(run: TrainingRun, t: UnitTower, s: RelicSocket): boolean {
 
 /** Wear rally boosts down, then run every relic's clock; whatever a relic draws is gold. */
 export function relics(run: TrainingRun, dt: number): void {
+  for (const e of run.enemies) if (e.sunder !== undefined && (e.sunder -= dt) <= 0) e.sunder = undefined;
   for (const t of towers(run)) {
     if (!t.rush) continue;
     t.rush.left -= dt;
@@ -184,6 +204,7 @@ export function relicText(s: RelicSocket): string {
     case 'frenzy': return e?.kind === 'frenzy' ? `Attacks ${e.mul}× as fast for ${e.time === 1 ? 'a round' : `${e.time} rounds`}` : 'Attacks faster';
     case 'field': return e?.kind === 'field' ? `Enemies within ${e.radius} cells are ${e.status === 'slow' ? 'slowed' : 'dazed'} for ${R.field.secs}s` : 'A field';
     case 'bleed': return `Enemies within ${TRAINING.bleedField.radius} cells bleed`;
+    case 'sunder': return `One enemy in its reach (a boss first) takes AP(+${R.sunder.ap}) from every hit for ${R.sunder.secs}s`;
     case 'status': {
       const what = e?.kind === 'onHit' ? { slow: 'slowed', stun: 'stunned', daze: 'dazed', mark: 'marked', bleed: 'bleeding', knock: 'knocked back', execute: 'finished off if badly hurt' }[e.status] : 'marked';
       return `Up to ${R.status.max} enemies in its reach are ${what}`;

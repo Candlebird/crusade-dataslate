@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import type { Force } from '../model/types';
 import { FEATS, rewardText, type Feat } from '../rules/feats';
 import { Icon } from './Icon';
@@ -15,14 +15,19 @@ export function FeatList({ force, where }: { force: Force; where: Feat['where'] 
       </button>
       {open && (
         <ul className="feat-list small">
-          {feats.map((f) => {
+          {feats.map((f, i) => {
             const on = force.feats?.[f.id];
+            // The hard feats come last, under their own heading.
+            const head = f.hard && !feats[i - 1]?.hard;
             return (
-              <li key={f.id} className={on ? 'feat-done' : ''}>
+              <Fragment key={f.id}>
+                {head && <li className="muted" style={{ marginTop: '0.5rem' }}><b>Hard feats</b></li>}
+                <li className={on ? 'feat-done' : ''}>
                 <span><Icon name={on ? 'l:circle-check' : 'l:circle'} /></span>
                 <span className="grow"><b>{f.name}</b> <span className="muted">· {f.text}</span></span>
                 <span className="feat-reward">{on ? `earned ${on}` : rewardText(f.reward)}</span>
-              </li>
+                </li>
+              </Fragment>
             );
           })}
         </ul>

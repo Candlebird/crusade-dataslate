@@ -403,6 +403,10 @@ export interface Force {
   finale?: ForceFinale;
   /** Feats earned, by id, with the date (rules/feats.ts): each pays once. */
   feats?: Record<string, string>;
+  /** Which feat rewards the force's feats were paid at (rules/feats.ts FEATS_VERSION; unset: the first). */
+  featsV?: number;
+  /** Training-only relics (RelicDef.training) the force's feats have won, by name: any unit may take one for free. */
+  trainingRelics?: string[];
   /** Furthest any unit got on one Sortie: nodes cleared (rules/sortie.ts). */
   sortieBest?: number;
   /** What the force's Sorties are remembered for (rules/sortie.ts). */
