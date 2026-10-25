@@ -1150,7 +1150,7 @@ export function echoSquads(book: CatalogBook, budget: number, kind: SortieFightK
   if (named) {
     take(named, named.cost, own ? book : builtinEchoes());
     // Its escorts keep their share even when the lord's wounds can shrink no further, so it never fights alone.
-    left = Math.max(budget * (1 - SORTIE.lordShare), budget - named.cost * lordScale(budget, named.cost));
+    left = Math.max(budget * SORTIE.escortShare, budget - named.cost * lordScale(budget, named.cost));
   } else if (kind === 'boss') {
     const leads = units.filter((cu) => hasRule(cu.rules, 'Hero') || (ruleRating(cu.rules, 'Tough') ?? 1) >= 6).sort((a, b) => b.cost - a.cost);
     const lead = leads.find((cu) => cu.cost <= budget * 0.7) ?? leads[leads.length - 1];
