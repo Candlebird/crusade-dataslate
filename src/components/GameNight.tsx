@@ -67,7 +67,7 @@ function TableRow({ c, t, n }: { c: Campaign; t: NightTable; n: number }) {
       <span className="grow">
         <b>{KIND[t.kind]}</b>{sector && <> at <a href={href.campaign('map', sector.id)}>{sector.name}</a></>}: {who}{t.foe && <> vs <b>{t.foe}</b></>}
         <br />
-        <span className="muted">{t.points} pts · <a href={href.missions()} title={t.mission.summary}>{t.mission.name}</a></span>
+        <span className="muted">{t.points} pts · <a href={href.missions()} data-tip={t.mission.summary}>{t.mission.name}</a></span>
         {t.notes.map((x) => <div key={x} className="muted">· {x}</div>)}
       </span>
       {sector && t.kind !== 'marauder' && <a className="btn" href={href.tracker(sector.id, t.factions[0], t.forceId)}>Start</a>}

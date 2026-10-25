@@ -129,7 +129,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
         <div className="row">
           <a className="btn" href={href.missions()}>Mission library</a>
           {!b.ended && <button onClick={() => setAuto(true)} disabled={!!autoBlock}
-            title={autoBlock ? `Play this one at the table (no overrun: ${autoBlock}). The GM can still auto-battle it.` : 'Let the units fight it out on their stats'}><Icon name="g:power-lightning" /> Auto-battle</button>}
+            data-tip={autoBlock ? `Play this one at the table (no overrun: ${autoBlock}). The GM can still auto-battle it.` : 'Let the units fight it out on their stats'}><Icon name="g:power-lightning" /> Auto-battle</button>}
           {!b.ended && <button className="primary" onClick={() => set((d) => void (d.ended = true))}>End battle</button>}
           <button className="danger" onClick={() => confirmAction('Throw away this battle?') && update((s) => void delete s.battle)}>Discard</button>
         </div>
@@ -186,7 +186,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
               Markers
               <Stepper value={b.objectives} min={0} onChange={(n) => set((d) => setObjectives(d, n))} />
               {typeof b.mission.objectives === 'string' && (
-                <button className="ghost small" onClick={() => set((d) => setObjectives(d, rollObjectives(d.mission.objectives as 'D3+2' | 'D3')))} title={`Reroll ${b.mission.objectives}`}><Icon name="g:perspective-dice-six-faces-six" /></button>
+                <button className="ghost small" onClick={() => set((d) => setObjectives(d, rollObjectives(d.mission.objectives as 'D3+2' | 'D3')))} data-tip={`Reroll ${b.mission.objectives}`} aria-label={`Reroll ${b.mission.objectives}`}><Icon name="g:perspective-dice-six-faces-six" /></button>
               )}
             </span>
           }
@@ -221,7 +221,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
                 <div key={c.id} className="tally">
                   <span className="grow">{c.label} <span className="muted small">{c.vp} VP each{c.max ? `, max ${c.max}` : ''}</span></span>
                   {teams.map((t) => (
-                    <span key={t} className={`team-${t}`} title={teamName(b, t)}>
+                    <span key={t} className={`team-${t}`} data-tip={teamName(b, t)}>
                       <Stepper value={b.counters[t]?.[c.id] ?? 0} min={0} onChange={(n) => set((d) => void ((d.counters[t] ??= {})[c.id] = c.max ? Math.min(c.max, n) : n))} />
                     </span>
                   ))}
@@ -274,7 +274,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
                 ))}
               </select>
               {DEPLOYMENT_STYLES.map((t) => (
-                <button key={t.group} className="ghost small" title={`Roll on the ${t.group} table: ${t.desc}`} onClick={() => set((d) => void (d.deploymentStyle = rollDeployment(t.group)))}><Icon name="g:perspective-dice-six-faces-six" /> {t.group}</button>
+                <button key={t.group} className="ghost small" data-tip={`Roll on the ${t.group} table: ${t.desc}`} onClick={() => set((d) => void (d.deploymentStyle = rollDeployment(t.group)))}><Icon name="g:perspective-dice-six-faces-six" /> {t.group}</button>
               ))}
             </span>
           </div>
@@ -432,7 +432,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
           <label className="row"><input type="checkbox" checked={withAi} onChange={(e) => { setWithAi(e.target.checked); if (!e.target.checked) setPlayers((n) => Math.max(2, n)); }} />Include AI</label>
           <label className="row"><input type="checkbox" checked={pickForces} onChange={(e) => setPickForces(e.target.checked)} />Random forces</label>
           <label className="row"><input type="checkbox" checked={pickMission} onChange={(e) => setPickMission(e.target.checked)} />Random mission</label>
-          <button onClick={randomize} title="Split players into random teams (or all vs the AI). Rolls forces and a mission if ticked."><Icon name="g:perspective-dice-six-faces-six" /> Randomize</button>
+          <button onClick={randomize} data-tip="Split players into random teams (or all vs the AI). Rolls forces and a mission if ticked."><Icon name="g:perspective-dice-six-faces-six" /> Randomize</button>
         </div>
         {forces.length > 0 && <p className="small">Forces, in side order: {forces.map((f) => { const t = forceTotals(f, state.settings); return `${f.name} (${t.pointsUsed} pts, ${t.bp} BP)`; }).join(', ')}. Swap them once the battle starts.</p>}
         <p className="muted small">Teams share objectives and VP. Add, remove or regroup players once the battle starts.</p>
@@ -454,7 +454,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
         ))}
         <div className="row" style={{ marginTop: '0.8rem' }}>
           <button className="primary" disabled={!m} onClick={() => m && start(m)}>Start {m ? m.name : 'battle'}</button>
-          <button onClick={() => setId(rollAdvancedMission().id)} title="Roll the mission type (1-2 Face-Off, 3-4 Progressive, 5-6 Attack & Defend), then a D6"><Icon name="g:perspective-dice-six-faces-six" /> Random OPR mission</button>
+          <button onClick={() => setId(rollAdvancedMission().id)} data-tip="Roll the mission type (1-2 Face-Off, 3-4 Progressive, 5-6 Attack & Defend), then a D6"><Icon name="g:perspective-dice-six-faces-six" /> Random OPR mission</button>
         </div>
       </Panel>
       {!sector && !crisis && <SoloPatrol mission={m} />}
@@ -586,7 +586,7 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
       <div className="panel-title">
         <h2>{title} · {b.auto ? `auto-battle, ${teams.map((t) => b.auto!.dealt[t] ?? 0).join('–')} pts destroyed` : teams.map((t) => sc[t]!.total).join('–')}</h2>
         <button className="ghost" onClick={() => set((d) => { d.ended = false; delete d.auto; })}
-          title={b.auto ? 'Back to the tracker. Drops the auto-battle result, but its losses and kill XP stay on the units.' : undefined}>Resume</button>
+          data-tip={b.auto ? 'Back to the tracker. Drops the auto-battle result, but its losses and kill XP stay on the units.' : undefined}>Resume</button>
       </div>
       <p className="muted small">Record the result in each crusade force's log. The wizard is pre-filled from this battle: check it, then apply.</p>
       <div className="row">
@@ -716,8 +716,8 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
               <div className="row">
                 <Stepper value={target} step={50} min={50} onChange={setTarget} />
                 <span className="small muted">pts</span>
-                <button onClick={generate} title="Build a random Void Echoes army up to the target points"><Icon name="g:perspective-dice-six-faces-six" /> Generate</button>
-                {!!garrison && garrison !== target && <button className="ghost small" onClick={() => setTarget(garrison)} title="The sector's difficulty rating">Sector garrison {garrison} pts</button>}
+                <button onClick={generate} data-tip="Build a random Void Echoes army up to the target points"><Icon name="g:perspective-dice-six-faces-six" /> Generate</button>
+                {!!garrison && garrison !== target && <button className="ghost small" onClick={() => setTarget(garrison)} data-tip="The sector's difficulty rating">Sector garrison {garrison} pts</button>}
                 {enemies > 0 && enemies !== target && <button className="ghost small" onClick={() => setTarget(enemies)}>Match {enemies} pts{reinforced ? ' (Reinforced)' : ''}</button>}
                 {!!side.roster?.length && <a className="btn" href={href.sideSheet(side.id)}><Icon name="l:file-text" /> Army sheet</a>}
               </div>

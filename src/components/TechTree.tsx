@@ -37,14 +37,14 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
     )} lead={
       <div className="tech-head">
         <span className="stat"><b>{f.research ?? 0}</b><span className="muted small">Research</span></span>
-        <span className="stat" title="Earned at round end: base, research stations and Nexus Observatories">
+        <span className="stat" data-tip="Earned at round end: base, research stations and Nexus Observatories">
           <b>+{researchRate(c, f.id)}</b><span className="muted small">a round</span>
         </span>
-        <span className="stat" title="Guardian loot: research any open tech for free"><b>{f.blueprints ?? 0}</b><span className="muted small">Blueprints</span></span>
+        <span className="stat" data-tip="Guardian loot: research any open tech for free"><b>{f.blueprints ?? 0}</b><span className="muted small">Blueprints</span></span>
         {(f.archives ?? 0) > 0 && (
-          <span className="stat" title="From a Lost Archive: research any one tech for free, ignoring its requirements"><b>{f.archives}</b><span className="muted small">Archive unlocks</span></span>
+          <span className="stat" data-tip="From a Lost Archive: research any one tech for free, ignoring its requirements"><b>{f.archives}</b><span className="muted small">Archive unlocks</span></span>
         )}
-        <span className="stat" title="Guardian loot: install on a planet from its map panel"><b>{f.cores ?? 0}</b><span className="muted small">Building Expansions</span></span>
+        <span className="stat" data-tip="Guardian loot: install on a planet from its map panel"><b>{f.cores ?? 0}</b><span className="muted small">Building Expansions</span></span>
         <span className="stat"><b>{known}/{BUILDINGS.length}</b><span className="muted small">buildings known</span></span>
       </div>
     }>
@@ -55,7 +55,7 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
       <div className="tech-tree" style={{ gridTemplateColumns: `3rem repeat(${TECH_BRANCHES.length}, minmax(10rem, 1fr))` }}>
         <span />
         {TECH_BRANCHES.map((br) => (
-          <div key={br.id} className="tech-branch" title={br.desc}><span className="tech-icon"><Glyph g={br.icon} /></span> {br.name}</div>
+          <div key={br.id} className="tech-branch" data-tip={br.desc}><span className="tech-icon"><Glyph g={br.icon} /></span> {br.name}</div>
         ))}
         {TIERS.map((tier) => (
           <TierRow key={tier} tier={tier}>
@@ -75,8 +75,8 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
                       <div className="small">{b.desc}</div>
                       <div className="tech-tags">
                         <span className="tag">{b.cost} Materials{b.shards ? ` + ${b.shards} US` : ''}</span>
-                        {b.homeOnly && <span className="tag cyan" title="Can only be built at a home">home only</span>}
-                        {b.rule === 'table' && <span className="tag" title="Not applied by the app: remember it at the table">at the table</span>}
+                        {b.homeOnly && <span className="tag cyan" data-tip="Can only be built at a home">home only</span>}
+                        {b.rule === 'table' && <span className="tag" data-tip="Not applied by the app: remember it at the table">at the table</span>}
                       </div>
                       {st !== 'known' && !!b.requires?.length && (
                         <div className="muted small">Needs {b.requires.map((r) => (
@@ -85,9 +85,9 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
                       )}
                       {(st === 'open' || archive) && (
                         <div className="row tech-actions">
-                          {st === 'open' && <button className="primary" disabled={!!why} title={why} onClick={() => go(b, 'research')}>Research</button>}
-                          {st === 'open' && (f.blueprints ?? 0) > 0 && <button disabled={!!whyBp} title={whyBp ?? 'Spend a Blueprint'} onClick={() => go(b, 'blueprint')}>Blueprint</button>}
-                          {archive && <button title="Spend an Archive unlock: ignores requirements" onClick={() => go(b, 'archive')}>Archive</button>}
+                          {st === 'open' && <button className="primary" disabled={!!why} data-tip={why} onClick={() => go(b, 'research')}>Research</button>}
+                          {st === 'open' && (f.blueprints ?? 0) > 0 && <button disabled={!!whyBp} data-tip={whyBp ?? 'Spend a Blueprint'} onClick={() => go(b, 'blueprint')}>Blueprint</button>}
+                          {archive && <button data-tip="Spend an Archive unlock: ignores requirements" onClick={() => go(b, 'archive')}>Archive</button>}
                         </div>
                       )}
                     </div>
@@ -105,7 +105,7 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
 function TierRow({ tier, children }: { tier: number; children: ReactNode }) {
   return (
     <>
-      <div className="tech-tier" title={tier === 1 ? 'Known from the start' : `${NEXUS_TECH.cost[tier as 2 | 3]} Research each`}>
+      <div className="tech-tier" data-tip={tier === 1 ? 'Known from the start' : `${NEXUS_TECH.cost[tier as 2 | 3]} Research each`}>
         <span>Tier</span><b>{'I'.repeat(tier)}</b>
       </div>
       {children}

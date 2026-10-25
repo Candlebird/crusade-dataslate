@@ -33,7 +33,7 @@ export default function DiceRoller() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <a href="#" className={open ? 'active' : ''} title="Dice roller" onClick={(e) => { e.preventDefault(); setOpen(true); }}>
+      <a href="#" className={open ? 'active' : ''} data-tip="Dice roller" onClick={(e) => { e.preventDefault(); setOpen(true); }}>
         <Icon name="g:perspective-dice-six-faces-six" /> Dice
       </a>
       {open && <DiceModal onClose={() => setOpen(false)} />}

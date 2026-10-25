@@ -164,7 +164,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
           </div>
           <div className="row">
             {canGm && (
-              <label className="row small" style={{ gap: '0.35rem' }} title="Whose fog of war the page shows">
+              <label className="row small" style={{ gap: '0.35rem' }} data-tip="Whose fog of war the page shows">
                 <span className="muted">Viewing as</span>
                 <select value={viewAs} onChange={(e) => setViewAs(e.target.value)}>
                   <option value="">Everything</option>
@@ -228,7 +228,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         </div>
         <div className="row">
           <a className="btn" href={href.campaign()}><Icon name="l:arrow-left" /> Player view</a>
-          <button onClick={guard} title="Guard every unguarded AI-held planet, station, anomaly, void sector and Lost Archive (round end does this too)">Place guardians</button>
+          <button onClick={guard} data-tip="Guard every unguarded AI-held planet, station, anomaly, void sector and Lost Archive (round end does this too)">Place guardians</button>
           <button className="primary" onClick={() => exportCampaign(c)}>Export campaign.json</button>
         </div>
       </div>
@@ -341,7 +341,7 @@ function ReportPanel({ c, viewer }: { c: Campaign; viewer?: string }) {
       {lines.length === 0 ? <p className="muted small">No news reached you this round.</p> : (
         <ul className="report">
           {lines.map((l, i) => (
-            <li key={i} title={sectorName(l.sectorId)}>
+            <li key={i} data-tip={sectorName(l.sectorId)}>
               <span className="report-icon" aria-hidden><Glyph g={l.icon} /></span>
               <span>{l.text}</span>
             </li>
@@ -379,7 +379,7 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                     <td className="s-2" data-label="Faction"><TextField value={fa.name} onCommit={(v) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.name = v; })} /></td>
                     <td className="s-full" data-label="Player"><TextField value={fa.player} placeholder="Player" onCommit={(v) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.player = v; })} /></td>
                     <td className="small s-full" data-label="Sectors">
-                      {owned.map((s) => <span key={s.id} className={`tag${s.type === 'home' ? ' gold' : ''}`} title={benefitOf(s)?.desc ?? SECTOR_TYPES[s.type].desc}>{s.name}</span>)}
+                      {owned.map((s) => <span key={s.id} className={`tag${s.type === 'home' ? ' gold' : ''}`} data-tip={benefitOf(s)?.desc ?? SECTOR_TYPES[s.type].desc}>{s.name}</span>)}
                     </td>
                     <td className="small s-full" data-label="Linked forces here">{linked.map((f) => <a key={f.id} href={href.force(f.id)}>{f.name} </a>)}</td>
                     <td className="s-tail">
@@ -422,10 +422,10 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                   <tr key={s.id}>
                     <td className="s-2" data-label="Name">
                       <TextField value={s.name} onCommit={(v) => setS(s.id, (d) => void (d.name = v))} />
-                      {c.map && s.q == null && <span className="muted small" title="Place it from the map"> · off map</span>}
+                      {c.map && s.q == null && <span className="muted small" data-tip="Place it from the map"> · off map</span>}
                     </td>
                     <td data-label="Type">
-                      <select value={s.type} title={SECTOR_TYPES[s.type].desc} onChange={(e) => setS(s.id, (d) => {
+                      <select value={s.type} data-tip={SECTOR_TYPES[s.type].desc} onChange={(e) => setS(s.id, (d) => {
                         d.type = e.target.value as SectorType;
                         if (!BENEFITS.some((b) => b.type === d.type && b.id === d.benefit)) d.benefit = undefined;
                         if (d.type === 'voidspawn') d.owner = ECHOES.id;
@@ -435,7 +435,7 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                     </td>
                     <td className="s-2" data-label="Benefit">
                       {benefits.length > 0 ? (
-                        <select value={s.benefit ?? ''} title={benefitOf(s)?.desc} onChange={(e) => setS(s.id, (d) => void (d.benefit = e.target.value || undefined))}>
+                        <select value={s.benefit ?? ''} data-tip={benefitOf(s)?.desc} onChange={(e) => setS(s.id, (d) => void (d.benefit = e.target.value || undefined))}>
                           <option value="">— choose —</option>
                           {benefits.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
                         </select>
@@ -451,8 +451,8 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                       </span>
                     </td>
                     <td className="small" data-label="Flags">
-                      <label className="row" title="Reinforce Sector: +200 supply when defending"><input type="checkbox" checked={!!s.reinforced} onChange={(e) => setS(s.id, (d) => void (d.reinforced = e.target.checked || undefined))} /> Reinforced</label>
-                      {s.type === 'void' && <label className="row" title="One-off reward already taken"><input type="checkbox" checked={!!s.rewardClaimed} onChange={(e) => setS(s.id, (d) => void (d.rewardClaimed = e.target.checked || undefined))} /> Claimed</label>}
+                      <label className="row" data-tip="Reinforce Sector: +200 supply when defending"><input type="checkbox" checked={!!s.reinforced} onChange={(e) => setS(s.id, (d) => void (d.reinforced = e.target.checked || undefined))} /> Reinforced</label>
+                      {s.type === 'void' && <label className="row" data-tip="One-off reward already taken"><input type="checkbox" checked={!!s.rewardClaimed} onChange={(e) => setS(s.id, (d) => void (d.rewardClaimed = e.target.checked || undefined))} /> Claimed</label>}
                     </td>
                     <td className="s-full" data-label="Lore"><TextField value={s.notes} placeholder="Lore, terrain…" onCommit={(v) => setS(s.id, (d) => void (d.notes = v))} /></td>
                     <td className="s-end"><button className="ghost icon" aria-label="Remove sector" onClick={() => setC((d) => void (d.sectors = d.sectors.filter((x) => x.id !== s.id)))}><Icon name="l:x" /></button></td>
@@ -537,7 +537,7 @@ function LogPanel({ c, setC, viewer }: { c: Campaign; setC: SetC; viewer?: strin
     <Panel id="campaign.log" title="Campaign log" extra={<span className="muted small">{log.length} game{log.length === 1 ? '' : 's'}</span>}>
       {log.length === 0 ? <p className="muted small">No games {viewer ? 'you know of ' : ''}yet.</p> : [...log].reverse().map((e) => (
         <div key={e.id} id={`log-${e.id}`} className="list-item small">
-          <span className="muted" title={`Round ${e.round ?? 1}`}>R{e.round ?? 1} · {e.date}</span>
+          <span className="muted" data-tip={`Round ${e.round ?? 1}`}>R{e.round ?? 1} · {e.date}</span>
           <span className="grow">
             {e.skirmish ? <><Icon name="g:crossed-swords" /> Skirmish: <b>{factionName(c, e.winner)} wins</b>{e.defender === ECHOES.id ? <> a patrol against the {ECHOES.name}</> : ''}</>
               : e.crisis ? <><Icon name="g:crowned-skull" /> Nexus Crisis at <b>{sectorName(e.sectorId)}</b>: {e.winner === ECHOES.id ? <b>the Echo Lord prevails</b> : <b>the factions defeat the Echo Lord</b>}</>
@@ -546,12 +546,12 @@ function LogPanel({ c, setC, viewer }: { c: Campaign; setC: SetC; viewer?: strin
               <b>{sectorName(e.sectorId)}</b>: {factionName(c, e.attacker)} vs {factionName(c, e.defender)} —{' '}
               {e.winner ? <b>{factionName(c, e.winner)} wins</b> : 'draw'}
             </>}
-            {e.loot && <span title={`Guardian loot (rolled ${e.loot.roll})`}> · <Icon name="g:open-treasure-chest" /> {factionName(c, e.loot.factionId)} looted {e.loot.name}{e.loot.amount ? ` (+${e.loot.amount}${e.loot.id === 'research' ? ' Research' : ' Materials'})` : ''}</span>}
+            {e.loot && <span data-tip={`Guardian loot (rolled ${e.loot.roll})`}> · <Icon name="g:open-treasure-chest" /> {factionName(c, e.loot.factionId)} looted {e.loot.name}{e.loot.amount ? ` (+${e.loot.amount}${e.loot.id === 'research' ? ' Research' : ' Materials'})` : ''}</span>}
             {e.notes && <span className="muted"> · {e.notes}</span>}
             {e.stories?.map((x) => <div key={x} className="muted small"><Icon name="g:quill-ink" /> {x}</div>)}
           </span>
           {!viewer && <button className="ghost icon" aria-label="Delete log entry"
-            title={e.undo ? 'Delete and restore the sector, unless a later game changed it' : 'Delete the entry'}
+            data-tip={e.undo ? 'Delete and restore the sector, unless a later game changed it' : 'Delete the entry'}
             onClick={() => confirmAction(`Delete this ${e.crisis ? 'Nexus Crisis battle' : e.skirmish ? 'skirmish' : `${sectorName(e.sectorId)} ${e.spread ? 'spread' : 'game'}`} from the log?${e.undo ? ` The sector goes back to how the ${e.spread ? 'spread' : 'game'} found it.` : ''}`) && setC((d) => removeSectorGame(d, e.id))}><Icon name="l:x" /></button>}
         </div>
       ))}

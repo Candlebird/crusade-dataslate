@@ -266,14 +266,14 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
         <div className="row">
           {gm && <button onClick={() => setGenOpen(true)}>Generate…</button>}
           {gm && <SpreadButton c={c} setC={setC} />}
-          <button onClick={exportPng} title="Download the whole map as a picture">Export PNG</button>
+          <button onClick={exportPng} data-tip="Download the whole map as a picture">Export PNG</button>
         </div>
       }>
 
         {gm && <><div className="map-toolbar">
           <div className="seg">
             {TOOLS.map((t) => (
-              <button key={t.key} className={tool === t.key ? 'on' : ''} title={t.hint} onClick={() => { setTool(t.key); setMoving(null); }}>{t.label}</button>
+              <button key={t.key} className={tool === t.key ? 'on' : ''} data-tip={t.hint} onClick={() => { setTool(t.key); setMoving(null); }}>{t.label}</button>
             ))}
           </div>
           {tool === 'type' && (
@@ -290,7 +290,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
           <span className="spacer" />
           <label className="row small">
             View as
-            <select value={viewAs} onChange={(e) => setViewAs(e.target.value)} title="See that faction's fog of war and where its detachments can reach this round">
+            <select value={viewAs} onChange={(e) => setViewAs(e.target.value)} data-tip="See that faction's fog of war and where its detachments can reach this round">
               <option value="">Everything (GM)</option>
               {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
@@ -368,13 +368,12 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                     {markOn(c, s.id) && !markOn(c, s.id)!.brokenBy && (
                       <SvgIcon name="g:hazard-sign" x={p.x + 19} y={p.y + 9} size={11} className="hex-mark hex-echo" title={MARK_TIP} />
                     )}
-                    {ratingFor(s, viewAs) !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff"><title>AI garrison{viewAs ? ` for ${factionName(c, viewAs)}` : " (the biggest faction's scale)"}: {ratingFor(s, viewAs)} Supply</title>{ratingFor(s, viewAs)}</text>}
+                    {ratingFor(s, viewAs) !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff" data-tip={`AI garrison${viewAs ? ` for ${factionName(c, viewAs)}` : " (the biggest faction's scale)"}: ${ratingFor(s, viewAs)} Supply`}>{ratingFor(s, viewAs)}</text>}
                     {/* Detachments: your own always, anyone else's only while you can see the sector. */}
                     {(() => {
                       const here = (posted.get(s.id) ?? []).filter((f) => !viewAs || known === 'visible' || f.nexus?.factionId === viewAs);
                       return here.length > 0 && (
-                        <g className="hex-force" transform={`translate(${p.x - 19}, ${p.y + 9})`}>
-                          <title>{here.map((x) => detachmentName(c, forces, x)).join(', ')}</title>
+                        <g className="hex-force" transform={`translate(${p.x - 19}, ${p.y + 9})`} data-tip={here.map((x) => detachmentName(c, forces, x)).join(', ')}>
                           {(() => {
                             // The first detachment's emblem if it has one, ringed in its faction's colour; else the plain marker.
                             const layers = emblemLayers(here[0].emblem);
@@ -405,9 +404,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                 if (!h || !s || !isPlaced(s)) return null;
                 const pts = [s as Hex, ...h.road].map((x) => toPixel(x, SIZE));
                 return (
-                  <polyline key={`road-${m.id}`} className="band-road" points={pts.map((p) => `${p.x},${p.y}`).join(' ')} markerEnd="url(#band-arrow)">
-                    <title>{headingText(c, m.name, h)}</title>
-                  </polyline>
+                  <polyline key={`road-${m.id}`} className="band-road" points={pts.map((p) => `${p.x},${p.y}`).join(' ')} markerEnd="url(#band-arrow)" data-tip={headingText(c, m.name, h)} />
                 );
               })}
               <defs>
@@ -421,8 +418,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                 const p = toPixel(s as Hex, SIZE);
                 const n = all.slice(0, i).filter((x) => x.sectorId === m.sectorId).length;
                 return (
-                  <g key={m.id} data-q={s.q} data-r={s.r} className="hex-band" transform={`translate(${p.x + 19 - n * 9}, ${p.y + 9})`}>
-                    <title>{m.name}: Marauders, {m.strength} Supply</title>
+                  <g key={m.id} data-q={s.q} data-r={s.r} className="hex-band" transform={`translate(${p.x + 19 - n * 9}, ${p.y + 9})`} data-tip={`${m.name}: Marauders, ${m.strength} Supply`}>
                     <circle r={6.5} />
                     <SvgIcon name="g:hood" x={0} y={0} size={9} />
                   </g>
@@ -432,7 +428,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
             <div className="map-zoom">
               <button className="icon" aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(4, z * 1.25))}>+</button>
               <button className="icon" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}>−</button>
-              <button className="icon" aria-label="Reset view" title="Reset view" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}><Icon name="l:rotate-ccw" /></button>
+              <button className="icon" aria-label="Reset view" data-tip="Reset view" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}><Icon name="l:rotate-ccw" /></button>
             </div>
           </div>
 
@@ -449,12 +445,12 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
         </div>
 
         <div className="map-legend small muted">
-          {SECTOR_TYPE_KEYS.map((t) => <span key={t} title={SECTOR_TYPES[t].desc}><Glyph g={GLYPH[t]} /> {SECTOR_TYPES[t].label}</span>)}
+          {SECTOR_TYPE_KEYS.map((t) => <span key={t} data-tip={SECTOR_TYPES[t].desc}><Glyph g={GLYPH[t]} /> {SECTOR_TYPES[t].label}</span>)}
           <span><Icon name="g:checked-shield" /> Reinforced</span>
           <span><Icon name="l:check" /> Reward claimed</span>
           <span><Icon name="g:warlord-helmet" /> Guardian</span>
           <span><Icon name="g:hood" /> Marauders</span>
-          <span title="Where a band goes next round. Any detachment on its road stops it."><i className="swatch band-road-swatch" /> Marauder road</span>
+          <span data-tip="Where a band goes next round. Any detachment on its road stops it."><i className="swatch band-road-swatch" /> Marauder road</span>
           {sidesOf(c).map((f) => <span key={f.id}><i className="swatch" style={{ background: f.color }} /> {f.name}</span>)}
         </div>
 
@@ -529,7 +525,7 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
       <p className="small">{benefit ? <><b>{benefit.name}:</b> {benefit.desc}</> : SECTOR_TYPES[s.type].desc}</p>
       <SectorDanger s={s} factionId={viewer} />
       {g && (
-        <p className="small" title={g.unit.notes}>
+        <p className="small" data-tip={g.unit.notes}>
           <span className={`tag${g.tier === 'Legendary' ? ' gold' : g.tier === 'Rare' ? ' red' : ''}`}><Icon name="g:warlord-helmet" /> {g.tier} guardian</span>{' '}
           <b>{g.name}</b>, a {g.unit.unitType} ({g.unit.points} pts) with doubled Tough{g.unit.relics[0] ? <>, carrying <b>{g.unit.relics[0].name}</b></> : ''}.
           {' '}It leads the garrison{ratingFor(s, viewer) !== undefined ? <>: <b>{ratingFor(s, viewer)} Supply</b> in all</> : ''}. Slay it with a Hero and roll {GUARDIANS.stealRoll}+ to take its relic.
@@ -547,8 +543,8 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
       {blocked && <p className="small"><span className="tag red">{blocked}</span></p>}
       {running?.sectorId === s.id && <p className="small"><Icon name="g:crossed-swords" /> <a href={href.tracker()}>{running.mission.name}</a> is being fought here, round {running.round}.</p>}
       <div className="row" style={{ marginTop: '0.75rem' }}>
-        <a className="btn primary" href={href.tracker(s.id)} title="Open the battle tracker for this sector; the result updates the map"><Icon name="g:crossed-swords" /> Start a battle here</a>
-        {gm && onRecord && <button onClick={onRecord} title="Log a game you didn't track">Record a game here</button>}
+        <a className="btn primary" href={href.tracker(s.id)} data-tip="Open the battle tracker for this sector; the result updates the map"><Icon name="g:crossed-swords" /> Start a battle here</a>
+        {gm && onRecord && <button onClick={onRecord} data-tip="Log a game you didn't track">Record a game here</button>}
         {gm && <button onClick={onEdit}>Edit</button>}
       </div>
     </>
@@ -618,8 +614,8 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
                 {m.barred.by.filter((id) => gm || id === viewer).map((id) => (
                   <div key={id} className="row" style={{ marginTop: '0.35rem' }}>
                     <b>{factionName(c, id)}</b>
-                    <button onClick={() => startAuto(m.id, id)} title="Auto-battle the band with the detachment that barred them"><Icon name="g:power-lightning" /> Auto-battle</button>
-                    <button onClick={() => pay(m.id, id)} title={`Pay ${MARAUDERS.toll} Materials from your banks`}>Pay {MARAUDERS.toll}</button>
+                    <button onClick={() => startAuto(m.id, id)} data-tip="Auto-battle the band with the detachment that barred them"><Icon name="g:power-lightning" /> Auto-battle</button>
+                    <button onClick={() => pay(m.id, id)} data-tip={`Pay ${MARAUDERS.toll} Materials from your banks`}>Pay {MARAUDERS.toll}</button>
                   </div>
                 ))}
               </div>
@@ -629,8 +625,8 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
                 <select value={who} onChange={(e) => setBy(e.target.value)} aria-label="Faction fighting the band">
                   {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
                 </select>
-                <button onClick={() => fight(m.id, true)} title="Log a win: the band breaks and the winner rolls loot">Beat them</button>
-                <button onClick={() => fight(m.id, false)} title="Log a loss: the band stays">Lost</button>
+                <button onClick={() => fight(m.id, true)} data-tip="Log a win: the band breaks and the winner rolls loot">Beat them</button>
+                <button onClick={() => fight(m.id, false)} data-tip="Log a loss: the band stays">Lost</button>
               </div>
             )}
           </div>
@@ -684,7 +680,7 @@ function DetachmentsHere({ c, s, forces, gm, setC }: { c: Campaign; s: Sector; f
         </p>
       )}
       {gm && elsewhere.length > 0 && (
-        <select value="" aria-label="Move a detachment here" title="Place a detachment here by hand, outside orders"
+        <select value="" aria-label="Move a detachment here" data-tip="Place a detachment here by hand, outside orders"
           onChange={(e) => { const f = elsewhere.find((x) => x.id === e.target.value); if (f) move(f); }}>
           <option value="">Move a detachment here…</option>
           {elsewhere.map((f) => <option key={f.id} value={f.id}>{detachmentName(c, forces, f)} ({positionOf(c, f)?.name})</option>)}
@@ -733,33 +729,33 @@ function ProductionBox({ s }: { s: Sector }) {
     <div className="small" style={{ margin: '0.5rem 0' }}>
       <div>
         <b><Icon name="g:anvil" /> Production</b>{' '}
-        <span className="muted" title={`Banks ${rate} Materials each round${trade ? ` (${trade} from its Trade Hub)` : ''}, up to ${cap}. Lost if the sector is taken.`}>
+        <span className="muted" data-tip={`Banks ${rate} Materials each round${trade ? ` (${trade} from its Trade Hub)` : ''}, up to ${cap}. Lost if the sector is taken.`}>
           {s.bank ?? 0}/{cap} Materials banked · +{rate} a round
         </span>
       </div>
       <div className="muted" style={{ marginTop: '0.25rem' }}>
-        Buildings: {built.length + (k ? 1 : 0)} of {buildingSlots(s, c ?? undefined)} slots used{s.core && <> · <span className="tag gold" title="Building Expansion: one more building slot"><Icon name="g:diamonds" /> Building Expansion</span></>}
+        Buildings: {built.length + (k ? 1 : 0)} of {buildingSlots(s, c ?? undefined)} slots used{s.core && <> · <span className="tag gold" data-tip="Building Expansion: one more building slot"><Icon name="g:diamonds" /> Building Expansion</span></>}
       </div>
       {built.map((id) => {
         const x = buildingById(id);
         return (
-          <div key={id} className="row" title={x?.desc}>
+          <div key={id} className="row" data-tip={x?.desc}>
             <span className="grow">
-              <Glyph g={x?.icon} /> {x?.name ?? id} {x?.rule === 'table' && <span className="tag" title="Not applied by the app: remember it at the table">at the table</span>}{' '}
+              <Glyph g={x?.icon} /> {x?.name ?? id} {x?.rule === 'table' && <span className="tag" data-tip="Not applied by the app: remember it at the table">at the table</span>}{' '}
               <span className="muted">— {x?.desc}</span>
             </span>
-            <button className="ghost icon" aria-label={`Tear down ${x?.name ?? id}`} title="Tear down (no refund)"
+            <button className="ghost icon" aria-label={`Tear down ${x?.name ?? id}`} data-tip="Tear down (no refund)"
               onClick={() => confirmAction(`Tear down the ${x?.name ?? id} at ${s.name}? There's no refund.`) && edit((y) => demolish(y, id))}><Icon name="l:x" /></button>
           </div>
         );
       })}
       {k && (
-        <div className="row" title={going?.desc}>
+        <div className="row" data-tip={going?.desc}>
           <span className="grow">
             <Icon name="g:crane" /> {going?.name ?? k.id} <span className="tag gold">building</span>{' '}
             <span className="muted">— done when round {k.round} ends. Paid {price({ cost: k.supply, shards: k.shards })}.</span>
           </span>
-          <button className="ghost" title="Stop building for a full refund"
+          <button className="ghost" data-tip="Stop building for a full refund"
             onClick={() => confirmAction(`Stop building the ${going?.name ?? k.id}? The ${price({ cost: k.supply, shards: k.shards })} paid comes back.`)
               && edit((y, _c, fs) => cancelBuilding(y, fs, today, uid))}>Cancel</button>
         </div>
@@ -773,7 +769,7 @@ function ProductionBox({ s }: { s: Sector }) {
                 <option key={x.id} value={x.id}>{x.icon} {x.name} — {price(priced(x))}</option>
               ))}
             </select>
-            <button className="primary" disabled={!pick || !!block} title={block} onClick={() => {
+            <button className="primary" disabled={!pick || !!block} data-tip={block} onClick={() => {
               edit((y, c, fs) => void build(c, y, pick, fs.find((f) => f.id === payer?.id), today, uid));
               toast(`${b!.name} started at ${s.name}. Done at round end.`);
               setPick('');
@@ -801,7 +797,7 @@ function ProductionBox({ s }: { s: Sector }) {
         <div className="row" style={{ marginTop: '0.25rem' }}>
           <span className="grow"><Icon name="l:arrow-left-right" /> Grand Exchange{s.exchanged === (c?.round ?? 1) ? <span className="muted"> — traded this round</span> : <span className="muted"> — once a round, with {payer?.name ?? 'a force'}</span>}</span>
           {([['buyShard', `${X.materials} Materials → ${X.shards} US`], ['sellShard', `${X.shards} US → ${X.back} Materials`]] as [ExchangeTrade, string][]).map(([t, label]) => (
-            <button key={t} disabled={!!trade1(t)} title={trade1(t)} onClick={() => {
+            <button key={t} disabled={!!trade1(t)} data-tip={trade1(t)} onClick={() => {
               edit((y, cc, fs) => {
                 const f = fs.find((x) => x.id === payer?.id);
                 if (f) exchange(cc, y, t, f, today, uid);
@@ -814,7 +810,7 @@ function ProductionBox({ s }: { s: Sector }) {
       {s.type === 'planet' && !s.core && (owner?.cores ?? 0) > 0 && (
         <div className="row" style={{ marginTop: '0.25rem' }}>
           <span className="grow"><Icon name="g:diamonds" /> {owner?.name} has {owner?.cores} Building Expansion{owner?.cores === 1 ? '' : 's'}: install one here for a permanent extra slot.</span>
-          <button disabled={!!coreBlocked} title={coreBlocked} onClick={() => confirmAction(`Install a Building Expansion at ${s.name}? It can't be moved and stays if the planet is taken.`)
+          <button disabled={!!coreBlocked} data-tip={coreBlocked} onClick={() => confirmAction(`Install a Building Expansion at ${s.name}? It can't be moved and stays if the planet is taken.`)
             && edit((y, cc) => void installCore(cc, y))}>Install</button>
         </div>
       )}
@@ -874,7 +870,7 @@ function SectorEditor({ c, s, setSector, setC, onDone, onDeleted }: {
       </div>
       <label className="field span-all">Lore<TextArea value={s.notes} rows={4} placeholder="Lore, terrain, rumours…" onCommit={(v) => setSector((d) => void (d.notes = v))} /></label>
       <div className="span-all row">
-        <button onClick={() => setSector((d) => { const r = rollSector(d.type); d.name = r.name; d.notes = r.notes; })} title="Random name and lore"><Icon name="g:perspective-dice-six-faces-six" /> Reroll name &amp; lore</button>
+        <button onClick={() => setSector((d) => { const r = rollSector(d.type); d.name = r.name; d.notes = r.notes; })} data-tip="Random name and lore"><Icon name="g:perspective-dice-six-faces-six" /> Reroll name &amp; lore</button>
       </div>
       <div className="span-all row">
         {s.image && <img className="sector-art thumb" src={s.image} alt="" />}
@@ -895,7 +891,7 @@ function SectorEditor({ c, s, setSector, setC, onDone, onDeleted }: {
       <div className="span-all row">
         <button className="primary" onClick={onDone}>Done</button>
         <span className="spacer" />
-        <button className="ghost" onClick={() => setSector((d) => void (d.q = d.r = undefined))} title="Keeps the sector in the list">Take off map</button>
+        <button className="ghost" onClick={() => setSector((d) => void (d.q = d.r = undefined))} data-tip="Keeps the sector in the list">Take off map</button>
         <button className="danger" onClick={() => {
           if (!confirmAction(`Delete ${s.name}? Its log entries will show "Deleted sector".`)) return;
           setC((d) => void (d.sectors = d.sectors.filter((x) => x.id !== s.id)));
@@ -978,7 +974,7 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
           <label className="field">Rows<Stepper value={o.rows} min={3} onChange={(n) => resize(o.cols, Math.min(n, 30))} /></label>
           <label className="field span-all">
             Seed
-            <span className="row"><input value={o.seed} onChange={(e) => set({ seed: e.target.value })} /><button onClick={() => set({ seed: randomSeed() })} title="New seed"><Icon name="g:perspective-dice-six-faces-six" /></button></span>
+            <span className="row"><input value={o.seed} onChange={(e) => set({ seed: e.target.value })} /><button onClick={() => set({ seed: randomSeed() })} data-tip="New seed" aria-label="New seed"><Icon name="g:perspective-dice-six-faces-six" /></button></span>
             <span className="muted small">The same seed and settings give the same map.</span>
           </label>
           <label className="field span-all">
@@ -989,7 +985,7 @@ function GenerateDialog({ c, setC, onClose }: { c: Campaign; setC: SetC; onClose
         </div>
         <div className="fields">
           {(Object.keys(o.counts) as (keyof GenCounts)[]).map((t) => (
-            <label key={t} className="field" title={SECTOR_TYPES[t].desc}><span><Glyph g={GLYPH[t]} /> {SECTOR_TYPES[t].label}</span><Stepper value={o.counts[t]} min={0} onChange={(n) => setCount(t, n)} /></label>
+            <label key={t} className="field" data-tip={SECTOR_TYPES[t].desc}><span><Glyph g={GLYPH[t]} /> {SECTOR_TYPES[t].label}</span><Stepper value={o.counts[t]} min={0} onChange={(n) => setCount(t, n)} /></label>
           ))}
           <label className="span-all row small">
             <input type="checkbox" checked={o.replace} onChange={(e) => set({ replace: e.target.checked })} />
@@ -1036,15 +1032,15 @@ function EchoMarkTag({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
   if (m.brokenBy)
     return <>
       <span className="tag green"><Icon name="g:shield" /> Mark broken by {factionName(c, m.brokenBy)}: the {ECHOES.name} won't take it this round</span>
-      {gm && <button className="small" onClick={() => setC((d) => restoreMark(d, s.id))} title="Undo the break">Restore mark</button>}
+      {gm && <button className="small" onClick={() => setC((d) => restoreMark(d, s.id))} data-tip="Undo the break">Restore mark</button>}
     </>;
   return <>
-    <span className={`tag ${held.length ? 'green' : 'red'}`} title={MARK_TIP}>
+    <span className={`tag ${held.length ? 'green' : 'red'}`} data-tip={MARK_TIP}>
       <Icon name="g:hazard-sign" /> The {ECHOES.name} are massing here{held.length ? `: ${held.map((id) => factionName(c, id)).join(', ')} hold${held.length === 1 ? 's' : ''} the line` : ': it falls when the round ends'}
     </span>
     {!held.length && can.map((f) => (
       <button key={f.id} className="small" onClick={() => breakIt(f.id)}
-        title={`Spend ${f.name}'s Battle win against the ${ECHOES.name} this round to keep them out of ${s.name}`}>
+        data-tip={`Spend ${f.name}'s Battle win against the ${ECHOES.name} this round to keep them out of ${s.name}`}>
         Break this mark{gm && can.length > 1 ? ` (${f.name})` : ''}
       </button>
     ))}
@@ -1064,7 +1060,7 @@ function SpreadButton({ c, setC }: { c: Campaign; setC: SetC }) {
   };
   return (
     <button onClick={spread} disabled={!options.length}
-      title={options.length ? `Spread into one of ${options.length} neighbouring sector${options.length === 1 ? '' : 's'} at random` : 'No neighbouring sector to spread into'}>
+      data-tip={options.length ? `Spread into one of ${options.length} neighbouring sector${options.length === 1 ? '' : 's'} at random` : 'No neighbouring sector to spread into'}>
       <Icon name="g:biohazard" /> {ECHOES.name} spread
     </button>
   );

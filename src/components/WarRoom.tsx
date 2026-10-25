@@ -44,7 +44,7 @@ export default function WarRoomPanel({ c }: { c: Campaign }) {
         <div className="table-wrap">
           <table className="compact">
             <thead>
-              <tr><th>Force</th><th>Faction</th><th className="num">Games</th><th className="num">W–L–D</th><th className="num">Win rate</th><th className="num" title="Average VP over tracked games">Avg VP</th><th>MVP</th></tr>
+              <tr><th>Force</th><th>Faction</th><th className="num">Games</th><th className="num">W–L–D</th><th className="num">Win rate</th><th className="num" data-tip="Average VP over tracked games">Avg VP</th><th>MVP</th></tr>
             </thead>
             <tbody>
               {league.map((f) => {
@@ -89,8 +89,8 @@ function ForceDetail({ s }: { s: ForceStats }) {
         <div className="stat"><b>{s.games}</b><span>Games</span></div>
         <div className="stat"><b>{wld(s.record)}</b><span>W–L–D</span></div>
         <div className="stat"><b>{pct(s.winRate)}</b><span>Win rate</span></div>
-        <div className="stat" title={`Over ${s.tracked} tracked game${s.tracked === 1 ? '' : 's'}`}><b>{vp(s.avgVp)}</b><span>Avg VP</span></div>
-        <div className="stat" title="The best opponent's VP, averaged"><b>{vp(s.avgOppVp)}</b><span>Opp. VP</span></div>
+        <div className="stat" data-tip={`Over ${s.tracked} tracked game${s.tracked === 1 ? '' : 's'}`}><b>{vp(s.avgVp)}</b><span>Avg VP</span></div>
+        <div className="stat" data-tip="The best opponent's VP, averaged"><b>{vp(s.avgOppVp)}</b><span>Opp. VP</span></div>
       </div>
       {s.mvp && (
         <p><Icon name="g:medal" /> <b>MVP: {s.mvp.name}</b> <span className="muted">— {s.mvp.kills} kills in {s.mvp.games} game{s.mvp.games === 1 ? '' : 's'}, wiped {s.mvp.wiped}×</span></p>
@@ -108,7 +108,7 @@ function ForceDetail({ s }: { s: ForceStats }) {
           <div className="table-wrap">
             <table className="compact">
               <thead>
-                <tr><th>Unit</th><th className="num">Games</th><th className="num" title="Kill XP from the tracker (kills, in older battles)">Kills</th><th className="num">Wiped</th><th className="num">Kills / game</th></tr>
+                <tr><th>Unit</th><th className="num">Games</th><th className="num" data-tip="Kill XP from the tracker (kills, in older battles)">Kills</th><th className="num">Wiped</th><th className="num">Kills / game</th></tr>
               </thead>
               <tbody>
                 {s.units.map((u) => (

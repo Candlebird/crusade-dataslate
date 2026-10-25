@@ -40,7 +40,7 @@ export function EditModeButton({ f }: { f: Force }) {
       className={edit ? 'primary' : ''}
       aria-pressed={edit}
       onClick={toggle}
-      title={edit ? 'Hide the manual controls' : 'Show manual controls to fix an untracked game or wrong reward'}
+      data-tip={edit ? 'Hide the manual controls' : 'Show manual controls to fix an untracked game or wrong reward'}
     >
       <Icon name="l:pencil" /> {edit ? 'Editing — done' : 'Edit mode'}
     </button>

@@ -86,7 +86,7 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
       footer={
         <>
           {allowFree && (
-            <label className="row small muted" title="Free upgrades (e.g. from a reward roll) still add BP but don't use a level.">
+            <label className="row small muted" data-tip="Free upgrades (e.g. from a reward roll) still add BP but don't use a level.">
               <input type="checkbox" checked={free} onChange={(e) => setFree(e.target.checked)} />
               {freeLabel ?? "Free (doesn't use a level)"}
             </label>
@@ -107,7 +107,7 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
             </button>
           ))}
           {shown.length < groups.length && (
-            <button className="ghost small muted" onClick={() => setShowRestricted(true)} title="Only when a reward, relic or Nexus effect tells you to">
+            <button className="ghost small muted" onClick={() => setShowRestricted(true)} data-tip="Only when a reward, relic or Nexus effect tells you to">
               Show unique tables…
             </button>
           )}
@@ -120,7 +120,7 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
             <div className="row" style={{ marginBottom: '0.6rem' }}>
               <button onClick={roll}><Icon name="g:perspective-dice-six-faces-six" /> Roll D{group.entries.length}</button>
               {rolls.slice(0, -1).map((r, i) => (
-                <span key={i} className="muted small" title="Already had — rerolled"><s>{r} {group.entries[r - 1].name}</s></span>
+                <span key={i} className="muted small" data-tip="Already had — rerolled"><s>{r} {group.entries[r - 1].name}</s></span>
               ))}
               {rolled != null && <span className="dice-result">{rolled}</span>}
               {rolled != null && <span><Icon name="l:arrow-right" /> {group.entries[rolled - 1].name}{isOwned(group.entries[rolled - 1]) ? ' (already had, nothing new to reroll)' : ''}</span>}
@@ -131,7 +131,7 @@ export default function TablePicker({ title, groups, onPick, onClose, allowFree 
               <div
                 key={e.name + i}
                 className={`pick${selected === i ? ' selected' : ''}${e.disabled ? ' disabled' : ''}`}
-                title={e.disabled}
+                data-tip={e.disabled}
                 onClick={() => { setSelected(i); setCustom(''); }}
               >
                 {group.rollable && <span className="die">{i + 1}</span>}

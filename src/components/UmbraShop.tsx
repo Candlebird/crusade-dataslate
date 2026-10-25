@@ -140,7 +140,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
         <div>
           {UMBRA_SHOP.map((x) => (
             <div key={x.key} className={`shop-item${sel === x.key ? ' selected' : ''}${costOf(x) > us ? ' disabled' : ''}`} onClick={() => pick(x.key)}>
-              <span className="cost" title={costOf(x) < x.cost ? 'Relic Collector discount' : undefined}>{costOf(x)} US</span>
+              <span className="cost" data-tip={costOf(x) < x.cost ? 'Relic Collector discount' : undefined}>{costOf(x)} US</span>
               <div className="grow"><b>{x.name}</b><div className="muted small">{x.desc}</div></div>
             </div>
           ))}

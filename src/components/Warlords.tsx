@@ -28,7 +28,7 @@ export default function WarlordsPanel({ c, setC, faction, gm }: { c: Campaign; s
         {shown.map((f) => {
           const path = pathById(f.path);
           return (
-            <span key={f.id} className="stat" title={path ? `${path.name}: ${path.desc}` : 'No Warlord named yet'}>
+            <span key={f.id} className="stat" data-tip={path ? `${path.name}: ${path.desc}` : 'No Warlord named yet'}>
               <b>{f.warlord ? <><Glyph g={path?.icon} /> {f.warlord.name}</> : '—'}</b>
               <span className="muted small">{shown.length > 1 ? `${f.name}: ` : ''}{f.warlord ? `level ${f.warlord.level}` : 'no Warlord'}</span>
             </span>
@@ -108,7 +108,7 @@ function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: Campai
               <option value="">Change Path…</option>
               {WARLORDS.paths.filter((p) => p.id !== f.path).map((p) => <option key={p.id} value={p.id}>{p.icon} {p.name}</option>)}
             </select>
-            <button className="small" disabled={!newPath} onClick={switchPath} title="The Warlord starts back at level 1">Change Path</button>
+            <button className="small" disabled={!newPath} onClick={switchPath} data-tip="The Warlord starts back at level 1">Change Path</button>
           </span>
         </p>
       ) : (
@@ -135,7 +135,7 @@ function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: Campai
             </>
           )}
           {gm && canRevive(f) && (
-            <button className="small" onClick={revive} title="GM: undo the loss of this faction's Warlord">
+            <button className="small" onClick={revive} data-tip="GM: undo the loss of this faction's Warlord">
               Revive{f.fallenWarlord ? ` ${f.fallenWarlord.name}` : ''}
             </button>
           )}

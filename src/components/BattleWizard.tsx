@@ -313,7 +313,7 @@ function UnitsStep({ units, input, setUnit, used, busy }: { units: Unit[]; input
         <table className="compact stack">
           <thead>
             <tr>
-              <th>Fought</th><th>Unit</th><th>Destroyed</th><th title="Marked for Greatness">Marked</th><th title="Holding an objective at the end">Holding</th>
+              <th>Fought</th><th>Unit</th><th>Destroyed</th><th data-tip="Marked for Greatness">Marked</th><th data-tip="Holding an objective at the end">Holding</th>
               <th className="num">Kills</th><th className="num">Kill XP</th><th className="num">Bonus XP</th><th className="num">Total</th>
             </tr>
           </thead>
@@ -327,9 +327,9 @@ function UnitsStep({ units, input, setUnit, used, busy }: { units: Unit[]; input
                   <td data-label="Fought"><input type="checkbox" checked={r.in} disabled={used.includes(u.id)} onChange={(e) => setUnit(u.id, { in: e.target.checked })} /></td>
                   <td className="s-2">
                     <b>{unitName(u)}</b>
-                    <div className="muted small">{u.name && u.unitType} {comatose && <span className="tag cyan" title="Sits this battle out; recovers afterwards">Comatose</span>}
-                      {busy.includes(u.id) ? <span className="tag gold" title="On a downtime task this round: can't fight, including the main Battle">Busy on a task</span>
-                        : used.includes(u.id) && <span className="tag gold" title="1 skirmish, Solo patrol or Expedition per unit per campaign round">Already fought this round</span>}</div>
+                    <div className="muted small">{u.name && u.unitType} {comatose && <span className="tag cyan" data-tip="Sits this battle out; recovers afterwards">Comatose</span>}
+                      {busy.includes(u.id) ? <span className="tag gold" data-tip="On a downtime task this round: can't fight, including the main Battle">Busy on a task</span>
+                        : used.includes(u.id) && <span className="tag gold" data-tip="1 skirmish, Solo patrol or Expedition per unit per campaign round">Already fought this round</span>}</div>
                   </td>
                   <td data-label="Destroyed"><input type="checkbox" disabled={!r.in} checked={r.destroyed} onChange={(e) => setUnit(u.id, { destroyed: e.target.checked, death: e.target.checked ? r.death : null })} /></td>
                   <td data-label="Marked"><input type="radio" name="marked" disabled={!r.in || input.patrol} checked={r.marked} onChange={() => setUnit(u.id, { marked: true })} onClick={() => r.marked && setUnit(u.id, { marked: false })} /></td>
@@ -380,7 +380,7 @@ function DeathsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInp
           <div key={u.id} className="reward">
             <div className="reward-head">
               <h4>{unitName(u)}</h4>
-              {n > 1 && <span className="tag red" title="Lowered Constitution">2 dice</span>}
+              {n > 1 && <span className="tag red" data-tip="Lowered Constitution">2 dice</span>}
               <span className="spacer" />
               {r.death && r.death.dice.length > 0 && (
                 <span className="dice-tray" style={{ margin: 0 }}>

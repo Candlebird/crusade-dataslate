@@ -177,7 +177,7 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
     <div className="warlord">
       <h3>
         {j.warlord} <span className="muted small">— {factionName(c, j.factionId)}, round {j.round}</span>
-        {gm && status !== 'done' && <button className="ghost small" onClick={discard} title="Discard this journal"><Icon name="l:x" /></button>}
+        {gm && status !== 'done' && <button className="ghost small" onClick={discard} data-tip="Discard this journal" aria-label="Discard this journal"><Icon name="l:x" /></button>}
       </h3>
       {!u && <p className="warn small">{force ? `${j.warlord} is no longer in play.` : `Load ${j.warlord}'s force in this browser to play the journal.`}</p>}
       {j.note && <p><i>{j.note}</i></p>}
@@ -344,7 +344,7 @@ function Marks({ c, setC, factionId, canDrop }: { c: Campaign; setC: SetC; facti
           <span className={`tag ${m.good ? 'green' : 'red'}`}>{m.kind}</span>
           <span className="small"><b>{m.name}.</b> {m.text} <span className="muted">({where(m)})</span></span>
           {canDrop && m.kind !== 'quirk' && (
-            <button className="ghost small" title="Strike it off once it's used" onClick={() => setC((d) => void dropMark(d, factionId, m.id))}>Used</button>
+            <button className="ghost small" data-tip="Strike it off once it's used" onClick={() => setC((d) => void dropMark(d, factionId, m.id))}>Used</button>
           )}
         </div>
       ))}

@@ -34,7 +34,7 @@ export default function ChroniclePanel({ c, viewer, onJump }: { c: Campaign; vie
                 <span className="report-icon"><Glyph g={e.icon} /></span>
                 {e.eventId || e.sectorId
                   ? <a href={e.eventId ? href.campaign('log', e.eventId) : href.campaign('map', e.sectorId)}
-                      title={e.eventId ? 'Show the game in the log' : 'Show the sector on the map'}
+                      data-tip={e.eventId ? 'Show the game in the log' : 'Show the sector on the map'}
                       onClick={(ev) => { ev.preventDefault(); onJump(e); }}>{e.text}</a>
                   : <span>{e.text}</span>}
               </li>

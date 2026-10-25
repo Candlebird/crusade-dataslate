@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment } from 'react';
 import { ICONS, type IconName } from './iconData';
 
 export type { IconName };
@@ -11,20 +11,20 @@ export function Icon({ name, title, className }: { name: IconName; title?: strin
   const [box, body] = ICONS[name];
   const inner = name.startsWith('g:') ? `<path fill="currentColor" d="${body}"/>` : body;
   return (
-    <svg className={`icon${className ? ` ${className}` : ''}`} viewBox={`0 0 ${box} ${box}`} aria-hidden={title ? undefined : true} role={title ? 'img' : undefined}>
-      {title && <title>{title}</title>}
+    <svg className={`icon${className ? ` ${className}` : ''}`} viewBox={`0 0 ${box} ${box}`} aria-hidden={title ? undefined : true} role={title ? 'img' : undefined}
+      aria-label={title || undefined} data-tip={title || undefined}>
       <g dangerouslySetInnerHTML={{ __html: inner }} />
     </svg>
   );
 }
 
 /** An icon inside an SVG drawing, centred on (x, y). */
-export function SvgIcon({ name, x, y, size, className, title }: { name: IconName; x: number; y: number; size: number; className?: string; title?: ReactNode }) {
+export function SvgIcon({ name, x, y, size, className, title }: { name: IconName; x: number; y: number; size: number; className?: string; title?: string }) {
   const [box, body] = ICONS[name];
   const inner = name.startsWith('g:') ? `<path fill="currentColor" d="${body}"/>` : body;
   return (
-    <svg className={className} x={x - size / 2} y={y - size / 2} width={size} height={size} viewBox={`0 0 ${box} ${box}`} overflow="visible">
-      {title && <title>{title}</title>}
+    <svg className={className} x={x - size / 2} y={y - size / 2} width={size} height={size} viewBox={`0 0 ${box} ${box}`} overflow="visible"
+      role={title ? 'img' : undefined} aria-label={title || undefined} data-tip={title || undefined}>
       <rect width={box} height={box} fill="transparent" />
       <g dangerouslySetInnerHTML={{ __html: inner }} />
     </svg>

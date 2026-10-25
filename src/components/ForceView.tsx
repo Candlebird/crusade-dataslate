@@ -222,11 +222,11 @@ export default function ForceView({ forceId }: { forceId: string }) {
                           <td className="num" data-label="Pts">{u.points}</td>
                           <td className="num" data-label="BP">{battlePoints(u, s)}</td>
                           <td className="s-full">
-                            {pendingLevels(u) > 0 && <span className="tag gold" title="Level-ups waiting to be picked"><Icon name="g:upgrade" /> Level up</span>}
+                            {pendingLevels(u) > 0 && <span className="tag gold" data-tip="Level-ups waiting to be picked"><Icon name="g:upgrade" /> Level up</span>}
                             {u.status === 'comatose' && <span className="tag cyan">Comatose</span>}
                             {u.status === 'removed' && <span className="tag red">Fallen</span>}
                             {u.scars.length > 0 && <span className="tag red">{u.scars.length} scar{u.scars.length > 1 ? 's' : ''}</span>}
-                            {issues.length > 0 && <span className="tag gold" title={issues.map((i) => i.text).join('\n')}><Icon name="g:hazard-sign" /> {issues.length}</span>}
+                            {issues.length > 0 && <span className="tag gold" data-tip={issues.map((i) => i.text).join('\n')}><Icon name="g:hazard-sign" /> {issues.length}</span>}
                           </td>
                         </tr>
                       );
@@ -278,7 +278,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                 <button
                   disabled={t.rp < 1}
                   onClick={() => addLedger('Increase Supply', -1, s.supplyPerRp)}
-                  title={`Spend 1 RP for +${s.supplyPerRp} Supply`}
+                  data-tip={`Spend 1 RP for +${s.supplyPerRp} Supply`}
                 >
                   Increase supply (−1 RP)
                 </button>
@@ -301,7 +301,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                         <td className="s-full" data-label="Entry"><TextField className="wide" value={e.label} onCommit={(v) => set((d) => void (d.ledger[i].label = v))} /></td>
                         <td className="num" data-label="RP"><input type="number" value={e.rp} onChange={(ev) => set((d) => void (d.ledger[i].rp = Number(ev.target.value) || 0))} /></td>
                         <td className="num" data-label="Supply"><input type="number" step={50} value={e.supply} onChange={(ev) => set((d) => void (d.ledger[i].supply = Number(ev.target.value) || 0))} /></td>
-                        <td className="num small" data-label="US" title="Umbra Shards (history only; set the balance in Force details)">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
+                        <td className="num small" data-label="US" data-tip="Umbra Shards (history only; set the balance in Force details)">{e.us ? (e.us > 0 ? `+${e.us}` : e.us) : ''}</td>
                         <td className="s-end"><button className="ghost icon" onClick={() => set((d) => void d.ledger.splice(i, 1))} aria-label="Delete entry"><Icon name="l:x" /></button></td>
                       </tr>
                     ) : (
@@ -424,13 +424,13 @@ function ProductionBox({ f, c }: { f: Force; c: Campaign }) {
   const budget = Math.min(room, site ? Math.floor(bank / (1 - produceDiscount(site, { tough: 0 }))) : 0);
   return (
     <div className="span-all small">
-      <div className="muted" title="Each planet banks Materials every round. Spend them to raise units there. Barracks double the bank; Training Grounds give new units XP.">Production</div>
+      <div className="muted" data-tip="Each planet banks Materials every round. Spend them to raise units there. Barracks double the bank; Training Grounds give new units XP.">Production</div>
       <div className="row">
         <select value={site.id} onChange={(e) => setSite(e.target.value)} aria-label="Where to produce" style={{ minWidth: 0, flex: 1 }}>
           {sites.map((x) => <option key={x.id} value={x.id}>{x.name}: {x.bank ?? 0} Materials banked</option>)}
         </select>
         <button disabled={budget <= 0} onClick={() => setAdding(true)}
-          title={bank <= 0 ? 'Nothing banked yet. More arrives when the round ends.' : room <= 0 ? 'No room under your Supply Limit' : `Up to ${budget} pts`}>
+          data-tip={bank <= 0 ? 'Nothing banked yet. More arrives when the round ends.' : room <= 0 ? 'No room under your Supply Limit' : `Up to ${budget} pts`}>
           Produce units…
         </button>
       </div>
@@ -471,11 +471,11 @@ function HeroOffers({ f, c }: { f: Force; c: Campaign }) {
         const block = hireBlock(c, o, f);
         const relic = o.unit.relics[0];
         return (
-          <div key={o.id} className="row" title={o.unit.rules.join(', ')}>
+          <div key={o.id} className="row" data-tip={o.unit.rules.join(', ')}>
             <span className="grow">
               <Icon name="g:round-star" /> <b>{o.unit.unitType}</b> <span className="muted">— level {levelForXp(o.unit.xp)}, {o.unit.points} pts{relic ? <>, carrying <b>{relic.name}</b> ({relic.tier})</> : ''}. {o.fee} US; {offerEnds(o) > currentRound(c) ? 'leaves after next round' : 'leaves when this round ends'}.</span>
             </span>
-            <button disabled={!!block} title={block ?? `Hire for ${o.fee} Umbra Shards. They join ${f.name} for good.`} onClick={() => {
+            <button disabled={!!block} data-tip={block ?? `Hire for ${o.fee} Umbra Shards. They join ${f.name} for good.`} onClick={() => {
               if (!confirmAction(`Hire ${o.unit.unitType} into ${f.name} for ${o.fee} Umbra Shards?`)) return;
               let hired = false;
               update((d) => {
@@ -672,7 +672,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
               <div className="span-all small">
                 <div className="muted">Controlled sectors</div>
                 {ownedSectors(c, n.factionId).map((s) => (
-                  <div key={s.id} title={benefitOf(s)?.desc ?? SECTOR_TYPES[s.type].desc}>
+                  <div key={s.id} data-tip={benefitOf(s)?.desc ?? SECTOR_TYPES[s.type].desc}>
                     <b>{s.name}</b> <span className="muted">— {benefitOf(s)?.name ?? SECTOR_TYPES[s.type].label}{isReinforced(s) ? ' · reinforced' : ''}{s.buildings?.length ? ` · ${s.buildings.length} building${s.buildings.length === 1 ? '' : 's'}` : ''}</span>
                   </div>
                 ))}

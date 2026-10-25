@@ -109,7 +109,7 @@ function BountyCard({ c, setC, b, i, gm }: { c: Campaign; setC: SetC; b: Bounty;
 
   return (
     <div className="list-item small bounty" style={{ alignItems: 'flex-start', opacity: b.claimed ? 0.7 : undefined }}>
-      <span className="bounty-stars" title={`Difficulty ${b.difficulty}`}>{STARS[b.difficulty] ? <IconText text={STARS[b.difficulty]} /> : b.difficulty}</span>
+      <span className="bounty-stars" data-tip={`Difficulty ${b.difficulty}`}>{STARS[b.difficulty] ? <IconText text={STARS[b.difficulty]} /> : b.difficulty}</span>
       <span className="grow">
         <b>{kind.name}</b> — {bountyText(c, b)}
         <br />
@@ -167,18 +167,18 @@ function BountyCard({ c, setC, b, i, gm }: { c: Campaign; setC: SetC; b: Bounty;
                       </select>
                     : <input type="number" min={1} value={r.n} style={{ width: '4.5em' }}
                         onChange={(e) => edit((x) => { const y = x.rewards[ri]; if (y.kind !== 'relic') y.n = Math.max(1, Number(e.target.value) || 1); })} />}
-                  <button className="ghost icon" title="Remove this reward" onClick={() => edit((x) => void x.rewards.splice(ri, 1))}><Icon name="l:x" /></button>
+                  <button className="ghost icon" data-tip="Remove this reward" aria-label="Remove this reward" onClick={() => edit((x) => void x.rewards.splice(ri, 1))}><Icon name="l:x" /></button>
                 </span>
               ))}
               <button className="ghost small" onClick={() => edit((x) => void x.rewards.push({ kind: 'shards', n: 1 }))}>+ Reward</button>
-              <span className="muted" title="What the rewards are worth, in Umbra Shards, against the difficulty's budget">
+              <span className="muted" data-tip="What the rewards are worth, in Umbra Shards, against the difficulty's budget">
                 worth ~{Math.round(worth * 10) / 10} / {BOUNTY.budget[b.difficulty]}
               </span>
             </div>
             <div className="row" style={{ gap: '0.35rem' }}>
               <button onClick={() => edit((x, d) => setDifficulty(d, i, x.difficulty, Math.random))}>Reroll rewards</button>
               <button onClick={() => regen()}>Regenerate</button>
-              <select value="" onChange={(e) => e.target.value && award(e.target.value)} title="Hand the bounty to a faction yourself">
+              <select value="" onChange={(e) => e.target.value && award(e.target.value)} data-tip="Hand the bounty to a faction yourself">
                 <option value="">Award to…</option>
                 {c.factions.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>
@@ -186,7 +186,7 @@ function BountyCard({ c, setC, b, i, gm }: { c: Campaign; setC: SetC; b: Bounty;
           </div>
         )}
       </span>
-      {gm && b.claimed && <button onClick={() => regen()} title="Replace it now rather than at the round's end">Regenerate</button>}
+      {gm && b.claimed && <button onClick={() => regen()} data-tip="Replace it now rather than at the round's end">Regenerate</button>}
     </div>
   );
 }

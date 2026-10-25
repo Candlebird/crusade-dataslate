@@ -9,7 +9,7 @@ export default function SectorDanger({ s, factionId }: { s: Sector; factionId?: 
   const mods = (s.modifiers ?? []).map(modifierOf).filter((m) => !!m);
   return (
     <div className="small" style={{ margin: '0.5rem 0' }}>
-      <span className="tag red" title="Recalculated every round, scaled to the attacking faction's total Supply">
+      <span className="tag red" data-tip="Recalculated every round, scaled to the attacking faction's total Supply">
         {aiDefended(s) ? `AI garrison: ${rating} Supply` : `Difficulty ${rating} Supply`}
       </span>
       {mods.map((m) => <div key={m.id}><b>{m.name}:</b> {m.desc}</div>)}

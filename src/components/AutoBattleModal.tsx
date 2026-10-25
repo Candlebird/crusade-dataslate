@@ -150,7 +150,7 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
       <>
         <span className="muted small">{applyNote ?? 'Applying ends the battle with these losses and kill XP. Record it for each force as usual.'}</span>
         <span className="spacer" />
-        <button onClick={fight} title="Discard this run and fight again"><Icon name="g:perspective-dice-six-faces-six" /> Fight again</button>
+        <button onClick={fight} data-tip="Discard this run and fight again"><Icon name="g:perspective-dice-six-faces-six" /> Fight again</button>
         <button className="primary" onClick={apply}><Icon name="l:check" /> Apply result</button>
       </>
     ) : (
@@ -238,7 +238,7 @@ function SideSetup({ b, side, set, fixedAi }: { b: TrackedBattle; side: TrackerS
         fixedAi ? null : book ? (
           <div className="row small">
             <Stepper value={target} step={50} min={50} onChange={setTarget} /> pts
-            <button onClick={generate} title={`A random ${ECHOES.name} army up to the target points`}><Icon name="g:perspective-dice-six-faces-six" /> Generate</button>
+            <button onClick={generate} data-tip={`A random ${ECHOES.name} army up to the target points`}><Icon name="g:perspective-dice-six-faces-six" /> Generate</button>
           </div>
         ) : !side.units.length && <div className="muted small">Import the {ECHOES.name} book to generate an army, or set one up on the tracker.</div>
       ) : (
@@ -266,11 +266,11 @@ function FighterTable({ fighters }: { fighters: Fighter[] }) {
     <div className="table-wrap">
       <table className="compact">
         <thead>
-          <tr><th>Unit</th><th title="Expected wounds a round: shooting / melee">Attack</th><th title="Plain hits to lose one wound">Defense</th><th>Wounds</th></tr>
+          <tr><th>Unit</th><th data-tip="Expected wounds a round: shooting / melee">Attack</th><th data-tip="Plain hits to lose one wound">Defense</th><th>Wounds</th></tr>
         </thead>
         <tbody>
           {fighters.map((f) => (
-            <tr key={f.key} title={f.notes.join('\n')}>
+            <tr key={f.key} data-tip={f.notes.join('\n')}>
               <td>
                 <details>
                   <summary>{f.name}</summary>
@@ -295,7 +295,7 @@ function HpBar({ f, hp, withdrawn }: { f: Fighter; hp: number; withdrawn?: boole
   const pct = (hp / f.maxHp) * 100;
   const out = withdrawn && hp > 0;
   return (
-    <div className={`auto-hp${hp <= 0 || out ? ' dead' : ''}`} title={`${hp}/${f.maxHp} wounds${out ? ', pulled back' : ''}`}>
+    <div className={`auto-hp${hp <= 0 || out ? ' dead' : ''}`} data-tip={`${hp}/${f.maxHp} wounds${out ? ', pulled back' : ''}`}>
       <div className="row small">
         <span className="grow">{hp <= 0 ? <><Icon name="g:death-skull" /> </> : out ? <><Icon name="g:exit-door" /> </> : null}{f.name}{out && <span className="muted"> (pulled back)</span>}</span>
         <span className="muted">{hp}/{f.maxHp}</span>

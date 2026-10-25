@@ -167,7 +167,7 @@ function DuelCard({ c, setC, d, me, gm }: { c: Campaign; setC: SetC; d: NexusDue
               <div>Puts up: {wagerText(s.wager)}</div>
               {(mine === r || (gm && !mine)) && (s.agreed
                 ? <button className="small" onClick={() => agree(s, false)}>Take back agreement</button>
-                : <button className="primary small" disabled={!s.forceId} title={s.forceId ? undefined : 'Pick a force first in Change wagers'} onClick={() => agree(s, true)}>{mine ? 'Agree' : `Agree for ${sideName(s)}`}</button>)}
+                : <button className="primary small" disabled={!s.forceId} data-tip={s.forceId ? undefined : 'Pick a force first in Change wagers'} onClick={() => agree(s, true)}>{mine ? 'Agree' : `Agree for ${sideName(s)}`}</button>)}
               {issues.length > 0 && <ul className="issues">{issues.map((i) => <li key={i} className="warn">{i} If it loses, it pays what it has.</li>)}</ul>}
             </div>
           );

@@ -29,7 +29,7 @@ export function DatasheetTags({ book, name }: { book: CatalogBook; name: string 
       {tags.map((t) => (
         <span key={t} className="tag utag">
           {t}
-          <button type="button" aria-label={`Remove tag ${t}`} title="Remove tag" onClick={() => save(tags.filter((x) => x !== t))}><Icon name="l:x" /></button>
+          <button type="button" aria-label={`Remove tag ${t}`} data-tip="Remove tag" onClick={() => save(tags.filter((x) => x !== t))}><Icon name="l:x" /></button>
         </span>
       ))}
       {adding ? (
@@ -47,7 +47,7 @@ export function DatasheetTags({ book, name }: { book: CatalogBook; name: string 
           }}
         />
       ) : (
-        <button type="button" className="tag tag-add" title={`Tag every "${name}" from ${book.name}`} onClick={() => setAdding(true)}>+ tag</button>
+        <button type="button" className="tag tag-add" data-tip={`Tag every "${name}" from ${book.name}`} onClick={() => setAdding(true)}>+ tag</button>
       )}
       {adding && (
         <datalist id="tag-suggestions">
@@ -62,7 +62,7 @@ export function DatasheetTags({ book, name }: { book: CatalogBook; name: string 
 export function UnitTags({ unit, editable = true }: { unit: Unit; editable?: boolean }) {
   const { state } = useStore();
   const book = bookOf(unit, state.books);
-  if (!book) return <span className="muted small" title="Tags live on army books, and this unit's book isn't imported.">—</span>;
+  if (!book) return <span className="muted small" data-tip="Tags live on army books, and this unit's book isn't imported.">—</span>;
   if (!editable) return <TagChips tags={datasheetTags(book, unit.unitType)} />;
   return <DatasheetTags book={book} name={unit.unitType} />;
 }

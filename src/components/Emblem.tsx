@@ -29,8 +29,7 @@ export function EmblemBadge({ emblem, size = 32, title }: { emblem: unknown; siz
   const layers = emblemLayers(emblem);
   if (!layers) return null;
   return (
-    <svg className="emblem" width={size} height={size} viewBox="0 0 100 100" role="img" aria-label={title ?? 'Emblem'}>
-      {title && <title>{title}</title>}
+    <svg className="emblem" width={size} height={size} viewBox="0 0 100 100" role="img" aria-label={title ?? 'Emblem'} data-tip={title || undefined}>
       <EmblemShapes layers={layers} />
     </svg>
   );
@@ -73,7 +72,7 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback, fixedLayers
   const setLayer = (i: number, patch: Partial<EmblemLayer>) => onChange(layers.map((l, j) => (j === i ? { ...l, ...patch } : l)));
   const shapeButton = (s: EmblemShape, i: number, l: EmblemLayer) => (
     <button key={s} type="button" role="radio" aria-checked={l.shape === s} className={l.shape === s ? 'on' : ''}
-      title={EMBLEM_SHAPES[s].name} aria-label={EMBLEM_SHAPES[s].name} onClick={() => setLayer(i, { shape: s })}>
+      data-tip={EMBLEM_SHAPES[s].name} aria-label={EMBLEM_SHAPES[s].name} onClick={() => setLayer(i, { shape: s })}>
       <ShapeIcon shape={s} />
     </button>
   );
@@ -81,7 +80,7 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback, fixedLayers
     <div className="emblem-editor">
       <div className="emblem-preview">
         <EmblemBadge emblem={layers} size={112} />
-        <div className="emblem-map-size" title={fallback ? 'About how big it is in the games' : 'About how big it is on the Nexus Map'}><EmblemBadge emblem={layers} size={22} /></div>
+        <div className="emblem-map-size" data-tip={fallback ? 'About how big it is in the games' : 'About how big it is on the Nexus Map'}><EmblemBadge emblem={layers} size={22} /></div>
       </div>
       {!readOnly && (
         <>
@@ -91,7 +90,7 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback, fixedLayers
               <div className="emblem-shapes" role="radiogroup" aria-label={`${LAYER_NAMES[i]} shape`}>
                 {i > 0 && (
                   <button type="button" role="radio" aria-checked={l.shape === 'none'} className={l.shape === 'none' ? 'on' : ''}
-                    title="None" onClick={() => setLayer(i, { shape: 'none' })}><Icon name="l:ban" /></button>
+                    data-tip="None" aria-label="None" onClick={() => setLayer(i, { shape: 'none' })}><Icon name="l:ban" /></button>
                 )}
                 {BASE_SHAPE_IDS.map((s) => shapeButton(s, i, l))}
                 <span className="emblem-shapes-break muted small">Symbols</span>
@@ -100,9 +99,9 @@ export function EmblemEditor({ emblem, onChange, readOnly, fallback, fixedLayers
               <div className="emblem-colors">
                 {EMBLEM_PALETTE.map((c) => (
                   <button key={c} type="button" className={`emblem-swatch${l.color.toLowerCase() === c ? ' on' : ''}`} style={{ background: c }}
-                    title={c} aria-label={`Colour ${c}`} onClick={() => setLayer(i, { color: c })} />
+                    data-tip={c} aria-label={`Colour ${c}`} onClick={() => setLayer(i, { color: c })} />
                 ))}
-                <input type="color" value={l.color} aria-label={`${LAYER_NAMES[i]} colour`} title="Any colour"
+                <input type="color" value={l.color} aria-label={`${LAYER_NAMES[i]} colour`} data-tip="Any colour"
                   onChange={(e) => setLayer(i, { color: e.target.value })} />
               </div>
             </fieldset>
@@ -131,7 +130,7 @@ export function EmblemButton({ emblem, onChange, readOnly, fallback, fixedLayers
   const close = () => setOpen(false);
   return (
     <>
-      <button type="button" className="emblem-button" title={readOnly ? title : `Edit ${title.toLowerCase()}`} aria-label={readOnly ? title : `Edit ${title.toLowerCase()}`}
+      <button type="button" className="emblem-button" data-tip={readOnly ? title : `Edit ${title.toLowerCase()}`} aria-label={readOnly ? title : `Edit ${title.toLowerCase()}`}
         onClick={() => setOpen(true)}>
         <EmblemBadge emblem={emblemLayers(emblem) ?? fallback} size={size} />
         {!readOnly && <span className="emblem-button-hint" aria-hidden><Icon name="l:pencil" /></span>}

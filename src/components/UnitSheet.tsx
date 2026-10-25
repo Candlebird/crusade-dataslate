@@ -240,7 +240,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
         </div>
         <div className="row">
           {edit && (u.heroicRise || u.category !== 'Hero') && (
-            <label className="row small muted" title="Requisition: may carry a relic like a Hero">
+            <label className="row small muted" data-tip="Requisition: may carry a relic like a Hero">
               <input type="checkbox" checked={!!u.heroicRise} onChange={(e) => set((d) => void (d.heroicRise = e.target.checked || undefined))} />
               Heroic Rise
             </label>
@@ -405,10 +405,10 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                   <TextField className="wide" value={up.name} onCommit={(v) => set((d) => void (d.upgrades[i].name = v))} />
                 </div>
                 {up.nexus && <span className="tag cyan">Nexus</span>}
-                <label className="row small" title="Unique traits are worth more BP and have their own limit">
+                <label className="row small" data-tip="Unique traits are worth more BP and have their own limit">
                   <input type="checkbox" checked={up.unique} onChange={(e) => set((d) => void (d.upgrades[i].unique = e.target.checked))} />Unique
                 </label>
-                <label className="row small" title="Free traits don't use a level">
+                <label className="row small" data-tip="Free traits don't use a level">
                   <input type="checkbox" checked={!!up.free} onChange={(e) => set((d) => void (d.upgrades[i].free = e.target.checked || undefined))} />Free
                 </label>
                 <button className="ghost icon" aria-label="Remove trait" onClick={() => set((d) => void d.upgrades.splice(i, 1))}><Icon name="l:x" /></button>
@@ -535,7 +535,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               <div className="stat"><b>{earned}</b><span>Level</span></div>
               <div className="stat"><b>{u.points}</b><span>Points</span></div>
             </div>
-            <label className="field" style={{ marginTop: '0.75rem' }} title="e.g. +1 for Heroic Rise">
+            <label className="field" style={{ marginTop: '0.75rem' }} data-tip="e.g. +1 for Heroic Rise">
               BP adjustment
               {edit ? <Stepper value={u.bpAdjust} onChange={(n) => set((d) => void (d.bpAdjust = n))} /> : <Fixed>{u.bpAdjust > 0 ? `+${u.bpAdjust}` : u.bpAdjust}</Fixed>}
             </label>
@@ -595,7 +595,7 @@ function FixedWeapon({ w }: { w: Weapon }) {
       {w.traits.length > 0 && (
         <div className="row" style={{ marginTop: 6 }}>
           {w.traits.map((t) => (
-            <span key={t.id} className={`tag ${t.unique ? 'gold' : 'green'}`} title={t.free ? 'Free' : undefined}>
+            <span key={t.id} className={`tag ${t.unique ? 'gold' : 'green'}`} data-tip={t.free ? 'Free' : undefined}>
               {traitMark(t)} {t.name}{t.free && ' (free)'}
             </span>
           ))}
@@ -616,12 +616,12 @@ function WeaponRow({ w, infantry, onChange, onRemove, onAddTrait, onRemoveTrait 
   return (
     <div className="weapon">
       <div className="weapon-head">
-        <input type="number" min={0} value={w.count} title="Count" style={{ width: '3.5rem' }} onChange={(e) => onChange((x) => void (x.count = Number(e.target.value) || 0))} />
+        <input type="number" min={0} value={w.count} data-tip="Count" aria-label="Count" style={{ width: '3.5rem' }} onChange={(e) => onChange((x) => void (x.count = Number(e.target.value) || 0))} />
         <span className="muted">×</span>
         <TextField className="name" value={w.name} onCommit={(v) => onChange((x) => void (x.name = v))} />
         <label className="row small muted">
           Range
-          <input type="number" min={0} step={6} value={w.range} title='0 = melee' style={{ width: '4rem' }} onChange={(e) => onChange((x) => void (x.range = Number(e.target.value) || 0))} />
+          <input type="number" min={0} step={6} value={w.range} data-tip='0 = melee' style={{ width: '4rem' }} onChange={(e) => onChange((x) => void (x.range = Number(e.target.value) || 0))} />
         </label>
         <label className="row small muted">
           A
@@ -640,7 +640,7 @@ function WeaponRow({ w, infantry, onChange, onRemove, onAddTrait, onRemoveTrait 
       </div>
       <div className="row" style={{ marginTop: 6 }}>
         {w.traits.map((t) => (
-          <span key={t.id} className={`tag ${t.unique ? 'gold' : 'green'}`} title={t.free ? 'Free' : undefined}>
+          <span key={t.id} className={`tag ${t.unique ? 'gold' : 'green'}`} data-tip={t.free ? 'Free' : undefined}>
             {traitMark(t)} {t.name}{t.free && ' (free)'}
             <button aria-label={`Remove ${t.name}`} onClick={() => onRemoveTrait(t.id)}><Icon name="l:x" /></button>
           </span>

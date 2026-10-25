@@ -116,21 +116,21 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
 
   return (
     <Panel id="campaign.round" title={`Round ${round}`}
-      extra={gm && <button className="primary" onClick={endNow} title="When everyone has played this round">End round…</button>}>
+      extra={gm && <button className="primary" onClick={endNow} data-tip="When everyone has played this round">End round…</button>}>
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
-        <span className="tag red" title={`Up ${NEXUS_ROUNDS.threatPerRound} each round, down ${NEXUS_ROUNDS.threatPerWin} per Battle won against them (${NEXUS_ROUNDS.threatPerVoidspawnWin} at a Voidspawn) and ${NEXUS_ROUNDS.threatPerPatrolWin} per patrol (a skirmish won against them)`}>
+        <span className="tag red" data-tip={`Up ${NEXUS_ROUNDS.threatPerRound} each round, down ${NEXUS_ROUNDS.threatPerWin} per Battle won against them (${NEXUS_ROUNDS.threatPerVoidspawnWin} at a Voidspawn) and ${NEXUS_ROUNDS.threatPerPatrolWin} per patrol (a skirmish won against them)`}>
           <Icon name="g:biohazard" /> {ECHOES.name} threat {threat}/{NEXUS_ROUNDS.threatMax}
         </span>
         {marked
           ? <span className="muted">If the round ended now: threat {coming}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>
           : <span className="muted">If the round ended now: threat {coming}, spreading {spreads} sector{spreads === 1 ? '' : 's'}{ahead.size ? ', most likely into the leader\'s space' : ''}{patrols ? ` (${patrols} patrol${patrols === 1 ? '' : 's'} won so far)` : ''}.</span>}
         {gm && !marked && (
-          <button className="small" onClick={markNow} title={`Show where the ${ECHOES.name} spread at round end, so players can hold the line`}><Icon name="g:hazard-sign" /> Mark their targets</button>
+          <button className="small" onClick={markNow} data-tip={`Show where the ${ECHOES.name} spread at round end, so players can hold the line`}><Icon name="g:hazard-sign" /> Mark their targets</button>
         )}
       </div>
       {marked && (
         <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}
-          title={`Each falls at round end unless its faction's detachment (anyone's, if unclaimed) stands there, or a faction that won a Battle against the ${ECHOES.name} this round breaks the mark`}>
+          data-tip={`Each falls at round end unless its faction's detachment (anyone's, if unclaimed) stands there, or a faction that won a Battle against the ${ECHOES.name} this round breaks the mark`}>
           <span className="muted"><Icon name="g:hazard-sign" /> The {ECHOES.name} are massing:</span>
           {!marks.length && <span className="muted">nowhere this round.</span>}
           {marks.map(({ s, by, status }) => (
@@ -140,20 +140,20 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
             </span>
           ))}
           {breakers.map((f) => (
-            <span key={f.id} className="tag gold" title={`Won a Battle against the ${ECHOES.name}: break a mark from its sector panel on the map`}>
+            <span key={f.id} className="tag gold" data-tip={`Won a Battle against the ${ECHOES.name}: break a mark from its sector panel on the map`}>
               {f.name} can break {breaksLeft(c, f.id)}
             </span>
           ))}
         </div>
       )}
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-        <span className="tag" title={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}, × ${difficultyLevel(c).scale} for ${difficultyLevel(c).name} difficulty; rescaled when the round ends`}>
+        <span className="tag" data-tip={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}, × ${difficultyLevel(c).scale} for ${difficultyLevel(c).name} difficulty; rescaled when the round ends`}>
           Sector difficulty {range.min}–{range.max} Supply
         </span>
-        {gm && <><button className="small" onClick={rescale} title="Rate sectors against current faction Supply (round end does this too)">
+        {gm && <><button className="small" onClick={rescale} data-tip="Rate sectors against current faction Supply (round end does this too)">
           {rated ? 'Rescale sectors now' : 'Rate sectors'}
         </button>
-        <label className="row" style={{ gap: '0.35rem' }} title="Scales every sector rating; changing it rescales now">
+        <label className="row" style={{ gap: '0.35rem' }} data-tip="Scales every sector rating; changing it rescales now">
           <span className="muted">Difficulty</span>
           <select value={difficultyLevel(c).id} onChange={(e) => setDifficulty(e.target.value)}>
             {DIFFICULTY_LEVELS.map((l) => (
@@ -200,7 +200,7 @@ function EventRow({ c, gm }: { c: Campaign; gm: boolean }) {
     <div className="small" style={{ marginTop: '0.5rem' }}>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         <span className="tag gold"><Icon name="g:diamonds" /> Galactic Event: {event ? event.name : 'none'}</span>
-        {gm && <><button className="small" onClick={() => change((d) => rollEvent(d))} title="Roll a D12 on the Galactic Events table">{event ? 'Re-roll' : 'Roll a Galactic Event'}</button>
+        {gm && <><button className="small" onClick={() => change((d) => rollEvent(d))} data-tip="Roll a D12 on the Galactic Events table">{event ? 'Re-roll' : 'Roll a Galactic Event'}</button>
         <select value="" aria-label="Pick the Galactic Event" onChange={(e) => e.target.value && change((d) => setEvent(d, e.target.value))}>
           <option value="">Pick one…</option>
           {GALACTIC_EVENTS.map((x, i) => <option key={x.id} value={x.id}>{i + 1}. {x.name}</option>)}
@@ -254,7 +254,7 @@ function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
   });
   return (
     <div className="small" style={{ marginTop: '0.5rem' }}>
-      <span className="muted" title={`One per skirmish won this round, and one per Weekly Siege won (Training), up to ${NEXUS_ROUNDS.assetsMax} in all. Spend them in the Battle; unspent ones are lost at round end.`}>
+      <span className="muted" data-tip={`One per skirmish won this round, and one per Weekly Siege won (Training), up to ${NEXUS_ROUNDS.assetsMax} in all. Spend them in the Battle; unspent ones are lost at round end.`}>
         Strategic Assets (1 per skirmish or Weekly Siege won, up to {NEXUS_ROUNDS.assetsMax}; lost if unspent at round end):
       </span>
       {c.factions.filter((f) => !only || f.id === only).map((f) => {
@@ -263,9 +263,9 @@ function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
           <div key={f.id} className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>
             <span className="tag" style={{ borderColor: factionColor(c, f.id) }}>{f.name}: {a.left} of {a.earned} left</span>
             {a.spent.map((u) => (
-              <span key={u.id} className="tag gold" title={STRATEGIC_ASSETS.find((x) => x.key === u.asset)?.desc}>
+              <span key={u.id} className="tag gold" data-tip={STRATEGIC_ASSETS.find((x) => x.key === u.asset)?.desc}>
                 {assetName(u.asset)}{u.forceId && `: ${forces.find((d) => d.id === u.forceId)?.name ?? 'a detachment'}`}
-                <button className="ghost icon" aria-label={`Take back ${assetName(u.asset)}`} title="Take back a mistaken spend"
+                <button className="ghost icon" aria-label={`Take back ${assetName(u.asset)}`} data-tip="Take back a mistaken spend"
                   onClick={() => change((d) => refundAsset(d, u.id))}><Icon name="l:x" /></button>
               </span>
             ))}

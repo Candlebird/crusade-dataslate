@@ -17,7 +17,7 @@ export default function AccountButton() {
   // Shown while the cloud is still connecting too: on a slow phone that can take a while, or never finish.
   if (!email) {
     return (
-      <a href="#" title={status === 'loading' ? 'Connecting… Sign in with Google to share forces with the group' : 'Sign in with Google to share forces with the group'} onClick={(e) => { e.preventDefault(); signIn(); }}>
+      <a href="#" data-tip={status === 'loading' ? 'Connecting… Sign in with Google to share forces with the group' : 'Sign in with Google to share forces with the group'} onClick={(e) => { e.preventDefault(); signIn(); }}>
         Sign in
       </a>
     );
@@ -26,14 +26,14 @@ export default function AccountButton() {
   return (
     <>
     {isGm && requests.length > 0 && (
-      <a className="join-badge" href={href.settings()} title="Join requests">
+      <a className="join-badge" href={href.settings()} data-tip="Join requests">
         {requests.length} to approve
       </a>
     )}
     <a
       href="#"
       className="account"
-      title={`${STATUS_TEXT[status]} as ${email}${isGm ? ' (GM)' : ''}. Click to sign out.`}
+      data-tip={`${STATUS_TEXT[status]} as ${email}${isGm ? ' (GM)' : ''}. Click to sign out.`}
       onClick={(e) => {
         e.preventDefault();
         if (confirmAction(`Sign out ${email}? Your data stays in this browser but stops syncing.`)) signOut();

@@ -77,14 +77,14 @@ export function XpBar({ xp, mini }: { xp: number; mini?: boolean }) {
   const label = p.next == null ? `LVL ${p.level} · ${xp} XP · ${p.replacements} swap(s)` : `LVL ${p.level} · ${xp} / ${p.next} XP`;
   return (
     <div>
-      <div className={`xpbar${mini ? ' mini' : ''}`} title={label}>
+      <div className={`xpbar${mini ? ' mini' : ''}`} data-tip={label}>
         <div style={{ width: `${Math.round(p.pct * 100)}%` }} />
         {!mini && <span>{label}</span>}
       </div>
       {!mini && (
         <div className="levels">
           {LEVEL_THRESHOLDS.map((t, i) => (
-            <i key={t} className={i < p.level ? 'on' : ''} title={`Level ${i + 1} at ${t} XP`} />
+            <i key={t} className={i < p.level ? 'on' : ''} data-tip={`Level ${i + 1} at ${t} XP`} />
           ))}
         </div>
       )}
@@ -221,7 +221,7 @@ export function Panel({ id, title, extra, h = 2, className, domId, collapsed, le
     <div id={domId} className={`panel${className ? ` ${className}` : ''}${closed ? ' collapsed' : ''}`}>
       <div className="panel-title">
         <span className="panel-head">
-          <button type="button" className="ghost icon fold" onClick={toggle} aria-expanded={!closed} title={closed ? 'Expand' : 'Collapse'}>
+          <button type="button" className="ghost icon fold" onClick={toggle} aria-expanded={!closed} data-tip={closed ? 'Expand' : 'Collapse'} aria-label={closed ? 'Expand' : 'Collapse'}>
             <Icon name={closed ? 'l:chevron-right' : 'l:chevron-down'} />
           </button>
           {/* The title folds it too: a bigger target on phones. The arrow stays the keyboard control. */}

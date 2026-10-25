@@ -124,13 +124,13 @@ function Hp({ hp, max }: { hp: number; max: number }) {
   const left = Math.max(0, hp);
   if (max > 12) {
     return (
-      <span className="sortie-bar" title={`${left}/${max} wounds`}>
+      <span className="sortie-bar" data-tip={`${left}/${max} wounds`}>
         <span style={{ width: `${(left / max) * 100}%` }} />
       </span>
     );
   }
   return (
-    <span className="sortie-pips" title={`${left}/${max} wounds`}>
+    <span className="sortie-pips" data-tip={`${left}/${max} wounds`}>
       {Array.from({ length: max }, (_, i) => <i key={i} className={i < left ? 'on' : ''} />)}
     </span>
   );
@@ -141,7 +141,7 @@ function Token({ face, m, current }: { face: React.ReactNode; m: { hp: number; m
   const down = m.hp <= 0;
   const marks = [m.shaken ? '≈' : '', m.routed ? 'fled' : ''].filter(Boolean).join(' ');
   return (
-    <span className={`sortie-token${down ? ' down' : ''}${m.routed ? ' routed' : ''}${current ? ' current' : ''}`} title={down ? 'Fallen' : m.routed ? 'Routed' : m.shaken ? 'Shaken' : undefined}>
+    <span className={`sortie-token${down ? ' down' : ''}${m.routed ? ' routed' : ''}${current ? ' current' : ''}`} data-tip={down ? 'Fallen' : m.routed ? 'Routed' : m.shaken ? 'Shaken' : undefined}>
       {face}
       <Hp hp={m.hp} max={m.max} />
       {marks && <span className="sortie-mark"><IconText text={marks} /></span>}
@@ -153,7 +153,7 @@ function Token({ face, m, current }: { face: React.ReactNode; m: { hp: number; m
 function Stress({ v }: { v?: number }) {
   const n = Math.min(SORTIE.stress.max, v ?? 0);
   return (
-    <span className={`sortie-stress${n >= SORTIE.stress.max * 0.7 ? ' high' : ''}`} title={`Stress ${+n.toFixed(1)}/${SORTIE.stress.max}: when full, the unit cracks for a round`}>
+    <span className={`sortie-stress${n >= SORTIE.stress.max * 0.7 ? ' high' : ''}`} data-tip={`Stress ${+n.toFixed(1)}/${SORTIE.stress.max}: when full, the unit cracks for a round`}>
       <span style={{ width: `${(n / SORTIE.stress.max) * 100}%` }} />
     </span>
   );
@@ -420,7 +420,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               <div className="small" style={{ marginTop: 8 }}><b>Difficulty</b></div>
               <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
                 {SORTIE.tiers.slice(0, topTier + 1).map((t, i) => (
-                  <button key={t.name} className={tier === i ? 'primary' : ''} title={t.text} onClick={() => setTier(i)}>{t.name}{i ? ` ×${t.pay}` : ''}</button>
+                  <button key={t.name} className={tier === i ? 'primary' : ''} data-tip={t.text} onClick={() => setTier(i)}>{t.name}{i ? ` ×${t.pay}` : ''}</button>
                 ))}
               </div>
               <p className="muted small" style={{ margin: '4px 0 0' }}>
@@ -433,7 +433,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                   <div className="small" style={{ marginTop: 8 }}><b>Ascension</b></div>
                   <div className="row" style={{ gap: 4, flexWrap: 'wrap' }}>
                     {Array.from({ length: topAsc + 1 }, (_, i) => (
-                      <button key={i} className={asc === i ? 'primary' : ''} title={i ? SORTIE.ascension.curses[i - 1].text : 'No curses'} onClick={() => setAsc(i)}>
+                      <button key={i} className={asc === i ? 'primary' : ''} data-tip={i ? SORTIE.ascension.curses[i - 1].text : 'No curses'} onClick={() => setAsc(i)}>
                         {i || 'Off'}
                       </button>
                     ))}
@@ -442,7 +442,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                     {asc ? (
                       <>
                         {SORTIE.ascension.curses.slice(0, asc).map((x) => (
-                          <span key={x.id} className="sortie-cursed" title={x.text}>{x.name}{' '}</span>
+                          <span key={x.id} className="sortie-cursed" data-tip={x.text}>{x.name}{' '}</span>
                         ))}
                         — {SORTIE.ascension.curses.slice(0, asc).map((x) => x.text).join(' ')} Pays ×{(SORTIE.tiers[tier].pay + asc * SORTIE.ascension.pay).toFixed(1)}.
                       </>
@@ -491,7 +491,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               {SORTIE.marks.list.map((m) => {
                 const on = marks.includes(m.id);
                 return (
-                  <button key={m.id} className={`small${on ? ' primary' : ''}`} title={m.text} aria-pressed={on}
+                  <button key={m.id} className={`small${on ? ' primary' : ''}`} data-tip={m.text} aria-pressed={on}
                     onClick={() => setMarks(on ? marks.filter((x) => x !== m.id) : [...marks, m.id])}>
                     {m.name} <span className="muted">· {m.heat}</span>
                   </button>
@@ -571,7 +571,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
       onClose={close}
       footer={
         <>
-          <label className="row small" style={{ gap: 4, marginRight: 'auto' }} title="The party plays itself: path, orders, boons and shrine choices.">
+          <label className="row small" style={{ gap: 4, marginRight: 'auto' }} data-tip="The party plays itself: path, orders, boons and shrine choices.">
             <input type="checkbox" checked={auto} disabled={!!run.over} onChange={(e) => setAuto(e.target.checked)} /> Auto
           </label>
           {!run.over && <button onClick={close}>Turn back</button>}
@@ -741,11 +741,11 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
           </div>
           <div className="row" style={{ gap: 6 }}>
             <span className="muted">Stress</span> <Stress v={m.stress} />
-            {m.unit.trinket && trinketInfo(m.unit.trinket) && <span className="muted" title={trinketInfo(m.unit.trinket)!.text}>· {trinketInfo(m.unit.trinket)!.name}</span>}
+            {m.unit.trinket && trinketInfo(m.unit.trinket) && <span className="muted" data-tip={trinketInfo(m.unit.trinket)!.text}>· {trinketInfo(m.unit.trinket)!.name}</span>}
           </div>
           {m.scars?.length ? (
             <div className="row small" style={{ gap: 4, flexWrap: 'wrap' }}>
-              {m.scars.map((id) => <span key={id} className="sortie-scar" title={SORTIE.scars[id].text}>{SORTIE.scars[id].name}</span>)}
+              {m.scars.map((id) => <span key={id} className="sortie-scar" data-tip={SORTIE.scars[id].text}>{SORTIE.scars[id].name}</span>)}
             </div>
           ) : null}
         </div>
@@ -753,7 +753,7 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
       <div>XP <b>{runXp(run)}</b> / {cap} <span className="muted">({+run.xp.toFixed(2)} earned)</span></div>
       {run.mode === 'shard' ? <div>Haul: {haulText(run)}</div> : <div>Supply: {run.haul.supply} <span className="muted">(for shops)</span></div>}
       <div>Nodes cleared: {run.depth}</div>
-      {!run.marks?.length ? null : <div title={marksOf(run).map((m) => m.text).join(' ')}>Pact marks: {marksOf(run).map((m) => m.name.replace(/^Mark of (the )?/, '')).join(', ')} <span className="muted">({markHeat(run)} heat)</span></div>}
+      {!run.marks?.length ? null : <div data-tip={marksOf(run).map((m) => m.text).join(' ')}>Pact marks: {marksOf(run).map((m) => m.name.replace(/^Mark of (the )?/, '')).join(', ')} <span className="muted">({markHeat(run)} heat)</span></div>}
       {run.omens || run.map.flat().some((n) => n.omen) ? (
         <div>Omens read: <b>{Math.min(run.omens ?? 0, SORTIE.omens.need)}</b> / {SORTIE.omens.need}{run.foreseen ? <span className="muted"> · lord foreseen</span> : null}</div>
       ) : null}
@@ -762,7 +762,7 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
       {run.boons.length > 0 && (
         <div>
           <div className="muted">Boons</div>
-          {run.boons.map((b) => <div key={b} title={SORTIE_BOONS[b].text}>• {SORTIE_BOONS[b].name}</div>)}
+          {run.boons.map((b) => <div key={b} data-tip={SORTIE_BOONS[b].text}>• {SORTIE_BOONS[b].name}</div>)}
         </div>
       )}
       <div className="sortie-journal">
@@ -827,6 +827,7 @@ function MapScreen({ run, onEnter }: { run: SortieRun; onEnter: (n: SortieNode) 
           const open = next.includes(n);
           const here = n.row === run.row && n.col === run.col;
           const past = n.row <= run.row && !here;
+          const tip = n.hidden ? 'Unknown: get closer to see it' : n.kind === 'boss' ? `${bossOf(run).name} (${bossOf(run).unit})` : n.affix ? `${NODE_NAME[n.kind]}: ${SORTIE.affixes[n.affix].name}` : NODE_NAME[n.kind];
           return (
             <g
               key={`${n.row}.${n.col}`}
@@ -836,13 +837,13 @@ function MapScreen({ run, onEnter }: { run: SortieRun; onEnter: (n: SortieNode) 
               role={open ? 'button' : undefined}
               tabIndex={open ? 0 : undefined}
               onKeyDown={open ? (e) => (e.key === 'Enter' || e.key === ' ') && onEnter(n) : undefined}
+              data-tip={tip}
+              aria-label={tip}
             >
-              <title>{n.hidden ? 'Unknown: get closer to see it' : n.kind === 'boss' ? `${bossOf(run).name} (${bossOf(run).unit})` : n.affix ? `${NODE_NAME[n.kind]}: ${SORTIE.affixes[n.affix].name}` : NODE_NAME[n.kind]}</title>
               <circle r={n.kind === 'boss' ? 21 : 16} />
               {n.hidden ? <text textAnchor="middle" dominantBaseline="central">?</text> : <SvgIcon name={NODE_ICON[n.kind]} x={0} y={0} size={n.kind === 'boss' ? 24 : 18} className="sortie-node-icon" />}
               {n.omen && !n.hidden && (
-                <g className="sortie-omen" transform="translate(13 -13)">
-                  <title>An omen of the lord</title>
+                <g className="sortie-omen" transform="translate(13 -13)" data-tip="An omen of the lord">
                   <circle r={6} />
                   <SvgIcon name="g:diamonds" x={0} y={0} size={8} />
                 </g>
@@ -869,7 +870,7 @@ function EventScreen({ run, onChoose, onLeave }: { run: SortieRun; onChoose: (i:
           {ev.choices.map((ch, i) => {
             const open = choiceOpen(run, ch);
             return (
-              <button key={i} disabled={!open} onClick={() => onChoose(i)} title={open ? undefined : `Needs ${ch.needs!.join(' or ')}`}>
+              <button key={i} disabled={!open} onClick={() => onChoose(i)} data-tip={open ? undefined : `Needs ${ch.needs!.join(' or ')}`}>
                 {ch.label}
                 {ch.chance !== undefined && <span className="muted"> ({Math.round(ch.chance * 100)}%)</span>}
                 {ch.needs && <span className="muted"> [{ch.needs.join(' / ')}]</span>}
@@ -947,12 +948,12 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }:
       <div className="row" style={{ gap: 8 }}>
         <h3 className="grow" style={{ margin: 0 }}>
           {c.kind === 'boss' ? bossOf(run).name : fightTitle[c.kind]}
-          {c.affix && <span className="sortie-affix" title={SORTIE.affixes[c.affix].text}> · {SORTIE.affixes[c.affix].name}</span>}
+          {c.affix && <span className="sortie-affix" data-tip={SORTIE.affixes[c.affix].text}> · {SORTIE.affixes[c.affix].name}</span>}
         </h3>
         <span className="muted small">Round {c.round} · {c.kills} kill{c.kills === 1 ? '' : 's'}</span>
       </div>
       {!c.over && c.queue.length > 0 && (
-        <div className="sortie-init" title="Who acts next this round, fastest first">
+        <div className="sortie-init" data-tip="Who acts next this round, fastest first">
           <span className="sortie-init-label">{c.need === 'start' ? `Round ${c.round} order` : 'Turn order'}</span>
           <div className="sortie-init-row">
             {turns.map((t, i) => {
@@ -960,7 +961,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }:
               if (!s) return null;
               const size = i === 0 ? 36 : 26;
               return (
-                <span key={i} className={`sortie-init-tok${s.echo ? ' echo' : ' mine'}${i === 0 ? ' now' : ''}`} title={`${s.name}${t.n > 1 ? `, ${t.n} turns in a row` : ''}`}>
+                <span key={i} className={`sortie-init-tok${s.echo ? ' echo' : ' mine'}${i === 0 ? ' now' : ''}`} data-tip={`${s.name}${t.n > 1 ? `, ${t.n} turns in a row` : ''}`}>
                   {i === 0 && <span className="sortie-init-now">{c.need === 'start' ? 'First' : 'Now'}</span>}
                   {face(s, size)}
                   {t.n > 1 && <span className="sortie-init-n">×{t.n}</span>}
@@ -986,7 +987,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }:
                     <div className="row small" style={{ gap: 6 }}>
                       <Portrait unit={p.unit} size={26} />
                       <span className="grow"><b>{p.name}</b> <span className="muted">Q{p.quality}+ D{p.defense}+</span>{p.shield > 0 && <span className="sortie-status"> · shield {p.shield}</span>}</span>
-                      {c.orders[p.key] && <span className="sortie-ordered" title="Has its order for the round"><Icon name="l:check" /></span>}
+                      {c.orders[p.key] && <span className="sortie-ordered" data-tip="Has its order for the round"><Icon name="l:check" /></span>}
                     </div>
                     <div className="sortie-models">
                       {p.models.map((m, j) => <Token key={j} face={null} m={m} current={m === current} />)}
@@ -995,7 +996,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }:
                       <div className="row small" style={{ gap: 6 }}>
                         <Stress v={run.party[p.member].stress} />
                         {lastStanding(c, p) && <span className="sortie-stand">last stand: +1 to hit, more attacks, no morale</span>}
-                        {run.party[p.member].scars?.map((id) => <span key={id} className="sortie-scar" title={SORTIE.scars[id].text}>{SORTIE.scars[id].name}</span>)}
+                        {run.party[p.member].scars?.map((id) => <span key={id} className="sortie-scar" data-tip={SORTIE.scars[id].text}>{SORTIE.scars[id].name}</span>)}
                         {p.crack?.round === c.round && <span className="sortie-cracked">{p.crack.kind === 'refuse' ? 'cracked: won’t take orders' : 'cracked: fights wild, -1 to hit'}</span>}
                       </div>
                     )}
@@ -1038,7 +1039,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }:
                         <span className="sortie-models">{e.models.map((m, i) => <Token key={i} face={null} m={m} />)}</span>
                         {statusesOf(e, c.round).length > 0 && <span className="small sortie-status">{statusesOf(e, c.round).join(', ')}</span>}
                       </span>
-                      {icon && <span className="sortie-intent" title={intent}><Glyph g={icon} /></span>}
+                      {icon && <span className="sortie-intent" data-tip={intent}><Glyph g={icon} /></span>}
                     </button>
                   );
                 })}
@@ -1069,7 +1070,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }:
         <>
           <div className="row small" style={{ gap: 6, marginTop: 8 }}>
             <span className="grow">{who} {chosen && <b>Pick a target at {reachText(chosen.reach)}.</b>}</span>
-            {(import.meta.env.DEV || mixed) && <button onClick={onAuto} title="Let the unit choose this one">Auto</button>}
+            {(import.meta.env.DEV || mixed) && <button onClick={onAuto} data-tip="Let the unit choose this one">Auto</button>}
           </div>
           {([['Attacks', skills.filter((sk) => ATTACKS.includes(sk.kind))], ['Abilities', skills.filter((sk) => !ATTACKS.includes(sk.kind))]] as const).map(([head, list]) => list.length > 0 && (
             <div key={head} className="sortie-skillset">
@@ -1081,7 +1082,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }:
                     className={`sortie-skill ${sk.kind}${sk.melee ? ' melee' : ''}${skill === sk.id ? ' chosen' : ''}`}
                     disabled={sk.wait > 0 || !!sk.blocked}
                     onClick={() => pick(sk)}
-                    title={sk.blocked ? `${sk.blocked} ${sk.text}` : sk.text}
+                    data-tip={sk.blocked ? `${sk.blocked} ${sk.text}` : sk.text}
                   >
                     <b>{sk.name}</b>
                     <span className="muted">{sk.blocked ? sk.blocked : sk.wait ? `ready in ${sk.wait}` : sk.reach ? reachText(sk.reach) : sk.kind === 'atwill' ? 'nearest squad in reach' : ''}</span>

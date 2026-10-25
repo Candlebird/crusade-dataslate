@@ -140,7 +140,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
             };
             return (
               <label key={f.id} className="field">
-                <span>{label(f)} <span className="muted small" title={why.join(', ')}>at {at?.name ?? '—'}, moves {move}</span></span>
+                <span>{label(f)} <span className="muted small" data-tip={why.join(', ')}>at {at?.name ?? '—'}, moves {move}</span></span>
                 <select value={own?.picks[f.id] ?? own?.picks[f.nexus!.factionId] ?? ''} onChange={(e) => pick(f.id, e.target.value)}>
                   <option value="">— Not declared —</option>
                   <option value={HOLD}>Hold: stay put, no attack{digsIn(c, f) ? ' · ⛊ digs in if attacked' : ''}{fx(at?.id)}</option>
@@ -164,7 +164,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
           <h3>Declared</h3>
           {expected.length === 0 ? <p className="muted small">No forces are linked to factions yet.</p> : (
             <div className="row">
-              {expected.map((f) => <span key={f.id} className="tag" title={isDeclared(f) ? 'Declared' : 'Waiting'}>{isDeclared(f) ? <Icon name="l:check" /> : '…'} {label(f)}</span>)}
+              {expected.map((f) => <span key={f.id} className="tag" data-tip={isDeclared(f) ? 'Declared' : 'Waiting'}>{isDeclared(f) ? <Icon name="l:check" /> : '…'} {label(f)}</span>)}
             </div>
           )}
           {cloud.isGm && (
@@ -233,7 +233,7 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
       {moves.length > 0 && gm && !moved && (
         <div className="row" style={{ margin: '4px 0 8px' }}>
           <button className="primary" disabled={unsettled > 0} onClick={makeMoves}
-            title={unsettled ? 'Settle the meeting engagements first' : 'Move every detachment still in reach. Attackers move when they win their battle'}>
+            data-tip={unsettled ? 'Settle the meeting engagements first' : 'Move every detachment still in reach. Attackers move when they win their battle'}>
             Move detachments
           </button>
           {unsettled > 0 && <span className="muted small">{unsettled} meeting engagement{unsettled === 1 ? '' : 's'} to settle first</span>}
@@ -252,14 +252,14 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
               {!fought && a.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}><Icon name="g:hazard-sign" /> {f}</span>)}
             </span>
             {fought ? (
-              <span className="tag green" title={fought.notes || undefined}><Icon name="l:check" /> Fought: {fought.winner ? `${factionName(c, fought.winner)} won` : 'a draw'}</span>
+              <span className="tag green" data-tip={fought.notes || undefined}><Icon name="l:check" /> Fought: {fought.winner ? `${factionName(c, fought.winner)} won` : 'a draw'}</span>
             ) : (
               <span className="row" style={{ gap: 4 }}>
                 <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}><Icon name="g:crossed-swords" /> Start battle</a>
                 {!block && mine ? (
-                  <button className="small" onClick={() => autoBattle(a)} title="The garrison is small enough to auto-battle instead of playing at the table. It can still go wrong."><Icon name="g:power-lightning" /> Overrun</button>
+                  <button className="small" onClick={() => autoBattle(a)} data-tip="The garrison is small enough to auto-battle instead of playing at the table. It can still go wrong."><Icon name="g:power-lightning" /> Overrun</button>
                 ) : gm && sector ? (
-                  <button className="small" onClick={() => autoBattle(a)} title={`GM fallback for an attack nobody can play at the table (no overrun: ${block})`}><Icon name="g:perspective-dice-six-faces-six" /> Auto-battle</button>
+                  <button className="small" onClick={() => autoBattle(a)} data-tip={`GM fallback for an attack nobody can play at the table (no overrun: ${block})`}><Icon name="g:perspective-dice-six-faces-six" /> Auto-battle</button>
                 ) : null}
               </span>
             )}
@@ -267,7 +267,7 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
         );
       })}
       {holds.map((h) => (
-        <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds{dug(h.forceId) && <span className="tag" style={{ marginLeft: 6 }} title="If its sector is attacked this round, it fights and picks the deployment"><Icon name="g:trench-spade" /> Dug in</span>}</span></div>
+        <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds{dug(h.forceId) && <span className="tag" style={{ marginLeft: 6 }} data-tip="If its sector is attacked this round, it fights and picks the deployment"><Icon name="g:trench-spade" /> Dug in</span>}</span></div>
       ))}
     </>
   );
@@ -330,8 +330,8 @@ function MeetingRow({ c, m, round, gm, who, sectorName }: {
       {status === 'fight' && either && (
         <span className="row" style={{ gap: 4 }}>
           <button className="small" onClick={() => setAuto(meetingBattle(c, m, state.forces, state.settings))}><Icon name="g:power-lightning" /> Auto-battle</button>
-          {m.sides.map((id) => <button key={id} className="small" title="Played at the table" onClick={() => settle(id, 'At the table')}>{who(id)} won</button>)}
-          <button className="small" title="Played at the table" onClick={() => settle('', 'At the table')}>Draw</button>
+          {m.sides.map((id) => <button key={id} className="small" data-tip="Played at the table" onClick={() => settle(id, 'At the table')}>{who(id)} won</button>)}
+          <button className="small" data-tip="Played at the table" onClick={() => settle('', 'At the table')}>Draw</button>
         </span>
       )}
       {auto && (
