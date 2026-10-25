@@ -27,10 +27,11 @@ export const isBoss = (e: Enemy) => enemyDef(e).spawn === 'boss';
 /** A listed range (inches) as cells on the map: TRAINING.rangeMul of it. */
 export const rangeCells = (inches: number) => inches * TRAINING.rangeMul;
 
-/** How far a gun reaches, in cells: its range by TRAINING.rangeMul, + levels and range boosts; melee TRAINING.meleeReach. */
+/** How far a gun reaches, in cells: its range by TRAINING.rangeMul, + levels (a default's upgrade) and range boosts; melee TRAINING.meleeReach. */
 export function reach(t: Tower, g: TowerGun): number {
   if (g.melee) return TRAINING.meleeReach;
-  return rangeCells(g.range) + (isUnit(t) ? t.up * TRAINING.levels.range : 0) + t.boost.range;
+  const up = isUnit(t) ? t.up * TRAINING.levels.range : t.kind === 'default' && t.upgraded ? TRAINING.defaults.upgrade.reach : 0;
+  return rangeCells(g.range) + up + t.boost.range;
 }
 
 /** The Shards a tower that isn't a unit is made of, by type and grade: a Shard itself, a default tower its slots. */
@@ -100,7 +101,8 @@ export function addDot(e: Enemy, by: number, dps: number, secs: number) {
 /** A unit's share more damage now: a shield boost on it, and lastStand while it holds an enemy. */
 export function dmgMul(t: Tower): number {
   const last = isUnit(t) && t.holding !== undefined ? skillsOf(t, 'lastStand').reduce((m, s) => m * s.effect.mul, 1) : 1;
-  return t.atkBonus * (1 + (t.dmgBoost.left > 0 ? t.dmgBoost.mul : 0)) * last;
+  const up = t.kind === 'default' && t.upgraded ? 1 + TRAINING.defaults.upgrade.dmg : 1;
+  return t.atkBonus * (1 + (t.dmgBoost.left > 0 ? t.dmgBoost.mul : 0)) * last * up;
 }
 
 /**

@@ -138,7 +138,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `squadPower(units: Unit[]): number` (done) — points × (1 + levelPower × level); Sortie uses it.
 - `trainPoints(u): number` — points × TRAINING.immobileSurcharge (1.125) for an Immobile unit or a Fortification, else points. Used by recipes.recipesFor (recipe tier), recipes.unitTower (level cap; `UnitTower.price` when it differs), levelCost, and run.createRun (run.power: the waves, and so the bot). Real points (Recipe.points, UnitTower.points, squadPower) unchanged.
 - `levelCap(points): number` — TRAINING.levels.caps (called with trainPoints).
-- `levelCost(t: UnitTower): number` — max(base, base × (price ?? points)/perPoints) × growth^up.
+- `levelCost(t: UnitTower): number` — max(minCost, round(base × (price ?? points)/perPoints × costMul × growth^up)): a pure sliding scale by points (30 a 100 pts × 1.1: 50 pts 17, 200 pts 66), never under minCost (5).
 - `levelProblem(run, id): string | null`, `buyLevel(run, id): void`
 - `applyLevel(t: UnitTower): boolean` — +1 up, +1 tough (others read `up` for dmg/rate/range); false at cap.
 - `luckCost(run): number | null` (less the Thrift perk), `luckProblem(run): string | null` (also refused at drill.luckCap), `buyLuck(run): void`
@@ -285,6 +285,8 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `emplacementUses(d, shards)` — ids in slot order, exact type and grade, kept Shards first; null if they can't.
 - `defaultHidden(run, d)` — an uncrafted unit recipe of the run fills from d's exact Shards (recipes.recipeUses). `freedDefaults(run)` — the defaults a recipe hid whose unit is now crafted (buildable again). `defaultsFor(run)`, `readyDefaults(run)` (as readyRecipes).
 - `defaultTower(d, id, at): DefaultTower` — one gun per `d.guns` type (DefaultRecipeDef.guns: one, the Citadel's two), each at the best grade of its slots of that type; every slot's rule (daze, slow via onWound; aura, bleed via harm.partsOf); Quality best of theirs − qualityBonus (2+ best); attacks × k so dps.towerDps = dpsShare × unitDps × value at dpsDefense. No XP, levels, traits or relics (not a UnitTower: economy, XP and records skip it).
+- `defaultUpgradeCost(t: Pick<DefaultTower,'slots'>): number` — max(upgrade.min, upgrade.perValue × its Shards' value) (TRAINING.defaults.upgrade: perValue 4, min 10).
+- `defaultUpgradeProblem(run, id): string | null` / `upgradeDefault(run, id): void` — once per default tower (sets `DefaultTower.upgraded`), build phase only, takes the credits, logs. An upgraded default gets ×(1 + upgrade.dmg) in harm.dmgMul and +upgrade.reach cells in harm.reach (ranged guns).
 - `craftDefaultProblem(run, key, uses, onId)`, `craftDefault(run, key, uses, onId)` — as run.craft: stands on onId, other uses → rubble, a draft craft is the keep; any number of each; not in run.crafted.
 
 ### dps.ts
@@ -349,7 +351,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 
 ### bot.ts (not in index.ts: the tests, and the app's Auto (debug) button via components/training/useAuto, import it directly)
 - `interface MazeSpot { n; x; y }`
-- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (waves 1-2: the walker gun that covers most route, never a grade down, the hand's best walker gun placed first (`bestOpener`); then exact-grade recipe progress, a grade-down keep included, then grade, a second Firepower ranked two grades lower), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use (past wave 4 with no unit up, only a recipe half filled holds a Shard), never a flyers-only one that eats a walker gun (nor any on waves 1-2), spend (levels cheapest first, then luck, mend when low), pick card 0 (`BOT_CARD`).
+- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (waves 1-2: the walker gun that covers most route, never a grade down, the hand's best walker gun placed first (`bestOpener`); then exact-grade recipe progress, a grade-down keep included, then grade, a second Firepower ranked two grades lower), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use (past wave 4 with no unit up, only a recipe half filled holds a Shard), never a flyers-only one that eats a walker gun (nor any on waves 1-2), spend (mend when low, levels cheapest first, then luck, then defences' upgrades cheapest first while 100 credits stay banked), pick card 0 (`BOT_CARD`).
 - `botMoves(run, units, maze, cursor): Generator<string, number>` — botBuild a move at a time (each yield one move, a few words saying it; returns the cursor); botBuild runs it straight through, so headless results are the same.
 - `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt?; nexus?; drill?; siege? }): TrainingRun`
 

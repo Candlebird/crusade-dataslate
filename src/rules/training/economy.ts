@@ -22,11 +22,11 @@ export const trainPoints = (u: Pick<Unit, 'points' | 'rules' | 'category'>): num
 /** The most level-ups a unit of these points may have (TRAINING.levels.caps). */
 export const levelCap = (points: number): number => (TRAINING.levels.caps.find((c) => points <= c.upTo) ?? TRAINING.levels.caps[TRAINING.levels.caps.length - 1]).cap;
 
-/** What a crafted unit's next level-up costs: base × its Training points (price, else points) / perPoints (at least
- *  base), growth times more each level. */
+/** What a crafted unit's next level-up costs: base × its Training points (price, else points) / perPoints × costMul
+ *  (a pure sliding scale: a 50-pt unit's first is 17, a 200-pt one's 66), at least minCost, growth times more each level. */
 export function levelCost(t: UnitTower): number {
   const L = TRAINING.levels;
-  return Math.round(Math.max(L.base, (L.base * (t.price ?? t.points)) / L.perPoints) * L.growth ** t.up);
+  return Math.max(L.minCost, Math.round(((L.base * (t.price ?? t.points)) / L.perPoints) * L.costMul * L.growth ** t.up));
 }
 
 const unitPiece = (run: TrainingRun, id: number): UnitTower | undefined => {

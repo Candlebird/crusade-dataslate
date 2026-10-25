@@ -4,11 +4,11 @@ import { centreOf, placeProblem, routeOf, shardsOnMap, unitTowers } from './boar
 import { pickCard } from './cards';
 import { buyLevel, buyLuck, buyMend, levelCost, levelProblem, luckProblem, mendProblem } from './economy';
 import { N, overlaps } from './map';
-import { craftDefault, defaultByKey, readyDefaults } from './emplacements';
+import { craftDefault, defaultByKey, defaultUpgradeCost, defaultUpgradeProblem, readyDefaults, upgradeDefault } from './emplacements';
 import { readyRecipes } from './recipes';
 import { continueEndless, craft, createRun, endRun, startWave, step } from './run';
 import { keep, keepOptions, placeDraft, shardGun } from './shards';
-import type { Grade, KeepOption, RunDrill, RunNexus, ShardPiece, Tile, TrainingRun } from './types';
+import type { DefaultTower, Grade, KeepOption, RunDrill, RunNexus, ShardPiece, Tile, TrainingRun } from './types';
 
 // The balance bot: plays a whole run headless for the tests, and a move at a time for the app's Auto (debug) button
 // (botMoves). index.ts leaves it out: the app imports it from here.
@@ -149,18 +149,31 @@ function* craftAll(run: TrainingRun, units: Unit[]): Generator<string, void> {
   }
 }
 
-/** Spend: mend when low, then levels cheapest first, then luck; a move a yield. */
+/** Credits the bot keeps back when it upgrades a defence (for the next unit's levels and the base's mending). */
+const UPGRADE_RESERVE = 100;
+
+/** Spend: mend when low, then levels cheapest first, then luck, then defences' upgrades; a move a yield. */
 function* spend(run: TrainingRun): Generator<string, void> {
   while (run.baseHp <= MEND_AT && !mendProblem(run)) {
     buyMend(run);
     yield 'mends the base';
   }
   for (;;) {
+    // Levels cheapest first, then luck, then defences' upgrades (cheapest first).
     const t = unitTowers(run).filter((u) => !levelProblem(run, u.id)).sort((a, b) => levelCost(a) - levelCost(b))[0];
-    if (t) buyLevel(run, t.id);
-    else if (!luckProblem(run)) buyLuck(run);
-    else return;
-    yield t ? `levels ${t.name}` : 'buys luck';
+    const d = t ? undefined : (run.pieces.filter((p) => p.kind === 'default' && !defaultUpgradeProblem(run, p.id)) as DefaultTower[])
+      .filter((p) => run.credits - defaultUpgradeCost(p) >= UPGRADE_RESERVE)
+      .sort((a, b) => defaultUpgradeCost(a) - defaultUpgradeCost(b))[0];
+    if (t) {
+      buyLevel(run, t.id);
+      yield `levels ${t.name}`;
+    } else if (!luckProblem(run)) {
+      buyLuck(run);
+      yield 'buys luck';
+    } else if (d) {
+      upgradeDefault(run, d.id);
+      yield `upgrades ${d.name}`;
+    } else return;
   }
 }
 

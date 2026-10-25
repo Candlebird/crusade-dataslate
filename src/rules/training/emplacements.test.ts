@@ -3,8 +3,9 @@ import { SHARD_TYPES, TRAINING } from '../downtimeData';
 import { towerDps } from './dps';
 import {
   craftDefault, craftDefaultProblem, defaultHidden, defaultsFor, DEFAULTS, freedDefaults, defaultTower, defaultValue, emplacementUses,
-  readyDefaults,
+  defaultUpgradeCost, defaultUpgradeProblem, readyDefaults, upgradeDefault,
 } from './emplacements';
+import { dmgMul, reach } from './harm';
 import { recipesFor, unitTower } from './recipes';
 import { shardPiece, shardValue } from './shards';
 import { FORCES } from './testForces';
@@ -131,5 +132,38 @@ describe('default strength', () => {
     const t = defaultTower(DEFAULTS[0], 1, { x: 10, y: 10 });
     for (const k of ['xp', 'up', 'cap', 'relics', 'quirks', 'skills', 'unitId']) expect(t).not.toHaveProperty(k);
     expect(t.guns.every((g) => g.shard)).toBe(true);
+  });
+});
+
+describe('default upgrade', () => {
+  const U = TRAINING.defaults.upgrade;
+
+  it('costs perValue a point of Shard value, at least min', () => {
+    for (const d of DEFAULTS) expect(defaultUpgradeCost(defaultTower(d, 1, { x: 0, y: 0 }))).toBe(Math.max(U.min, U.perValue * defaultValue(d)));
+    expect(defaultUpgradeCost({ slots: [['assault', 1]] })).toBe(U.min);
+  });
+
+  it('once, between waves, for credits: more damage and reach', () => {
+    const run = blankRun();
+    const d = DEFAULTS.find((x) => x.key === 'mortar')!;
+    const t = defaultTower(d, run.nextId++, { x: 20, y: 30 });
+    run.pieces.push(t);
+    const cost = defaultUpgradeCost(t);
+    const [mul, far] = [dmgMul(t), reach(t, t.guns[0])];
+    run.credits = cost - 1;
+    expect(defaultUpgradeProblem(run, t.id)).toMatch(/credits/);
+    run.credits = cost + 5;
+    run.phase = 'wave';
+    expect(defaultUpgradeProblem(run, t.id)).not.toBeNull();
+    run.phase = 'build';
+    expect(defaultUpgradeProblem(run, 12345)).not.toBeNull();
+    upgradeDefault(run, t.id);
+    expect(run.credits).toBe(5);
+    expect(t.upgraded).toBe(true);
+    expect(dmgMul(t)).toBeCloseTo(mul * (1 + U.dmg));
+    expect(reach(t, t.guns[0])).toBe(far + U.reach);
+    run.credits = 1000;
+    expect(defaultUpgradeProblem(run, t.id)).toMatch(/already/);
+    expect(() => upgradeDefault(run, t.id)).toThrow();
   });
 });

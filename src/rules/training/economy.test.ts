@@ -23,11 +23,12 @@ describe('levels', () => {
     expect([50, 100, 101, 200, 250, 350, 401, 900].map(levelCap)).toEqual([5, 5, 4, 4, 3, 2, 1, 1]);
   });
 
-  it('cost grows with points and level', () => {
-    const L = TRAINING.levels;
-    expect(levelCost(unit(50))).toBe(L.base);
-    expect(levelCost(unit(300))).toBe(Math.round(L.base * 3));
-    expect(levelCost(unit(300, 1))).toBe(Math.round(L.base * 3 * L.growth));
+  it('cost slides with points (×1.1) and grows with level, never under minCost', () => {
+    // 30 a 100 pts × 1.1: a 50-pt unit's first level 16.5 → 17, a 200-pt unit's 66.
+    expect([50, 100, 200, 300].map((p) => levelCost(unit(p)))).toEqual([17, 33, 66, 99]);
+    expect(levelCost(unit(300, 1))).toBe(Math.round(99 * TRAINING.levels.growth));
+    expect(levelCost(unit(5))).toBe(TRAINING.levels.minCost);
+    expect(levelCost({ ...unit(100), price: 112.5 })).toBe(37); // the Immobile surcharge (immobile.test.ts)
   });
 
   it('buys a level: credits, up and Tough; stops at the cap', () => {
@@ -38,7 +39,7 @@ describe('levels', () => {
     run.credits = 1000;
     buyLevel(run, t.id);
     expect(t).toMatchObject({ up: 1, tough: 2 });
-    expect(run.credits).toBe(1000 - Math.round(TRAINING.levels.base * 4.5));
+    expect(run.credits).toBe(1000 - 149); // 30 × 4.5 × 1.1 = 148.5
     expect(levelProblem(run, t.id)).toMatch(/cap/);
     expect(applyLevel(t)).toBe(false);
     expect(() => buyLevel(run, t.id)).toThrow();

@@ -532,7 +532,8 @@ export const TRAINING = {
   holds: { perTough: 0.3, max: 1.5, bigMul: 0.5, regrab: [3, 1.5] as [number, number] },
   /**
    * Level-ups, bought with credits between waves. A unit's cap by its points (`upTo` or less); the first costs `base` ×
-   * points / `perPoints` (at least `base`), each after `growth` times the last. Each gives +1 Tough (a longer hold),
+   * points / `perPoints` (its Training points: economy.trainPoints) × `costMul`, at least `minCost`, each after `growth`
+   * times the last. Each gives +1 Tough (a longer hold),
    * `dmg` a hit (`meleeDmg` in melee), `rate` faster fire and `range` cells to shooting weapons and auras.
    */
   /**
@@ -545,6 +546,8 @@ export const TRAINING = {
     caps: [{ upTo: 100, cap: 5 }, { upTo: 200, cap: 4 }, { upTo: 300, cap: 3 }, { upTo: 400, cap: 2 }, { upTo: Infinity, cap: 1 }],
     base: 30,
     perPoints: 100,
+    costMul: 1.1,
+    minCost: 5,
     growth: 1.25,
     dmg: 0.5,
     meleeDmg: 1,
@@ -628,9 +631,12 @@ export const TRAINING = {
    * the same value does: `unitDps` a point of recipe value at Defense `dpsDefense` (dps.ts towerDps; the sample
    * forces' mean, measured, and checked by emplacements.test.ts). Quality is the best of its Shards' less
    * `qualityBonus` (lower is better), never below 2+. A default takes no XP, levels, traits or relics, and is hidden
-   * while one of the force's uncrafted unit recipes can be filled from its Shards.
+   * while one of the force's uncrafted unit recipes can be filled from its Shards. Each can be upgraded once between
+   * waves (emplacements.upgradeDefault): `upgrade.dmg` more damage and `upgrade.reach` cells more reach, for
+   * `upgrade.perValue` credits a point of its Shards' value (Cracked 1 … Pristine 16; at least `upgrade.min`).
    */
   defaults: {
+    upgrade: { dmg: 0.25, reach: 1, perValue: 4, min: 10 },
     dpsShare: 0.75,
     unitDps: 1.384,
     dpsDefense: 5,

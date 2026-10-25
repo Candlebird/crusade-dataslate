@@ -89,6 +89,8 @@ export interface DefaultTower extends PieceBase, Armed {
   name: string;
   /** The Shards it was built from, by type and grade (their rules: auras, bleeds). */
   slots: [ShardType, Grade][];
+  /** Upgraded (once a defence; emplacements.upgradeDefault): TRAINING.defaults.upgrade more damage and reach. */
+  upgraded?: boolean;
 }
 
 export interface RubblePiece extends PieceBase {

@@ -111,3 +111,32 @@ export function craftDefault(run: TrainingRun, key: string, uses: number[], onId
   if (used.some((p) => p.draft)) crumbleDraft(run, []);
   run.log.push(`${t.name} built.`);
 }
+
+const defaultPiece = (run: TrainingRun, id: number): DefaultTower | undefined => {
+  const p = pieceById(run, id);
+  return p?.kind === 'default' ? p : undefined;
+};
+
+/** What a default tower's one upgrade costs: upgrade.perValue a point of its Shards' value, at least upgrade.min. */
+export const defaultUpgradeCost = (t: Pick<DefaultTower, 'slots'>): number =>
+  Math.max(D.upgrade.min, D.upgrade.perValue * t.slots.reduce((n, [, g]) => n + shardValue(g), 0));
+
+/** Why default tower piece `id` can't be upgraded now, or null. */
+export function defaultUpgradeProblem(run: TrainingRun, id: number): string | null {
+  if (run.phase !== 'build') return 'Upgrades are bought between waves.';
+  const t = defaultPiece(run, id);
+  if (!t) return 'Only a built defence takes this upgrade.';
+  if (t.upgraded) return `${t.name} is already upgraded.`;
+  if (run.credits < defaultUpgradeCost(t)) return 'Not enough credits.';
+  return null;
+}
+
+/** Upgrade default tower piece `id` (once): +upgrade.dmg damage (harm.dmgMul) and +upgrade.reach cells (harm.reach). Throws on a problem. */
+export function upgradeDefault(run: TrainingRun, id: number): void {
+  const why = defaultUpgradeProblem(run, id);
+  if (why) throw new Error(why);
+  const t = defaultPiece(run, id)!;
+  run.credits -= defaultUpgradeCost(t);
+  t.upgraded = true;
+  run.log.push(`${t.name} upgraded.`);
+}
