@@ -11,7 +11,7 @@ import { RELICS } from './data';
 import { awardFeats, trainingFeats } from './feats';
 import { raidBand, raiderPool } from './raiders';
 import {
-  gain, act, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicKeysOf, relicsOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, startRound, gunReach, keepsHaul, distOf,
+  gain, act, braceFor, omensRead, sigStrength, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicKeysOf, relicsOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, startRound, gunReach, keepsHaul, distOf,
   leaveCombat, leaveEvent, moveMember, nextSlots, onField, partyLine, patchUp, pickBoon, reachable, runXp, skillProblem, skillsOf, squadOf,
   trinketInfo, weekKey, weekSeed, weeklyScore, reveal, sightOf, veteranTitle,
   ambushOdds, beastInfo, beastKey, cursesOf, cursed, shopPrice, goalProgress, goalText, lastStanding, rematchTricks, unlockedBoons, markHeat, marked,
@@ -60,6 +60,7 @@ function spam(units: Unit[], seed: number, length: 'short' | 'long' = 'short'): 
     if (run.screen === 'map') enterNode(run, book, pick(reachable(run)));
     else if (run.screen === 'combat') {
       if (c?.over) leaveCombat(run);
+      else if (c?.need === 'brace') braceFor(run, pick(c.brace!.options));
       else if (c?.need === 'start') startRound(run);
       else if (c?.need === 'order') giveOrder(run, 'atwill');
       else act(run, 'atwill');
@@ -356,6 +357,10 @@ describe('sortie', () => {
       run.boss = b.id;
       startCombat(run, book, 'boss');
       expect(run.combat!.enemies.some((e) => e.name === b.name), b.id).toBe(true);
+      // Named once the party has braced, not before (the brace would be no guess at all).
+      expect(run.combat!.need).toBe('brace');
+      expect(run.combat!.log.some((j) => j.text.startsWith(`${b.sig.name}:`)), b.id).toBe(false);
+      autoStep(run, book);
       expect(run.combat!.log.some((j) => j.text.includes(b.sig.name)), b.id).toBe(true);
       for (let i = 0; i < 20000 && !run.over; i++) autoStep(run, book);
       expect(run.over, b.id).toBeDefined();
@@ -1138,14 +1143,14 @@ describe('sortie pact marks, battle scars and lord omens', () => {
     }
   });
 
-  it('lays omens on the road, none with silence, and reading them takes a trick or the signature', () => {
+  it('lays omens on the road, none with silence, and each one read weakens the signature, never the rematch tricks', () => {
     for (let seed = 1; seed < 10; seed++) {
       expect(createRun(PARTIES.line(), seed).map.flat().filter((n) => n.omen).length).toBeGreaterThan(SORTIE.omens.need);
       expect(createRun(PARTIES.line(), seed, 'free', 'short', { marks: ['silent'] }).map.flat().some((n) => n.omen)).toBe(false);
     }
-    expect(SORTIE_BOSSES.every((b) => b.omens.length === 3 && b.omens.every(Boolean))).toBe(true);
-    const read = (run: SortieRun) => {
-      for (const n of run.map.flat().filter((x) => x.omen).slice(0, SORTIE.omens.need)) {
+    expect(SORTIE_BOSSES.every((b) => b.omens.length === 3 && b.omens.every(Boolean) && b.tell)).toBe(true);
+    const read = (run: SortieRun, k = SORTIE.omens.need) => {
+      for (const n of run.map.flat().filter((x) => x.omen).slice(0, k)) {
         n.kind = 'camp';
         n.hidden = false;
         run.screen = 'map';
@@ -1156,16 +1161,27 @@ describe('sortie pact marks, battle scars and lord omens', () => {
       }
     };
     const plain = createRun(PARTIES.line(), 4);
-    const sigs = sigsOf(plain).length;
+    const own = bossOf(plain).sig.id;
+    expect(sigStrength(plain, own)).toBe(1);
+    read(plain, 1);
+    expect(sigStrength(plain, own)).toBeCloseTo(1 - SORTIE.omens.step);
+    expect(plain.journal.some((l) => l.text.includes('you will be asked what to brace for'))).toBe(true);
     read(plain);
-    expect(plain.omens).toBe(SORTIE.omens.need);
-    expect(plain.foreseen).toBe(true);
-    expect(sigsOf(plain).length).toBe(sigs - 1);
+    expect(omensRead(plain)).toBe(SORTIE.omens.need);
+    expect(sigStrength(plain, own)).toBeCloseTo(1 - SORTIE.omens.need * SORTIE.omens.step);
+    // Never switched off: the signature is still the lord's.
+    expect(sigsOf(plain).map((x) => x.id)).toContain(own);
+    // Omens never name it.
+    expect(plain.journal.filter((l) => l.text.startsWith('Omen')).some((l) => l.text.includes(bossOf(plain).sig.name))).toBe(false);
     const again = createRun(PARTIES.line(), 4, 'free', 'short', { slain: { [plain.boss]: 2 } });
     read(again);
-    expect(again.rematch).toBe(1);
-    expect(again.foreseen).toBeUndefined();
+    expect(again.rematch).toBe(2);
     expect(again.journal.some((l) => l.text.startsWith('Omen: '))).toBe(true);
+    // An old save that foresaw the lord counts as every omen read, its signature still there.
+    const old = createRun(PARTIES.line(), 4);
+    old.foreseen = true;
+    expect(omensRead(old)).toBe(SORTIE.omens.need);
+    expect(sigsOf(old).map((x) => x.id)).toContain(own);
   });
 
   it('earns battle scars in won fights, once each, and names them in the recap', () => {

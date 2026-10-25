@@ -14,7 +14,7 @@ import {
   type SortieAffix, type SortieBoonId, type SortieChoice, type SortieEvent, type SortieLength, type SortieMode, type SortieOutcome,
   type SortieCurseId, type SortieMarkId, type SortieScarId,
 } from './downtimeData';
-import { NEXUS_LORE, SORTIE_BOSSES, SORTIE_LORE, SORTIE_LORE_DEFAULT, SORTIE_REGIONS, SORTIE_STAND, SORTIE_VOICE, type SortieBoss, type SortieRegion, type SortieRegionId, type SortieVoiceKind } from './sortieStory';
+import { NEXUS_LORE, SORTIE_BOSSES, SORTIE_LORE, SORTIE_LORE_DEFAULT, SORTIE_REGIONS, SORTIE_STAND, SORTIE_VOICE, type SortieBoss, type SortieRegion, type SortieRegionId, type SortieSignature, type SortieVoiceKind } from './sortieStory';
 import { RELICS, type RelicDef } from './data';
 import { ECHO_LORDS } from './nexusData';
 import { pickRaiders, raidBand, type Raider } from './raiders';
@@ -146,14 +146,21 @@ export interface SortieCombat {
   enemies: SortieSquad[];
   /** Models still to act this round, fastest first. */
   queue: SortieTurn[];
-  /** What the game waits on: the player to start the round, a unit's order for the round, or a Hero's (or lone model's) own turn. */
-  need?: 'start' | 'order' | 'turn';
+  /** What the game waits on: the player to brace for a signature (before a lord's fight), to start the round, a unit's
+   *  order for the round, or a Hero's (or lone model's) own turn. */
+  need?: 'brace' | 'start' | 'order' | 'turn';
   /** The party unit the game waits on. */
   acting?: string;
   /** Each unit's order this round. */
   orders: Record<string, SortieOrder>;
   /** Units whose order's ability or charge has gone off this round. */
   cast: Record<string, boolean>;
+  /** The kinds of skill each party unit was ordered (or used on its own turns) this round, to answer a tell. */
+  did?: Record<string, SortieSkillKind[]>;
+  /** The lord's tells this round: its signatures that go off at the start of the next. */
+  tells?: SortieTell[];
+  /** The lord's fight: the signatures the party may brace for, and the one it picked. */
+  brace?: { options: SortieSignature[]; pick?: SortieSignature };
   /** Outflank: the round a unit's guns reach any distance. */
   outflank: Record<string, number>;
   /** Echo squads that already stepped forward this round. */
@@ -177,6 +184,9 @@ export interface SortieCombat {
   fx?: SortieFx[];
   fxSeq?: number;
 }
+
+/** A tell: a signature that goes off next round, the party unit it means (if one), and how to answer it. */
+export interface SortieTell { sig: SortieSignature; target?: string; text: string; answer: string }
 
 /** One blow: who struck whom, and how hard. */
 export interface SortieFx { n: number; from: string; to: string; hits: number; dmg: number; melee: boolean; mine: boolean }
@@ -290,8 +300,9 @@ export interface SortieRun {
   weekly?: string;
   /** Pact marks taken on for this run (SORTIE.marks). */
   marks?: SortieMarkId[];
-  /** Omens of the lord read on the road, and whether they took away its own signature ability. */
+  /** Omens of the lord read on the road: each of the first SORTIE.omens.need weakens its own signature. */
   omens?: number;
+  /** @deprecated Old saves: the omens once switched the signature off. Counts as every omen read (see omensRead). */
   foreseen?: boolean;
 }
 
@@ -518,8 +529,21 @@ export const ambushOdds = (run: SortieRun) =>
 /** The lord's signature abilities: its own, and from tier 3 one borrowed from another lord. */
 export function sigsOf(run: SortieRun): SortieBoss['sig'][] {
   const extra = run.sig2 ? SORTIE_BOSSES.find((b) => b.sig.id === run.sig2)?.sig : undefined;
-  return [...(run.foreseen ? [] : [bossOf(run).sig]), ...(extra ? [extra] : [])];
+  return [bossOf(run).sig, ...(extra ? [extra] : [])];
 }
+/** The signature by id, and the lord whose own it is. */
+const sigInfo = (id: SortieSignature) => SORTIE_BOSSES.find((b) => b.sig.id === id)!;
+/** Omens of the lord read so far, up to the ones that count (an old save that foresaw the lord read them all). */
+export const omensRead = (run: SortieRun) => (run.foreseen ? SORTIE.omens.need : Math.min(run.omens ?? 0, SORTIE.omens.need));
+/** How strong a signature of the lord's is, 1 at full: its own weakens with each omen read, and either weakens again
+ *  when the party braced for it; never under SORTIE.omens.floor. */
+export function sigStrength(run: SortieRun, id: SortieSignature): number {
+  const own = bossOf(run).sig.id === id ? omensRead(run) * SORTIE.omens.step : 0;
+  const braced = run.combat?.brace?.pick === id ? SORTIE.omens.brace : 0;
+  return Math.max(SORTIE.omens.floor, 1 - own - braced);
+}
+/** How much weaker a signature is, in percent. */
+export const sigWeaker = (run: SortieRun, id: SortieSignature) => Math.round((1 - sigStrength(run, id)) * 100);
 
 // --- Quirks: habits a unit picks up on runs, which count on a Sortie (and some in Training) -----------------------
 
@@ -816,7 +840,8 @@ export function enterNode(run: SortieRun, book: CatalogBook, node: SortieNode) {
 
 /** A lord slain `n` times in Training (ForceSortie.bled) since this force last met it: it starts the fight
  *  TRAINING.shared.nemesis.bled down a time (to SORTIE.maxWeaken), and each time costs it a rematch trick or, with none
- *  left, an omen the party already knows (never the last one: that is still read on the road). */
+ *  left, an omen the party already knows (never the last one: that is still read on the road), which weakens its
+ *  signature as one read would. */
 function bleed(run: SortieRun, n: number) {
   const boss = bossOf(run);
   run.weaken = Math.min(SORTIE.maxWeaken, run.weaken + n * TRAINING.shared.nemesis.bled);
@@ -830,22 +855,15 @@ function bleed(run: SortieRun, n: number) {
   note(run, `${bits.join(', ')}.`, 'good');
 }
 
-/** Read an omen at a node: enough of them take away one of the lord's tricks. */
+/** Read an omen at a node: each of the first few weakens the lord's own signature, and hints at what it is. */
 function readOmen(run: SortieRun, node: SortieNode) {
   node.omen = false;
   const boss = bossOf(run);
   const n = (run.omens = (run.omens ?? 0) + 1);
-  if (n > SORTIE.omens.need) return;
+  if (n > SORTIE.omens.need || run.foreseen) return;
   note(run, `Omen: ${boss.omens[n - 1]}`, 'info');
-  if (n < SORTIE.omens.need) return;
-  if (run.rematch) {
-    const t = rematchTricks(run)[run.rematch - 1];
-    run.rematch = run.rematch - 1 || undefined;
-    note(run, `The omens add up: ${boss.name} has lost its ${t.name} trick.`, 'good');
-  } else {
-    run.foreseen = true;
-    note(run, `The omens add up: the party knows ${boss.name}’s ${boss.sig.name}, and it won’t work on them.`, 'good');
-  }
+  if (n === 1) note(run, `Each omen weakens ${boss.name}’s signature ability. Read them closely: before the fight you will be asked what to brace for.`, 'info');
+  note(run, `Omens read ${n}/${SORTIE.omens.need}: its signature is ${sigWeaker(run, boss.sig.id)}% weaker.`, 'good');
 }
 
 /** A node done: back to the map. */
@@ -1328,7 +1346,6 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
       for (const t of rematchTricks(run)) log(c, `${t.name}: ${t.text}`, 'bad');
     }
     if (run.nemesis) log(c, `Nemesis: ${Math.round(SORTIE.nemesis.tough * run.nemesis * 100)}% more wounds, and a bounty of ${run.nemesis * SORTIE.nemesis.bounty} RP on its head.`, 'bad');
-    for (const sig of sigsOf(run)) log(c, `${sig.name}: ${sig.text}`, 'bad');
     if (run.weaken) log(c, `${boss.name} comes into the fight already hurt.`, 'good');
   }
   // Nobody standing Close: the nearest squad steps up.
@@ -1360,6 +1377,78 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
     log(c, 'The Void Pact takes its due.', 'bad');
   }
   newRound(run);
+  // Before the first round of a lord's fight, the party braces for one signature: its own, any borrowed one, and decoys.
+  if (c.lord && !c.over) {
+    const real = sigsOf(run).map((x) => x.id);
+    const decoys = SORTIE_BOSSES.map((b) => b.sig.id).filter((id) => !real.includes(id));
+    const options = [...real];
+    while (options.length < real.length + 2 && decoys.length) options.push(decoys.splice(Math.floor(rand(run) * decoys.length), 1)[0]);
+    for (let i = options.length - 1; i > 0; i--) {
+      const j = Math.floor(rand(run) * (i + 1));
+      [options[i], options[j]] = [options[j], options[i]];
+    }
+    c.brace = { options };
+    c.need = 'brace';
+    log(c, `What does ${boss!.name} have in store? The omens read on the road may tell you: brace for one of ${options.length} signatures.`, 'info');
+  }
+}
+
+/** Before a lord's fight: brace for one of the signatures offered. The right one goes off weaker all fight. */
+export function braceFor(run: SortieRun, id: SortieSignature) {
+  const c = run.combat;
+  if (c?.need !== 'brace' || !c.brace) throw new Error('Nothing to brace for now.');
+  if (!c.brace.options.includes(id)) throw new Error('Not one of the signatures on offer.');
+  c.brace.pick = id;
+  const boss = bossOf(run);
+  const sigs = sigsOf(run);
+  const right = sigs.some((x) => x.id === id);
+  log(c, right
+    ? `Braced for ${sigInfo(id).sig.name}, and rightly: it is ${Math.round(SORTIE.omens.brace * 100)}% weaker again.`
+    : `Braced for ${sigInfo(id).sig.name}, but ${boss.name} has no such thing.`, right ? 'good' : 'bad');
+  for (const sig of sigs) {
+    const w = sigWeaker(run, sig.id);
+    log(c, `${sig.name}${w ? ` (${w}% weaker)` : ''}: ${sig.text}`, 'bad');
+  }
+  c.need = 'start';
+}
+
+/** The orders that answer a signature's tell and cut its next firing to SORTIE.omens.answer: for Tremor and Dirge each
+ *  unit answers for itself, for the Diving Strike and the Aura of Dread the unit the tell names must (or, for the dive,
+ *  anyone's shield), and for Mounting Rage and the brood any one unit answers for the whole party. */
+export const TELLS: Record<SortieSignature, { kinds: SortieSkillKind[]; answer: string }> = {
+  rage: { kinds: ['charge', 'barrage', 'field'], answer: 'A charge, barrage or field ability this round halves the rage it gains next round.' },
+  dive: { kinds: ['regroup', 'shield'], answer: 'If {unit} Regroup this round, or anyone raises a shield, the swoop next round does half.' },
+  dirge: { kinds: ['regroup'], answer: 'Units that Regroup this round are not dazed by the next verse.' },
+  tremor: { kinds: ['regroup', 'shield'], answer: 'Units that Regroup or raise a shield this round take half the stamp next round.' },
+  dread: { kinds: ['regroup'], answer: 'If {unit} Regroup this round, they hold their nerve at the Front next round: no morale tests.' },
+  brood: { kinds: ['charge', 'barrage', 'field'], answer: 'A charge, barrage or field ability this round halves the brood that comes next round.' },
+};
+
+/** Whether a signature goes off at the start of a round (Mounting Rage from the second round, the Aura of Dread every
+ *  round), and whether the lord shows a tell for it the round before (for those two, only every other round). */
+const sigFires = (id: SortieSignature, round: number) =>
+  id === 'rage' ? round > 1 : id === 'dread' ? true : id === 'tremor' || id === 'brood' ? round % 3 === 0 : round % 2 === 0;
+const sigTells = (id: SortieSignature, round: number) => sigFires(id, round) && (id === 'rage' || id === 'dread' ? round % 2 === 0 : true);
+
+/** The lord's tells for this round: its signatures that go off at the start of the next, while it is on the field or
+ *  arriving by then. */
+function tellsFor(run: SortieRun): SortieTell[] {
+  const c = run.combat!;
+  const lord = c.enemies.find((e) => e.key === c.lord);
+  if (!lord || !standing(lord) || (lord.arrives && lord.arrives > c.round + 1)) return [];
+  const slots = nextSlots(c);
+  const keys = Object.keys(slots);
+  if (!keys.length) return [];
+  const at = (slot: number) => keys.find((k) => slots[k] === slot);
+  const out: SortieTell[] = [];
+  for (const sig of sigsOf(run)) {
+    if (!sigTells(sig.id, c.round + 1)) continue;
+    const t = TELLS[sig.id];
+    const target = sig.id === 'dive' ? at(Math.max(...keys.map((k) => slots[k]))) : sig.id === 'dread' ? at(0) : undefined;
+    const name = target ? squadByKey(c, target)?.name ?? 'the line' : '';
+    out.push({ sig: sig.id, target, text: sigInfo(sig.id).tell.replace('{unit}', name), answer: t.answer.replace('{unit}', name) });
+  }
+  return out;
 }
 
 /** Rough offence of a squad's weapons of one kind, to place the squads and pick a line. */
@@ -1371,9 +1460,12 @@ function output(s: SortieSquad, melee: boolean): number {
 function newRound(run: SortieRun) {
   const c = run.combat!;
   c.round++;
+  const prev = { did: c.did ?? {}, tells: c.tells ?? [] };
   c.moved = [];
   c.orders = {};
   c.cast = {};
+  c.did = {};
+  c.tells = [];
   c.acting = undefined;
   log(c, `— Round ${c.round} —`, 'info');
   if (c.round > 1) {
@@ -1395,7 +1487,7 @@ function newRound(run: SortieRun) {
   for (const s of [...partyLine(c), ...onField(c)]) if (statusOn(c, s, 'bleed')) wound(run, s, SORTIE.hpMul / 2, 'Bleeding');
   checkEnd(run);
   if (c.over) return;
-  signature(run);
+  signature(run, prev);
   checkEnd(run);
   if (c.over) return;
   if (c.affix === 'regenerating') for (const e of onField(c)) {
@@ -1423,6 +1515,8 @@ function newRound(run: SortieRun) {
   }
   c.queue = turns.sort((a, b) => b.init - a.init);
   for (const e of c.enemies) e.intent = standing(e) ? intentOf(run, e) : undefined;
+  c.tells = tellsFor(run);
+  for (const t of c.tells) log(c, `Tell: ${t.text} ${t.answer}`, 'bad');
   // The round waits on the player, so the turn order and the Echoes' intents can be read first.
   c.need = 'start';
   c.acting = undefined;
@@ -1434,10 +1528,13 @@ function lordArrives(run: SortieRun, lord: SortieSquad) {
   const boss = bossOf(run);
   log(c, `${lord.name} arrives at Close range!`, 'bad');
   log(c, run.nemesis ? boss.taunt : boss.intro, 'bad');
+  const w = sigWeaker(run, boss.sig.id);
+  if (w) log(c, `${boss.sig.name} is ${w}% weaker for the omens read${c.brace?.pick === boss.sig.id ? ' and the party bracing for it' : ''}.`, 'good');
 }
 
-/** The Echo lord's signature ability, at the start of a round while it stands. */
-function signature(run: SortieRun) {
+/** The Echo lord's signature abilities, at the start of a round while it stands, each at its strength (sigStrength);
+ *  a firing whose tell the party answered last round (TELLS) is cut to SORTIE.omens.answer. */
+function signature(run: SortieRun, prev: { did: Record<string, SortieSkillKind[]>; tells: SortieTell[] }) {
   const c = run.combat!;
   const lord = c.enemies.find((e) => e.key === c.lord);
   if (!lord || !standing(lord) || lord.arrives) return;
@@ -1445,38 +1542,50 @@ function signature(run: SortieRun) {
     const n = mend(lord, Math.max(1, Math.round(maxOf(lord) * SORTIE.rematch.regen)));
     if (n) log(c, `Regenerating: ${lord.name} mends ${n} wound${n === 1 ? '' : 's'}.`, 'bad');
   }
+  const half = SORTIE.omens.answer;
   for (const sig of sigsOf(run)) {
-  const line = partyLine(c);
-  if (!line.length) return;
-  if (sig.id === 'rage' && c.round > 1) {
-    lord.atkBonus *= 1.12;
-    log(c, `${sig.name}: ${lord.name} hits harder.`, 'bad');
-  }
-  if (sig.id === 'dive' && c.round % 2 === 0) {
-    const back = line[line.length - 1];
-    const guns = active(lord)[0]?.guns.filter((g) => g.melee) ?? [];
-    log(c, `${sig.name}: ${lord.name} swoops on ${back.name}!`, 'bad');
-    strike(run, lord, back, { melee: true, guns: guns.length ? guns : [FISTS], dist: 1, label: sig.name });
-  }
-  if (sig.id === 'dirge' && c.round % 2 === 0) {
-    for (const p of line) p.status.daze = c.round;
-    log(c, `${sig.name}: the whole party is dazed.`, 'bad');
-  }
-  if (sig.id === 'tremor' && c.round % 3 === 0) {
-    log(c, `${sig.name}: the ground heaves.`, 'bad');
-    for (const p of line) wound(run, p, active(p).length * Math.ceil(SORTIE.hpMul / 2), sig.name);
-  }
-  if (sig.id === 'dread') {
-    const f = line[0];
-    for (const m of active(f)) morale(run, f, m, false);
-  }
-  if (sig.id === 'brood' && c.round % 3 === 0 && c.brood) {
-    const s = squadOf(c.brood, `e${c.enemies.length}`, { echo: true, n: 2 });
-    s.dist = 1;
-    s.intent = intentOf(run, s);
-    c.enemies.push(s);
-    log(c, `${sig.name}: ${s.models.length} ${s.name} crawl out of ${lord.name}!`, 'bad');
-  }
+    const line = partyLine(c);
+    if (!line.length) return;
+    if (!sigFires(sig.id, c.round)) continue;
+    const s = sigStrength(run, sig.id);
+    const told = prev.tells.some((t) => t.sig === sig.id);
+    const did = (p: SortieSquad | undefined) => !!p && told && (prev.did[p.key] ?? []).some((k) => TELLS[sig.id].kinds.includes(k));
+    const anyDid = line.some(did);
+    if (sig.id === 'rage') {
+      lord.atkBonus *= 1 + 0.12 * s * (anyDid ? half : 1);
+      log(c, `${sig.name}: ${lord.name} hits harder${anyDid ? ', but less than it would have: you broke its feeding' : ''}.`, 'bad');
+    }
+    if (sig.id === 'dive') {
+      const back = line[line.length - 1];
+      const braced = did(back) || (told && line.some((p) => (prev.did[p.key] ?? []).includes('shield')));
+      const k = s * (braced ? half : 1);
+      const guns = (active(lord)[0]?.guns.filter((g) => g.melee) ?? []).map((g) => ({ ...g, attacks: g.attacks * k }));
+      log(c, `${sig.name}: ${lord.name} swoops on ${back.name}${braced ? ', who were braced for it' : ''}!`, 'bad');
+      strike(run, lord, back, { melee: true, guns: guns.length ? guns : [{ ...FISTS, attacks: FISTS.attacks * k }], dist: 1, label: sig.name });
+    }
+    if (sig.id === 'dirge') {
+      const dazed: string[] = [];
+      for (const p of line) if (!did(p) && rand(run) < s) { p.status.daze = c.round; dazed.push(p.name); }
+      const spared = line.filter(did).map((p) => p.name);
+      log(c, `${sig.name}: ${dazed.length ? `${listText(dazed)} ${dazed.length === 1 ? 'is' : 'are'} dazed` : 'the party shakes off the song'}${spared.length ? ` (${listText(spared)} stopped their ears)` : ''}.`, dazed.length ? 'bad' : 'good');
+    }
+    if (sig.id === 'tremor') {
+      log(c, `${sig.name}: the ground heaves.`, 'bad');
+      for (const p of line) wound(run, p, stoch(run, active(p).length * Math.ceil(SORTIE.hpMul / 2) * s * (did(p) ? half : 1)), did(p) ? `${sig.name} (braced)` : sig.name);
+    }
+    if (sig.id === 'dread') {
+      const f = line[0];
+      if (did(f)) log(c, `${sig.name}: ${f.name} hold their nerve.`, 'good');
+      else for (const m of active(f)) if (rand(run) < s) morale(run, f, m, false);
+    }
+    if (sig.id === 'brood' && c.brood) {
+      const n = Math.max(1, stoch(run, 2 * s * (anyDid ? half : 1)));
+      const sq = squadOf(c.brood, `e${c.enemies.length}`, { echo: true, n });
+      sq.dist = 1;
+      sq.intent = intentOf(run, sq);
+      c.enemies.push(sq);
+      log(c, `${sig.name}: ${sq.models.length} ${sq.name} crawl out of ${lord.name}${anyDid ? ', fewer than there were going to be' : ''}!`, 'bad');
+    }
   }
 }
 
@@ -1870,7 +1979,7 @@ export function skillTargets(run: SortieRun, skill: SortieSkill): string[] {
 /** Why a skill can't be used on this target now, or null. */
 export function skillProblem(run: SortieRun, id: string, target?: string): string | null {
   const c = run.combat;
-  if (!c || c.over || !c.need || c.need === 'start') return 'Not your move.';
+  if (!c || c.over || !c.need || c.need === 'start' || c.need === 'brace') return 'Not your move.';
   const sk = skillsOf(run, turnModel(run)).find((x) => x.id === id);
   if (!sk) return 'No such skill.';
   if (sk.blocked) return sk.blocked;
@@ -1894,6 +2003,7 @@ export function giveOrder(run: SortieRun, id: string, target?: string) {
   if (p) throw new Error(p);
   c.orders[s.key] = { skill: id, target };
   const sk = skillsFor(run, s).find((x) => x.id === id)!;
+  (c.did ??= {})[s.key] = [...(c.did[s.key] ?? []), sk.kind];
   log(c, `▸ ${s.name}: ${sk.name}${target ? ` on ${squadByKey(c, target)?.name}` : ''}.`, 'info');
   advance(run);
 }
@@ -1914,6 +2024,7 @@ export function act(run: SortieRun, id: string, target?: string) {
   if (p) throw new Error(p);
   const m = turnModel(run)!;
   const sk = skillsFor(run, s, m).find((x) => x.id === id)!;
+  (c.did ??= {})[s.key] = [...(c.did[s.key] ?? []), sk.kind];
   c.queue.shift();
   log(c, `▸ ${s.name}: ${sk.name}${target ? ` on ${squadByKey(c, target)?.name}` : ''}.`, 'info');
   useSkill(run, s, m, sk, target);
@@ -2351,6 +2462,14 @@ export function autoChoice(run: SortieRun): { id: string; target?: string } | nu
   const shaken = models.filter((m) => m.shaken).length;
   if (ok('heal') && hurt >= healOf(me) * 0.75) return { id: 'heal' };
   if (ok('regroup') && (shaken * 2 >= models.length || statusOn(c, me, 'bleed'))) return { id: 'regroup' };
+  // Answer the lord's tells: raise a shield against a dive or stamp, and Regroup when it is this unit the tell names, or
+  // against a stamp or a verse when the unit is hurt enough that the mending isn't wasted.
+  const worn = models.reduce((n, m) => n + m.max - m.hp, 0) * 4 >= models.reduce((n, m) => n + m.max, 0);
+  for (const t of c.tells ?? []) {
+    if ((t.sig === 'dive' || t.sig === 'tremor') && ok('shield')) return { id: 'shield' };
+    const mine = t.target === me.key || ((t.sig === 'tremor' || t.sig === 'dirge') && worn);
+    if (mine && TELLS[t.sig].kinds.includes('regroup') && ok('regroup')) return { id: 'regroup' };
+  }
   if (ok('barrage') && onField(c).length) return { id: 'barrage', target: [...onField(c)].sort((a, b) => worth(b, 3) - worth(a, 3))[0]?.key };
   if (ok('field') && onField(c).length) return { id: 'field' };
   const incoming = onField(c).filter((e) => e.intent === 'melee' || e.intent === 'shoot' || e.intent === 'charge').length;
@@ -2377,10 +2496,18 @@ export function autoChoice(run: SortieRun): { id: string; target?: string } | nu
   return best;
 }
 
+/** What to brace for before a lord's fight: its own signature once the omens have told enough, else a guess. */
+export function autoBrace(run: SortieRun): SortieSignature {
+  const opts = run.combat?.brace?.options ?? [];
+  const own = bossOf(run).sig.id;
+  return omensRead(run) >= 2 && opts.includes(own) ? own : pickOf(run, opts);
+}
+
 /** Make the choice the game is waiting on with autoChoice. */
 export function autoMove(run: SortieRun) {
   const c = run.combat;
   if (!c?.need) return;
+  if (c.need === 'brace') return braceFor(run, autoBrace(run));
   if (c.need === 'start') return startRound(run);
   const p = autoChoice(run) ?? { id: 'atwill' };
   if (c.need === 'order') giveOrder(run, p.id, p.target);

@@ -1396,9 +1396,12 @@ export const SORTIE = {
     headhunter: { name: 'Headhunter', text: 'a tenth more attacks.', how: 'struck the last blow against elites', mul: 1.1 },
     survivor: { name: 'Survivor', text: 'more wounds on every model.', how: 'came through a won fight at a quarter of its wounds or less' },
   } as Record<SortieScarId, { name: string; text: string; how: string; mul?: number }>,
-  /** Lord omens: nodes that tell of the lord. Reading `need` of them takes away a rematch trick, or else its own
-   * signature ability. About `share` of the nodes past the first row have one, and never fewer than `need` + 1. */
-  omens: { share: 0.2, need: 3 },
+  /** Lord omens: nodes that tell of the lord. Each of the first `need` read weakens its own signature ability by `step`
+   * (never switches it off). About `share` of the nodes past the first row have one, and never fewer than `need` + 1.
+   * Before the lord's fight the party braces for one of a few signatures: the right one is `brace` weaker again. No
+   * signature drops under `floor` strength. A tell the round before a signature fires, answered with the fitting order,
+   * cuts that firing to `answer` (see sortie.ts TELLS). */
+  omens: { share: 0.2, need: 3, step: 0.15, brace: 0.25, floor: 0.3, answer: 0.5 },
   /** Rematches: a lord slain by the force before comes back changed, with one more trick for each time (up to all three). */
   rematch: {
     def: 1,

@@ -13,13 +13,13 @@ import { applySortie, offTableKey, offTableLeft, postWeekly, weekBoard } from '.
 import { partyProblem, sortieProblem, sortieScout, startSortie } from '../rules/tasks';
 import { SORTIE, SORTIE_BOONS, type SortieLength, type SortieMarkId, type SortieMode } from '../rules/downtimeData';
 import {
-  active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, startRound, act,
+  active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, startRound, act, braceFor, omensRead, sigWeaker,
   isFort, keepsHaul, leaveCombat, leaveEvent, memberName, memberUp, nextSlots, onField, patchUp, pickBoon, quitRun, distOf, DISTANCES, reachText, reachable, runXp, skillProblem,
   skillTargets, skillsOf, slotOf, SLOTS, turnModel, trinketInfo, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
   ambushOdds, beastInfo, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons,
   type SortieFx, type SortieIntentKind, type SortieModel, type SortieNode, type SortieNodeKind, type SortieRun, type SortieSkill, type SortieSkillKind, type SortieSquad,
 } from '../rules/sortie';
-import { SORTIE_BOSSES, SORTIE_REGIONS } from '../rules/sortieStory';
+import { SORTIE_BOSSES, SORTIE_REGIONS, type SortieSignature } from '../rules/sortieStory';
 import { Modal, confirmAction, toast } from './ui';
 import { EmblemBadge, Portrait } from './Emblem';
 import { Glyph, Icon, IconText, SvgIcon, type IconName } from './Icon';
@@ -599,6 +599,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               onUse={(id, target) => doit(() => (run.combat!.need === 'order' ? giveOrder(run, id, target) : act(run, id, target)))}
               onAuto={() => doit(() => autoMove(run))}
               onStart={() => doit(() => startRound(run))}
+              onBrace={(id) => doit(() => braceFor(run, id))}
               onLeave={() => doit(() => leaveCombat(run))}
             />
           )}
@@ -755,7 +756,9 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
       <div>Nodes cleared: {run.depth}</div>
       {!run.marks?.length ? null : <div data-tip={marksOf(run).map((m) => m.text).join(' ')}>Pact marks: {marksOf(run).map((m) => m.name.replace(/^Mark of (the )?/, '')).join(', ')} <span className="muted">({markHeat(run)} heat)</span></div>}
       {run.omens || run.map.flat().some((n) => n.omen) ? (
-        <div>Omens read: <b>{Math.min(run.omens ?? 0, SORTIE.omens.need)}</b> / {SORTIE.omens.need}{run.foreseen ? <span className="muted"> · lord foreseen</span> : null}</div>
+        <div data-tip="Each omen weakens the lord's own signature. Read them closely: before its fight you brace for one signature, and the right one is weaker again.">
+          Omens read: <b>{omensRead(run)}</b> / {SORTIE.omens.need}{sigWeaker(run, bossOf(run).sig.id) ? <span className="muted"> · signature {sigWeaker(run, bossOf(run).sig.id)}% weaker</span> : null}
+        </div>
       ) : null}
       {run.weekly && <div>Weekly score: <b>{weeklyScore(run)}</b></div>}
       {run.trinkets?.length ? <div>Trinkets found: {run.trinkets.map((t) => trinketInfo(t)?.name ?? t).join(', ')}</div> : null}
@@ -890,13 +893,14 @@ function EventScreen({ run, onChoose, onLeave }: { run: SortieRun; onChoose: (i:
 }
 
 /** The fight: the party's line on the left, the Echo squads by distance on the right, the skills below. */
-function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }: {
+function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, onLeave }: {
   run: SortieRun;
   skill: string | null;
   setSkill: (s: string | null) => void;
   onUse: (id: string, target?: string) => void;
   onAuto: () => void;
   onStart: () => void;
+  onBrace: (id: SortieSignature) => void;
   onLeave: () => void;
 }) {
   const c = run.combat!;
@@ -1023,7 +1027,8 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }:
                 {!here.length && <div className="muted small sortie-band-none">No one</div>}
                 {here.map((e) => {
                   const can = targets.includes(e.key);
-                  const [icon, intent] = e.intent ? INTENT[e.intent] : ['', ''];
+                  const [icon, intent0] = e.intent ? INTENT[e.intent] : ['', ''];
+                  const intent = e.key === c.lord && c.tells?.length ? `${intent0}. ${c.tells.map((t) => `${t.text} ${t.answer}`).join(' ')}` : intent0;
                   return (
                     <button
                       key={e.key}
@@ -1054,10 +1059,33 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }:
           ))}
         </div>
       </div>
+      {!c.over && c.need !== 'brace' && c.tells?.map((t) => (
+        <div key={t.sig} className="small tone-bad sortie-tell" style={{ marginTop: 6 }}>
+          <b>Tell:</b> {t.text} <span className="muted">{t.answer}</span>
+        </div>
+      ))}
       {c.over ? (
         <div className="row" style={{ gap: 6, marginTop: 8 }}>
           <b className="grow">{c.over === 'won' ? 'The Echoes are gone.' : c.over === 'broke' ? 'The party breaks and flees.' : 'The party is wiped out.'}</b>
           <button className="primary" onClick={onLeave}>Continue</button>
+        </div>
+      ) : c.need === 'brace' && c.brace ? (
+        <div style={{ marginTop: 8 }}>
+          <div className="small">
+            <b>What will you brace for?</b> Omens read: {omensRead(run)}/{SORTIE.omens.need}. Bracing for one of {bossOf(run).name}’s signatures makes it {Math.round(SORTIE.omens.brace * 100)}% weaker
+            all fight; a wrong guess costs nothing. Think back on what the omens said.
+          </div>
+          <div className="sortie-skills" style={{ marginTop: 6 }}>
+            {c.brace.options.map((id) => {
+              const sig = SORTIE_BOSSES.find((b) => b.sig.id === id)!.sig;
+              return (
+                <button key={id} className="sortie-skill" onClick={() => onBrace(id)} data-tip={sig.text}>
+                  <b>{sig.name}</b>
+                  <span className="muted">{sig.text}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       ) : c.need === 'start' ? (
         <div className="row" style={{ gap: 6, marginTop: 8 }}>

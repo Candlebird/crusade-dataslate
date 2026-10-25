@@ -39,8 +39,10 @@ export interface SortieBoss {
   lore: string;
   /** What it says coming back after being slain by the force once, twice, and three times or more. */
   rematch: [string, string, string];
-  /** Omens of it along the road (SORTIE.omens), read in order. */
+  /** Omens of it along the road (SORTIE.omens), read in order: each hints at its signature without naming it. */
   omens: [string, string, string];
+  /** Its tell, shown the round before its signature goes off; `{unit}` is the party unit it means to hit. */
+  tell: string;
 }
 
 export const SORTIE_BOSSES: SortieBoss[] = [
@@ -57,10 +59,11 @@ export const SORTIE_BOSSES: SortieBoss[] = [
       'Gorrhul no longer laughs. It just comes, stitched together from every time you have killed it.',
     ],
     omens: [
-      'Hooks hang from a dead tree, each one picked clean. Something here eats as it walks.',
-      'A ledger lies in the mud, columns of rations in a careful hand, and the last page is all teeth marks.',
-      'You find where Gorrhul rested: it sleeps sitting up, and the chains on its left side drag. It favours that side.',
+      'Hooks hang from a dead tree, each one picked clean, and the deeper in, the more hooks to a branch. Whatever eats here gets hungrier as it goes.',
+      'A ledger lies in the mud: rations in a careful hand, every day’s line longer than the last, and the last page is all teeth marks.',
+      'Where it met a patrol, the first cuts are few and clean; by the end the ground is chopped to pulp. The longer it fights, the more it swings.',
     ],
+    tell: 'Gorrhul stops to chew, and its breathing quickens.',
   },
   {
     id: 'horror', unit: 'Great Winged Horror', name: 'The Carrion Crown',
@@ -75,10 +78,11 @@ export const SORTIE_BOSSES: SortieBoss[] = [
       'The sky goes dark long before the Crown arrives. It has stopped circling. It is only waiting.',
     ],
     omens: [
-      'Every bone along the path lies in a ring. Something hunts from above, in circles.',
-      'Feathers like sheet metal, shed in a dive. The Crown pulls up late, after it strikes.',
-      'A scout’s log: the Crown never dives into the sun. You know now which way to face.',
+      'Every bone along the path lies in a ring, and the freshest at the very edge. Something hunts from above, and takes the stragglers.',
+      'Feathers like sheet metal, shed in a dive over the head of a column and onto its tail.',
+      'A scout’s log: ‘It comes down, climbs, circles once, comes down again. Never on the front rank. Always on the last man.’',
     ],
+    tell: 'The Carrion Crown climbs and wheels over {unit}.',
   },
   {
     id: 'screecher', unit: 'Great Screecher', name: 'The Choir of Teeth',
@@ -93,10 +97,11 @@ export const SORTIE_BOSSES: SortieBoss[] = [
       'The Choir has learned a single, perfect note. It has been saving it for you.',
     ],
     omens: [
-      'A hum in the ground, one note, coming and going like breath.',
-      'A soldier’s helmet, the inside scratched with a hundred tally marks: one for every voice she counted in the Choir.',
-      'Silence in a ring of stones. Whatever sings out there cannot sing in here: you learn how to stop up its song.',
+      'A hum in the air, one note, coming and going like breath: a verse, a rest, a verse.',
+      'A gunner’s helmet beside a rifle, every shot in the wall behind it gone wide. Inside the helmet: ‘it sings and my eyes swim’.',
+      'Silence in a ring of stones. The scouts who sheltered here could aim again; outside, the song blurred every sight.',
     ],
+    tell: 'The Choir draws one long, rattling breath.',
   },
   {
     id: 'behemoth', unit: 'Blind Behemoth', name: 'The Blind Mountain',
@@ -111,10 +116,11 @@ export const SORTIE_BOSSES: SortieBoss[] = [
       'The ground was the Mountain all along. It has been listening to you walk across it since the first step.',
     ],
     omens: [
-      'The ground has a heartbeat here. Slow. Very large.',
-      'Outposts built in a line, every one tipped over the same way. It turns to the left when it wakes.',
-      'A crater where it stamped, and the rock at the rim untouched. You learn to see the stamp coming.',
+      'The ground has a heartbeat here. Slow, very large: one beat for every third breath you take.',
+      'Outposts built in a line, every wall cracked and every man inside them bruised, though nothing ever came through a door.',
+      'A crater where it stamped, the rock at the rim untouched. It never struck anyone; the ground did, all of them at once.',
     ],
+    tell: 'The ground goes still under your boots.',
   },
   {
     id: 'terror', unit: 'Terror Beast', name: 'Dread Vashkar',
@@ -129,10 +135,11 @@ export const SORTIE_BOSSES: SortieBoss[] = [
       'Vashkar does not hunt you any more. It simply stands there and lets you remember.',
     ],
     omens: [
-      'Abandoned weapons, all dropped, none fired. The men who held them ran.',
-      'A wall daubed in an old regiment’s hand: IT ONLY GROWS WHEN YOU RUN.',
-      'A grave, and on it a single line: ‘We stood, and it was smaller than we thought.’ Your party steadies.',
+      'Abandoned weapons, all dropped, none fired, lying where the front rank stood. The men who held them ran.',
+      'A wall daubed in an old regiment’s hand: IT ONLY GROWS WHEN YOU RUN. DON’T BE THE ONE NEAREST IT.',
+      'A grave for a vanguard, and on it a single line: ‘We stood at the front, and it was smaller than we thought.’',
     ],
+    tell: 'Vashkar turns its eyes on {unit}.',
   },
   {
     id: 'ascended', unit: 'Ascended Fiend', name: 'The Hollow Prince',
@@ -147,10 +154,11 @@ export const SORTIE_BOSSES: SortieBoss[] = [
       '‘Every time you kill me I remember a little more,’ says the Hollow Prince. ‘Let us see what I remember today.’',
     ],
     omens: [
-      'Tiny claw marks, hundreds of them, all leading one way.',
-      'A nest, broken open from the inside. The brood hatches in threes.',
-      'Scraps of an old name scratched into a wall, over and over, then scratched out. You know what the Prince is afraid to remember.',
+      'Tiny claw marks, hundreds of them, all coming up out of the ground, right where the sentries stood.',
+      'A nest, broken open from the inside: one hatching, then a long wait, then another. Every third night, the scratching starts again.',
+      'An old name scratched into a wall, over and over, and under it, small and new, the claw marks of its young.',
     ],
+    tell: 'Something claws at the ground beneath the Hollow Prince.',
   },
 ];
 
