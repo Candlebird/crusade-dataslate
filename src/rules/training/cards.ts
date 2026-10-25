@@ -19,6 +19,8 @@ export interface TrainingCard {
   text: string;
   /** Only crafted units this allows can draw it; without it, the card is for the whole run. */
   unit?: (t: UnitTower) => boolean;
+  /** Whether a whole-run card would do anything now (cardUseful); without it, always. */
+  useful?: (run: TrainingRun) => boolean;
   apply: (run: TrainingRun, t?: UnitTower) => void;
 }
 
@@ -32,6 +34,10 @@ const below = (t: UnitTower) => t.up < t.cap;
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 /** Mend the base by `n`, never above TRAINING.baseHp. */
 const mend = (run: TrainingRun, n: number) => { run.baseHp = Math.min(TRAINING.baseHp, run.baseHp + n); };
+/** The base has HP to mend. */
+const hurtBase = (run: TrainingRun) => run.baseHp < TRAINING.baseHp;
+/** Some crafted unit holds walkers (only units hold), so longer holds do something. */
+const holds = (run: TrainingRun) => unitTowers(run).some(grounded);
 
 /** A card that teaches one unit an ability; its text is the ability's unless given. */
 const skillCard = (id: string, name: string, rarity: RelicTier, effect: Effect, unit: (t: UnitTower) => boolean = any, text?: string): TrainingCard => ({
@@ -46,7 +52,7 @@ export const CARDS: TrainingCard[] = [
   { id: 'whet', name: 'Whetstones', rarity: 'Common', text: '{unit}: hits 20% harder.', unit: any, apply: (_, t) => { t!.atkBonus *= 1.2; } },
   { id: 'grip', name: 'Iron grip', rarity: 'Common', text: '{unit}: +1 Tough (holds walkers longer).', unit: grounded, apply: (_, t) => { t!.tough += 1; } },
   {
-    id: 'nets', name: 'Snare nets', rarity: 'Common', text: `Every hold lasts ${pct(C.holdMul - 1)} longer.`,
+    id: 'nets', name: 'Snare nets', rarity: 'Common', text: `Every hold lasts ${pct(C.holdMul - 1)} longer.`, useful: holds,
     apply: (run) => { run.mods.holdMul *= C.holdMul; },
   },
   {
@@ -54,7 +60,7 @@ export const CARDS: TrainingCard[] = [
     id: 'sandbags', name: 'Sandbags', rarity: 'Common', text: `${C.patches} more patches of cover along the route.`,
     apply: (run) => { run.cover.push(...layCover(run, C.patches, routeOf(run), run.cover)); },
   },
-  { id: 'walls', name: 'Patch the walls', rarity: 'Common', text: `Mends the base by ${C.walls}.`, apply: (run) => mend(run, C.walls) },
+  { id: 'walls', name: 'Patch the walls', rarity: 'Common', text: `Mends the base by ${C.walls}.`, useful: hurtBase, apply: (run) => mend(run, C.walls) },
   {
     id: 'supply', name: 'Supply drop', rarity: 'Common', text: 'Credits for the cheapest level-up on the map.',
     apply: (run) => {
@@ -71,14 +77,15 @@ export const CARDS: TrainingCard[] = [
   skillCard('rapid', 'Rapid fire', 'Rare', { kind: 'sixes', again: true }),
   { id: 'promote', name: 'Field promotion', rarity: 'Rare', text: '{unit}: a free level-up.', unit: below, apply: (_, t) => { applyLevel(t!); } },
   { id: 'bounty', name: 'Bounty', rarity: 'Rare', text: `Kills pay ${pct(C.bounty)} more credits.`, apply: (run) => { run.mods.bounty += C.bounty; } },
-  { id: 'ramparts', name: 'Ramparts', rarity: 'Rare', text: `Mends the base by ${C.ramparts}.`, apply: (run) => mend(run, C.ramparts) },
+  { id: 'ramparts', name: 'Ramparts', rarity: 'Rare', text: `Mends the base by ${C.ramparts}.`, useful: hurtBase, apply: (run) => mend(run, C.ramparts) },
   skillCard('trance', 'Battle trance', 'Legendary', { kind: 'frenzy', mul: 2, every: 2, time: 1 }),
   skillCard('uplink', 'Orbital uplink', 'Legendary', { kind: 'barrage', hits: 4, ap: 1, every: 2, radius: 1.5 }),
   skillCard('banner', 'Banner of glory', 'Legendary', { kind: 'aura', stat: 'hit', n: 1, radius: 2 }),
-  { id: 'heroes', name: 'Heroes of the hour', rarity: 'Legendary', text: 'Every crafted unit levels up for free.', apply: (run) => { unitTowers(run).forEach(applyLevel); } },
+  { id: 'heroes', name: 'Heroes of the hour', rarity: 'Legendary', text: 'Every crafted unit levels up for free.',
+    useful: (run) => unitTowers(run).some(below), apply: (run) => { unitTowers(run).forEach(applyLevel); } },
   {
     id: 'chains', name: 'Chains', rarity: 'Legendary', text: `Holds last ${pct(C.holdMul - 1)} longer, and a let-go enemy can't be grabbed again for ${C.regrabAdd} s more.`,
-    apply: (run) => { run.mods.holdMul *= C.holdMul; run.mods.regrabAdd += C.regrabAdd; },
+    useful: holds, apply: (run) => { run.mods.holdMul *= C.holdMul; run.mods.regrabAdd += C.regrabAdd; },
   },
   { id: 'line', name: 'Hold the line', rarity: 'Legendary', text: '{unit}: +2 Tough (holds walkers longer).', unit: grounded, apply: (_, t) => { t!.tough += 2; } },
 ];
@@ -86,11 +93,18 @@ export const CARDS: TrainingCard[] = [
 export const cardById = (id: string) => CARDS.find((c) => c.id === id);
 const RANK: Record<RelicTier, number> = { Common: 0, Rare: 1, Legendary: 2 };
 
-/** Draw TRAINING.cards.offer cards: rarity by the odds, no card twice, unit cards to a crafted unit they fit. */
+/** Would card `c` do something if drawn now: open (Drill Honours), a unit card with a crafted unit it fits, a whole-run
+ *  card whose `useful` holds (no mending a full base, no free levels with every unit at its cap, no longer holds with no
+ *  unit to hold). */
+export const cardUseful = (run: TrainingRun, c: TrainingCard): boolean =>
+  cardOpen(run, c.id) && (c.unit ? unitTowers(run).some(c.unit) : c.useful?.(run) ?? true);
+
+/** Draw TRAINING.cards.offer cards: rarity by the odds, no card twice, only useful ones (cardUseful), unit cards to a
+ *  crafted unit they fit. */
 export function drawCards(run: TrainingRun): CardDraw[] {
   const units = unitTowers(run);
   const out: CardDraw[] = [];
-  const fits = (c: TrainingCard) => cardOpen(run, c.id) && !out.some((d) => d.id === c.id) && (!c.unit || units.some(c.unit));
+  const fits = (c: TrainingCard) => !out.some((d) => d.id === c.id) && cardUseful(run, c);
   for (let i = 0; i < C.offer + perkOf(run, 'offer'); i++) {
     const r = rand(run);
     const want: RelicTier = r < C.odds.Legendary ? 'Legendary' : r < C.odds.Legendary + C.odds.Rare ? 'Rare' : 'Common';

@@ -107,6 +107,7 @@ describe('drill honours', () => {
     const trinket = { id: TRINKET_CARD, rarity: 'Rare', trinket: 'lucky-coin' } as NonNullable<TrainingRun['offer']>[number];
     const run = drilled({ ...all(), perks: { reroll: 1 } }, { offer: [{ id: 'aim', rarity: 'Common' }, trinket] });
     expect(rerollsLeft(run)).toBe(1);
+    run.baseHp -= 5; // so the mending cards are useful too (cardUseful): enough to fill the offer with no unit crafted
     rerollCards(run);
     expect(run.offer).toContainEqual(trinket);
     expect(run.offer!.length).toBe(TRAINING.cards.offer + 1);

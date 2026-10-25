@@ -34,6 +34,7 @@ export * from './siegeBoard';
 export * from './dps';
 export * from './clock';
 export * from './emplacements';
+export * from './moves';
 export * from './waveKinds';
 export * from './flightLane';
 export * from './finaleCore';

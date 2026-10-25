@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TRAINING } from '../downtimeData';
-import { CARDS, autoCardIndex, cardById, cardText, drawCards, offerCards, pickCard } from './cards';
+import { CARDS, autoCardIndex, cardById, cardText, cardUseful, drawCards, offerCards, pickCard } from './cards';
 import { blankRun } from './testRun';
 import type { TrainingRun, UnitTower } from './types';
 
@@ -83,5 +83,24 @@ describe('cards', () => {
     const run = blankRun();
     run.offer = [{ id: 'walls', rarity: 'Common' }, { id: 'heroes', rarity: 'Legendary' }, { id: 'bounty', rarity: 'Rare' }];
     expect(autoCardIndex(run)).toBe(1);
+  });
+
+  it('offers only cards that would do something now (cardUseful)', () => {
+    const c = (id: string) => cardById(id)!;
+    const run = blankRun(2);
+    run.baseHp = TRAINING.baseHp;
+    expect(['walls', 'ramparts', 'heroes', 'nets', 'chains', 'promote', 'aim'].map((id) => cardUseful(run, c(id)))).toEqual(Array(7).fill(false));
+    expect(cardUseful(run, c('bounty'))).toBe(true);
+    for (let i = 0; i < 20; i++) expect(drawCards(run).map((d) => d.id)).not.toContain('walls');
+    run.baseHp -= 1;
+    expect(cardUseful(run, c('walls'))).toBe(true);
+    const t = unit();
+    run.pieces.push(t);
+    expect(['heroes', 'nets', 'chains', 'promote'].map((id) => cardUseful(run, c(id)))).toEqual(Array(4).fill(true));
+    t.up = t.cap;
+    expect(cardUseful(run, c('heroes'))).toBe(false);
+    expect(cardUseful(run, c('promote'))).toBe(false);
+    t.category = 'Aircraft' as UnitTower['category'];
+    expect(cardUseful(run, c('nets'))).toBe(false);
   });
 });

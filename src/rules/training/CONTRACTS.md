@@ -15,6 +15,8 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | pieces (shard → unit swap on craft) | run.ts (craft, via recipes.unitTower) |
 | pieces (shard → DefaultTower swap on a default craft; key, name, slots) | emplacements.ts (craftDefault, via defaultTower) |
 | UnitTower.up / cap / tough growth | economy.ts (buyLevel, applyLevel) |
+| DefaultTower.upgraded | emplacements.ts (upgradeDefault) |
+| moved; a unit's x, y on a Scout move, and two pieces' x, y on an Ambush swap | moves.ts (run.startWave clears moved) |
 | Tower combat fields (guns clocks, boost, dmgBoost, frenzy, holding, holdLeft, kills, dealt, skills cd) | combat.ts |
 | UnitTower.grit, UnitTower.relics (set at craft), TowerGun.relic | recipes.unitTower (via veterans.gritOf, relics.socketsOf) |
 | UnitTower.relics[].cd, Tower.rush, UnitTower.brace (set), dmgBoost from a brace ward | relics.ts (run.startWave resets via resetSockets, rush, brace 0) |
@@ -314,13 +316,20 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `spawnOne(run, plan): Enemy` — one spawn (spawnDue and the nemesis's brood); a nemesis plan gets `nem`; noteMet. speedOf × nem.speed × the lord's Surge × affixes.affixPace; a real lord's plan gets `lord`, an Armoured one `hard`.
 
 ### cards.ts
-- `interface TrainingCard { id; name; rarity; text; unit?(t); apply(run, t?) }`, `CARDS: TrainingCard[]`
-- `drawCards(run): CardDraw[]` (only drill.cardOpen cards; offer + the Wider choice perk), `cardById(id)`
+- `interface TrainingCard { id; name; rarity; text; unit?(t); useful?(run); apply(run, t?) }`, `CARDS: TrainingCard[]`
+- `cardUseful(run, c: TrainingCard): boolean` — drill.cardOpen, and a unit card with a crafted unit `unit` fits, a whole-run card whose `useful` holds (no mending a full base, no Heroes with every unit at its cap, no longer holds with no grounded unit to hold).
+- `drawCards(run): CardDraw[]` (only cardUseful cards; offer + the Wider choice perk), `cardById(id)`
 - `rerollsLeft(run)`, `rerollProblem(run)`, `rerollCards(run)` — the Second thoughts perk: re-draw the offer (a trinket card stays), run.rerolls++.
 - `offerCards(run): void` — sets run.offer unless one is on offer; trinkets.trinketOffer may add a 4th (trinket) card. cardText / pickCard branch on isTrinketCard.
 - `cardText(run, d: CardDraw): { name; text }`
 - `pickCard(run, i: number): void` — apply, push to run.cards, clear offer, log.
 - `autoCardIndex(run): number`
+
+### moves.ts (Scout and Ambush)
+- UnitTower.scout / .ambush — set by recipes.unitTower from the datasheet's Scout / Ambush rule.
+- `scoutMoveProblem(run, id, x, y): string | null` / `scoutMove(run, id, x, y)` — build phase, a unit with `scout`, not yet moved this build phase; (x, y) passes map.noBuild, overlaps no other piece (its own old spot is fine), and leaves the route open.
+- `ambushSwapProblem(run, id, otherId): string | null` / `ambushSwap(run, id, otherId)` — build phase, a unit with `ambush`, not yet moved; swaps x, y with any other piece (defence, unit, Shard, rubble; the route must stay open, which a swap of 2×2 pieces always does).
+- Either move pushes the unit's id to `run.moved` (one move a build phase, whichever rule), logs, throws on a problem; `hasMoved(run, id)`.
 
 ### save.ts
 - `saveKey(forceId): string` (done) — `trainingRun:<forceId>`.
@@ -332,7 +341,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus, opts: { drill?: RunDrill; siege?: string; final?: number } = {}): TrainingRun` — run.finale = finale.newFinale(opts.final ?? finale.from, siege); — run.drill = a copy of opts.drill (unset: everything open), credits + drill.purseOf; run.siege = opts.siege (the UI then passes no story, nexus or drill, and seed = sortie.weekSeed(week)); run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
 - `startProblem(run): string | null` — build phase, draft step 'done', no card offer pending, no Victory pending.
 - `victoryProblem(run)`, `continueEndless(run)` (victory 'endless'; credits past finale.endlessCarry are left behind), `bankVictory(run)` (victory 'banked', endRun).
-- `startWave(run): void` — wave++, phase 'wave', t 0, leaked 0, queue = finale.finalePlan(run, lords.lordPlan(run, nemesis.nemesisPlan(run, waves.planWave(...)))); gun clocks reset.
+- `startWave(run): void` — wave++, phase 'wave', t 0, leaked 0, moved cleared, queue = finale.finalePlan(run, lords.lordPlan(run, nemesis.nemesisPlan(run, waves.planWave(...)))); gun clocks reset.
 - `step(run, dt): void` — see the order above.
 - `craftProblem(run, unitId, uses: number[], onId: number): string | null` — build phase, not crafted, `uses` satisfy the recipe (recipeUses-style check), onId ∈ uses; if any of `uses` is a draft piece the draft must be at step 'keep' (the craft is then this draft's keep).
 - `craft(run, unit: Unit, uses: number[], onId: number): void` — Shard onId becomes recipes.unitTower (same id/cell); other uses → rubble; draft pieces used → shards.crumbleDraft(run, []) after; push unitId to crafted.

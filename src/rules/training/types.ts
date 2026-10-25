@@ -97,7 +97,7 @@ export interface RubblePiece extends PieceBase {
   kind: 'rubble';
 }
 
-/** A crafted unit: a real tower from its datasheet. Fixed where it was crafted. */
+/** A crafted unit: a real tower from its datasheet. Fixed where it was crafted, bar a Scout or Ambush move (moves.ts). */
 export interface UnitTower extends PieceBase, Armed {
   kind: 'unit';
   unitId: string;
@@ -141,6 +141,9 @@ export interface UnitTower extends PieceBase, Armed {
   trinket?: string;
   /** Times the cover penalty on its shots (region quirks; 1 if unset). */
   coverMul?: number;
+  /** Datasheet Scout / Ambush: once a build phase it may move to any open spot / swap places with another piece (moves.ts). */
+  scout?: boolean;
+  ambush?: boolean;
   /** What it did this run, for the quirk it may pick up (tally.ts): damage by shots and blows, and holds. */
   tally?: Tally;
 }
@@ -310,6 +313,8 @@ export interface TrainingRun {
   recipes: Recipe[];
   /** Units crafted this run (each only once). */
   crafted: string[];
+  /** Units (piece ids) that made their Scout or Ambush move this build phase (moves.ts); cleared when a wave starts. */
+  moved?: number[];
   enemies: Enemy[];
   queue: SpawnPlan[];
   /** Cover patches, each by its top-left cell (TRAINING.cover.size square). */

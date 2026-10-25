@@ -65,6 +65,7 @@ export function startWave(run: TrainingRun): void {
   run.phase = 'wave';
   run.t = 0;
   run.leaked = 0;
+  run.moved = undefined; // Scout and Ambush moves come back for the next build phase (moves.ts)
   run.queue = finalePlan(run, lordPlan(run, nemesisPlan(run, planWave(run, run.wave))));
   for (const p of run.pieces) {
     if (p.kind === 'rubble') continue;

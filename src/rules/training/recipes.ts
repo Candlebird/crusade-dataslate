@@ -210,5 +210,6 @@ export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): Uni
     ...(grit !== 1 ? { grit } : {}), ...(relics.length ? { relics } : {}),
     ...(u.quirks?.length ? { quirks: [...u.quirks] } : {}), ...(u.trinket ? { trinket: u.trinket } : {}),
     ...(coverMulOf(h) !== 1 ? { coverMul: coverMulOf(h) } : {}),
+    ...(hasRule(u.rules, 'Scout') ? { scout: true } : {}), ...(hasRule(u.rules, 'Ambush') ? { ambush: true } : {}),
   };
 }
