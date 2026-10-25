@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
-import { emptyUnitBattle, participationXp, resolveBattle, restartInput, rewardRows, type BattleInput } from './battle';
+import { emptyUnitBattle, materialsLine, participationXp, resolveBattle, restartInput, rewardRows, type BattleInput } from './battle';
+import { emptyNexus } from './nexus';
 
 function setup() {
   const f = newForce('Test');
@@ -55,6 +56,23 @@ describe('battle resolution', () => {
     expect(out.rp).toBe(3);
     expect(out.supply).toBe(50);
     expect(f.ledger.reduce((n, l) => n + l.rp, 0)).toBe(3);
+  });
+
+  it('counts a reward’s Materials for a Nexus force, for the wizard to bank', () => {
+    const { f, input, id } = setup();
+    f.nexus = emptyNexus('A');
+    input.rewards.main = { roll: 2, alloc: {}, target: '' }; // +100 Supply Limit and +100 Materials
+    const out = resolveBattle(f, input, id);
+    expect([out.materials, out.supply]).toEqual([100, 100]);
+    expect(out.summary).toContain(materialsLine(100));
+  });
+
+  it('banks no Materials for a force outside Nexus Wars', () => {
+    const { f, input, id } = setup();
+    input.rewards.main = { roll: 2, alloc: {}, target: '' };
+    const out = resolveBattle(f, input, id);
+    expect([out.materials, out.supply]).toEqual([0, 100]);
+    expect(out.summary).toContain('Materials only go to a Nexus Wars faction: none banked.');
   });
 
   it('adds sub-table, suffering and risky gamble rows', () => {

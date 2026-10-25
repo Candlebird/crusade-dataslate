@@ -82,11 +82,12 @@ export function scaledReward(r: ExpeditionReward, stage: number): Required<Exped
     supply: Math.round(((r.supply ?? 0) * m) / 5) * 5,
     rp: r.rp ?? 0,
     us: r.us ?? 0,
+    materials: Math.round(((r.materials ?? 0) * m) / 5) * 5,
   };
 }
 
 export function rewardText(r: ExpeditionReward): string {
-  const parts = [r.xp ? `+${r.xp} XP each` : '', r.supply ? `+${r.supply} Supply` : '', r.rp ? `+${r.rp} RP` : '', r.us ? `+${r.us} US` : ''];
+  const parts = [r.xp ? `+${r.xp} XP each` : '', r.supply ? `+${r.supply} Supply` : '', r.rp ? `+${r.rp} RP` : '', r.us ? `+${r.us} US` : '', r.materials ? `+${r.materials} Materials` : ''];
   return parts.filter(Boolean).join(', ') || 'nothing';
 }
 
@@ -95,6 +96,7 @@ const addReward = (a: Required<ExpeditionReward>, b: ExpeditionReward) => {
   a.supply += b.supply ?? 0;
   a.rp += b.rp ?? 0;
   a.us += b.us ?? 0;
+  a.materials = (a.materials ?? 0) + (b.materials ?? 0);
 };
 
 export function startExpedition(siteId: string, squad: string[], rand: Rand = Math.random): Expedition {
@@ -109,7 +111,7 @@ export function startExpedition(siteId: string, squad: string[], rand: Rand = Ma
   const variants = deck.map((id) => Math.floor(rand() * site.encounters.find((x) => x.id === id)!.variants.length));
   return {
     site: siteId, squad: squad.slice(0, EXPEDITION.squadMax), deck, variants, stage: 0, phase: 'encounter',
-    haul: { xp: 0, supply: 0, rp: 0, us: 0 }, danger: 0, injuries: [], log: [], finished: false,
+    haul: { xp: 0, supply: 0, rp: 0, us: 0, materials: 0 }, danger: 0, injuries: [], log: [], finished: false,
   };
 }
 
@@ -134,7 +136,7 @@ export function chooseOption(e: Expedition, index: number, bonus = 0, rand: Rand
   const allOnes = !!dice && dice.every((x) => x === 1);
   const success = !check || (!allOnes && total >= check.target);
   const fumble = !!check && !success && (allOnes || total <= check.target - EXPEDITION.fumbleMiss);
-  const gained = success ? scaledReward(choice.reward, e.stage) : { xp: 0, supply: 0, rp: 0, us: 0 };
+  const gained = success ? scaledReward(choice.reward, e.stage) : { xp: 0, supply: 0, rp: 0, us: 0, materials: 0 };
   if (success) addReward(e.haul, gained);
   else e.danger += fumble ? EXPEDITION.fumbleDanger : EXPEDITION.failDanger;
   const text = success ? choice.win : choice.lose;
@@ -184,8 +186,11 @@ export function pressOn(e: Expedition, rand: Rand = Math.random): PressOnResult 
   return { roll, ambush };
 }
 
-/** Pay the haul and the injuries to the force. Returns a one-line summary. */
-export function applyExpedition(force: Force, e: Expedition, date: string, newId: () => string): string {
+/**
+ * Pay the haul and the injuries to the force. Its Materials are banked by the caller (depositNearest), which passes
+ * where they went as `banked` for the summary. Returns a one-line summary.
+ */
+export function applyExpedition(force: Force, e: Expedition, date: string, newId: () => string, banked?: string): string {
   const site = expeditionSite(e.site)!;
   const squad = force.units.filter((u) => e.squad.includes(u.id) && u.status !== 'removed');
   for (const u of squad) u.xp += e.haul.xp;
@@ -202,7 +207,9 @@ export function applyExpedition(force: Force, e: Expedition, date: string, newId
     }
   }
   force.umbraShards += e.haul.us;
-  const summary = [`Expedition — ${site.name}${e.finished ? ' (completed)' : ''}: ${rewardText(e.haul)}`, ...hurt].join('; ');
+  const got = rewardText(banked ? { ...e.haul, materials: 0 } : e.haul);
+  const haul = banked ? (got === 'nothing' ? banked : `${got}, ${banked}`) : got;
+  const summary = [`Expedition — ${site.name}${e.finished ? ' (completed)' : ''}: ${haul}`, ...hurt].join('; ');
   force.ledger.push({ id: newId(), date, label: summary, rp: e.haul.rp, supply: e.haul.supply, ...(e.haul.us ? { us: e.haul.us } : {}) });
   return summary;
 }

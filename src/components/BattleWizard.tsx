@@ -7,6 +7,7 @@ import { AGENDAS, MARKED_XP, MAX_AGENDAS, REWARD_TABLES, SCAR_TABLE, type Reward
 import { matchBonusesEarned } from '../rules/detachments';
 import { unitsBusy } from '../rules/tasks';
 import { ECHOES, currentRound, emptyNexusPick, markUnitsUsed, nexusEntry, nexusGeneration, recordSectorGame, unitsUsed, type NexusContext, type NexusPick } from '../rules/nexus';
+import { depositNearest, depositText, rewardOrigin } from '../rules/production';
 import { deathDiceCount, deathOutcome, forceTotals, levelForXp, rollDice, rollDie, type DeathOutcome } from '../rules/engine';
 import {
   RESULT_LABEL,
@@ -14,6 +15,7 @@ import {
   emptyPick,
   emptyUnitBattle,
   mainTable,
+  materialsLine,
   participationXp,
   resolveBattle,
   restartInput,
@@ -125,8 +127,21 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       ? `${preview.warnings.length} unresolved item(s):\n\n${preview.warnings.join('\n')}\n\nApply anyway?`
       : `Apply this battle to ${f.name}? It updates XP, scars, RP and Supply.`;
     if (!confirmAction(msg)) return;
+    // Materials go to the faction's bank nearest the battle (or where the force stands, for a skirmish).
+    let banked = '';
+    if (preview.materials && linked)
+      update((d) => {
+        const c = d.campaign;
+        if (!c) return;
+        banked = depositText(preview.materials, depositNearest(c, factionId!, preview.materials, rewardOrigin(c, f, input.sectorId)));
+        c.updatedAt = new Date().toISOString();
+      });
+    else if (preview.materials) banked = `${preview.materials} Materials, but this force isn't in the campaign: none banked`;
+    const swap = (lines: string[]) => lines.map((l) => (banked && l === materialsLine(preview.materials) ? banked : l));
     updateForce(f.id, (d) => {
       resolveBattle(d, full, uid);
+      const log = d.battleLog?.[d.battleLog.length - 1];
+      if (log) log.summary = swap(log.summary);
       if (linked && !mainBattle) markUnitsUsed(d, campaign!, Object.keys(full.units).filter((id) => full.units[id].in));
       if (full.patrol && linked && d.nexus) d.nexus.patrolRound = currentRound(campaign!);
     });
@@ -152,7 +167,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       update((d) => {
         if (d.battle?.id === source.battle.id && !d.battle.recorded.includes(source.side)) d.battle.recorded.push(source.side);
       });
-    setApplied(preview);
+    setApplied({ ...preview, summary: swap(preview.summary) });
     toast('Battle recorded.');
   };
 

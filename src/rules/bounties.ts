@@ -7,7 +7,7 @@ import { isHero } from './lists';
 import { marauderTier } from './marauders';
 import { currentRound, factionName } from './nexus';
 import { BOUNTY, BOUNTY_KINDS, STRONGHOLDS } from './nexusData';
-import { depositBanked } from './production';
+import { depositNearest, depositText, rewardOrigin } from './production';
 import { randomRelic } from './relicPick';
 import type { FinishedBattle } from './tracker';
 import { resultFor } from './tracker';
@@ -225,8 +225,8 @@ export function claimBounty(c: Campaign, b: Bounty, factionId: string, forces: F
   const bits: string[] = [];
   for (const r of b.rewards) {
     if (r.kind === 'materials') {
-      const n = depositBanked(c, factionId, r.n);
-      if (n) bits.push(`+${n} Materials`);
+      const at = c.log.find((e) => e.id === eventId)?.sectorId;
+      bits.push(depositText(r.n, depositNearest(c, factionId, r.n, rewardOrigin(c, force, at))));
     } else if (r.kind === 'research' || r.kind === 'blueprints' || r.kind === 'cores' || r.kind === 'archives') {
       f[r.kind] = (f[r.kind] ?? 0) + r.n;
       bits.push(`+${rewardText(r)}`);

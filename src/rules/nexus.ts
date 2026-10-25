@@ -7,7 +7,8 @@ import {
 import { explore } from './fog';
 import { MARAUDER_ID, unrecordMarauderGame } from './marauders';
 import { settleGame, unsettleGame } from './movement';
-import { bankCap, hasBuilding, loseBank, produces } from './production';
+import { isPlaced } from './hexmap';
+import { deposited, depositNearest, hasBuilding, loseBank } from './production';
 import { hasPerk } from './warlords';
 
 // Nexus Wars: what a faction earns each round and after each match. The tables and costs live in nexusData.ts;
@@ -100,7 +101,7 @@ export function changeHands(s: Sector, owner: string, undo: NonNullable<Campaign
 
 /**
  * Roll the slain guardian's loot for the faction that beat it: D6 + its tier's bonus (GUARDIAN_LOOT), and give it.
- * Materials go to the sector's bank (or the faction's home, if the sector has none), up to the bank's cap.
+ * Materials go to the faction's bank nearest the fight with room (spilling into the next nearest), up to each bank's cap.
  */
 export function rollGuardianLoot(c: Campaign, s: Sector, g: Pick<SectorGuardian, 'tier'>, factionId: string, rand = Math.random): NonNullable<CampaignEvent['loot']> | undefined {
   const f = c.factions.find((x) => x.id === factionId);
@@ -110,12 +111,11 @@ export function rollGuardianLoot(c: Campaign, s: Sector, g: Pick<SectorGuardian,
   const l = T[roll - 1];
   const loot: NonNullable<CampaignEvent['loot']> = { roll, id: l.id, name: l.name, factionId };
   if (l.id === 'materials') {
-    const bank = produces(s) ? s : c.sectors.find((x) => x.type === 'home' && x.owner === factionId);
-    if (bank) {
-      const before = bank.bank ?? 0;
-      bank.bank = Math.max(before, Math.min(bankCap(bank, c), before + (l.amount ?? 0)));
-      loot.amount = bank.bank - before;
-      loot.sectorId = bank.id;
+    const d = depositNearest(c, factionId, l.amount ?? 0, isPlaced(s) ? s : undefined);
+    loot.amount = deposited(d);
+    if (d.length) {
+      loot.sectorId = d[0].sectorId;
+      if (d.length > 1) loot.banks = Object.fromEntries(d.map((x) => [x.sectorId, x.n]));
     }
   } else if (l.id === 'research') {
     loot.amount = l.amount ?? 0;
@@ -130,8 +130,10 @@ function returnGuardianLoot(c: Campaign, loot: NonNullable<CampaignEvent['loot']
   const f = c.factions.find((x) => x.id === loot.factionId);
   const take = (n: number | undefined, k: number) => Math.max(0, (n ?? 0) - k) || undefined;
   if (loot.id === 'materials') {
-    const s = c.sectors.find((x) => x.id === loot.sectorId);
-    if (s && s.owner === loot.factionId) s.bank = take(s.bank, loot.amount ?? 0);
+    for (const [id, n] of Object.entries(loot.banks ?? (loot.sectorId ? { [loot.sectorId]: loot.amount ?? 0 } : {}))) {
+      const s = c.sectors.find((x) => x.id === id);
+      if (s && s.owner === loot.factionId) s.bank = take(s.bank, n);
+    }
   }
   if (!f) return;
   if (loot.id === 'research') f.research = take(f.research, loot.amount ?? 0);

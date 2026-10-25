@@ -188,11 +188,16 @@ export interface BattleOutcome {
   rp: number;
   supply: number;
   us: number;
+  /** Materials won (Nexus Wars): banked by the wizard at the faction's bank nearest the battle (materialsLine in the summary). */
+  materials: number;
   /** Nexus Wars lines (rolls, unlocks, relics). */
   nexus: string[];
   warnings: string[];
   summary: string[];
 }
+
+/** The summary line for a battle's Materials until they're banked (the wizard swaps in where they went). */
+export const materialsLine = (n: number) => `+${n} Materials for the bank nearest the battle`;
 
 export function resolveBattle(force: Force, input: BattleInput, newId: () => string): BattleOutcome {
   const units = force.units.filter((u) => u.status !== 'removed' && input.units[u.id]);
@@ -204,6 +209,8 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
   const free: Record<string, string[]> = {};
   const byId = new Map(units.map((u) => [u.id, u]));
   let us = 0;
+  let materials = 0;
+  let lostMaterials = false;
   /** Nexus rewards from the reward tables, applied once last match's Nexus items expire. */
   const nexusRewards: { source: string; tokens: number; manipulation: boolean }[] = [];
 
@@ -223,7 +230,11 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
       warnings.push(`${row.source}: not rolled yet.`);
       continue;
     }
-    if (e.rp || e.supply || e.us) {
+    if (e.materials) {
+      if (force.nexus) materials += e.materials;
+      else lostMaterials = true;
+    }
+    if (e.rp || e.supply || e.us || e.materials) {
       ledger.push({ label: `${row.source}: ${e.text}`, rp: e.rp ?? 0, supply: e.supply ?? 0, ...(e.us ? { us: e.us } : {}) });
       us += e.us ?? 0;
     }
@@ -348,6 +359,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
           const label = `${src}${pick.roll && item.kind !== 'medicae' ? ` (${pick.roll})` : ''}: ${e.text}`;
           if (e.us) addUs(label, e.us);
           if (e.supply) addSupply(label, e.supply);
+          if (e.materials) materials += e.materials;
           if (e.xp) {
             let given = 0;
             for (const [id, xp] of Object.entries(pick.alloc)) {
@@ -459,6 +471,8 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
   const rp = ledger.reduce((n, l) => n + l.rp, 0);
   const supply = ledger.reduce((n, l) => n + l.supply, 0);
   summary.push(...nexusLines);
+  if (materials) summary.push(materialsLine(materials));
+  if (lostMaterials) summary.push('Materials only go to a Nexus Wars faction: none banked.');
   summary.push(`Force: +${rp} RP${supply ? `, +${supply} Supply Limit` : ''}${us ? `, +${us} Umbra Shard${us > 1 ? 's' : ''}` : ''}`);
 
   force.battleLog ??= [];
@@ -470,5 +484,5 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
     ...(input.from ? { battleId: input.from.battleId, sideId: input.from.sideId } : {}),
   });
 
-  return { units: outcomes, ledger, rp, supply, us, nexus: nexusLines, warnings, summary };
+  return { units: outcomes, ledger, rp, supply, us, materials, nexus: nexusLines, warnings, summary };
 }

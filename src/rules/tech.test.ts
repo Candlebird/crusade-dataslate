@@ -7,7 +7,7 @@ import { randomLoadout } from './echoForce';
 import { ECHOES, emptyNexus, incomeItems, nexusEntry, recordSectorGame, removeSectorGame, rollGuardianLoot } from './nexus';
 import { BUILDINGS, GUARDIAN_LOOT, NEXUS_TECH, PRODUCTION, TECH_BRANCHES } from './nexusData';
 import {
-  bankCap, buildBlock, buildingSlots, coreBlock, exchange, exchangeBlock, installCore, produceCost, productionRate, tradeBonus,
+  bankCap, buildBlock, buildingSlots, depositNearest, depositText, rewardOrigin, coreBlock, exchange, exchangeBlock, installCore, produceCost, productionRate, tradeBonus,
 } from './production';
 import { accrueResearch, knows, research, researchBlock, researchRate, techStatus } from './tech';
 
@@ -171,12 +171,32 @@ describe('Guardian loot', () => {
     expect(faction(c, 'A').cores).toBe(1);
   });
 
-  it('banks Materials at the sector, or home if it has no bank', () => {
+  it('banks Materials at the bank nearest the fight, spilling into the next nearest', () => {
     const c = campaign();
+    sector(c, 'near').owner = 'A';
+    const amount = GUARDIAN_LOOT.table[0].amount!;
     const loot = rollGuardianLoot(c, sector(c, 'near'), guardian('Common'), 'A', () => 0)!;
-    expect([loot.sectorId, loot.amount, sector(c, 'near').bank]).toEqual(['near', GUARDIAN_LOOT.table[0].amount, GUARDIAN_LOOT.table[0].amount]);
+    expect([loot.sectorId, loot.amount, sector(c, 'near').bank]).toEqual(['near', amount, amount]);
+    // A research station has no bank: the nearest of A's banks (A Planet 2, 3 hexes off) takes it.
+    delete sector(c, 'near').owner;
+    const pA2 = sector(c, 'pA2');
+    pA2.bank = bankCap(pA2, c) - 40;
     const station = rollGuardianLoot(c, sector(c, 'mid'), guardian('Common'), 'A', () => 0)!;
-    expect([station.sectorId, sector(c, 'hA').bank]).toEqual(['hA', GUARDIAN_LOOT.table[0].amount]);
+    expect([station.sectorId, station.amount, station.banks]).toEqual(['pA2', amount, { pA2: 40, pA: amount - 40 }]);
+    expect([pA2.bank, sector(c, 'pA').bank, sector(c, 'hA').bank]).toEqual([bankCap(pA2, c), amount - 40, undefined]);
+  });
+
+  it('takes spilled Materials back from every bank when its game is deleted', () => {
+    const c = campaign();
+    const s = sector(c, 'mid');
+    s.guardian = guardian('Common');
+    const pA2 = sector(c, 'pA2');
+    pA2.bank = bankCap(pA2, c) - 40;
+    const e: CampaignEvent = { id: 'g', date: '', round: 1, sectorId: 'mid', attacker: 'A', defender: ECHOES.id, winner: 'A', notes: '' };
+    recordSectorGame(c, e, () => 0); // 1: Salvaged Materials
+    expect(e.loot?.banks).toEqual({ pA2: 40, pA: GUARDIAN_LOOT.table[0].amount! - 40 });
+    removeSectorGame(c, 'g');
+    expect([pA2.bank, sector(c, 'pA').bank]).toEqual([bankCap(pA2, c) - 40, undefined]);
   });
 
   it('is rolled when the game is recorded and given back when it is deleted', () => {
@@ -188,5 +208,32 @@ describe('Guardian loot', () => {
     expect([e.loot?.id, faction(c, 'A').research]).toEqual(['research', GUARDIAN_LOOT.table[5].amount]);
     removeSectorGame(c, 'g');
     expect(faction(c, 'A').research).toBeUndefined();
+  });
+});
+
+describe('Materials rewards', () => {
+  it('go to the bank nearest the force, then the next nearest, home first without a position', () => {
+    const c = campaign();
+    expect(depositNearest(c, 'A', 100, { q: 3, r: 0 })).toEqual([{ sectorId: 'pA2', name: 'A Planet 2', n: 100 }]);
+    const pA2 = sector(c, 'pA2');
+    pA2.bank = bankCap(pA2, c) - 30;
+    const d = depositNearest(c, 'A', 100, { q: 3, r: 0 });
+    expect(d.map((x) => [x.sectorId, x.n])).toEqual([['pA2', 30], ['pA', 70]]);
+    expect(depositText(100, d)).toBe('+100 Materials to A Planet 2 (30) and A Planet (70)');
+    expect(depositNearest(c, 'A', 50).map((x) => x.sectorId)).toEqual(['hA']);
+  });
+
+  it('say so when no bank has room', () => {
+    const c = campaign();
+    for (const s of c.sectors) if (s.owner === 'A') s.bank = bankCap(s, c);
+    expect(depositText(100, depositNearest(c, 'A', 100))).toBe("+100 Materials, but no bank had room");
+  });
+
+  it('start from the sector fought in, else where the force stands', () => {
+    const c = campaign();
+    const f = force('A');
+    c.positions = { [f.id]: { factionId: 'A', sectorId: 'pA2' } };
+    expect(rewardOrigin(c, f, 'mid')?.q).toBe(5);
+    expect(rewardOrigin(c, f)?.q).toBe(2);
   });
 });

@@ -70,10 +70,10 @@ describe('expeditions', () => {
     expect(checkOdds('heroic', EXPEDITION.bonusCap)).toBeGreaterThan(0.5);
   });
 
-  it('scales XP and Supply with depth, not RP or shards', () => {
-    expect(scaledReward({ xp: 1, supply: 25, rp: 1, us: 1 }, 0)).toEqual({ xp: 1, supply: 25, rp: 1, us: 1 });
-    expect(scaledReward({ xp: 1, supply: 25 }, 1)).toEqual({ xp: 2, supply: 40, rp: 0, us: 0 });
-    expect(scaledReward({ xp: 2, supply: 25 }, 2)).toEqual({ xp: 4, supply: 50, rp: 0, us: 0 });
+  it('scales XP, Supply and Materials with depth, not RP or shards', () => {
+    expect(scaledReward({ xp: 1, supply: 25, rp: 1, us: 1 }, 0)).toEqual({ xp: 1, supply: 25, rp: 1, us: 1, materials: 0 });
+    expect(scaledReward({ xp: 1, supply: 25, materials: 50 }, 1)).toEqual({ xp: 2, supply: 40, rp: 0, us: 0, materials: 75 });
+    expect(scaledReward({ xp: 2, supply: 25 }, 2)).toEqual({ xp: 4, supply: 50, rp: 0, us: 0, materials: 0 });
   });
 
   it('pays a success, adds danger on a fail and more on a fumble', () => {
@@ -154,7 +154,7 @@ describe('expeditions', () => {
     const f = newForce('Test');
     f.units.push(newUnit({ id: 'a', name: 'Alpha', xp: 0 }), newUnit({ id: 'b', name: 'Bravo', xp: 5 }), newUnit({ id: 'x', name: 'Home', xp: 0 }));
     const e = startExpedition('hulk', ['a', 'b']);
-    e.haul = { xp: 2, supply: 40, rp: 1, us: 1 };
+    e.haul = { xp: 2, supply: 40, rp: 1, us: 1, materials: 0 };
     e.injuries = [{ unitId: 'a', scar: 'Weakened Armor' }, { unitId: 'b' }];
     e.phase = 'done';
     let n = 0;
@@ -166,6 +166,16 @@ describe('expeditions', () => {
     expect(f.ledger[f.ledger.length - 1]).toMatchObject({ rp: 1, supply: 40, us: 1, date: '2026-10-20' });
     expect(summary).toMatch(/^Expedition — Derelict Space Hulk: \+2 XP each/);
     expect(summary).toMatch(/Bravo: Lost/);
+  });
+
+  it('names the bank its Materials went to instead of the bare amount', () => {
+    const f = newForce('Test');
+    f.units.push(newUnit({ id: 'a', name: 'Alpha', xp: 0 }));
+    const e = startExpedition('hulk', ['a']);
+    e.haul = { xp: 0, supply: 0, rp: 0, us: 0, materials: 100 };
+    e.phase = 'done';
+    expect(applyExpedition(structuredClone(f), e, '2026-10-20', () => 'x')).toMatch(/\+100 Materials$/);
+    expect(applyExpedition(f, e, '2026-10-20', () => 'x', '+100 Materials to Vesta')).toBe('Expedition — Derelict Space Hulk: +100 Materials to Vesta');
   });
 });
 

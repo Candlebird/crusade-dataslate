@@ -108,6 +108,8 @@ export interface NexusTableEntry {
   text: string;
   us?: number;
   supply?: number;
+  /** Materials: banked at the faction's producing sector nearest the battle. */
+  materials?: number;
   xp?: number;
   removeScar?: boolean;
   unlockAll?: boolean;
@@ -120,21 +122,21 @@ export interface NexusTableEntry {
 export const ANOMALY_TABLE: NexusTableEntry[] = [
   { text: '+3 Umbra Shards', us: 3 },
   { text: '+6 Umbra Shards', us: 6 },
-  { text: '+50 Supply', supply: 50 },
+  { text: '+50 Supply and +100 Materials', supply: 50, materials: 100 },
   { text: '+100 Supply', supply: 100 },
   { text: 'Remove 1 battle scar from a unit', removeScar: true },
   { text: 'All Nexus tables unlocked until your next round income', unlockAll: true },
-  { text: '+3 Umbra Shards and +50 Supply', us: 3, supply: 50 },
+  { text: '+3 Umbra Shards, +50 Supply and +50 Materials', us: 3, supply: 50, materials: 50 },
   { text: 'A Nexus trait token (any Nexus trait when a unit levels up)', traitToken: true },
   { text: '+9 Umbra Shards', us: 9 },
   { text: '+100 Supply and +3 Umbra Shards', supply: 100, us: 3 },
 ];
 
 export const VOID_TABLE: NexusTableEntry[] = [
-  { text: '3 XP to distribute', xp: 3 },
+  { text: '3 XP to distribute and +150 Materials', xp: 3, materials: 150 },
   { text: '6 XP to distribute and +3 Umbra Shards', xp: 6, us: 3 },
   { text: 'Upgrade one unit with any Nexus Trait when levelling up', traitToken: true },
-  { text: '+6 Umbra Shards', us: 6 },
+  { text: '+6 Umbra Shards and +100 Materials', us: 6, materials: 100 },
   { text: 'One free weapon upgrade', free: 'Free weapon upgrade' },
   { text: 'A Common Nexus Relic (Rare if none is available)', nexusRelic: true },
   { text: '+100 Supply and +3 Umbra Shards', supply: 100, us: 3 },
@@ -491,7 +493,7 @@ export interface GuardianLoot {
 
 /**
  * Guardian loot: on top of the chance at its relic, a slain guardian drops one roll on this table, D10 plus its tier's bonus (10 at
- * most). Materials go to the bank of the sector it guarded, if that produces, or else to the faction's home. The
+ * most). Materials go to the faction's bank nearest the sector it guarded (spilling to the next when full). The
  * Building Expansion is the only way to give a planet a third building slot.
  */
 /**

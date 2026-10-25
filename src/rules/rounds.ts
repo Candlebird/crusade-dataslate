@@ -328,6 +328,8 @@ export function roundIncomeItems(c: Campaign, factionId: string, snap: RoundSnap
 export interface RoundIncomeOutcome {
   us: number;
   supply: number;
+  /** Materials from Anomaly rolls: the caller banks them nearest the force (depositNearest). */
+  materials: number;
   lines: string[];
   warnings: string[];
 }
@@ -336,7 +338,7 @@ export interface RoundIncomeOutcome {
 export function resolveRoundIncome(
   force: Force, c: Campaign, rounds: RoundSnapshot[], items: NexusItem[], picks: Record<string, NexusPick>, date: string, newId: () => string,
 ): RoundIncomeOutcome {
-  const out: RoundIncomeOutcome = { us: 0, supply: 0, lines: [], warnings: [] };
+  const out: RoundIncomeOutcome = { us: 0, supply: 0, materials: 0, lines: [], warnings: [] };
   const n = force.nexus;
   if (!n || !rounds.length) return out;
   n.tempTables = [];
@@ -381,6 +383,7 @@ export function resolveRoundIncome(
         const label = `${src}${pick.roll && item.kind !== 'medicae' ? ` (${pick.roll})` : ''}: ${e.text}`;
         if (e.us) addUs(label, e.us);
         if (e.supply) addSupply(label, e.supply);
+        if (e.materials) out.materials += e.materials;
         if (e.removeScar) {
           const [unitId, scarId] = pick.target.split(':');
           const u = force.units.find((x) => x.id === unitId && x.status !== 'removed');
@@ -400,6 +403,6 @@ export function resolveRoundIncome(
   n.claimedRound = Math.max(n.claimedRound ?? 0, ...rounds.map((r) => r.round));
   force.umbraShards += out.us;
   const which = rounds.length === 1 ? `round ${rounds[0].round}` : `rounds ${rounds[0].round}–${rounds[rounds.length - 1].round}`;
-  out.lines.unshift(`${factionName(c, n.factionId)} income for ${which}: +${out.us} Umbra Shard${out.us === 1 ? '' : 's'}, +${out.supply} Supply.`);
+  out.lines.unshift(`${factionName(c, n.factionId)} income for ${which}: +${out.us} Umbra Shard${out.us === 1 ? '' : 's'}, +${out.supply} Supply${out.materials ? `, +${out.materials} Materials` : ''}.`);
   return out;
 }

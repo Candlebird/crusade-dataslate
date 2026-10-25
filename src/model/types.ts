@@ -680,7 +680,11 @@ export interface CampaignEvent {
   /** The detachment that attacked: it moves into the sector when it takes or holds it. */
   forceId?: string;
   /** The slain guardian's loot (GUARDIAN_LOOT): what it gave, and to whom, so deleting the entry can take it back. */
-  loot?: { roll: number; id: string; name: string; factionId: string; amount?: number; sectorId?: string };
+  loot?: {
+    roll: number; id: string; name: string; factionId: string; amount?: number;
+    /** The bank Materials went to (the first, if they spilled into more: `banks` then holds each bank's share). */
+    sectorId?: string; banks?: Record<string, number>;
+  };
   /** A game against a Marauder band (not for the sector): the band as it was, so deleting a win brings it back. */
   marauder?: Marauder;
   /** Materials a band took off the faction for barring its road (lost the fight), so deleting the entry gives them back. */

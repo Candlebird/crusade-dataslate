@@ -287,9 +287,9 @@ export function recordMarauderGame(c: Campaign, e: CampaignEvent, bandId: string
   c.marauders = c.marauders!.filter((x) => x.id !== m.id);
   if (!c.marauders.length) delete c.marauders;
   const s = c.sectors.find((x) => x.id === m.sectorId);
-  // The spoils go to the sector's bank if the winner holds it, otherwise home.
-  const bank = s?.owner === e.winner ? s : c.sectors.find((x) => x.type === 'home' && x.owner === e.winner);
-  if (bank) e.loot = rollGuardianLoot(c, bank, { tier: lootTier(c, m, e.winner) }, e.winner, rand);
+  // The spoils go to the winner's bank nearest where the band was beaten.
+  const at = s ?? c.sectors.find((x) => x.type === 'home' && x.owner === e.winner);
+  if (at) e.loot = rollGuardianLoot(c, at, { tier: lootTier(c, m, e.winner) }, e.winner, rand);
 }
 
 /** A deleted marauder game: the band it broke is back (if nothing took its place). */

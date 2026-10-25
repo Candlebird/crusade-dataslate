@@ -9,12 +9,13 @@ import {
   applyExpedition, checkOdds, checkText, chooseOption, currentEncounter, expeditionSite, headHome, pressOn, rewardText, scaledReward, squadBonus, startExpedition,
   type Expedition,
 } from '../rules/downtime';
+import { depositNearest, depositText, rewardOrigin } from '../rules/production';
 import { Modal, toast } from './ui';
 import { localDate } from '../model/date';
 
 /** Send up to three units on a short dice-story into the Nexus. Any number a round, but each unit goes once. */
 export default function ExpeditionModal({ force, c, onClose }: { force: Force; c: Campaign; onClose: () => void }) {
-  const { updateForce } = useStore();
+  const { update, updateForce } = useStore();
   const units = force.units.filter((u) => u.status === 'active');
   const used = unitsUsed(force, c);
   const [site, setSite] = useState(EXPEDITION_SITES[0].id);
@@ -31,8 +32,18 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
 
   const apply = (x: Expedition) => {
     let summary = '';
+    // The haul's Materials go to the faction's bank nearest this force.
+    let banked = '';
+    const materials = x.haul.materials ?? 0;
+    if (materials)
+      update((s) => {
+        const cc = s.campaign;
+        if (!cc || !force.nexus) return;
+        banked = depositText(materials, depositNearest(cc, force.nexus.factionId, materials, rewardOrigin(cc, force)));
+        cc.updatedAt = new Date().toISOString();
+      });
     updateForce(force.id, (d) => {
-      summary = applyExpedition(d, x, localDate(), uid);
+      summary = applyExpedition(d, x, localDate(), uid, banked || undefined);
       markUnitsUsed(d, c, x.squad);
     });
     setDone(summary);

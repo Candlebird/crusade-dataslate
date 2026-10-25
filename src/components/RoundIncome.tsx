@@ -4,13 +4,14 @@ import { uid } from '../model/factory';
 import type { Campaign, Force } from '../model/types';
 import { emptyNexusPick, type NexusPick } from '../rules/nexus';
 import { claimableRounds, resolveRoundIncome, roundIncomeItems } from '../rules/rounds';
+import { depositNearest, depositText, rewardOrigin } from '../rules/production';
 import NexusBox from './NexusBox';
 import { Modal, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
 
 /** Collect the sector income of every ended round this force's faction hasn't claimed yet (on any of its detachments). */
 export default function RoundIncome({ force, c, onClose }: { force: Force; c: Campaign; onClose: () => void }) {
-  const { state, updateForce } = useStore();
+  const { state, update, updateForce } = useStore();
   const [picks, setPicks] = useState<Record<string, NexusPick>>({});
   const n = force.nexus!;
   const rounds = useMemo(() => claimableRounds(c, n, state.forces), [c, n, state.forces]);
@@ -26,7 +27,16 @@ export default function RoundIncome({ force, c, onClose }: { force: Force; c: Ca
   const claim = () => {
     if (preview.warnings.length && !confirmAction(`${preview.warnings.join('\n')}\n\nClaim anyway? Anything unresolved is lost.`)) return;
     updateForce(force.id, (d) => void resolveRoundIncome(d, c, rounds, items, picks, date, uid));
-    toast(preview.lines[0]);
+    // Anomaly Materials go to the faction's bank nearest this force.
+    let banked = '';
+    if (preview.materials)
+      update((s) => {
+        const cc = s.campaign;
+        if (!cc) return;
+        banked = depositText(preview.materials, depositNearest(cc, n.factionId, preview.materials, rewardOrigin(cc, force)));
+        cc.updatedAt = new Date().toISOString();
+      });
+    toast(banked ? `${preview.lines[0]} ${banked}.` : preview.lines[0]);
     onClose();
   };
 

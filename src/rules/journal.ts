@@ -12,7 +12,7 @@ import { positionOf } from './movement';
 import { currentRound, homeOf } from './nexus';
 import { NEXUS_ROUNDS } from './nexusData';
 import { randomRelic } from './relicPick';
-import { depositBanked, withdrawBanked } from './production';
+import { depositNearest, depositText, rewardOrigin, withdrawBanked } from './production';
 
 // Crossroads Journal (Nexus Wars): once a round each faction's Warlord gets a vignette dealt from the tables in
 // journalData.ts. The player picks an approach (a check), answers the complication (a risky choice is a check too) and
@@ -413,8 +413,12 @@ export function pickOption(c: Campaign, id: string, index: number, forces: Force
   const bits: string[] = [];
   for (const e of r.effects) {
     if (e.kind === 'materials') {
-      const n = e.n > 0 ? depositBanked(c, f.id, e.n) : -withdrawBanked(c, f.id, -e.n);
-      if (n) bits.push(`${n > 0 ? '+' : '−'}${Math.abs(n)} Materials`);
+      // Found Materials go to the bank nearest the Warlord's force; lost ones come out of the fullest banks.
+      if (e.n > 0) bits.push(depositText(e.n, depositNearest(c, f.id, e.n, rewardOrigin(c, forces.find((x) => x.id === j.forceId)))));
+      else {
+        const n = withdrawBanked(c, f.id, -e.n);
+        if (n) bits.push(`−${n} Materials`);
+      }
     } else if (e.kind === 'research' || e.kind === 'blueprints' || e.kind === 'cores' || e.kind === 'archives') {
       f[e.kind] = (f[e.kind] ?? 0) + e.n;
       bits.push(`+${e.n} ${{ research: 'Research', blueprints: 'Blueprint', cores: 'Building Expansion', archives: 'Archive unlock' }[e.kind]}`);

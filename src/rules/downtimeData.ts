@@ -46,6 +46,8 @@ export interface ExpeditionReward {
   supply?: number;
   rp?: number;
   us?: number;
+  /** Materials: banked at the faction's producing sector nearest the force. */
+  materials?: number;
 }
 
 export interface ExpeditionChoice {
@@ -87,11 +89,11 @@ const LEAVE: ExpeditionChoice = { label: 'Leave it be', reward: {}, win: 'The sq
 export const EXPEDITION_SITES: ExpeditionSite[] = [
   {
     id: 'hulk', name: 'Derelict Space Hulk', desc: 'A dead ship drifting through the Nexus. Salvage and old relics, if the dark lets you keep them.',
-    finish: { text: 'Deep in the hulk the squad finds a sealed reliquary, still humming.', reward: { us: 3 } },
+    finish: { text: 'Deep in the hulk the squad finds a sealed reliquary, still humming.', reward: { us: 3, materials: 100 } },
     encounters: [
       { id: 'reactor', variants: [
         v('Humming reactor', 'A reactor still hums behind a cracked bulkhead.',
-          ch('Salvage its cells', 'medium', { supply: 25 }, 'The cells come out whole.', 'A coolant line bursts and the squad scatters.'),
+          ch('Salvage its cells', 'medium', { supply: 25, materials: 50 }, 'The cells come out whole.', 'A coolant line bursts and the squad scatters.'),
           ch('Rig it to blow and test their nerve', 'easy', { xp: 1 }, 'They hold steady as the deck shakes.', 'The blast comes early.'),
           LEAVE),
         v('Leaking reactor', 'Green light pools on the deck around a cracked reactor housing. The air tastes of metal.',
@@ -106,7 +108,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
       { id: 'armoury', variants: [
         v('Sealed armoury', 'A vault door, its lock still glowing.',
           ch('Crack the lock', 'hard', { rp: 1 }, 'Inside: well-kept wargear, ready to trade.', 'The alarm wakes something in the vents.'),
-          ch('Cut through the wall', 'easy', { supply: 25 }, 'Slow work, but the racks are theirs.', 'The cutter gives out halfway.')),
+          ch('Cut through the wall', 'easy', { supply: 25, materials: 50 }, 'Slow work, but the racks are theirs.', 'The cutter gives out halfway.')),
         v('Crew lockers', "A row of lockers, each stamped with a dead crewman's name.",
           ch('Force them open one by one', 'easy', { supply: 25 }, 'Ammunition, rations, a good knife.', 'One of the lockers was trapped.'),
           ch("Find the officer's locker", 'hard', { rp: 1, supply: 25 }, 'The officer kept a fine sidearm, and finer papers.', 'They spend far too long looking.')),
@@ -130,7 +132,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
       { id: 'bridge', variants: [
         v('The bridge', 'The captain is still in the chair, and the logs are intact.',
           ch('Pull the star charts', 'medium', { rp: 1 }, 'The charts show routes no one else knows.', 'The data core crumbles as they lift it.'),
-          ch('Strip the command throne', 'easy', { supply: 25 }, 'Gilded plating, worth a fortune.', 'The deck gives way under them.'),
+          ch('Strip the command throne', 'easy', { supply: 25, materials: 50 }, 'Gilded plating, worth a fortune.', 'The deck gives way under them.'),
           LEAVE),
         v('Ghost on the bridge', "The captain's hologram still gives orders to an empty bridge.",
           ch('Answer its hails', 'easy', { xp: 1 }, 'It hands over command, and a few old lessons with it.', 'It declares them mutineers.'),
@@ -144,7 +146,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
       { id: 'cryo', variants: [
         v('Cryo bay', 'Rows of frosted pods. A few of the sleepers are still breathing.',
           ch('Wake one and ask what happened', 'medium', { rp: 1 }, 'A dazed officer tells them where the vault is.', 'The sleeper wakes up screaming.'),
-          ch('Strip the pods for parts', 'easy', { supply: 25 }, 'Good medical kit, barely used.', 'A pod vents frozen gas over them.'),
+          ch('Strip the pods for parts', 'easy', { supply: 25, materials: 50 }, 'Good medical kit, barely used.', 'A pod vents frozen gas over them.'),
           LEAVE),
         v('Thawed pods', 'Every pod is open. Wet footprints lead off into the dark.',
           ch('Follow the footprints', 'medium', { xp: 2 }, 'They find the sleepers, and the sleepers are not friendly.', 'The footprints lead them in circles.'),
@@ -157,7 +159,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
       { id: 'turrets', variants: [
         v('Point-defence turrets', 'Guns along the corridor ceiling wake as the squad passes.',
           ch('Charge through', 'medium', { xp: 2 }, 'Under fire and through, whooping like fresh recruits.', 'The guns find their range.'),
-          ch('Pull the turrets for salvage', 'hard', { xp: 1, supply: 25 }, 'The guns come down, and come home with them.', 'One turret was only playing dead.'),
+          ch('Pull the turrets for salvage', 'hard', { xp: 1, supply: 25, materials: 50 }, 'The guns come down, and come home with them.', 'One turret was only playing dead.'),
           ch('Crawl through the maintenance ducts', 'safe', {}, 'Tight, filthy and safe.', 'The ducts are not empty.')),
         v('Security drones', 'Hovering drones sweep the hall with red light.',
           ch('Shoot them down', 'easy', { xp: 1 }, 'The drones fall like hail.', 'More drones answer the alarm.'),
@@ -239,7 +241,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
       { id: 'drift', variants: [
         v('Drift of wrecks', 'Ships from a dozen ages hang still, tangled together.',
           ch('Board the oldest', 'hard', { us: 3 }, 'Its hold is full of old shards.', 'Its crew is still aboard.'),
-          ch('Salvage the newest', 'easy', { supply: 25 }, 'Fresh parts, barely scorched.', 'It breaks apart around them.')),
+          ch('Salvage the newest', 'easy', { supply: 25, materials: 50 }, 'Fresh parts, barely scorched.', 'It breaks apart around them.')),
         v('Lost patrol', 'A patrol of their own faction drifts past, still in formation, decades too late.',
           ch('Recover their orders', 'medium', { rp: 1 }, 'The orders were never delivered. Now they are.', 'The orders are for a war long over.'),
           ch('Give them a burial', 'easy', { xp: 1 }, 'The squad stands a little straighter.', 'The bodies will not stay still.')),
@@ -252,7 +254,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
   },
   {
     id: 'planet', name: 'Uncharted World', desc: 'A world off the maps, with ruins, beasts and whatever its last owners left behind.',
-    finish: { text: 'The squad plants a beacon on the highest peak: the world is on your maps now.', reward: { supply: 50 } },
+    finish: { text: 'The squad plants a beacon on the highest peak: the world is on your maps now.', reward: { supply: 50, materials: 100 } },
     encounters: [
       { id: 'beasts', variants: [
         v('Apex predator', 'Something huge is stalking them through the jungle.',
@@ -332,7 +334,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
   },
   {
     id: 'fringe', name: 'Voidspawn Fringe', desc: 'The edge of Echo space. The richest pickings, and the Echoes notice who takes them.',
-    finish: { text: 'The squad comes back with an Echo nest-core: the Void Echoes will feel this.', reward: { us: 3, rp: 1 } },
+    finish: { text: 'The squad comes back with an Echo nest-core: the Void Echoes will feel this.', reward: { us: 3, rp: 1, materials: 50 } },
     encounters: [
       { id: 'scouts', variants: [
         v('Echo scouts', 'A pack of Void Echoes is moving through the dust.',
@@ -392,7 +394,7 @@ export const EXPEDITION_SITES: ExpeditionSite[] = [
           LEAVE),
         v('Dead relay', 'A dark relay station, its antennae bent toward Echo space.',
           ch('Restore power and listen', 'medium', { rp: 1 }, 'They listen in on the Echoes for a while.', 'The Echoes were listening too.'),
-          ch('Strip it', 'easy', { supply: 25 }, 'Good copper and better circuits.', 'The relay was rigged.')),
+          ch('Strip it', 'easy', { supply: 25, materials: 50 }, 'Good copper and better circuits.', 'The relay was rigged.')),
       ] },
       { id: 'husks', variants: [
         v('Husk field', 'Dead soldiers stand in rows, their eyes full of void-light.',

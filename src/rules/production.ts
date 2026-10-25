@@ -1,5 +1,6 @@
 import type { Campaign, CampaignEvent, Force, Sector, Unit } from '../model/types';
-import { hexDistance, isPlaced } from './hexmap';
+import { hexDistance, isPlaced, type Hex } from './hexmap';
+import { positionOf } from './movement';
 import { BUILDINGS, PRODUCTION, WARLORDS, type Building } from './nexusData';
 import { knows } from './tech';
 import { hasPerk } from './warlords';
@@ -59,16 +60,51 @@ export function withdrawBanked(c: Campaign, factionId: string, n: number): numbe
   return n - left;
 }
 
-/** Bank up to `n` Materials at the faction's producing sectors with room, home first. Returns how many fit. */
-export function depositBanked(c: Campaign, factionId: string, n: number): number {
+/** Where a Materials reward went: each bank that took some, nearest first. */
+export type Deposit = { sectorId: string; name: string; n: number }[];
+
+/**
+ * Bank up to `n` Materials at the faction's producing sectors with room: the one nearest `from` first (the force that
+ * earned them), spilling into the next nearest when it fills; without `from`, home first. Returns what each bank took.
+ */
+export function depositNearest(c: Campaign, factionId: string, n: number, from?: Hex): Deposit {
+  const out: Deposit = [];
+  if (n <= 0) return out;
+  const far = (s: Sector) => (from && isPlaced(s) ? hexDistance(s, from) : Infinity);
+  const sites = productionSites(c, factionId).sort((a, b) =>
+    from ? far(a) - far(b) || Number(b.type === 'home') - Number(a.type === 'home') : Number(b.type === 'home') - Number(a.type === 'home'));
   let left = n;
-  const sites = productionSites(c, factionId).sort((a, b) => Number(b.type === 'home') - Number(a.type === 'home'));
   for (const s of sites) {
     const k = Math.min(left, Math.max(0, bankCap(s, c) - (s.bank ?? 0)));
-    if (k) s.bank = (s.bank ?? 0) + k;
+    if (!k) continue;
+    s.bank = (s.bank ?? 0) + k;
+    out.push({ sectorId: s.id, name: s.name, n: k });
     left -= k;
+    if (!left) break;
   }
-  return n - left;
+  return out;
+}
+
+export const deposited = (d: Deposit) => d.reduce((t, x) => t + x.n, 0);
+
+/** "+150 Materials to Kharon (100) and Vesta (50)", or why none were banked. */
+export function depositText(want: number, d: Deposit): string {
+  const got = deposited(d);
+  if (!got) return `+${want} Materials, but no bank had room`;
+  const where = d.length === 1 ? d[0].name : d.map((x) => `${x.name} (${x.n})`).join(d.length === 2 ? ' and ' : ', ');
+  return `+${got} Materials to ${where}${got < want ? ` (${want - got} didn't fit)` : ''}`;
+}
+
+/** Where a force's Materials rewards are sent from: the sector it fought in, if given and on the map, else where it stands. */
+export function rewardOrigin(c: Campaign, force: Force | undefined, sectorId?: string): Hex | undefined {
+  const s = sectorId ? c.sectors.find((x) => x.id === sectorId) : undefined;
+  if (s && isPlaced(s)) return s;
+  return force ? positionOf(c, force) : undefined;
+}
+
+/** Bank up to `n` Materials at the faction's producing sectors with room, home first. Returns how many fit. */
+export function depositBanked(c: Campaign, factionId: string, n: number, from?: Hex): number {
+  return deposited(depositNearest(c, factionId, n, from));
 }
 
 /** Round end: every held producing sector banks its production. Returns what each sector gained. */
