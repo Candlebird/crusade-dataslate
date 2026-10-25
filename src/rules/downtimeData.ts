@@ -535,6 +535,12 @@ export const TRAINING = {
    * points / `perPoints` (at least `base`), each after `growth` times the last. Each gives +1 Tough (a longer hold),
    * `dmg` a hit (`meleeDmg` in melee), `rate` faster fire and `range` cells to shooting weapons and auras.
    */
+  /**
+   * Immobile units (and Fortifications) are cheap in OPR for a rule that costs nothing in a tower defence: wherever
+   * Training prices a unit by its points (recipe tier, level cap and cost, the waves' power) they count this many times
+   * their points (economy.trainPoints). Their real points are untouched everywhere else.
+   */
+  immobileSurcharge: 1.125,
   levels: {
     caps: [{ upTo: 100, cap: 5 }, { upTo: 200, cap: 4 }, { upTo: 300, cap: 3 }, { upTo: 400, cap: 2 }, { upTo: Infinity, cap: 1 }],
     base: 30,

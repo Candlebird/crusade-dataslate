@@ -4,6 +4,7 @@ import type { Unit, Weapon } from '../../model/types';
 import { applySelection, normalizeBook } from '../../armyforge/book';
 import { newUnit, unitFromCatalog } from '../../model/factory';
 import { TRAINING } from '../downtimeData';
+import { trainPoints } from './economy';
 import { habitNames, habitsOf } from './habits';
 import { readyRecipes, recipesFor, recipeUses, typeScores, unitTower } from './recipes';
 import { shardPiece } from './shards';
@@ -45,7 +46,8 @@ describe('training recipes', () => {
     expect(recipes.map((r) => r.unitId)).toEqual(force.map((u) => u.id));
     expect(new Set(recipes.map(sig)).size).toBe(recipes.length);
     for (const r of recipes) {
-      const t = tier(r.points);
+      // Priced by Training points (an Immobile unit's are surcharged).
+      const t = tier(trainPoints(force.find((u) => u.id === r.unitId)!));
       expect(r.slots).toHaveLength(t.count);
       for (const s of r.slots) {
         expect(s.grade).toBeGreaterThanOrEqual(t.grades[0]);

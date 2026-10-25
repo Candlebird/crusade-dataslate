@@ -102,6 +102,8 @@ export interface UnitTower extends PieceBase, Armed {
   name: string;
   category: Category;
   points: number;
+  /** The points Training prices it by when they differ (Immobile: economy.trainPoints); level costs go by it. */
+  price?: number;
   /** Its campaign level (from XP), for show. */
   rank: number;
   /** Datasheet Tough (at least 1), plus level-ups: how long it holds. */

@@ -136,8 +136,9 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 
 ### economy.ts
 - `squadPower(units: Unit[]): number` (done) — points × (1 + levelPower × level); Sortie uses it.
-- `levelCap(points): number` — TRAINING.levels.caps.
-- `levelCost(t: UnitTower): number` — max(base, base × points/perPoints) × growth^up.
+- `trainPoints(u): number` — points × TRAINING.immobileSurcharge (1.125) for an Immobile unit or a Fortification, else points. Used by recipes.recipesFor (recipe tier), recipes.unitTower (level cap; `UnitTower.price` when it differs), levelCost, and run.createRun (run.power: the waves, and so the bot). Real points (Recipe.points, UnitTower.points, squadPower) unchanged.
+- `levelCap(points): number` — TRAINING.levels.caps (called with trainPoints).
+- `levelCost(t: UnitTower): number` — max(base, base × (price ?? points)/perPoints) × growth^up.
 - `levelProblem(run, id): string | null`, `buyLevel(run, id): void`
 - `applyLevel(t: UnitTower): boolean` — +1 up, +1 tough (others read `up` for dmg/rate/range); false at cap.
 - `luckCost(run): number | null` (less the Thrift perk), `luckProblem(run): string | null` (also refused at drill.luckCap), `buyLuck(run): void`

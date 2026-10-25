@@ -5,7 +5,7 @@ import { unitName } from '../battle';
 import { hasRule, levelForXp, ruleRating } from '../engine';
 import { SHARD_TYPES, TRAINING, type ShardType } from '../downtimeData';
 import { shardsOnMap } from './board';
-import { levelCap } from './economy';
+import { levelCap, trainPoints } from './economy';
 import { coverMulOf, habitsOf } from './habits';
 import { socketRuns, socketsOf } from './relics';
 import { adjustSlots, gritOf, rangeBonus, recordBudget } from './veterans';
@@ -143,7 +143,7 @@ export function recipesFor(units: Unit[]): Recipe[] {
   const taken = new Set<string>();
   return force.map((u, i) => {
     const budget = recordBudget(u);
-    const slots = bestRecipe(ranked(raw[i], raw), u.points, taken, (s) => adjustSlots(s, budget));
+    const slots = bestRecipe(ranked(raw[i], raw), trainPoints(u), taken, (s) => adjustSlots(s, budget));
     taken.add(signature(slots));
     return { unitId: u.id, name: unitName(u), points: u.points, slots };
   });
@@ -196,6 +196,7 @@ export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): Uni
   const skills = skillsOf(u).filter((s) => !relics.some((r) => socketRuns(r, s.source, s.effect.kind)));
   return {
     kind: 'unit', id, x: at.x, y: at.y, unitId: u.id, name: unitName(u), category: u.category, points: u.points,
+    ...(trainPoints(u) !== u.points ? { price: trainPoints(u) } : {}),
     rank: levelForXp(u.xp), tough: Math.max(1, f.tough + g.tough + h.tough), size: f.size, impact: f.impact, skills,
     quality: f.quality,
     guns: f.guns.map((x) => ({
@@ -204,7 +205,7 @@ export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): Uni
     })),
     hitShoot: f.hitShoot + h.shoot, hitMelee: f.hitMelee + h.melee, atkBonus: f.atkBonus + g.atk,
     boost: { hit: 0, save: 0, rate: 0, range: 0 }, dmgBoost: { mul: 0, left: 0 }, kills: 0, dealt: 0,
-    up: 0, cap: levelCap(u.points), holdLeft: 0, frenzy: 0, frenzyMul: 1, craftedAt, xp: 0,
+    up: 0, cap: levelCap(trainPoints(u)), holdLeft: 0, frenzy: 0, frenzyMul: 1, craftedAt, xp: 0,
     init: h.init + g.init, jumpy: h.jumpy, myopic: h.myopic,
     ...(grit !== 1 ? { grit } : {}), ...(relics.length ? { relics } : {}),
     ...(u.quirks?.length ? { quirks: [...u.quirks] } : {}), ...(u.trinket ? { trinket: u.trinket } : {}),

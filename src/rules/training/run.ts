@@ -2,7 +2,7 @@ import type { ForceSortie, Unit } from '../../model/types';
 import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { pieceById, unitTowers } from './board';
 import { abilities, auras, fireAll, holds, reap, tickEnemies } from './combat';
-import { waveCredits } from './economy';
+import { trainPoints, waveCredits } from './economy';
 import { canTrain, recipesFor, recipeUses, unitTower } from './recipes';
 import { crumbleDraft, drawDraft, toRubble } from './shards';
 import { relics, resetSockets } from './relics';
@@ -28,7 +28,7 @@ export function createRun(forceId: string, units: Unit[], seed: number, story?: 
   const force = units.filter(canTrain);
   const run: TrainingRun = {
     v: 9, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
-    power: force.reduce((n, u) => n + u.points, 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
+    power: force.reduce((n, u) => n + trainPoints(u), 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
     mends: 0, leaked: 0, nextId: 1, pieces: [], draft: { step: 'done', hand: [], placed: [] }, recipes: recipesFor(force),
     crafted: [], enemies: [], queue: [], cover: [], cards: [], mods: { bounty: 1, holdMul: 1, regrabAdd: 0 }, banked: {},
     fx: [], log: [], finale: newFinale(opts.final ?? TRAINING.finale.from, !!opts.siege),

@@ -1,5 +1,5 @@
 import type { Unit } from '../../model/types';
-import { levelForXp } from '../engine';
+import { hasRule, levelForXp } from '../engine';
 import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { pieceById } from './board';
 import { luckCap, mendPerk, thrifty } from './drill';
@@ -14,13 +14,19 @@ export function squadPower(units: Unit[]): number {
   return units.reduce((n, u) => n + u.points * (1 + TRAINING.levelPower * levelForXp(u.xp)), 0);
 }
 
+/** The points Training prices a unit by: its points, × TRAINING.immobileSurcharge if it is Immobile or a Fortification
+ *  (a rule OPR prices low that costs nothing here). Recipe tier, level cap and cost, and the run's power go by it. */
+export const trainPoints = (u: Pick<Unit, 'points' | 'rules' | 'category'>): number =>
+  u.points * (hasRule(u.rules, 'Immobile') || u.category === 'Fortification' ? TRAINING.immobileSurcharge : 1);
+
 /** The most level-ups a unit of these points may have (TRAINING.levels.caps). */
 export const levelCap = (points: number): number => (TRAINING.levels.caps.find((c) => points <= c.upTo) ?? TRAINING.levels.caps[TRAINING.levels.caps.length - 1]).cap;
 
-/** What a crafted unit's next level-up costs: base × points / perPoints (at least base), growth times more each level. */
+/** What a crafted unit's next level-up costs: base × its Training points (price, else points) / perPoints (at least
+ *  base), growth times more each level. */
 export function levelCost(t: UnitTower): number {
   const L = TRAINING.levels;
-  return Math.round(Math.max(L.base, (L.base * t.points) / L.perPoints) * L.growth ** t.up);
+  return Math.round(Math.max(L.base, (L.base * (t.price ?? t.points)) / L.perPoints) * L.growth ** t.up);
 }
 
 const unitPiece = (run: TrainingRun, id: number): UnitTower | undefined => {
