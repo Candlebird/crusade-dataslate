@@ -25,13 +25,13 @@ export function WaveStatus({ run }: WavePreviewProps) {
         <b>{live ? `Wave ${n} under way` : `Next: wave ${n}`}</b>
         {waveTags(n).map((t) => <span key={t} className="tag">{t}</span>)}
         {run.nemesis && isNemesisWave(run, n) && (
-          <span className="tag red" title={`Your Sortie nemesis is this wave's Echo Lord. ${nemesisTricks(run.nemesis).map((t) => `${t.name}: ${t.text}`).join(' ')}`}>
+          <span className="tag red" data-tip={`Your Sortie nemesis is this wave's Echo Lord. ${nemesisTricks(run.nemesis).map((t) => `${t.name}: ${t.text}`).join(' ')}`}>
             Nemesis: {run.nemesis.name}
           </span>
         )}
         {run.nexus && <RealLordTag run={run} w={n} />}
         {run.finale && n === finalOf(run) && !inEndless(run) && (
-          <span className="tag gold" title={run.siege ? 'It comes alone and cannot fall: hurt it all you can before it reaches the base.' : 'Slay it with the base standing for a Victory; if it reaches the base the run ends.'}>
+          <span className="tag gold" data-tip={run.siege ? 'It comes alone and cannot fall: hurt it all you can before it reaches the base.' : 'Slay it with the base standing for a Victory; if it reaches the base the run ends.'}>
             Final: {finalBoss(run)}
           </span>
         )}
@@ -46,7 +46,7 @@ function RealLordTag({ run, w }: { run: TrainingRun; w: number }) {
   const i = lordIndex(run, w);
   const l = i === undefined ? undefined : run.nexus!.lords[i];
   if (!l) return null;
-  return <span className="tag red" title={lordLine(l, w)}>{l.slain ? 'Slain: ' : ''}{l.name} ({l.tier})</span>;
+  return <span className="tag red" data-tip={lordLine(l, w)}>{l.slain ? 'Slain: ' : ''}{l.name} ({l.tier})</span>;
 }
 
 /** What the next wave sends: its one kind (and a boss wave's lord), an icon with a count, the kind's name and how many
@@ -57,7 +57,7 @@ export function WavePreview({ run }: WavePreviewProps) {
   return (
     <span className="training-preview row" aria-label="Next wave's enemies">
       {groups.map((g) => (
-        <span key={g.kind} className="training-preview-group" title={enemyRundown(TRAINING_ENEMIES[g.kind], g)}>
+        <span key={g.kind} className="training-preview-group" data-tip={enemyRundown(TRAINING_ENEMIES[g.kind], g)}>
           <EnemyIcon def={TRAINING_ENEMIES[g.kind]} elite={g.elites > 0} />
           <span className="small">×{g.n} {TRAINING_ENEMIES[g.kind].name}{g.elites ? <span style={{ color: 'var(--gold)' }}> · {g.elites} elite</span> : null}</span>
         </span>

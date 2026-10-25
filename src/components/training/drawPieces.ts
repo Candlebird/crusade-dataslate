@@ -90,24 +90,25 @@ export function drawShard(ctx: CanvasRenderingContext2D, p: ShardPiece, s: numbe
   }
 }
 
-/** Rubble: no plate, a faint hatched footprint and a low stone pile, so it reads as ground, not a Shard. */
+/** Rubble: a solid, opaque stone slab with a hatched face and a stone pile, so it never gets lost on the map, but plain
+ *  and dull beside a Shard's bright crystal. */
 export function drawRubble(ctx: CanvasRenderingContext2D, p: RubblePiece, s: number) {
   ctx.save();
   platePath(ctx, p, s);
-  ctx.fillStyle = 'rgba(60,54,46,0.35)';
+  ctx.fillStyle = '#4a4339';
   ctx.fill();
+  ctx.strokeStyle = '#6e6556';
+  ctx.lineWidth = Math.min(2, Math.max(1, s * 0.08));
+  ctx.stroke();
   ctx.clip();
-  ctx.strokeStyle = 'rgba(140,128,110,0.16)';
+  ctx.strokeStyle = 'rgba(30,26,22,0.45)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   const step = Math.max(3, s * 0.5);
   for (let d = 0; d < 4 * s; d += step) { ctx.moveTo(p.x * s + d, p.y * s); ctx.lineTo(p.x * s + d - 2 * s, p.y * s + 2 * s); }
   ctx.stroke();
   ctx.restore();
-  ctx.save();
-  ctx.globalAlpha = 0.6;
-  drawIcon(ctx, RUBBLE_ICON, (p.x + 1) * s, (p.y + 1.05) * s, s * 1.4, '#8a8172');
-  ctx.restore();
+  drawIcon(ctx, RUBBLE_ICON, (p.x + 1) * s, (p.y + 1.05) * s, s * 1.4, '#b3a890');
 }
 
 /** A crafted unit: a dark plate rimmed in its category's colour with a drop shadow, its Emblem, level pips and state rings;

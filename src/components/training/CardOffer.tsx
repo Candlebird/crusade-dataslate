@@ -63,7 +63,7 @@ export function CardOffer({ run, offer, portraits, auto, autoPick, onPick, onPee
         <div className="row" style={{ gap: 6, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button className="small" onClick={onPeek}>Look at the field first</button>
           {onReroll && rerollsOf(run) > 0 && (
-            <button className="small" disabled={!!rerollProblem(run)} title={rerollProblem(run) ?? undefined} onClick={onReroll}>
+            <button className="small" disabled={!!rerollProblem(run)} data-tip={rerollProblem(run) ?? undefined} onClick={onReroll}>
               Re-draw ({rerollsLeft(run)} left)
             </button>
           )}

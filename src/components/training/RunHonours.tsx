@@ -13,8 +13,8 @@ export function RunHonoursView({ run, force, best }: { run: TrainingRun; force: 
         <table>
           <thead>
             <tr>
-              <th title="Training record after this run">Record</th><th title="Best wave cleared">Best</th><th title="Kills over every run">Kills</th>
-              <th title="Real Echo Lords and the nemesis slain">Lords</th><th title="Runs it was crafted in">Runs</th><th title="Runs it led the defence">MVPs</th>
+              <th data-tip="Training record after this run">Record</th><th data-tip="Best wave cleared">Best</th><th data-tip="Kills over every run">Kills</th>
+              <th data-tip="Real Echo Lords and the nemesis slain">Lords</th><th data-tip="Runs it was crafted in">Runs</th><th data-tip="Runs it led the defence">MVPs</th>
             </tr>
           </thead>
           <tbody>

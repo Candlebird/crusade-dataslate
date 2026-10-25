@@ -20,6 +20,9 @@ export interface MapViewProps {
   selected?: number;
   /** Placing: the Shard about to go down (or true for a bare footprint). The hover shows its 2×2 ghost, green or red. */
   placing?: DrawnShard | true;
+  /** Why a 2×2 piece can't go down with its top-left at (x, y), or null: the ghost's colour. Left out, a new piece's
+   *  placeProblem (a Scout move passes its own). */
+  placeWhy?: (x: number, y: number) => string | null;
   /** A click or tap: the cell under it, and the top-left cell of a 2×2 piece centred there (where a ghost stands). */
   onCell: (cell: Tile, place: Tile) => void;
   /** The pointer moved to another cell (null: off the map). */
@@ -77,7 +80,7 @@ export function MapView(props: MapViewProps) {
 
   // A new thing to place, a new layout or the end of placing drops a waiting touch placement.
   const layout = `${props.run.pieces.length},${props.run.nextId},${props.run.phase}`;
-  useEffect(() => { setPending(null); }, [props.placing, layout]);
+  useEffect(() => { setPending(null); }, [props.placing, !!props.placeWhy, layout]);
 
   const setView = (v: View) => {
     view.current = clamp(v);
@@ -149,8 +152,8 @@ export function MapView(props: MapViewProps) {
       const at = p.placing && run.phase !== 'over' && hover.current ? cellsAt(hover.current.x, hover.current.y) : null;
       if (at && `${at.place.x},${at.place.y}` !== justPlaced.current) {
         // Legality walks the whole maze, so only ask again when the spot or the pieces change.
-        const key = `${at.place.x},${at.place.y},${run.pieces.length},${run.nextId}`;
-        if (key !== ghostKey) { ghostKey = key; ghostOk = !placeProblem(run, at.place.x, at.place.y); }
+        const key = `${at.place.x},${at.place.y},${run.pieces.length},${run.nextId},${p.placeWhy ? 'w' : ''}`;
+        if (key !== ghostKey) { ghostKey = key; ghostOk = !whyAt(p, at.place.x, at.place.y); }
         ghost = { at: at.place, ok: ghostOk, shard: p.placing === true ? undefined : p.placing };
       }
       const s = v.k;
@@ -255,7 +258,7 @@ export function MapView(props: MapViewProps) {
         confirm();
         return;
       }
-      setPending({ ...hit, ok: !placeProblem(p.run, hit.place.x, hit.place.y) });
+      setPending({ ...hit, ok: !whyAt(p, hit.place.x, hit.place.y) });
       const v = view.current;
       // Zoom in on it, with the ghost brought to the middle (an edge tap would leave it under the bar).
       if (v.k < TAP_ZOOM_BELOW) {
@@ -316,6 +319,8 @@ export function MapView(props: MapViewProps) {
     </div>
   );
 }
+
+const whyAt = (p: MapViewProps, x: number, y: number) => (p.placeWhy ? p.placeWhy(x, y) : placeProblem(p.run, x, y));
 
 /** The touch Place / Cancel bar along the map's foot, or its head when the ghost sits low (styled inline: it is the
  *  map's own control). */

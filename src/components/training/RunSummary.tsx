@@ -52,7 +52,7 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
       {(units.length > 0 || shards.length > 0 || defences.length > 0) && (
         <table>
           <thead>
-            <tr><th>Unit</th><th title="Enemies it finished off">Kills</th><th title="Wounds it dealt">Damage</th><th title="Levels bought this run">Levels</th><th title="XP earned this run">XP</th></tr>
+            <tr><th>Unit</th><th data-tip="Enemies it finished off">Kills</th><th data-tip="Wounds it dealt">Damage</th><th data-tip="Levels bought this run">Levels</th><th data-tip="XP earned this run">XP</th></tr>
           </thead>
           <tbody>
             {units.map((t) => (

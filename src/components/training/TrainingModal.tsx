@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Force } from '../../model/types';
 import { unitPortrait } from '../../model/emblem';
 import {
-  ackStale, bankVictory, continueEndless, finalBoss, clearRubble, defaultByKey, clearSave, loadRun, pickCard, rerollCards, pieceAt, pieceById, placeDraft, quitRun, saveRun, staleSave, startWave,
+  ackStale, bankVictory, continueEndless, finalBoss, clearRubble, defaultByKey, clearSave, loadRun, pickCard, rerollCards, pieceAt, pieceById, placeDraft, quitRun, ambushSwap, scoutMove, scoutMoveProblem, saveRun, staleSave, startWave,
   type Phase, type SavedRun, type Tile, type TrainingRun,
 } from '../../rules/training';
 import { TRAINING } from '../../rules/downtimeData';
@@ -12,6 +12,7 @@ import { act } from './act';
 import { CardOffer } from './CardOffer';
 import { HudBar, type Speed } from './HudBar';
 import { MapView } from './MapView';
+import type { MoveRule } from './PieceActions';
 import { PieceInfo } from './PieceInfo';
 import { finishCraft, type Crafting } from './RecipeBook';
 import { glowIds } from './recipeView';
@@ -49,6 +50,8 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   const [crafting, setCrafting] = useState<Crafting | null>(null);
   const [focus, setFocus] = useState<number[] | null>(null);
   const [sel, setSel] = useState<number | null>(null);
+  // A Scout move or Ambush swap waiting for its spot or piece on the map.
+  const [moving, setMoving] = useState<{ id: number; rule: MoveRule } | null>(null);
   const best = useRef(force.trainingBest ?? 0);
   // Auto (debug): the bot plays (useAuto); and the side panel's tab on a phone (CSS shows them all on a wide screen).
   const [auto, setAuto] = useState(false);
@@ -66,6 +69,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     setPick(0);
     setSel(null);
     setCrafting(null);
+    setMoving(null);
     setFocus(null);
     setPeek(false);
     setPaused(false);
@@ -113,6 +117,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   const start = () => {
     if (!run) return;
     setCrafting(null);
+    setMoving(null);
     setFocus(null);
     setPaused(false);
     act(() => startWave(run), () => setTick((n) => n + 1));
@@ -154,13 +159,23 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     && crafting.uses.every((id) => pieceById(run, id)?.kind === 'shard') ? crafting : null;
   const hand = run.draft.hand;
   // A hand Shard is unknown until it is down: the ghost is a bare footprint.
-  const placing = build && !craftNow && run.draft.step === 'place' && pick !== null && hand[pick] ? true : undefined;
+  // A move whose unit has gone, or whose build phase ended, is no move any more.
+  const moveNow = moving && build && !craftNow && pieceById(run, moving.id)?.kind === 'unit' ? moving : null;
+  const scouting = moveNow?.rule === 'scout' ? moveNow : null;
+  const placing = scouting || (build && !craftNow && run.draft.step === 'place' && pick !== null && hand[pick]) ? true : undefined;
   const glow = craftNow ? new Set(craftNow.uses) : focus ? new Set(focus) : build ? glowIds(run) : undefined;
   const selPiece = sel !== null ? pieceById(run, sel) : undefined;
 
   const onCell = (cell: Tile, place: Tile) => {
     if (run.phase === 'over') return;
     const p = pieceAt(run, cell.x, cell.y);
+    if (moveNow) {
+      const done = () => { setMoving(null); setSel(moveNow.id); refresh(); };
+      if (moveNow.rule === 'scout') act(() => scoutMove(run, moveNow.id, place.x, place.y), done);
+      else if (!p || p.id === moveNow.id) toast('Tap another piece to swap with (or Cancel).', 'error');
+      else act(() => ambushSwap(run, moveNow.id, p.id), done);
+      return;
+    }
     if (craftNow) {
       if (p && craftNow.uses.includes(p.id)) {
         if (finishCraft(run, force.units, craftNow, p.id, refresh)) {
@@ -208,7 +223,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   /** Start (or cancel) a craft; the floating piece card makes way for the craft banner. */
   const craftMode = (cr: Crafting | null) => {
     setCrafting(cr);
-    if (cr) setSel(null);
+    if (cr) { setSel(null); setMoving(null); }
   };
   const over = run.phase === 'over';
   // The Final boss fell: bank the Victory (the run ends, the loop banks it) or go on into Endless.
@@ -216,6 +231,9 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   const onVictory = (go: boolean) => act(() => (go ? continueEndless(run) : bankVictory(run)), refresh);
   const craftName = !craftNow ? '' : craftNow.def ? defaultByKey(craftNow.def)?.name ?? 'The defence'
     : run.recipes.find((r) => r.unitId === craftNow.unitId)?.name ?? 'The unit';
+  const mover = moveNow ? pieceById(run, moveNow.id) : undefined;
+  const moverName = mover?.kind === 'unit' ? mover.name : 'The unit';
+  const scoutWhy = scouting ? (x: number, y: number) => scoutMoveProblem(run, scouting.id, x, y) : undefined;
 
   // The map (with the HUD over it) is the stage; the panels sit beside it, or under it on a phone. The header's ×
   // closes (the run saves between waves); the run summary comes up over the map when the base falls.
@@ -228,12 +246,18 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
             auto={TRAINING.debugAuto ? auto : undefined} onAuto={toggleAuto}
           />
           <div className="training-board">
-            <MapView run={run} portraits={portraits} glow={glow} selected={sel ?? undefined} placing={placing} paused={paused} onCell={onCell} />
-            {selPiece && !over && <PieceInfo run={run} piece={selPiece} record={selPiece.kind === 'unit' ? force.units.find((u) => u.id === selPiece.unitId) : undefined} onClose={() => setSel(null)} onChange={refresh} />}
+            <MapView run={run} portraits={portraits} glow={glow} selected={sel ?? undefined} placing={placing} placeWhy={scoutWhy} paused={paused} onCell={onCell} />
+            {selPiece && !over && !moveNow && <PieceInfo run={run} piece={selPiece} record={selPiece.kind === 'unit' ? force.units.find((u) => u.id === selPiece.unitId) : undefined} onClose={() => setSel(null)} onChange={refresh} onMove={(rule) => setMoving({ id: selPiece.id, rule })} />}
             {craftNow && (
               <div className="training-map-banner small" role="status">
                 <span className="grow">Tap one of the glowing Shards: {craftName} stands there, the rest turn to rubble.</span>
                 <button onClick={() => setCrafting(null)}>Cancel</button>
+              </div>
+            )}
+            {moveNow && (
+              <div className="training-map-banner small" role="status">
+                <span className="grow">{moveNow.rule === 'scout' ? `Tap an open spot: ${moverName} moves there (the route must stay open).` : `Tap a defence, Shard or rubble: ${moverName} swaps places with it.`}</span>
+                <button onClick={() => setMoving(null)}>Cancel</button>
               </div>
             )}
             {victory && !auto && (

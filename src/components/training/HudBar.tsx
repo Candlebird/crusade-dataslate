@@ -33,22 +33,22 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
   // What the next wave brings in full is on the wave line beside the map; the HUD has its icon (tap for what it does).
   return (
     <div className="training-hud small" role="toolbar" aria-label="Training run">
-      <span className="training-hud-stat" title={live ? 'The wave under way' : 'Waves cleared'}>
+      <span className="training-hud-stat" data-tip={live ? 'The wave under way' : 'Waves cleared'}>
         <Icon name="g:crossed-swords" /> {live ? 'Wave' : 'Cleared'} <b>{live ? run.wave : run.cleared}</b>
         {best ? <span className="muted"> · best {Math.max(best, run.cleared)}</span> : null}
       </span>
-      <span className="training-hud-stat" title="Base HP: each enemy that gets through costs some">
+      <span className="training-hud-stat" data-tip="Base HP: each enemy that gets through costs some">
         <Icon name="g:castle" /> <b style={{ color: low ? 'var(--red)' : undefined }}>{run.baseHp}/{TRAINING.baseHp}</b>
       </span>
-      <span className="training-hud-stat" title="Credits: for levels, luck and mending the base">
+      <span className="training-hud-stat" data-tip="Credits: for levels, luck and mending the base">
         <Icon name="g:two-coins" /> <b style={{ color: 'var(--gold)' }}>{Math.floor(run.credits)}</b>
       </span>
-      <span className="training-hud-stat" title={`Luck: better Shard grades in each draft (up to ${luckCap(run)} this run)`}>
+      <span className="training-hud-stat" data-tip={`Luck: better Shard grades in each draft (up to ${luckCap(run)} this run)`}>
         <Icon name="g:sparkles" /> {run.luck}/{luckCap(run)}
       </span>
       {run.phase === 'build' && <NextRoundIcon run={run} />}
       {run.siege && (
-        <span className="training-hud-stat" title="The Weekly Siege: the week's map, drafts and waves for every force; score is the damage dealt to the Final boss, or the wave reached">
+        <span className="training-hud-stat" data-tip="The Weekly Siege: the week's map, drafts and waves for every force; score is the damage dealt to the Final boss, or the wave reached">
           <Icon name="g:castle" /> Siege <span className="muted">· {run.siege}</span>
         </span>
       )}
@@ -57,12 +57,12 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
       {run.nemesis && !run.nemesis.slain && run.wave <= TRAINING.shared.nemesis.wave && (
         <span
           className="training-hud-stat"
-          title={`Your Sortie nemesis comes as the Echo Lord of wave ${TRAINING.shared.nemesis.wave}. ${nemesisTricks(run.nemesis).map((t) => `${t.name}: ${t.text}`).join(' ')}`}
+          data-tip={`Your Sortie nemesis comes as the Echo Lord of wave ${TRAINING.shared.nemesis.wave}. ${nemesisTricks(run.nemesis).map((t) => `${t.name}: ${t.text}`).join(' ')}`}
         >
           <Icon name="g:crown" /> <b style={{ color: 'var(--red)' }}>{run.nemesis.name}</b> <span className="muted">· wave {TRAINING.shared.nemesis.wave}</span>
         </span>
       )}
-      {run.auto && <span className="training-hud-stat" style={{ color: 'var(--red)' }} title="The Auto (debug) button played this run">Auto was used: nothing banked</span>}
+      {run.auto && <span className="training-hud-stat" style={{ color: 'var(--red)' }} data-tip="The Auto (debug) button played this run">Auto was used: nothing banked</span>}
       <span className="grow" />
       {run.phase !== 'over' && (
         <span className="training-hud-actions">
@@ -72,11 +72,11 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
             ))}
           </span>
           {auto !== undefined && onAuto && (
-            <button className={auto ? 'primary' : ''} aria-pressed={auto} title="Debug: the test bot plays the run (a run that uses it banks nothing)" onClick={onAuto}>Auto (debug)</button>
+            <button className={auto ? 'primary' : ''} aria-pressed={auto} data-tip="Debug: the test bot plays the run (a run that uses it banks nothing)" onClick={onAuto}>Auto (debug)</button>
           )}
           {onPause && (live || auto) && <button className="training-hud-go" onClick={onPause}>{paused ? 'Resume' : 'Pause'}</button>}
           {run.phase === 'build' && (
-            <button className="primary training-hud-go" disabled={!!why || auto} title={why ?? undefined} onClick={onStart}>Start wave {next}</button>
+            <button className="primary training-hud-go" disabled={!!why || auto} data-tip={why ?? undefined} onClick={onStart}>Start wave {next}</button>
           )}
           <button onClick={onQuit}>End run</button>
         </span>
@@ -90,13 +90,13 @@ function FinalStat({ run }: { run: TrainingRun }) {
   const fin = finalOf(run);
   if (inEndless(run)) {
     return (
-      <span className="training-hud-stat" title={`Victory at the Final wave ${fin}; every wave past it climbs steeper`}>
+      <span className="training-hud-stat" data-tip={`Victory at the Final wave ${fin}; every wave past it climbs steeper`}>
         <Icon name="g:medal" /> Endless <b>+{endlessDepth(run)}</b>
       </span>
     );
   }
   return (
-    <span className="training-hud-stat" title={`Slay ${finalBoss(run)} on wave ${fin} with the base standing for a Victory${run.siege ? '; in the Siege it cannot fall: hurt it all you can' : ''}`}>
+    <span className="training-hud-stat" data-tip={`Slay ${finalBoss(run)} on wave ${fin} with the base standing for a Victory${run.siege ? '; in the Siege it cannot fall: hurt it all you can' : ''}`}>
       <Icon name="g:crown" /> Final wave <b>{fin}</b>
     </span>
   );
@@ -110,12 +110,12 @@ function NexusStat({ run }: { run: TrainingRun }) {
   const next = nextLord(run, run.phase === 'wave' ? run.wave - 1 : run.wave);
   return (
     <>
-      <span className="training-hud-stat" title={[lines.threat, ...lines.affixes, lines.event].join('\n')}>
+      <span className="training-hud-stat" data-tip={[lines.threat, ...lines.affixes, lines.event].join('\n')}>
         <Icon name="g:death-skull" /> Threat <b style={{ color: nx.threat ? 'var(--red)' : undefined }}>{nx.threat}</b>
         {ev && <span className="muted"> · {ev.name}{ev.effect ? '' : ' (flavour)'}</span>}
       </span>
       {next && (
-        <span className="training-hud-stat" title={lordLine(next.lord, next.wave)}>
+        <span className="training-hud-stat" data-tip={lordLine(next.lord, next.wave)}>
           <Icon name="g:crown" /> <b>{next.lord.name}</b> <span className="muted">· wave {next.wave}</span>
         </span>
       )}

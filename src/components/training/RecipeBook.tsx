@@ -97,7 +97,7 @@ function RecipeRow({ run, recipe, portrait, progress, uses, active, onCraft, uni
         <span className="training-recipe-name">{recipe.name} <span className="muted">· {recipe.points} pts · {met}/{recipe.slots.length}</span></span>
         <span className="training-recipe-slots">
           {recipe.slots.map((s, i) => (
-            <span key={i} title={`${gradeName(s.grade)}+ ${SHARD_TYPES[s.type].name}${progress[i] ? ' (on the map)' : ''}`}>
+            <span key={i} data-tip={`${gradeName(s.grade)}+ ${SHARD_TYPES[s.type].name}${progress[i] ? ' (on the map)' : ''}`}>
               <ShardBadge type={s.type} grade={s.grade} size={18} faded={!progress[i]} glow={!!uses} />
             </span>
           ))}
@@ -110,7 +110,7 @@ function RecipeRow({ run, recipe, portrait, progress, uses, active, onCraft, uni
         <button
           className="primary"
           disabled={!known || !!why}
-          title={why ?? 'Then tap one of its Shards on the map'}
+          data-tip={why ?? 'Then tap one of its Shards on the map'}
           onClick={() => onCraft({ unitId: recipe.unitId, uses })}
         >
           Craft
