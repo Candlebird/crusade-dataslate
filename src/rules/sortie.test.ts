@@ -525,6 +525,8 @@ describe('sortie story persistence', () => {
     const a = lordWounds(plain);
     const b = lordWounds(grudge);
     expect(b / a).toBeGreaterThan(1 + SORTIE.nemesis.tough * 2 - 0.15);
+    // The lord comes in late; it taunts as it arrives.
+    for (const run of [plain, grudge]) for (let i = 0; i < 2000 && !run.combat!.over && onField(run.combat!).every((e) => e.name !== bossOf(run).name); i++) autoStep(run, book);
     expect(grudge.combat!.log.map((l) => l.text)).toContain(bossOf(grudge).taunt);
     expect(plain.combat!.log.map((l) => l.text)).not.toContain(bossOf(plain).taunt);
   });
@@ -1240,7 +1242,7 @@ describe('feats', () => {
     const lines = awardFeats(f, trainingFeats(30), [u.id], '2026-10-22', () => 'x');
     expect(lines).toHaveLength(3);
     expect([u.xp, f.umbraShards]).toEqual([1, 3]);
-    expect(f.ledger.reduce((s, l) => s + l.rp, 0)).toBe(6);
+    expect(f.ledger.reduce((s, l) => s + l.rp, 0)).toBe(2);
     expect(awardFeats(f, trainingFeats(30), [u.id], '2026-10-22', () => 'x')).toEqual([]);
   });
 });

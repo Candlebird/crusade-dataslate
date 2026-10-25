@@ -1287,6 +1287,12 @@ export const SORTIE = {
   ramp: 0.5,
   /** At most this many Echo squads in a fight. */
   squads: 3,
+  /** The Echo lord comes in late, in a round from the first to the second of these, while its escorts hold the field
+   * (the round after, if they all fall first); the lord's fight is won only once it falls too. */
+  lordArrives: [2, 3] as [number, number],
+  /** The share of the lord's fight's budget the lord takes in wounds; its escorts get the rest, enough to hold the
+   * field until it comes. */
+  lordShare: 0.5,
   /**
    * Camp: rest mends this share of each model's wounds and brings back `raise` of the squad's fallen (at least one).
    * After a fight, patching up mends `patch` and brings one back.

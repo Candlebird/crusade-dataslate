@@ -5,6 +5,7 @@ import { fighter, type Fighter, type Gun } from './autoBattle';
 import { effects, type Ability, type Status } from './abilities';
 import { hasRule, ruleRating } from './engine';
 import { BIG_UNIT, randomSelection } from './echoForce';
+import { builtinEchoes } from '../model/seed';
 import { squadPower } from './training/economy';
 import { shownTitle } from './training/titles';
 import { unitName } from './battle';
@@ -1133,19 +1134,23 @@ export function fightBudget(run: SortieRun, book: CatalogBook, kind: SortieFight
 export function echoSquads(book: CatalogBook, budget: number, kind: SortieFightKind, r: Rand, lord?: string): Unit[] {
   const out: { u: Unit; n: number }[] = [];
   let left = budget;
-  const take = (cu: CatalogUnit, max = left) => {
+  const take = (cu: CatalogUnit, max = left, from = book) => {
     const l = [applySelection(cu, randomSelection(cu, r)), applySelection(cu, {})].find((x) => x.cost > 0 && x.cost / cu.size <= max);
     if (!l) return false;
     const n = Math.min(cu.size, Math.floor(max / (l.cost / cu.size)));
-    out.push({ u: unitFromCatalog(cu, l, book), n });
+    out.push({ u: unitFromCatalog(cu, l, from), n });
     left -= (l.cost * n) / cu.size;
     return true;
   };
   const units = book.units.filter((cu) => cu.cost > 0);
-  const named = kind === 'boss' && lord ? units.find((cu) => cu.name === lord) : undefined;
+  // A book without the lord's datasheet (an edited or older copy) borrows it from the Void Echoes the site ships with,
+  // so the lord's fight is never led by a stand-in.
+  const own = kind === 'boss' && lord ? units.find((cu) => cu.name === lord) : undefined;
+  const named = own ?? (kind === 'boss' && lord ? builtinEchoes().units.find((cu) => cu.name === lord && cu.cost > 0) : undefined);
   if (named) {
-    take(named, named.cost);
-    left = Math.max(0, budget - named.cost * lordScale(budget, named.cost));
+    take(named, named.cost, own ? book : builtinEchoes());
+    // Its escorts keep their share even when the lord's wounds can shrink no further, so it never fights alone.
+    left = Math.max(budget * (1 - SORTIE.lordShare), budget - named.cost * lordScale(budget, named.cost));
   } else if (kind === 'boss') {
     const leads = units.filter((cu) => hasRule(cu.rules, 'Hero') || (ruleRating(cu.rules, 'Tough') ?? 1) >= 6).sort((a, b) => b.cost - a.cost);
     const lead = leads.find((cu) => cu.cost <= budget * 0.7) ?? leads[leads.length - 1];
@@ -1157,7 +1162,7 @@ export function echoSquads(book: CatalogBook, budget: number, kind: SortieFightK
     const cu = small[Math.floor(r() * small.length)];
     if (!take(cu)) misses++;
   }
-  if (!out.length && units.length) {
+  if ((!out.length || (named && out.length < 2)) && units.length) {
     const cheapest = [...units].sort((a, b) => a.cost / a.size - b.cost / b.size)[0];
     take(cheapest, cheapest.cost / cheapest.size);
   }
@@ -1172,7 +1177,7 @@ export function echoSquads(book: CatalogBook, budget: number, kind: SortieFightK
 export const fightTitle: Record<SortieFightKind, string> = { fight: 'Echo pack', elite: 'Elite Echoes', boss: 'Echo lord' };
 
 /** How far a named lord's wounds stretch or shrink to take its share of the boss fight's budget. */
-const lordScale = (budget: number, cost: number) => clamp((budget * 0.7) / Math.max(1, cost), 0.3, 3);
+const lordScale = (budget: number, cost: number) => clamp((budget * SORTIE.lordShare) / Math.max(1, cost), 0.3, 3);
 
 const log = (c: SortieCombat, text: string, tone: SortieTone = 'info') => c.log.push({ text, tone });
 const has = (run: SortieRun, b: SortieBoonId) => run.boons.includes(b);
@@ -1286,9 +1291,6 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
     const brawler = output(s, true) >= output(s, false);
     s.dist = hasRule(s.unit.rules, 'Scout') || brawler ? 1 : longest <= SORTIE.ranges[0][0] ? 2 : 3;
   }
-  // Nobody standing Close: the nearest squad steps up.
-  const near = Math.min(...enemies.filter((e) => !e.arrives).map(distOf));
-  if (near > 1) for (const e of enemies) if (!e.arrives && distOf(e) === near) e.dist = near - 1;
   run.combat = { kind, round: 0, party, enemies, queue: [], orders: {}, cast: {}, outflank: {}, moved: [], kills: 0, log: [] };
   run.screen = 'combat';
   const c = run.combat;
@@ -1305,9 +1307,12 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
       m.hp = Math.max(1, Math.round(m.max * short));
     }
     lord.name = boss.name;
-    lord.arrives = undefined;
     lord.dist = 1;
     c.lord = lord.key;
+    // It comes in late, while its escorts still hold the field (the round after, if they all fall first: see checkEnd); with
+    // no escorts it is there from the start.
+    const [from, to] = SORTIE.lordArrives;
+    lord.arrives = enemies.length > 1 ? from + Math.floor(rand(run) * (to - from + 1)) : undefined;
     if (sigsOf(run).some((s) => s.id === 'brood')) {
       const cu = book.units.find((u) => u.name === 'Fiends');
       if (cu) c.brood = unitFromCatalog(cu, applySelection(cu, {}), book);
@@ -1317,7 +1322,7 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
       if (run.rematch >= 1) lord.defMod += SORTIE.rematch.def;
       if (run.rematch >= 2) lord.atkBonus *= SORTIE.rematch.atk;
     }
-    log(c, run.nemesis ? boss.taunt : boss.intro, 'bad');
+    log(c, lord.arrives ? `${boss.name} is not on the field yet: its escorts hold the line, and it joins the fight in round ${lord.arrives}.` : run.nemesis ? boss.taunt : boss.intro, 'bad');
     if (run.rematch) {
       log(c, boss.rematch[run.rematch - 1], 'bad');
       for (const t of rematchTricks(run)) log(c, `${t.name}: ${t.text}`, 'bad');
@@ -1326,6 +1331,9 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
     for (const sig of sigsOf(run)) log(c, `${sig.name}: ${sig.text}`, 'bad');
     if (run.weaken) log(c, `${boss.name} comes into the fight already hurt.`, 'good');
   }
+  // Nobody standing Close: the nearest squad steps up.
+  const near = Math.min(...enemies.filter((e) => !e.arrives).map(distOf));
+  if (near > 1) for (const e of enemies) if (!e.arrives && distOf(e) === near) e.dist = near - 1;
   if (affix) {
     c.affix = affix;
     for (const e of enemies) {
@@ -1376,7 +1384,8 @@ function newRound(run: SortieRun) {
   for (const e of c.enemies) if (e.arrives && e.arrives <= c.round && standing(e)) {
     e.arrives = undefined;
     e.dist = 1;
-    log(c, `${e.name} burst out of ambush at Close range!`, 'bad');
+    if (e.key === c.lord) lordArrives(run, e);
+    else log(c, `${e.name} burst out of ambush at Close range!`, 'bad');
   }
   // Nobody left Close: the rest of the Echoes close in a step.
   if (c.round > 1 && onField(c).length && !onField(c).some((e) => distOf(e) === 1)) {
@@ -1417,6 +1426,14 @@ function newRound(run: SortieRun) {
   // The round waits on the player, so the turn order and the Echoes' intents can be read first.
   c.need = 'start';
   c.acting = undefined;
+}
+
+/** The Echo lord joins the fight at Close, late, as its omens foretold. */
+function lordArrives(run: SortieRun, lord: SortieSquad) {
+  const c = run.combat!;
+  const boss = bossOf(run);
+  log(c, `${lord.name} arrives at Close range!`, 'bad');
+  log(c, run.nemesis ? boss.taunt : boss.intro, 'bad');
 }
 
 /** The Echo lord's signature ability, at the start of a round while it stands. */
@@ -2159,7 +2176,9 @@ function checkEnd(run: SortieRun) {
   if (!c.party.some(standing)) return finish(run, 'broke');
   if (!onField(c).length) {
     // The field is clear, but an ambush may still be waiting: spring it now.
-    const lurk = c.enemies.find((e) => e.arrives && standing(e));
+    // (Escorts first, so the Echo lord still finds them up when its round comes; with every escort down it doesn't
+    // wait for its round, and comes in at the next.)
+    const lurk = c.enemies.find((e) => e.key !== c.lord && e.arrives && standing(e)) ?? c.enemies.find((e) => e.arrives && standing(e));
     if (lurk) {
       lurk.arrives = c.round;
       return;

@@ -1049,7 +1049,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onLeave }:
           {waiting.map((e) => (
             <div key={e.key} className="sortie-echo out small">
               {echoFace(e, 24)}
-              <span className="muted">{e.name} lurks in ambush (round {e.arrives}).</span>
+              <span className="muted">{e.key === c.lord ? `${e.name} is on its way: it joins the fight in round ${e.arrives}, or the round after its escorts all fall.` : `${e.name} lurks in ambush (round ${e.arrives}).`}</span>
             </div>
           ))}
         </div>
