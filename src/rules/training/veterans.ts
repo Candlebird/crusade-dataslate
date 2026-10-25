@@ -57,12 +57,13 @@ export function traitType(t: RecordEntry): ShardType | undefined {
   return undefined;
 }
 
-/** +1 grade for a trait of type `type`: on the lowest slot of that type short of Pristine, else the lowest slot short
- *  of Pristine; with every slot Pristine, a new Cracked slot (up to maxSlots). */
+/** +1 grade for a trait of type `type`: on the lowest slot short of Pristine (of that type, among the lowest), so a
+ *  veteran's recipe asks for a commoner Shard rather than a rarer one; with every slot Pristine, a new Cracked slot (up
+ *  to maxSlots). */
 function lift(slots: RecipeSlot[], type: ShardType | undefined): void {
   const open = slots.filter((s) => s.grade < 5);
-  const low = (xs: RecipeSlot[]) => xs.reduce<RecipeSlot | undefined>((m, s) => (!m || s.grade < m.grade ? s : m), undefined);
-  const s = low(open.filter((x) => x.type === type)) ?? low(open);
+  const lowest = Math.min(...open.map((s) => s.grade));
+  const s = open.find((x) => x.grade === lowest && x.type === type) ?? open.find((x) => x.grade === lowest);
   if (s) { s.grade = (s.grade + 1) as Grade; return; }
   if (slots.length < V.maxSlots) slots.push({ type: type ?? slots[0]?.type ?? TYPES[0], grade: 1 });
 }
@@ -73,24 +74,27 @@ function crack(slots: RecipeSlot[]): void {
   if (s && s.grade > 1) s.grade = (s.grade - 1) as Grade;
 }
 
-/** Traits and scars net out, capped at ±TRAINING.veterans.cap: the trait types to lift, or the scars' count to crack. */
-export function recordBudget(u: Unit): { lifts: (ShardType | undefined)[]; cracks: number } {
+/** Traits and scars net out, capped at ±TRAINING.veterans.cap: `net` (the traits that count, for the damage they add:
+ *  gritOf), the trait types to lift (one grade every `traitsPerLift` of them, the first earned), or the scars' count to
+ *  crack. */
+export function recordBudget(u: Unit): { lifts: (ShardType | undefined)[]; cracks: number; net: number } {
   const rec = recordOf(u);
   const traits = rec.filter((r) => r.kind === 'trait');
   const net = Math.max(-V.cap, Math.min(V.cap, traits.length - (rec.length - traits.length)));
-  return { lifts: traits.slice(0, Math.max(0, net)).map(traitType), cracks: Math.max(0, -net) };
+  const lifts = Math.floor(Math.max(0, net) / V.traitsPerLift);
+  return { lifts: traits.slice(0, lifts).map(traitType), cracks: Math.max(0, -net), net };
 }
 
 /** A recipe as the unit's record makes it: a copy of `slots`, lifted by its traits or cracked by its scars. */
-export function adjustSlots(slots: RecipeSlot[], budget: ReturnType<typeof recordBudget>): RecipeSlot[] {
+export function adjustSlots(slots: RecipeSlot[], budget: { lifts: (ShardType | undefined)[]; cracks: number }): RecipeSlot[] {
   const out = slots.map((s) => ({ ...s }));
   for (const t of budget.lifts) lift(out, t);
   for (let i = 0; i < budget.cracks; i++) crack(out);
   return out;
 }
 
-/** What the record adds to a tower beyond its fighter() numbers: hold share, Tough, damage share (its own, and the
- *  recipe's lifts and cracks), initiative. */
+/** What the record adds to a tower beyond its fighter() numbers: hold share, Tough, damage share (its own, liftDmg a
+ *  net trait and crackDmg off a crack), initiative. */
 export function gritOf(u: Unit): { hold: number; tough: number; atk: number; init: number } {
   const out = { hold: 1, tough: 0, atk: 0, init: 0 };
   for (const r of recordOf(u)) {
@@ -104,7 +108,7 @@ export function gritOf(u: Unit): { hold: number; tough: number; atk: number; ini
     }
   }
   const b = recordBudget(u);
-  out.atk += b.lifts.length * V.liftDmg - b.cracks * V.crackDmg;
+  out.atk += Math.max(0, b.net) * V.liftDmg - b.cracks * V.crackDmg;
   out.hold = Math.max(V.minHold, out.hold);
   return out;
 }

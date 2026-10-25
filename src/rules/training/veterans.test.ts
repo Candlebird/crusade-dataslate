@@ -26,14 +26,14 @@ const grades = (xs: RecipeSlot[]) => xs.map((s) => s.grade);
 
 describe('recipe budget', () => {
   it('nets traits against scars, capped either way', () => {
-    expect(recordBudget(squad(['Resilient', 'Point Blank'])).lifts).toHaveLength(2);
-    expect(recordBudget(squad(['Resilient'], ['Faulty Aim', 'Weakened Armor']))).toEqual({ lifts: [], cracks: 1 });
-    expect(recordBudget(squad(['Resilient', 'Point Blank', 'Blade Master', 'Fortified', 'Protected'])).lifts).toHaveLength(V.cap);
+    expect(recordBudget(squad(['Resilient', 'Point Blank'])).lifts).toHaveLength(2 / V.traitsPerLift);
+    expect(recordBudget(squad(['Resilient'], ['Faulty Aim', 'Weakened Armor']))).toEqual({ lifts: [], cracks: 1, net: -1 });
+    expect(recordBudget(squad(['Resilient', 'Point Blank', 'Blade Master', 'Fortified', 'Protected'])).lifts).toHaveLength(Math.floor(V.cap / V.traitsPerLift));
     expect(recordBudget(squad([], ['Faulty Aim', 'Weakened Armor', 'Damaged Equipment', 'Weak Spot'])).cracks).toBe(V.cap);
   });
 
   it('ignores scars that are not scars here (Comatose)', () => {
-    expect(recordBudget(squad([], ['Comatose']))).toEqual({ lifts: [], cracks: 0 });
+    expect(recordBudget(squad([], ['Comatose']))).toEqual({ lifts: [], cracks: 0, net: 0 });
   });
 
   it('types a trait by the table, its effect, or its weapon', () => {
@@ -47,7 +47,7 @@ describe('recipe budget', () => {
 describe('adjusting a recipe', () => {
   const base = [slot('firepower', 2), slot('bulwark', 2), slot('assault', 3)];
 
-  it('a trait lifts a slot of its own type, else the lowest slot', () => {
+  it('a lift goes on the lowest slot, of its own type among ties', () => {
     expect(adjustSlots(base, { lifts: ['bulwark'], cracks: 0 })).toEqual([slot('firepower', 2), slot('bulwark', 3), slot('assault', 3)]);
     expect(grades(adjustSlots(base, { lifts: ['vigor'], cracks: 0 }))).toEqual([3, 2, 3]);
     expect(grades(adjustSlots(base, { lifts: [undefined], cracks: 0 }))).toEqual([3, 2, 3]);
@@ -94,7 +94,7 @@ describe('recipes of a veteran force', () => {
 });
 
 describe('what the record does on the tower', () => {
-  it('grit: longer holds, more Tough, more damage for each lift, less for each crack', () => {
+  it('grit: longer holds, more Tough, more damage for each net trait, less for each crack', () => {
     expect(gritOf(squad())).toEqual({ hold: 1, tough: 0, atk: 0, init: 0 });
     const vet = gritOf(squad(['Resilient', 'Tough +3']));
     expect(vet.hold).toBeCloseTo(1 + V.grit.Resilient.hold!);

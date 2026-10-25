@@ -521,7 +521,7 @@ export const TRAINING = {
   blastRadius: 2,
   /** A Hero's aura gives +1 to hit to every tower within this many cells of it, itself included. */
   auraRadius: 6,
-  /** Every enemy has this many times its listed wounds (tuned with the balance bot, balance.test.ts: a fresh sample force
+  /** Every enemy has this many times its listed wounds (tuned with the balance bot, bot.balance.test.ts: a fresh sample force
    *  reaches about wave 20-25). */
   enemyHp: 0.16,
   /**
@@ -579,7 +579,7 @@ export const TRAINING = {
    * its costs say (towers fire as much faster); a kill pays `crowd` times less, bar the Lord's. Each wave is one kind (a boss wave the boss and one kind of escort), drawn by `kinds` weight from those that
    * can turn up (a flying wave's from the `main` ones); as many come as the budget buys, their wounds evened out so the
    * wave costs its budget. From wave `eliteFrom` every `eliteEvery`th is an elite, with `eliteHp` times the wounds (drawn
-   * with a gold rim). Tuned with the balance bot (balance.test.ts): a boss gets a pad or two into the maze, the bot leaks
+   * with a gold rim). Tuned with the balance bot (bot.balance.test.ts): a boss gets a pad or two into the maze, the bot leaks
    * now and then in waves 8-15, a fresh force reaches about wave 21, and no flying wave is a wall.
    */
   wave: {
@@ -746,18 +746,20 @@ export const TRAINING = {
     recipeFit: { topSpan: 250, repeat: 0.5, grade: 0.15, offTier: 2 },
   },
   /**
-   * Living recipes (veterans.ts): a unit's crusade record reworks its recipe. Each trait is +1 grade on a slot of its own
-   * Shard type (`traitTypes`, else what its effect is: see veterans.ts), else on the lowest slot, up to Pristine; with
-   * every slot Pristine a trait adds a slot (up to `maxSlots`). Each scar is −1 grade on the dearest slot, never below
+   * Living recipes (veterans.ts): a unit's crusade record reworks its recipe. Every `traitsPerLift` traits (net of
+   * scars) are +1 grade on the lowest slot short of Pristine (of the first one's own Shard type when several are lowest:
+   * `traitTypes`, else what its effect is: see veterans.ts), so a veteran asks for a commoner Shard, not a rarer one; with every slot Pristine a lift adds a slot (up to `maxSlots`). Each scar is −1 grade on the dearest slot, never below
    * Cracked. Traits and scars net out, at most `cap` grades either way. `notScars` don't count. What a trait or scar does
    * in a fight that never reaches a tower (towers are never attacked) comes in as `grit`: `hold` a share longer holds,
    * `tough` more Tough (holds, and grabs at all), `atk` a share more damage. Traits that move a unit mid-game (redeploy)
    * give `redeployInit` initiative a use; ones that bring it back from the dead (revive) `reviveHold` longer holds. A
-   * weapon's +6" range trait adds `rangeTrait` cells. A dearer recipe makes a harder-hitting tower: each grade the
-   * record lifts is `liftDmg` more damage, each it cracks `crackDmg` less.
+   * weapon's +6" range trait adds `rangeTrait` cells. A veteran hits harder: each net trait (up to `cap`) is `liftDmg`
+   * more damage, each grade a scar cracks `crackDmg` less. Grades are lifted softly (`traitsPerLift`) since recipes need
+   * exact grades and the high ones are rare at the luck a run has.
    */
   veterans: {
     cap: 3,
+    traitsPerLift: 2,
     maxSlots: 5,
     notScars: ['Comatose'],
     traitTypes: {

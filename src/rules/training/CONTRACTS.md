@@ -174,9 +174,9 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 ### veterans.ts (living recipes)
 - `recordOf(u): RecordEntry[]` — traits (unit, then weapon), then scars (less TRAINING.veterans.notScars).
 - `traitType(r): ShardType | undefined` — veterans.traitTypes, else its effect's type, else its weapon's (melee/shooting).
-- `recordBudget(u): { lifts: (ShardType | undefined)[]; cracks: number }` — traits − scars, capped ±veterans.cap.
-- `adjustSlots(slots, budget): RecipeSlot[]` — a copy: each lift +1 grade (own type, else lowest; all Pristine → a new grade-1 slot, up to maxSlots), each crack −1 on the dearest (floor 1).
-- `gritOf(u): { hold; tough; atk; init }` — what the record does beyond fighter(): veterans.grit, redeploy/revive traits, liftDmg/crackDmg a grade.
+- `recordBudget(u): { lifts: (ShardType | undefined)[]; cracks: number; net: number }` — traits − scars, capped ±veterans.cap (`net`); one grade lifted (on the lowest slot, own type first among the lowest) every `veterans.traitsPerLift` net traits (soft: recipes need exact grades), a crack a net scar.
+- `adjustSlots(slots, budget): RecipeSlot[]` — a copy: each lift +1 grade (the lowest slot, own type first among ties; all Pristine → a new grade-1 slot, up to maxSlots), each crack −1 on the dearest (floor 1).
+- `gritOf(u): { hold; tough; atk; init }` — what the record does beyond fighter(): veterans.grit, redeploy/revive traits, liftDmg a net trait, crackDmg a crack.
 - `rangeBonus(u, gun): number` — cells from +6" range weapon traits.
 - `recordBadges(u): RecordBadge[]` — {name, kind, type?, text} for PieceInfo and RecipeBook. `hereText(e)` — an effect in Training words.
 - recipes.recipesFor adjusts each unit's raw best recipe by its record before the uniqueness check (adjusted signatures stay unique).

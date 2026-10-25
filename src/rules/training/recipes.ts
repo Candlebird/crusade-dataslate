@@ -11,7 +11,7 @@ import { socketRuns, socketsOf } from './relics';
 import { adjustSlots, gritOf, rangeBonus, recordBudget } from './veterans';
 import type { Grade, Recipe, RecipeSlot, ShardPiece, Tile, TowerSkill, TrainingRun, UnitTower } from './types';
 
-// Recipes: every unit in the force gets one, a multiset of Shard types with minimum grades, from its datasheet. And a
+// Recipes: every unit in the force gets one, a multiset of Shard types each at an exact grade, from its datasheet. And a
 // crafted unit's tower stats (autoBattle fighter(), Sortie habits from habits.ts, abilities as skills).
 
 const TYPES = Object.keys(SHARD_TYPES) as ShardType[];
