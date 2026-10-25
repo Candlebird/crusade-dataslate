@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { href, useRoute } from './route';
 import ForceList from './components/ForceList';
 import ForceView from './components/ForceView';
@@ -8,19 +8,20 @@ import { Loading, Toaster } from './components/ui';
 import AccountButton from './cloud/AccountButton';
 import { JoinPanel } from './cloud/Players';
 import { Icon } from './components/Icon';
+import { PageBoundary, lazyPage } from './components/lazyPage';
 
 // The pages beyond the forces load on first visit, so the first screen doesn't wait for the map, the tracker and the rules.
-const BattleWizard = lazy(() => import('./components/BattleWizard'));
-const BooksPage = lazy(() => import('./components/BooksPage'));
-const CampaignPage = lazy(() => import('./components/CampaignPage'));
-const ListPage = lazy(() => import('./components/ListPage'));
-const LedgerPage = lazy(() => import('./components/Ledger'));
-const SettingsPage = lazy(() => import('./components/SettingsPage'));
-const BattleTracker = lazy(() => import('./components/BattleTracker'));
-const SideSheet = lazy(() => import('./components/SideSheet'));
-const MissionLibrary = lazy(() => import('./components/MissionLibrary'));
-const GuidePage = lazy(() => import('./components/GuidePage'));
-const RulesPage = lazy(() => import('./components/RulesPage'));
+const BattleWizard = lazyPage(() => import('./components/BattleWizard'));
+const BooksPage = lazyPage(() => import('./components/BooksPage'));
+const CampaignPage = lazyPage(() => import('./components/CampaignPage'));
+const ListPage = lazyPage(() => import('./components/ListPage'));
+const LedgerPage = lazyPage(() => import('./components/Ledger'));
+const SettingsPage = lazyPage(() => import('./components/SettingsPage'));
+const BattleTracker = lazyPage(() => import('./components/BattleTracker'));
+const SideSheet = lazyPage(() => import('./components/SideSheet'));
+const MissionLibrary = lazyPage(() => import('./components/MissionLibrary'));
+const GuidePage = lazyPage(() => import('./components/GuidePage'));
+const RulesPage = lazyPage(() => import('./components/RulesPage'));
 
 export default function App() {
   const route = useRoute();
@@ -61,6 +62,7 @@ export default function App() {
       </header>
       <main className="content">
         <JoinPanel />
+        <PageBoundary key={route.page}>
         <Suspense fallback={<Loading />}>
           {route.page === 'forces' && <ForceList />}
           {route.page === 'force' && <ForceView forceId={route.forceId} />}
@@ -77,6 +79,7 @@ export default function App() {
           {route.page === 'rules' && <RulesPage sub={route.sub} />}
           {route.page === 'guide' && <GuidePage />}
         </Suspense>
+        </PageBoundary>
       </main>
       <Toaster />
       <footer className="footer">++ Data lives in this browser and syncs with the group while you're signed in. ++</footer>

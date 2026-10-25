@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import { exportCampaign } from '../model/io';
@@ -25,9 +25,10 @@ import { BOUNTY } from '../rules/nexusData';
 import { Dropzone, Loading, Panel, TextField, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
 import { Glyph, Icon } from './Icon';
+import { lazyPage } from './lazyPage';
 
 // The map is the page's heaviest part; it loads with the Map tab.
-const HexMapPanel = lazy(() => import('./HexMap'));
+const HexMapPanel = lazyPage(() => import('./HexMap'));
 
 const COLORS = ['#c0392b', '#2e86c1', '#27ae60', '#d4ac0d', '#8e44ad', '#d35400', '#17a589', '#7f8c8d'];
 
