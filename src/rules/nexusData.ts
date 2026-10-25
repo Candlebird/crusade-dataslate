@@ -358,7 +358,7 @@ export const FOG = {
  */
 export const PRODUCTION = {
   /** Materials banked per round. */
-  perRound: 250,
+  perRound: 300,
   /** …with Barracks. */
   barracks: 500,
   /** A bank holds at most this many rounds of production. */
