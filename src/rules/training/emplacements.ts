@@ -1,4 +1,4 @@
-import { TRAINING, type DefaultRecipeDef } from '../downtimeData';
+import { TRAINING, type DefaultRecipeDef, type ShardType } from '../downtimeData';
 import { pieceById, shardsOnMap } from './board';
 import { towerDps } from './dps';
 import { recipeUses } from './recipes';
@@ -64,12 +64,17 @@ export function readyDefaults(run: TrainingRun): { key: string; uses: number[] }
   });
 }
 
-/** Default `d` as a tower at `at`: each Shard's gun and rule, Quality the best of theirs less qualityBonus (2+ at
- *  best), attacks scaled so it does dpsShare of a unit of the same value (dpsDefense, dps.ts). */
+/** The guns default `d` fires: each of its `guns` types at the best grade of its slots of that type. */
+const gunsOf = (d: DefaultRecipeDef, slots: [ShardType, Grade][]) =>
+  d.guns.map((type) => shardGun(type, Math.max(...slots.filter(([t]) => t === type).map(([, g]) => g)) as Grade));
+
+/** Default `d` as a tower at `at`: its one gun (two for a theme that needs them: DefaultRecipeDef.guns) and every
+ *  Shard's rule, Quality the best of theirs less qualityBonus (2+ at best), attacks scaled so it does dpsShare of a
+ *  unit of the same value (dpsDefense, dps.ts). */
 export function defaultTower(d: DefaultRecipeDef, id: number, at: Tile): DefaultTower {
-  const slots = d.slots.map(([type, grade]) => [type, grade as Grade] as [typeof type, Grade]);
+  const slots = d.slots.map(([type, grade]) => [type, grade as Grade] as [ShardType, Grade]);
   const quality = Math.max(2, Math.min(...slots.map(([, g]) => TRAINING.shards.quality[g - 1])) - D.qualityBonus);
-  const base = { quality, hitShoot: 0, hitMelee: 0, atkBonus: 1, guns: slots.map(([t, g]) => shardGun(t, g)) };
+  const base = { quality, hitShoot: 0, hitMelee: 0, atkBonus: 1, guns: gunsOf(d, slots) };
   const k = (D.dpsShare * D.unitDps * defaultValue(d)) / towerDps(base, D.dpsDefense);
   const guns = base.guns.map((g) => ({ ...g, name: `${d.name}: ${g.name}`, attacks: g.attacks * k }));
   return {

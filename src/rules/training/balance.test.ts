@@ -43,8 +43,11 @@ describe('training balance (bot)', () => {
     }
   });
 
-  it('leaks nothing on waves 1-2 (a sensible first Shard holds them)', () => {
-    for (const p of runs) expect(p.leaks.slice(1, 3).map((l) => l ?? 0)).toEqual([0, 0]);
+  it('leaks next to nothing on waves 1-2 (a sensible first Shard holds them)', () => {
+    // A first draft with no good gun for walkers (Firepower shoots only flyers) may let one Echo by; most hold.
+    const early = runs.map((p) => p.leaks.slice(1, 3).map((l) => l ?? 0));
+    for (const l of early) expect(Math.max(...l)).toBeLessThanOrEqual(1);
+    expect(early.filter((l) => l[0] + l[1] === 0).length).toBeGreaterThanOrEqual((runs.length * 2) / 3);
   });
 
   it('leaks now and then in waves 8-15, but not every wave', () => {

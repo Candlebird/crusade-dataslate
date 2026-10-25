@@ -588,25 +588,25 @@ export const TRAINING = {
     lateGrowth: 1.17,
     groundFrom: 8,
     groundTo: 16,
-    groundGrowth: 1.07,
+    groundGrowth: 1.05,
     groundLate: 1.02,
     earlyHp: [0.5, 0.65, 0.8] as number[],
     earlyPace: [0.5, 0.7, 0.9] as number[],
     earlyBudget: [0.4, 0.6, 1] as number[],
-    easeFrom: 21,
+    easeFrom: 20,
     easeTo: 25,
     ease: 0.9,
     flyEvery: 4,
     flyShare: 0.4,
     flyMax: 48,
-    flyHp: 1.4,
+    flyHp: 1.8,
     flyFade: 0.9,
     bossEvery: 5,
     flyBossEvery: 20,
     escorts: 0.5,
     bossMin: 0.1,
     bossHp: [2.0, 2.6, 3.5, 1.7, 0.45, 0.375] as number[],
-    flyBossHp: 0.5,
+    flyBossHp: 0.75,
     scoutHp: 0.8,
     ambushHp: 0.65,
     gap: 0.15,
@@ -618,11 +618,11 @@ export const TRAINING = {
   /**
    * Default towers (emplacements.ts): generic emplacements any force can build from Shards of exactly these types and
    * grades (Flawed means Flawed). Between them the recipes use each of the 40 Shard kinds once. Each slot brings its
-   * type's gun and rule; the guns are scaled so the whole does `dpsShare` of the damage a crafted unit from Shards of
+   * type's rule; only the `guns` slots bring a gun (one weapon, two for the Citadel), scaled so the whole does `dpsShare` of the damage a crafted unit from Shards of
    * the same value does: `unitDps` a point of recipe value at Defense `dpsDefense` (dps.ts towerDps; the sample
    * forces' mean, measured, and checked by emplacements.test.ts). Quality is the best of its Shards' less
    * `qualityBonus` (lower is better), never below 2+. A default takes no XP, levels, traits or relics, and is hidden
-   * when one of the force's unit recipes can be filled from its Shards.
+   * while one of the force's uncrafted unit recipes can be filled from its Shards.
    */
   defaults: {
     dpsShare: 0.75,
@@ -630,25 +630,25 @@ export const TRAINING = {
     dpsDefense: 5,
     qualityBonus: 1,
     recipes: [
-      { key: 'picket', name: 'Picket Post', text: 'A sentry nest with a long view.', slots: [['firepower', 1], ['swift', 1], ['command', 1]] },
-      { key: 'barricade', name: 'Barricade', text: 'Sharpened stakes behind a sandbag wall.', slots: [['bulwark', 1], ['assault', 1], ['vigor', 1]] },
-      { key: 'mortar', name: 'Mortar Pit', text: 'Lobbed shells that burst among the pack.', slots: [['blast', 1], ['breach', 1], ['firepower', 2]] },
-      { key: 'razorwire', name: 'Razorwire Run', text: 'Coils of wire that slow and cut.', slots: [['assault', 2], ['swift', 2], ['bulwark', 2]] },
-      { key: 'shrine', name: 'Field Shrine', text: 'A blessed post that steadies the guns round it.', slots: [['vigor', 2], ['command', 2], ['blast', 2]] },
-      { key: 'lascannon', name: 'Lascannon Nest', text: 'A heavy beam that cuts through armour.', slots: [['breach', 2], ['firepower', 3], ['command', 3]] },
-      { key: 'pylon', name: 'Bastion Pylon', text: 'A shield pylon that dazes what brushes it.', slots: [['bulwark', 3], ['vigor', 3], ['command', 4]] },
-      { key: 'flak', name: 'Flak Battery', text: 'Quick-firing guns that fill the sky.', slots: [['swift', 3], ['firepower', 4], ['blast', 3]] },
-      { key: 'ram', name: 'Breaker Ram', text: 'Piston-driven blades for anything that comes close.', slots: [['assault', 3], ['breach', 3], ['bulwark', 4]] },
-      { key: 'hellfire', name: 'Hellfire Array', text: 'Burning shells that leave the road aflame.', slots: [['blast', 4], ['breach', 4], ['vigor', 4]] },
-      { key: 'spire', name: 'Storm Spire', text: 'A crackling mast that strikes fast and far.', slots: [['swift', 4], ['swift', 5], ['firepower', 5]] },
-      { key: 'titan', name: 'Titan Bulwark', text: 'A wall of iron fists.', slots: [['assault', 4], ['assault', 5], ['bulwark', 5]] },
-      { key: 'citadel', name: 'Nexus Citadel', text: 'A fortress that does a little of everything.', slots: [['breach', 5], ['blast', 5], ['command', 5], ['vigor', 5]] },
+      { key: 'picket', name: 'Picket Post', text: 'A sentry nest that watches the sky.', slots: [['firepower', 1], ['swift', 1], ['command', 1]], guns: ['firepower'] },
+      { key: 'barricade', name: 'Barricade', text: 'Sharpened stakes behind a sandbag wall.', slots: [['bulwark', 1], ['assault', 1], ['vigor', 1]], guns: ['assault'] },
+      { key: 'mortar', name: 'Mortar Pit', text: 'Lobbed shells that burst among the pack.', slots: [['blast', 1], ['breach', 1], ['firepower', 2]], guns: ['blast'] },
+      { key: 'razorwire', name: 'Razorwire Run', text: 'Coils of wire that slow and cut.', slots: [['assault', 2], ['swift', 2], ['bulwark', 2]], guns: ['swift'] },
+      { key: 'shrine', name: 'Field Shrine', text: 'A blessed post that steadies the guns round it.', slots: [['vigor', 2], ['command', 2], ['blast', 2]], guns: ['command'] },
+      { key: 'lascannon', name: 'Lascannon Nest', text: 'A heavy beam that cuts through armour.', slots: [['breach', 2], ['firepower', 3], ['command', 3]], guns: ['breach'] },
+      { key: 'pylon', name: 'Bastion Pylon', text: 'A shield pylon that dazes what brushes it.', slots: [['bulwark', 3], ['vigor', 3], ['command', 4]], guns: ['bulwark'] },
+      { key: 'flak', name: 'Flak Battery', text: 'Quick-firing guns that fill the sky.', slots: [['swift', 3], ['firepower', 4], ['blast', 3]], guns: ['firepower'] },
+      { key: 'ram', name: 'Breaker Ram', text: 'Piston-driven blades for anything that comes close.', slots: [['assault', 3], ['breach', 3], ['bulwark', 4]], guns: ['assault'] },
+      { key: 'hellfire', name: 'Hellfire Array', text: 'Burning shells that leave the road aflame.', slots: [['blast', 4], ['breach', 4], ['vigor', 4]], guns: ['blast'] },
+      { key: 'spire', name: 'Storm Spire', text: 'A crackling mast that strikes fast and far.', slots: [['swift', 4], ['swift', 5], ['firepower', 5]], guns: ['swift'] },
+      { key: 'titan', name: 'Titan Bulwark', text: 'A wall of iron fists.', slots: [['assault', 4], ['assault', 5], ['bulwark', 5]], guns: ['assault'] },
+      { key: 'citadel', name: 'Nexus Citadel', text: 'A fortress that does a little of everything.', slots: [['breach', 5], ['blast', 5], ['command', 5], ['vigor', 5]], guns: ['breach', 'blast'] },
     ] as DefaultRecipeDef[],
   },
   /**
    * The flight lane: flyers go straight pad to pad. Building is open along it (only the pads and the spawn corner are
    * barred); a gun within reach of a leg can shoot what flies it. Firepower and Swift Shards (SHARD_TYPES `air`) do
-   * more to flyers. `width` cells either side of a leg are drawn as the lane.
+   * more to flyers; a Firepower gun shoots only flyers and a Blast one only walkers (SHARD_TYPES `only`). `width` cells either side of a leg are drawn as the lane.
    */
   flightLane: { width: 1.5 },
   /** Cover: `patches` (a range) of `size`×`size` patches laid out each run, `onRoute` of them centred on cells of the
@@ -1059,6 +1059,9 @@ export interface DefaultRecipeDef {
   name: string;
   text: string;
   slots: [ShardType, number][];
+  /** The slot types that carry its weapon (one, but for a theme that needs two), each at its slot's grade; every
+   *  slot's rule (daze, slow, aura, bleed) still counts. */
+  guns: ShardType[];
 }
 
 export type ShardType = 'assault' | 'firepower' | 'breach' | 'blast' | 'bulwark' | 'swift' | 'command' | 'vigor';
@@ -1080,11 +1083,13 @@ export const SHARD_TYPES: Record<ShardType, {
   bleed?: number;
   /** Damage against flyers, as a multiple (anti-air). */
   air?: number;
+  /** Its gun attacks only flyers ('air') or only walkers ('land'). */
+  only?: 'air' | 'land';
 }> = {
   assault: { name: 'Assault', color: '#d0603a', text: 'Strikes hard in melee.', gun: { melee: true, range: 0, attacks: 2, ap: 1 } },
-  firepower: { name: 'Firepower', color: '#e0b040', text: 'Shoots a long way; good against flyers.', gun: { range: 24, attacks: 1, ap: 0 }, air: 1.5 },
+  firepower: { name: 'Firepower', color: '#e0b040', text: 'Shoots a long way, but only at flyers.', gun: { range: 24, attacks: 1, ap: 0 }, air: 1.5, only: 'air' },
   breach: { name: 'Breach', color: '#c04a8a', text: 'Few shots, but they punch through armour.', gun: { range: 18, attacks: 0.5, ap: 2 } },
-  blast: { name: 'Blast', color: '#ff9a4a', text: 'Each hit spills onto the enemies round it.', gun: { range: 12, attacks: 0.5, ap: 0, blast: 3 } },
+  blast: { name: 'Blast', color: '#ff9a4a', text: 'Each hit spills onto the enemies round it; it can’t hit flyers.', gun: { range: 12, attacks: 0.5, ap: 0, blast: 3 }, only: 'land' },
   bulwark: { name: 'Bulwark', color: '#8d8778', text: 'Its blows leave enemies dazed (slower).', gun: { melee: true, range: 0, attacks: 1, ap: 0 }, daze: 0.4 },
   swift: { name: 'Swift', color: '#5fb3d0', text: 'Quick, short-ranged shots that slow what they hit; good against flyers.', gun: { range: 9, attacks: 1.5, ap: 0 }, slow: 0.25, air: 1.5 },
   command: { name: 'Command', color: '#c9a24a', text: 'Towers round it get +1 to hit.', gun: { range: 12, attacks: 0.5, ap: 0 }, aura: { radius: 4, perGrade: 1 } },

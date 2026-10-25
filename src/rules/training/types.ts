@@ -34,6 +34,8 @@ export interface TowerGun extends Gun {
   shard?: ShardType;
   /** Times the damage against flyers (anti-air: SHARD_TYPES `air`; 1 if unset). */
   air?: number;
+  /** It aims only at flyers ('air': Firepower) or only at walkers ('land': Blast); SHARD_TYPES `only`. */
+  only?: 'air' | 'land';
 }
 
 /** One effect of one ability on a crafted unit, with its own timer. */

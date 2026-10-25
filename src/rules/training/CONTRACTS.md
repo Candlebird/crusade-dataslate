@@ -42,7 +42,7 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | Enemy.lord (i, next, ward, burst, armed), boss SpawnPlan.lord / hp | lords.ts (lordPlan, lordTick, lordDmg); waves.spawnOne seeds it |
 | Enemy.hard, SpawnPlan.hard / elite / hp (affixes) | affixes.affixPlan; waves.spawnOne copies hard |
 | SpawnPlan.elite, Enemy.elite (one kind a wave, every eliteEvery-th from eliteFrom) | waves.planFor via waveKinds.isElite; waves.spawnOne copies it |
-| TowerGun.shard, TowerGun.air (the Shard rule and anti-air a gun carries) | shards.shardGun (Shards and default towers) |
+| TowerGun.shard, TowerGun.air, TowerGun.only (the Shard rule, anti-air, and 'air'/'land' only: SHARD_TYPES.only) | shards.shardGun (Shards and default towers) |
 | Enemy.surge | affixes.ts (onEchoDeath sets it, affixTick wears it) |
 | Unit.trainingRecord, Force.tales | records.bankHonours |
 | Unit.titles (stored ids, oldest first), Unit.title (the one shown; '-' none; unset the latest) | titles.earnTitles (records.bankHonours, downtime.applySortie); titles.pickTitle (UnitSheet via UnitRecord) |
@@ -151,7 +151,8 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - `reach(t: Tower, g: TowerGun): number` — cells (inches × TRAINING.rangeMul, via `rangeCells`), + levels × levels.range, + boost.range; melee meleeReach.
 - `rangeCells(inches): number` — inches × rangeMul (0.5 since the playtest pass); every tower, Shard, default and relic shot, and barrage radii.
 - `partsOf(t: Tower): [ShardType, Grade][]` — a Shard's own type and grade, a default's slots, nothing for a unit (auras, Vigor bleed).
-- Damage to a flyer × the gun's `air` (Firepower, Swift: SHARD_TYPES.air); a Shard's or default's wound applies its gun's `shard` rule (daze, slow).
+- Damage to a flyer × the gun's `air` (Firepower, Swift: SHARD_TYPES.air); a Shard's wound applies its gun's `shard` rule (daze, slow), a default's every distinct slot type's rule (combat.onWound).
+- `canAim(g, e): boolean` — a gun's `only` ('air': Firepower, flyers only; 'land': Blast, walkers only) allows this enemy. `targetFor` skips the ones it can't aim at; a Blast spill hits only those it can.
 - `levelDmg(t: Tower, g: TowerGun): number` — 0 for Shards.
 - `auras(run, dt): void` — recompute boost; wear dmgBoost.left.
 - `abilities(run, dt): void` — heal→bleed field, shield→dmgBoost on a random other tower, barrage, frenzy, field, Vigor bleed.
@@ -282,7 +283,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `DEFAULTS` (TRAINING.defaults.recipes: 13 sets covering each of the 40 Shard kinds once, exact grades), `defaultByKey(key)`, `defaultValue(d)`.
 - `emplacementUses(d, shards)` — ids in slot order, exact type and grade, kept Shards first; null if they can't.
 - `defaultHidden(run, d)` — an uncrafted unit recipe of the run fills from d's exact Shards (recipes.recipeUses). `freedDefaults(run)` — the defaults a recipe hid whose unit is now crafted (buildable again). `defaultsFor(run)`, `readyDefaults(run)` (as readyRecipes).
-- `defaultTower(d, id, at): DefaultTower` — each Shard's gun and rule; Quality best of theirs − qualityBonus (2+ best); attacks × k so dps.towerDps = dpsShare × unitDps × value at dpsDefense. No XP, levels, traits or relics (not a UnitTower: economy, XP and records skip it).
+- `defaultTower(d, id, at): DefaultTower` — one gun per `d.guns` type (DefaultRecipeDef.guns: one, the Citadel's two), each at the best grade of its slots of that type; every slot's rule (daze, slow via onWound; aura, bleed via harm.partsOf); Quality best of theirs − qualityBonus (2+ best); attacks × k so dps.towerDps = dpsShare × unitDps × value at dpsDefense. No XP, levels, traits or relics (not a UnitTower: economy, XP and records skip it).
 - `craftDefaultProblem(run, key, uses, onId)`, `craftDefault(run, key, uses, onId)` — as run.craft: stands on onId, other uses → rubble, a draft craft is the keep; any number of each; not in run.crafted.
 
 ### dps.ts
@@ -303,7 +304,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `speedOf(run, e: Enemy): number` — cells/s: def.speed × walkMul × slow/daze.
 - `leakCost(e: Enemy): number` — def.leak, or leak.elite for an elite if more; a boss ceil(leak × hp/maxHp), never below leak.bossMin.
 - `walk(run, dt): void` — skip held (heldBy) / stunned; walkers by flow field, flyers pad to pad; ambush jump on reaching pad ambushFrom → pad ambushAt; reaching base: remove, baseHp −= leakCost, leaked++.
-- Also (waves agent): `waveTags(w): string[]` ('Flying'/'Boss' for the HUD), `waveBudget(power, w)`, `wavePoints(power)` (all points to wave.fullPoints, wave.overRate of each past it: what planWave scales by, the siege too), `lateHp(w)` (hpGrowth from hpFrom to hpTo, lateGrowth after), `groundHpAt(w)` (1 on flying and sky-boss waves; groundGrowth a wave from groundFrom to groundTo, groundLate after), `flyHpAt(w)`, `bossHpAt(w)`,
+- Also (waves agent): `waveTags(w): string[]` ('Flying'/'Boss' for the HUD), `waveBudget(power, w)`, `wavePoints(power)` (all points to wave.fullPoints, wave.overRate of each past it: what planWave scales by, the siege too), `lateHp(w)` (hpGrowth from hpFrom to hpTo, lateGrowth after), `groundHpAt(w)` (1 on flying and sky-boss waves; groundGrowth a wave from groundFrom to groundTo, groundLate after), `flyHpAt(w)` (flyHp 1.8 × flyFade^(w-1); a sky boss (waves 20, 40, 60) × flyBossHp 0.75 too), `bossHpAt(w)`,
   `planFor(r: Rng, power, w, final = finale.from)` (planWave on any dice; past finale.from at `levelOf(w)` × `climbAt(w, final)`, a boss wave's escorts finale.escorts of the budget), `levelOf(w)`, `climbAt(w, final)`, `climbHp(w, final)`, `previewGroups(plans): PreviewGroup[]` ({kind, n, elites, hp, flies}
   for WavePreview), `mainKind(plans)` (the wave's one kind, for the preview and log), `runCover(r, extra = 0): Tile[]` (createRun's cover, + extra patches for Derelicts: patches range on the empty map's route), `layCover` takes an
   optional 4th `taken: Tile[]` to keep clear of, `atBase(e)`, `move(m, e, step)`. New TRAINING keys: `dazeMul`, `wave.bossMin`.
@@ -347,7 +348,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 
 ### bot.ts (not in index.ts: the tests, and the app's Auto (debug) button via components/training/useAuto, import it directly)
 - `interface MazeSpot { n; x; y }`
-- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (waves 1-2: the gun that covers most route, never a grade down; then exact-grade recipe progress, a grade-down keep included, then grade), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use, spend (levels cheapest first, then luck, mend when low), pick card 0 (`BOT_CARD`).
+- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (waves 1-2: the walker gun that covers most route, never a grade down, the hand's best walker gun placed first (`bestOpener`); then exact-grade recipe progress, a grade-down keep included, then grade, a second Firepower ranked two grades lower), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use (past wave 4 with no unit up, only a recipe half filled holds a Shard), never a flyers-only one that eats a walker gun (nor any on waves 1-2), spend (levels cheapest first, then luck, mend when low), pick card 0 (`BOT_CARD`).
 - `botMoves(run, units, maze, cursor): Generator<string, number>` — botBuild a move at a time (each yield one move, a few words saying it; returns the cursor); botBuild runs it straight through, so headless results are the same.
 - `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt?; nexus?; drill?; siege? }): TrainingRun`
 

@@ -52,6 +52,9 @@ export const toGo = (run: TrainingRun, e: Enemy) => remaining(mapOf(run), e.leg,
 export const enemiesNear = (run: TrainingRun, x: number, y: number, r: number) =>
   run.enemies.filter((e) => e.hp > 0 && dist(x, y, e.x, e.y) <= r);
 
+/** Can gun `g` aim at enemy `e` at all (a Firepower gun only at flyers, a Blast one only at walkers)? */
+export const canAim = (g: TowerGun, e: Enemy): boolean => !g.only || (g.only === 'air') === e.flies;
+
 /** The enemy a gun aims at: the one in reach furthest along the route (least still to go), or the toughest for a Sniper. */
 export function targetFor(run: TrainingRun, t: Tower, g: TowerGun): Enemy | undefined {
   // Hot (every gun, every step, with waves of a hundred): no arrays, squared distances, the maze looked up once.
@@ -63,7 +66,7 @@ export function targetFor(run: TrainingRun, t: Tower, g: TowerGun): Enemy | unde
   let best: Enemy | undefined;
   let score = Infinity;
   for (const e of run.enemies) {
-    if (e.hp <= 0) continue;
+    if (e.hp <= 0 || (g.only && (g.only === 'air') !== e.flies)) continue;
     const dx = e.x - c.x;
     const dy = e.y - c.y;
     if (dx * dx + dy * dy > r2) continue;

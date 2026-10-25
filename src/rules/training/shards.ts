@@ -47,7 +47,7 @@ export function shardGun(type: ShardType, grade: Grade): TowerGun {
     name: `${def.name} Shard`, melee: !!g.melee, range: g.melee ? 0 : g.range,
     attacks: Math.max(1, Math.round(g.attacks * shardValue(grade))), ap: g.ap, hitMod: 0, blast: g.blast ?? 0,
     deadly: 0, rending: false, reliable: false, bane: false, cd: 0, pending: 0, gap: 0, next: 0,
-    shard: type, ...(def.air ? { air: def.air } : {}),
+    shard: type, ...(def.air ? { air: def.air } : {}), ...(def.only ? { only: def.only } : {}),
   };
 }
 

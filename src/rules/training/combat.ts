@@ -2,7 +2,7 @@ import { SHARD_TYPES, TRAINING } from '../downtimeData';
 import { affixHit } from './affixes';
 import { centreOf, dist, towers } from './board';
 import {
-  afflict, covered, dmgMul, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, levelDmg, reach, targetFor,
+  afflict, canAim, covered, dmgMul, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, levelDmg, reach, targetFor,
   towerById, unsaved,
 } from './harm';
 import { lordHit } from './lords';
@@ -70,7 +70,7 @@ export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): bo
   const raw = Math.max(1, g.deadly) + levelDmg(t, g) + (six && isUnit(t) && t.category === 'Elite' ? 1 : 0) + sixes.reduce((n, e) => n + (e.dmg ?? 0), 0);
   const dmgTo = (e: Enemy) => Math.max(0.5, raw - (rend ? 0 : enemyDef(e).armor)) * dmgMul(t) * (e.flies ? g.air ?? 1 : 1);
   // Blast(X): the hit spills onto up to X−1 others close by, each saving on its own.
-  const splash = g.blast > 1 ? enemiesNear(run, target.x, target.y, TRAINING.blastRadius).filter((o) => o !== target).slice(0, g.blast - 1) : [];
+  const splash = g.blast > 1 ? enemiesNear(run, target.x, target.y, TRAINING.blastRadius).filter((o) => o !== target && canAim(g, o)).slice(0, g.blast - 1) : [];
   if (unsaved(run, target, ap)) {
     hurt(run, t, target, dmgTo(target), how);
     onWound(run, t, g, target, live);
@@ -86,11 +86,14 @@ function onWound(run: TrainingRun, t: Tower, g: TowerGun, e: Enemy, live: TowerS
     for (const s of live) if (s.effect.kind === 'onHit' && rand(run) < s.effect.chance) afflict(run, t, e, s.effect.status);
     return;
   }
-  const type = g.shard ?? (t.kind === 'shard' ? t.type : undefined);
-  if (!type) return;
-  const rule = SHARD_TYPES[type];
-  if (rule.daze && rand(run) < rule.daze) afflict(run, t, e, 'daze');
-  if (rule.slow && rand(run) < rule.slow) afflict(run, t, e, 'slow');
+  // A default tower's one gun carries every one of its Shards' rules (each type once).
+  const types = t.kind === 'default' ? [...new Set(t.slots.map(([k]) => k))] : [g.shard ?? (t.kind === 'shard' ? t.type : undefined)];
+  for (const type of types) {
+    if (!type) continue;
+    const rule = SHARD_TYPES[type];
+    if (rule.daze && rand(run) < rule.daze) afflict(run, t, e, 'daze');
+    if (rule.slow && rand(run) < rule.slow) afflict(run, t, e, 'slow');
+  }
 }
 
 /** Attacks in a volley: whole ones, and a fraction as a chance of one more (Shards have half attacks). */
