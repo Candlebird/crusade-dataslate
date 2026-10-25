@@ -27,10 +27,10 @@ describe('grades and draws', () => {
     expect(gradeName(5)).toBe('Pristine');
   });
 
-  it('luck 0 only draws Cracked; luck 4 draws every grade', () => {
+  it('luck 0 only draws Cracked; luck 7 draws every grade', () => {
     const run = blankRun(7);
     for (let i = 0; i < 50; i++) expect(rollGrade(run)).toBe(1);
-    run.luck = 4;
+    run.luck = 7;
     const seen = new Set<number>();
     for (let i = 0; i < 2000; i++) seen.add(rollGrade(run));
     expect([...seen].sort()).toEqual([1, 2, 3, 4, 5]);

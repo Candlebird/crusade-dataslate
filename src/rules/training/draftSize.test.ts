@@ -10,7 +10,7 @@ import type { RunDrill, TrainingRun } from './types';
 
 const N = TRAINING.shards.draw;
 const PERKS = Object.keys(TRAINING.drill.perks) as DrillPerk[];
-const maxed: RunDrill = { luck: 4, cards: [], perks: Object.fromEntries(PERKS.map((p) => [p, 9])) };
+const maxed: RunDrill = { luck: 10, cards: [], perks: Object.fromEntries(PERKS.map((p) => [p, 9])) };
 const nexusRun = (event: string) => createRun('f', [], 1, undefined, { threat: 4, affixes: [], event, lords: [] }, { drill: maxed });
 
 describe('draft size', () => {

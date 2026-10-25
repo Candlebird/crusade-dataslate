@@ -22,8 +22,8 @@ const drilled = (drill: RunDrill, o: Partial<TrainingRun> = {}): TrainingRun => 
 const all = () => drillFrom(DRILL_GOALS.map((_, i) => i));
 
 describe('drill honours', () => {
-  it('has about 20 goals (22 with the Final waves), and every boss card opens once: at the start or in one group', () => {
-    expect(DRILL_GOALS).toHaveLength(22);
+  it('has 25 goals (with the Final waves and luck 6-10), and every boss card opens once: at the start or in one group', () => {
+    expect(DRILL_GOALS).toHaveLength(25);
     const groups = Object.values(D.groups).flatMap((g) => g.cards);
     const sources = [...D.cardsAtStart, ...groups];
     expect(new Set(sources).size).toBe(sources.length);
@@ -36,13 +36,13 @@ describe('drill honours', () => {
     }
   });
 
-  it('a fresh force: luck to 2, the start cards, no perks', () => {
+  it('a fresh force: luck to 5, the start cards, no perks', () => {
     const d = drillOf(force());
     expect(d).toEqual({ luck: D.luckAtStart, cards: D.cardsAtStart, perks: {} });
     expect(drillEarned(force())).toEqual([]);
   });
 
-  it('every goal reached opens luck 4, every card and every perk', () => {
+  it('every goal reached opens luck 10, every card and every perk', () => {
     const d = all();
     expect(d.luck).toBe(TRAINING.shards.luckCost.length);
     expect([...d.cards].sort()).toEqual(CARDS.map((c) => c.id).sort());
@@ -78,7 +78,9 @@ describe('drill honours', () => {
     const open = drilled(drillFrom([3]), { credits: 9999, luck: D.luckAtStart });
     expect(luckProblem(open)).toBeNull();
     buyLuck(open);
-    expect(open.luck).toBe(3);
+    expect(open.luck).toBe(D.luckAtStart + 1);
+    while (!luckProblem(open)) buyLuck(open);
+    expect(open.luck).toBe(6);
     expect(luckProblem(open)).toMatch(/Drill Honour/);
   });
 

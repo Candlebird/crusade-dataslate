@@ -49,7 +49,7 @@ describe('levels', () => {
 });
 
 describe('luck', () => {
-  it('climbs 0..4 for its costs', () => {
+  it('climbs 0..10 for its costs', () => {
     const run = blankRun();
     run.credits = 10000;
     let spent = 0;
@@ -58,7 +58,7 @@ describe('luck', () => {
       buyLuck(run);
       spent += c;
     }
-    expect(run.luck).toBe(4);
+    expect(run.luck).toBe(TRAINING.shards.luckCost.length);
     expect(run.credits).toBe(10000 - spent);
     expect(luckCost(run)).toBeNull();
     expect(luckProblem(run)).not.toBeNull();

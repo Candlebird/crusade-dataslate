@@ -292,7 +292,7 @@ export interface TrainingRun {
   power: number;
   baseHp: number;
   credits: number;
-  /** Luck level 0..4: the draft's grade odds. */
+  /** Luck level 0..10: the draft's grade odds. */
   luck: number;
   /** Base mends bought this run (each dearer). */
   mends: number;
