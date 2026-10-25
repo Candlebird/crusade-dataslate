@@ -933,10 +933,10 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-shard-num { position: absolute; left: 3px; top: 1px; font-weight: 700; font-size: 0.8rem; color: var(--text); }
 .shard-unknown { display: inline-flex; align-items: center; justify-content: center; font-weight: 700; line-height: 1; color: var(--muted-2); border: 1px dashed var(--line-2); border-radius: 4px; }
 /* The keep table: a numbered row a draft Shard, a column each for keep, combine and downgrade, every cell one size. */
-.training-keep-table { display: grid; grid-template-columns: 1.8em repeat(3, minmax(0, 1fr)); gap: 4px; }
+.training-keep-table { display: grid; grid-template-columns: auto repeat(3, minmax(0, 1fr)); gap: 4px; }
 .training-keep-head, .training-keep-tr { display: contents; }
 .training-keep-head > span { color: var(--muted-2); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; text-align: center; }
-.training-keep-num { display: flex; align-items: center; justify-content: center; font-weight: 700; border-radius: 4px; background: rgba(255, 255, 255, 0.05); }
+.training-keep-num { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 0 4px; font-weight: 700; border-radius: 4px; background: rgba(255, 255, 255, 0.05); }
 .training-keep-tr.lit > .training-keep-num { background: var(--gold-dim); color: var(--text); }
 .training-keep-cell {
   display: flex; align-items: center; gap: 6px; min-width: 0; height: 48px; padding: 3px 6px; overflow: hidden;
@@ -944,8 +944,8 @@ fieldset.fields:disabled { opacity: 0.6; }
 }
 .training-keep-cell.off { justify-content: center; border: 1px dashed var(--line); border-radius: 4px; opacity: 0.5; }
 .training-keep-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
-.training-keep-name, .training-keep-for { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.training-keep-for { color: var(--gold); font-size: 0.9em; }
+.training-keep-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.training-keep-for { color: var(--gold); font-size: 0.9em; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .training-recipe { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 4px; }
 .training-recipe.ready { border-color: var(--gold); box-shadow: 0 0 10px rgba(201, 162, 74, 0.35); }
 .training-recipe.active { background: rgba(201, 162, 74, 0.12); }

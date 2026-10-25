@@ -78,10 +78,13 @@ export function EnemyIcon({ def, elite }: { def: TrainingEnemyDef; elite: boolea
 }
 
 /** A hover rundown of an enemy kind: what it does, and its numbers this wave. */
+/** A preview's wounds, rounded: an early wave's walkers have less than one. */
+export const woundsText = (hp: number) => (hp < 1 ? 'under 1' : String(hp));
+
 export function enemyRundown(d: TrainingEnemyDef, g: PreviewGroup): string {
   const lines = [
     `${d.name} ×${g.n}: ${d.desc}`,
-    `Wounds ${g.hp} · Defense ${d.defense}+ · speed ${Math.round(d.speed * TRAINING.walkMul * 10) / 10} cells/s${d.armor ? ` · armour ${d.armor}` : ''}`,
+    `Wounds ${woundsText(g.hp)} · Defense ${d.defense}+ · speed ${Math.round(d.speed * TRAINING.walkMul * 10) / 10} cells/s${d.armor ? ` · armour ${d.armor}` : ''}`,
   ];
   if (g.flies) lines.push('Flies straight from pad to pad, over the maze. Never held.');
   if (d.shotMul !== undefined && d.shotMul !== 1) lines.push(`Takes ×${d.shotMul} damage from shooting`);

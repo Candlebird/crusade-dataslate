@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyKind } from '../../rules/downtimeData';
 import { nextRound, previewGroups, previewWave, type NextRound, type PreviewGroup, type TrainingRun } from '../../rules/training';
 import { Tip } from '../Tooltip';
+import { woundsText } from './WavePreview';
 import { bossGlow, enemyShape, flyerWings } from './drawLive';
 
 /** A wave's enemy as drawn on the map: its shape and colour, the gold rim of an elite, a flyer's wings, a boss's glow. */
@@ -33,8 +34,8 @@ function StatRow({ g }: { g: PreviewGroup }) {
         <b>{d.name}</b> <span className="muted">×{g.n}{g.flies ? ' · flies' : ''}{g.elites ? ` · ${g.elites} elite` : ''}</span>
       </span>
       <span className="training-next-stats">
-        <span>Wounds <b>{g.hp}</b></span>
-        <span>Speed <b>{speed}</b></span>
+        <span>Wounds <b>{woundsText(g.hp)}</b></span>
+        <span>Speed <b>{speed}</b> cells/s</span>
         <span>Defense <b>{d.defense}+</b></span>
         {d.armor ? <span>Armour <b>{d.armor}</b></span> : null}
         <span>Leak <b>{d.leak}</b>{g.elites ? <span className="muted"> (elite {Math.max(d.leak, TRAINING.leak.elite)})</span> : null}</span>

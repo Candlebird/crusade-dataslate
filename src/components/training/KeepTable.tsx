@@ -66,7 +66,9 @@ export function KeepTable({ run, sel, onFocus, onChange }: KeepTableProps) {
           );
           return (
             <div key={p.id} className={`training-keep-tr${sel === p.id ? ' lit' : ''}`} role="row">
-              <span className="training-keep-num" role="rowheader" aria-label={`Shard ${num(p.id)}: ${gradeName(p.grade)} ${SHARD_TYPES[p.type].name}`}>{num(p.id)}</span>
+              <span className="training-keep-num" role="rowheader" aria-label={`Shard ${num(p.id)}: ${gradeName(p.grade)} ${SHARD_TYPES[p.type].name}`}>
+                {num(p.id)} <ShardBadge type={p.type} grade={p.grade} size={20} />
+              </span>
               {cell(plain, 'Keep', '')}
               {cell(merge, 'Combine', 'Needs an alike Shard (same type and grade) in this draft.')}
               {cell(down, 'Keep a grade down', 'A Cracked Shard has no grade below.')}
@@ -109,9 +111,8 @@ function KeepCell({ run, piece, opt, verb, none, num, onTake, onFocus }: {
       onFocus={light}
       onBlur={() => onFocus?.(null)}
     >
-      <ShardBadge type={piece.type} grade={opt.grade} size={20} glow={opt.with.length > 0} quiet />
       <span className="training-keep-text">
-        <span className="training-keep-name">{name}</span>
+        <span className="training-keep-name">{gradeName(opt.grade)}</span>
         {hints.length > 0 && <span className="training-keep-for">→ {hintText(hints[0])}{hints.length > 1 ? ` +${hints.length - 1}` : ''}</span>}
       </span>
     </button>
