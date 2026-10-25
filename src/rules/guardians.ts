@@ -49,8 +49,9 @@ export function rollGuardian(book: CatalogBook, tier: RelicTier, taken: Set<stri
 export const guardable = (s: Sector) => GUARDIANS.types.includes(s.type) && aiDefended(s);
 
 /**
- * Give every guardable sector without a guardian one (at round end, or when the GM asks). Returns the sectors that got
- * one. Does nothing without the Void Echoes book.
+ * Roll for a guardian at each guardable sector that hasn't rolled yet (at round end, or when the GM asks): GUARDIANS.chance
+ * of one, and a sector that misses stays unguarded for good. Returns the sectors that got one. Does nothing without the
+ * Void Echoes book.
  */
 export function placeGuardians(c: Campaign, books: CatalogBook[], forces: Force[], rand: Rand, newId: () => string): Sector[] {
   const book = echoesBook(books);
@@ -58,13 +59,28 @@ export function placeGuardians(c: Campaign, books: CatalogBook[], forces: Force[
   const taken = takenRelics(c, forces);
   const out: Sector[] = [];
   for (const s of c.sectors) {
-    if (s.guardian || !guardable(s)) continue;
+    if (s.guardian || s.unguarded || !guardable(s)) continue;
+    if (rand() >= GUARDIANS.chance) {
+      s.unguarded = true;
+      continue;
+    }
     const g = rollGuardian(book, guardianTier(sectorThreat(c, s)), taken, rand, newId);
     if (!g) continue;
     s.guardian = g;
     out.push(s);
   }
   return out;
+}
+
+/** Throw out every AI-held site's guardian (and its miss) and roll them all again. Returns the sectors that got one. */
+export function rerollGuardians(c: Campaign, books: CatalogBook[], forces: Force[], rand: Rand, newId: () => string): Sector[] {
+  if (!echoesBook(books)) return [];
+  for (const s of c.sectors) {
+    if (!guardable(s)) continue;
+    delete s.guardian;
+    delete s.unguarded;
+  }
+  return placeGuardians(c, books, forces, rand, newId);
 }
 
 /** The sector's AI garrison: its guardian (if any) leading random Echoes for the rest of the Supply. */

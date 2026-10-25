@@ -5,7 +5,7 @@ import { newForce, newUnit } from '../model/factory';
 import type { Campaign, CatalogBook, Force, Sector } from '../model/types';
 import { ruleRating, hasRule } from './engine';
 import { sectorThreat } from './difficulty';
-import { empower, guardable, guardianTier, placeGuardians } from './guardians';
+import { empower, guardable, guardianTier, placeGuardians, rerollGuardians } from './guardians';
 import { ECHOES } from './nexus';
 import { GUARDIANS } from './nexusData';
 
@@ -129,6 +129,22 @@ describe('placeGuardians', () => {
     delete sector(c, 'v').guardian;
     expect(placeGuardians(c, [book], [], () => 0.5, ids()).map((s) => s.id)).toEqual(['v']);
     expect(sector(c, 'an').guardian).toBe(kept);
+  });
+
+  it(`guards a sector only on a ${GUARDIANS.chance * 100}% roll, and never rolls a sector twice`, () => {
+    const c = campaign();
+    expect(placeGuardians(c, [book], [], () => GUARDIANS.chance, ids())).toEqual([]);
+    expect(c.sectors.filter((s) => s.unguarded).map((s) => s.id).sort()).toEqual(GUARDED);
+    expect(placeGuardians(c, [book], [], () => 0, ids())).toEqual([]);
+    expect(c.sectors.some((s) => s.guardian)).toBe(false);
+  });
+
+  it('re-rolls every site, guarded or missed', () => {
+    const c = campaign();
+    placeGuardians(c, [book], [], () => GUARDIANS.chance, ids());
+    expect(rerollGuardians(c, [book], [], () => 0, ids()).map((s) => s.id).sort()).toEqual(GUARDED);
+    expect(rerollGuardians(c, [book], [], () => GUARDIANS.chance, ids())).toEqual([]);
+    expect(c.sectors.some((s) => s.guardian)).toBe(false);
   });
 
   it('finds the book by name as well as by uid', () => {

@@ -575,6 +575,8 @@ export const HERO_OFFERS = {
  */
 export const GUARDIANS = {
   types: ['planet', 'research', 'anomaly', 'void', 'archive'] as SectorType[],
+  /** The chance a sector of those types gets a guardian. Each sector rolls once, the first time it's checked. */
+  chance: 0.6,
   rare: 0.4,
   legendary: 0.75,
   /** The guardian's Tough is multiplied by this (a hero without Tough gets Tough(2)). */

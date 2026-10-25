@@ -186,20 +186,20 @@ describe('guardians', () => {
     expect(guardianTier(0)).toBe('Common');
     expect(guardianTier(GUARDIANS.rare)).toBe('Rare');
     expect(guardianTier(1)).toBe('Legendary');
-    const placed = placeGuardians(c, [book], [], Math.random, uid);
+    const placed = placeGuardians(c, [book], [], () => 0.1, uid);
     expect(placed.map((s) => s.id).sort()).toEqual(['far', 'mid', 'near']);
     expect(c.sectors.filter((s) => s.guardian).every(guardable)).toBe(true);
     const g = sector(c, 'near').guardian!;
     expect(hasRule(g.unit.rules, 'Hero')).toBe(true);
     expect(ruleRating(g.unit.rules, 'Tough')).toBeGreaterThanOrEqual(GUARDIANS.toughFactor);
-    expect(placeGuardians(c, [book], [], Math.random, uid)).toEqual([]);
+    expect(placeGuardians(c, [book], [], () => 0.1, uid)).toEqual([]);
     // With no copy of the book imported, the one that ships with the site stands in.
-    expect(placeGuardians(campaign(), [], [], Math.random, uid)).toHaveLength(3);
+    expect(placeGuardians(campaign(), [], [], () => 0.1, uid)).toHaveLength(3);
   });
 
   it('leads the garrison', () => {
     const c = campaign();
-    placeGuardians(c, [book], [], Math.random, uid);
+    placeGuardians(c, [book], [], () => 0.1, uid);
     const s = sector(c, 'mid');
     const units = garrison(s, book, 1500);
     expect(units[0].name).toBe(s.guardian!.name);

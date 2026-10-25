@@ -548,6 +548,8 @@ export interface Sector {
   construction?: Construction;
   /** The Void Echoes hero guarding an AI-held point of interest (rules/guardians.ts). */
   guardian?: SectorGuardian;
+  /** It rolled for a guardian and got none: it isn't rolled again. */
+  unguarded?: boolean;
   /** Marauders raided it: it produces nothing in this round. */
   raided?: number;
   /** A downtime Project under way here (one per world). */
