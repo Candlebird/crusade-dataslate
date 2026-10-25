@@ -89,7 +89,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
           <div className="span-all small">
             <div className="muted">Squad ({squad.length}/{EXPEDITION.squadMax}){squad.length > 0 && <> · <b>+{bonus}</b> to every roll</>}</div>
             {units.length === 0 && <span className="muted">No active units.</span>}
-            {used.length > 0 && <div className="muted">Each unit gets 1 skirmish, Solo patrol or Expedition a round. The main Battle doesn't count.</div>}
+            {used.length > 0 && <div className="muted">Each unit gets 1 Solo patrol or Expedition a round. Games at the table don't count.</div>}
             {units.map((u) => (
               <label key={u.id} className="row">
                 <input type="checkbox" checked={squad.includes(u.id)} disabled={used.includes(u.id) || (!squad.includes(u.id) && squad.length >= EXPEDITION.squadMax)} onChange={() => toggle(u.id)} />

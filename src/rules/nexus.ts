@@ -71,7 +71,7 @@ export const stormed = (c: Campaign, sectorId: string) => !!activeEvent(c)?.sect
 
 export const lordById = (id: string | undefined) => ECHO_LORDS.find((l) => l.id === id);
 /** The Nexus Crisis to fight this round, if there is one. */
-/** The units of this force that already took part in a game or an Expedition this round. Each unit takes part once a round. */
+/** The units of this force that already went on a Solo patrol, Expedition or task this round. Each unit gets one a round. */
 export function unitsUsed(f: Force, c: Campaign | undefined): string[] {
   const used = f.nexus?.usedUnits;
   return c && used && used.round === currentRound(c) ? used.ids : [];

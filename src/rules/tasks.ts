@@ -39,7 +39,7 @@ function setBusy(f: Force, c: Campaign, ids: string[], task: UnitTaskKind) {
   const units = { ...tasksOf(f, c) };
   for (const id of ids) units[id] = task;
   f.nexus.tasks = { round: currentRound(c), units };
-  // Busy units are used, so patrols, Expeditions and skirmishes pass them over too.
+  // Busy units are used, so patrols and Expeditions pass them over too (and recorded games, through unitsBusy).
   markUnitsUsed(f, c, ids);
 }
 

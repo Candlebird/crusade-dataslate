@@ -89,8 +89,8 @@ export function emptyUnitBattle(u: Unit): UnitBattle {
 
 /**
  * "Start blank instead" on a report filled in from the tracker: a fresh report that still remembers which battle it
- * came from and whether it was a solo patrol, with the units that already fought this round left out (`used`, empty for
- * a Crisis battle).
+ * came from and whether it was a solo patrol, with the units that can't fight left out (`used`: those busy on a task, and
+ * for a patrol those that already went on one or an Expedition this round).
  */
 export function restartInput(blank: BattleInput, prev: BattleInput, used: string[]): BattleInput {
   const next: BattleInput = { ...blank, units: { ...blank.units }, from: prev.from };

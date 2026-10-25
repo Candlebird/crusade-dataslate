@@ -152,7 +152,7 @@ export interface ForceNexus {
   reorganisedRound?: number;
   /** The campaign round this force last recorded a solo patrol in. */
   patrolRound?: number;
-  /** Units that already fought a game or went on an Expedition in this round: each unit takes part once a round. */
+  /** Units that went on a Solo patrol or Expedition (or a task) this round: each unit gets one a round. Games at the table don't count. */
   usedUnits?: { round: number; ids: string[] };
   /** Settled Nexus Duels whose Umbra Shards and relics this force has paid or collected. */
   duelsPaid?: string[];

@@ -71,7 +71,7 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
           {linked ? ' Either way, the units have gone out for this round.' : ''}
         </p>
         {done && <p className="small"><span className="tag gold">{force.name} already recorded a patrol this round.</span></p>}
-        {used.length > 0 && <p className="muted small">Each unit gets 1 skirmish, Solo patrol or Expedition a round. The main Battle doesn't count.</p>}
+        {used.length > 0 && <p className="muted small">Each unit gets 1 Solo patrol or Expedition a round. Games at the table don't count.</p>}
         <div className="mission-pick">
           {active.length === 0 && <span className="muted small">No active units.</span>}
           {active.map((u) => {
