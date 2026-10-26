@@ -1129,7 +1129,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
                     data-tip={sk.blocked ? `${sk.blocked} ${sk.text}` : sk.text}
                   >
                     <b>{sk.name}</b>
-                    <span className="muted">{sk.blocked ? sk.blocked : sk.wait ? `ready in ${sk.wait}` : sk.reach ? reachText(sk.reach) : sk.kind === 'atwill' ? 'nearest squad in reach' : ''}</span>
+                    <span className="muted">{sk.blocked ? sk.blocked : sk.wait ? `ready in ${sk.wait}` : sk.free ? 'free action' : sk.reach ? reachText(sk.reach) : sk.kind === 'atwill' ? 'nearest squad in reach' : ''}</span>
                   </button>
                 ))}
               </div>

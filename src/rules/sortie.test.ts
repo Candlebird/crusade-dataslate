@@ -403,6 +403,23 @@ describe('sortie', () => {
     expect(active(s).length).toBeGreaterThan(0);
   });
 
+  it('outflanking is a free action that leaves the unit its order', () => {
+    const scouts = UNITS.snipers();
+    scouts.rules.push('Fast');
+    const run = fight([UNITS.troopers(), UNITS.hero(), scouts], 3);
+    const c = run.combat!;
+    const s = c.party.find((p) => p.name === 'Snipers')!;
+    c.acting = s.key;
+    c.need = 'order';
+    giveOrder(run, 'outflank');
+    expect(c.need).toBe('order');
+    expect(c.acting).toBe(s.key);
+    const skills = skillsOf(run);
+    expect(skills.find((x) => x.id === 'outflank')!.wait).toBeGreaterThan(0);
+    expect(skills.find((x) => x.id === 'shoot')!.reach).toBe(SORTIE.ranks);
+    expect(skillProblem(run, 'shoot', onField(c)[0]?.key)).toBeNull();
+  });
+
   it('keeps a shard haul only on a win or a trip home', () => {
     for (let seed = 1; seed <= 6; seed++) {
       const run = play(PARTIES.line(), seed, 'shard');

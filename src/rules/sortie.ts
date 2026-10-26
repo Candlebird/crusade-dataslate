@@ -82,6 +82,8 @@ export interface SortieSquad {
   /** The last round it fought in melee: guns fire at -1 that round and the next. */
   engaged: number;
   shield: number;
+  /** The last round a raised shield holds: one raised mid-round lasts through the next, so a late turn doesn't waste it. */
+  shieldUntil?: number;
   revived: boolean;
   /** Cracked under stress this round: it refuses its orders, or fights wild at -1 to hit. */
   crack?: { round: number; kind: 'refuse' | 'wild' };
@@ -122,6 +124,8 @@ export interface SortieSkill {
   wait: number;
   /** Why it can't be used from the unit's slot (a blade away from the front, a short gun at the back). */
   blocked?: string;
+  /** A free action: it doesn't use up the unit's turn, which still takes its order after. */
+  free?: boolean;
 }
 
 /** A squad's place in the round's initiative: every squad acts once a round, all its models together. */
@@ -1478,7 +1482,7 @@ function newRound(run: SortieRun) {
   c.acting = undefined;
   log(c, `— Round ${c.round} —`, 'info');
   if (c.round > 1) {
-    for (const p of c.party) p.shield = 0;
+    for (const p of c.party) if ((p.shieldUntil ?? 0) < c.round) { p.shield = 0; p.shieldUntil = undefined; }
     rotate(run, c);
   }
   if (has(run, 'rally')) for (const p of partyLine(c)) for (const m of p.models) m.shaken = false;
@@ -1970,14 +1974,16 @@ function skillsFor(run: SortieRun, me: SortieSquad): SortieSkill[] {
   const b = barrageOf(me);
   const abil: [SortieSkillKind, string | undefined, string, number][] = [
     ['heal', sourceOf(me, 'heal'), `Mend ${healOf(me)} wounds across the party, most hurt models first.`, 0],
-    ['shield', sourceOf(me, 'shield'), `A shield on the front unit that soaks ${shieldOf(me)} wounds this round.`, 0],
+    ['shield', sourceOf(me, 'shield'), `A shield on the front unit that soaks ${shieldOf(me)} wounds, this round and next.`, 0],
     ['barrage', sourceOf(me, 'barrage'), `${b.hits} hits at AP(${b.ap}) at any distance.`, SORTIE.ranks],
     ['field', sourceOf(me, 'field'), `The squads at Close and Mid are ${fieldOf(me) === 'slow' ? 'slowed (−2 initiative, no charges)' : 'dazed (−1 to hit)'} this round and next.`, 0],
     ['outflank', sourceOf(me, 'redeploy'), 'Swing round the flank: this round the unit\'s guns reach every distance, from any slot.', 0],
   ];
   const rest = models.length > 1 ? ' One model sees to it; the rest shoot or fight at will.' : '';
   for (const [kind, src, text, reach] of abil) if (src) {
-    out.push({ id: kind, kind, name: src, text: `${text}${rest} Cooldown ${SORTIE.cooldown[kind]}.`, reach, wait: waitOf(c, me, kind) });
+    // Outflanking only changes how the unit's own guns reach, so it's free: the unit still takes its order after.
+    const free = kind === 'outflank';
+    out.push({ id: kind, kind, name: src, text: `${text}${free ? ' A free action: the unit still takes its order after.' : rest} Cooldown ${SORTIE.cooldown[kind]}.`, reach, wait: waitOf(c, me, kind), free: free || undefined });
   }
   return out;
 }
@@ -2014,10 +2020,12 @@ export function giveOrder(run: SortieRun, id: string, target?: string) {
   if ((c.need !== 'order' && c.need !== 'turn') || !s) throw new Error('No order needed now.');
   const p = skillProblem(run, id, target);
   if (p) throw new Error(p);
-  c.orders[s.key] = { skill: id, target };
   const sk = skillsFor(run, s).find((x) => x.id === id)!;
   (c.did ??= {})[s.key] = [...(c.did[s.key] ?? []), sk.kind];
-  log(c, `▸ ${s.name}: ${sk.name}${target ? ` on ${squadByKey(c, target)?.name}` : ''}.`, 'info');
+  log(c, `▸ ${s.name}: ${sk.name}${target ? ` on ${squadByKey(c, target)?.name}` : ''}${sk.free ? ' (free)' : ''}.`, 'info');
+  // A free action happens at once, and the unit still waits on its order.
+  if (sk.free) return useAbility(run, s, sk, target);
+  c.orders[s.key] = { skill: id, target };
   advance(run);
 }
 
@@ -2137,6 +2145,7 @@ function useAbility(run: SortieRun, me: SortieSquad, sk: SortieSkill, target?: s
       cool(c, me, 'shield', SORTIE.cooldown.shield);
       const f = frontOf(c) ?? me;
       f.shield = Math.max(f.shield, shieldOf(me));
+      f.shieldUntil = c.round + 1;
       return log(c, `${sk.name}: a ${f.shield}-wound shield on ${f.name}.`, 'good');
     }
     case 'barrage': {
@@ -2492,7 +2501,8 @@ export function autoChoice(run: SortieRun): { id: string; target?: string } | nu
   if (ok('field') && onField(c).length) return { id: 'field' };
   const incoming = onField(c).filter((e) => e.intent === 'melee' || e.intent === 'shoot' || e.intent === 'charge').length;
   if (ok('shield') && incoming >= 2) return { id: 'shield' };
-  if (ok('outflank') && onField(c).some((e) => gap(e, me) > 2)) return { id: 'outflank' };
+  // Outflanking is free, so it's worth it whenever some squad stands beyond the unit's guns.
+  if (ok('outflank') && models.some((m) => m.guns.some((g) => !g.melee && onField(c).some((e) => gap(e, me) > gunReach(run, me, g))))) return { id: 'outflank' };
   // Attacks: what the unit's volley would do this round.
   let best: { id: string; target?: string; v: number } = { id: 'atwill', v: bestVolley(run, me, up, true)?.v ?? 0 };
   for (const sk of skills) {
