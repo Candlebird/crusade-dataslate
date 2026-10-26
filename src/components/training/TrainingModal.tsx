@@ -289,6 +289,8 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
           run={run} units={force.units} portraits={portraits} tab={tab} onTab={setTab} pick={pick} onPick={setPick} sel={sel} onFocus={setFocus}
           crafting={craftNow} onCraft={(cr) => { craftMode(cr); if (cr && !wideSide()) setTab('draft'); }} peek={peek} onUnpeek={() => setPeek(false)} onChange={refresh}
         />
+        {/* On a phone held upright End run sits at the foot of the page, under the panels, instead of in the HUD. */}
+        {run.phase !== 'over' && <button className="training-foot-quit" onClick={quit}>End run</button>}
       </div>
       {build && !victory && run.offer && !peek && <CardOffer run={run} offer={run.offer} portraits={portraits} auto={auto} autoPick={BOT_CARD} onPick={take} onPeek={() => setPeek(true)} onReroll={() => act(() => rerollCards(run), refresh)} />}
     </Modal>

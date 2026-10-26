@@ -850,6 +850,7 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-tabs > button { position: relative; flex: 1; min-width: 0; padding: 2px 4px; }
 .training-tab-dot { position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 6px var(--gold); }
 .training-sec { display: none; }
+.training-foot-quit { display: none; }
 .training-sec.on { display: flex; flex-direction: column; gap: 6px; }
 @media (min-width: 861px) and (min-height: 561px) {
   .training-tab-wave { display: none; }
@@ -887,13 +888,17 @@ fieldset.fields:disabled { opacity: 0.6; }
   .training-board .training-info { top: auto; bottom: 6px; left: 6px; right: 6px; width: auto; max-height: 55%; }
   .training-map-banner { left: 6px; right: 6px; bottom: 6px; }
 }
-/* Upright: the HUD, a square map as big as leaves the panels room, then the tabs. */
+/* Upright: the HUD and a square map fill the screen; the panels run on below at full length, so the page scrolls down
+   to read them (their tabs stay pinned at the top) and back up to the map. End run waits at the very foot. */
 @media (max-width: 860px) and (orientation: portrait), (max-width: 860px) and (min-height: 561px) {
-  .training-game { height: 100%; display: flex; flex-direction: column; }
+  .modal-body:has(> .training-game) { overflow-y: auto; overscroll-behavior: contain; }
+  .training-game { height: auto; min-height: 100%; display: flex; flex-direction: column; }
   .training-stage { flex: none; gap: 4px; }
-  .training-board { flex: none; width: min(100%, max(240px, calc(100dvh - 370px))); aspect-ratio: 1; margin: 0 auto; }
+  .training-board { flex: none; width: min(100%, max(240px, calc(100dvh - 150px))); aspect-ratio: 1; margin: 0 auto; }
   .training-map { height: auto; aspect-ratio: 1; }
-  .training-side { flex: 1; }
+  .training-side { flex: none; overflow: visible; padding-bottom: 0; }
+  .training-hud-quit { display: none; }
+  .training-game > .training-foot-quit { display: block; width: 100%; margin-top: 6px; }
 }
 /* Held sideways: the map down the left, as tall as the screen; the HUD and the tabs beside it. */
 @media (max-height: 560px) and (orientation: landscape) {

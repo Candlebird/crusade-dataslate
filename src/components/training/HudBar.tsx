@@ -78,7 +78,7 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
           {run.phase === 'build' && (
             <button className="primary training-hud-go" disabled={!!why || auto} data-tip={why ?? undefined} onClick={onStart}>Start wave {next}</button>
           )}
-          <button onClick={onQuit}>End run</button>
+          <button className="training-hud-quit" onClick={onQuit}>End run</button>
         </span>
       )}
     </div>
