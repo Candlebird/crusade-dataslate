@@ -405,6 +405,8 @@ export interface Force {
   feats?: Record<string, string>;
   /** Which feat rewards the force's feats were paid at (rules/feats.ts FEATS_VERSION; unset: the first). */
   featsV?: number;
+  /** Relics no unit carries, ready to give to one with room (rules/relicVault.ts). */
+  relicVault?: Relic[];
   /** Training-only relics (RelicDef.training) the force's feats have won, by name: any unit may take one for free. */
   trainingRelics?: string[];
   /** Furthest any unit got on one Sortie: nodes cleared (rules/sortie.ts). */

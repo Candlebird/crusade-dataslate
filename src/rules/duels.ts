@@ -1,3 +1,4 @@
+import { grantRelic, grantText } from './relicVault';
 import type { Campaign, DuelSide, DuelWager, Force, NexusDuel, Unit } from '../model/types';
 import { currentRound } from './nexus';
 import { NEXUS_DUELS } from './nexusData';
@@ -189,8 +190,10 @@ export function payDuel(d: NexusDuel, f: Force, date: string, newId: () => strin
     const unit = f.units.find((u) => u.id === unitId) ?? relicCarriers(f)[0];
     if (w.relics?.length && !unit) return undefined;
     f.umbraShards += w.shards ?? 0;
-    for (const r of w.relics ?? []) unit!.relics.push({ id: newId(), name: r.name, tier: r.tier, profile: r.profile, note: r.note });
-    const relics = w.relics?.length ? `${w.relics.map((r) => r.name).join(', ')} to ${unit!.name}` : '';
+    const relics = (w.relics ?? []).map((r) => {
+      const relic = { id: newId(), name: r.name, tier: r.tier, profile: r.profile, note: r.note };
+      return grantText(relic, unit, grantRelic(f, unit, relic));
+    }).join(', ');
     line = `${label}: ${[w.shards ? `+${w.shards} Umbra Shards` : '', relics].filter(Boolean).join(', ')}.`;
     if (w.shards) f.ledger.push({ id: newId(), date, label, rp: 0, supply: 0, us: w.shards });
   } else {
@@ -198,6 +201,7 @@ export function payDuel(d: NexusDuel, f: Force, date: string, newId: () => strin
     f.umbraShards -= n;
     const ids = new Set((w.relics ?? []).map((r) => r.id));
     for (const u of f.units) u.relics = u.relics.filter((r) => !ids.has(r.id));
+    if (f.relicVault) f.relicVault = f.relicVault.filter((r) => !ids.has(r.id)); // stowed since it was staked
     line = `${label}: ${[n ? `−${n} Umbra Shards` : '', ...(w.relics ?? []).map((r) => `${r.name} handed over`)].filter(Boolean).join(', ')}.`;
     if (n) f.ledger.push({ id: newId(), date, label, rp: 0, supply: 0, us: -n });
   }

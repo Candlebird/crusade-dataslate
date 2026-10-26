@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import TableMap from './TableMap';
+import { deploymentMap, suggestTable } from '../rules/tableMap';
 import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import { href } from '../route';
@@ -71,6 +73,7 @@ export default function MissionLibrary() {
 }
 
 function MissionSummary({ m }: { m: MissionDef }) {
+  const map = deploymentMap(m, 1);
   return (
     <>
       <p>{m.summary}</p>
@@ -82,6 +85,8 @@ function MissionSummary({ m }: { m: MissionDef }) {
       </p>
       {m.deployment && <p className="small"><b>Deployment.</b> {m.deployment}</p>}
       {(m.rules ?? []).map((r, i) => <p key={i} className="small"><b>{r.title}{r.round ? ` (round ${r.round})` : ''}.</b> {r.text}</p>)}
+      <p className="small"><b>Table.</b> {suggestTable(1).label} for games under 1250 pts a side, {suggestTable(0).label} for bigger ones. The map shows the smaller table.</p>
+      {map && <details><summary className="small">Deployment map</summary><TableMap map={map} /></details>}
     </>
   );
 }

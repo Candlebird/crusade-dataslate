@@ -1,6 +1,6 @@
 import type { Campaign, CampaignFaction, CrossroadsJournal, Force, JournalMark, JournalOption, JournalRoll, Unit } from '../model/types';
 import { MAX_SCARS, SCAR_TABLE } from './data';
-import { applyScar, hasRule, ruleRating } from './engine';
+import { applyScar, hasRule, levelForXp, relicTierAllowed, ruleRating } from './engine';
 import { abilitiesOf, type Effect } from './abilities';
 import { visibleTo } from './fog';
 import { hexDistance, isPlaced, type Hex, type Rand } from './hexmap';
@@ -12,6 +12,7 @@ import { positionOf } from './movement';
 import { currentRound, homeOf } from './nexus';
 import { NEXUS_ROUNDS } from './nexusData';
 import { randomRelic } from './relicPick';
+import { grantRelic, grantText } from './relicVault';
 import { depositNearest, depositText, rewardOrigin, withdrawBanked } from './production';
 
 // Crossroads Journal (Nexus Wars): once a round each faction's Warlord gets a vignette dealt from the tables in
@@ -277,8 +278,18 @@ export const checksDone = (j: CrossroadsJournal) => !!j.climax && (!j.twist || !
 /** Checks passed (0–4 with a twist). */
 export const successes = (j: CrossroadsJournal) => [j.approach?.roll, j.choice?.roll, j.climax, j.twist?.roll].filter((r) => r?.pass).length;
 
-/** The best reward tier the journal can offer (3 at most, twist or not). */
-export const tierCap = (j: CrossroadsJournal) => Math.min(3, Math.max(JOURNAL.minTier, successes(j)));
+/** The average level of the journal's force (its units still in it); 0 when the force isn't loaded. */
+export function journalForceLevel(j: CrossroadsJournal, forces: Force[]): number {
+  const units = forces.find((f) => f.id === j.forceId)?.units.filter((u) => u.status !== 'removed') ?? [];
+  return units.length ? units.reduce((n, u) => n + levelForXp(u.xp), 0) / units.length : 0;
+}
+
+/**
+ * The best reward tier the journal can offer (3 at most, twist or not): the successes, but tier 3 only once the force's
+ * average level reaches JOURNAL.tier3Level, so a young force doesn't find foundry cores and Legendary relics.
+ */
+export const tierCap = (j: CrossroadsJournal, forces: Force[]) =>
+  Math.min(journalForceLevel(j, forces) >= JOURNAL.tier3Level ? 3 : 2, Math.max(JOURNAL.minTier, successes(j)));
 
 /** How many of the endings must give nothing or worse: two after a total failure, else one; one more for a failed twist. */
 export const minNothing = (j: CrossroadsJournal) => (successes(j) === 0 ? 2 : 1) + (j.twist?.roll && !j.twist.roll.pass ? 1 : 0);
@@ -299,18 +310,18 @@ export function journalTags(j: CrossroadsJournal): string[] {
 }
 
 /** Relic names already held in the loaded forces (relics are unique). */
-const heldRelics = (forces: Force[]) => new Set(forces.flatMap((f) => f.units.flatMap((u) => u.relics.map((r) => r.name))));
+const heldRelics = (forces: Force[]) => new Set(forces.flatMap((f) => [...f.units.flatMap((u) => u.relics), ...(f.relicVault ?? [])].map((r) => r.name)));
 
 const scarPool = (u: Unit) => SCAR_TABLE.filter((s) => s.name !== 'Comatose' && !u.scars.some((x) => x.name === s.name));
 
-/** Rewards the journal may offer: up to its tier cap, and only what the Warlord can actually take. */
+/** Rewards the journal may offer: up to its tier cap, and only what the Warlord can actually take (relics by its XP too). */
 export function eligibleRewards(j: CrossroadsJournal, u: Unit, forces: Force[]): JournalReward[] {
-  const cap = tierCap(j);
+  const cap = tierCap(j, forces);
   const taken = heldRelics(forces);
   const payoff = requiredReward(j);
   return JOURNAL_REWARDS.filter((r) => (r.thread ? r.id === payoff : r.tier <= cap) && r.effects.every((e) => {
     if (e.kind === 'scar') return u.scars.length < MAX_SCARS && scarPool(u).length > 0;
-    if (e.kind === 'relic') return !!randomRelic(u, e.tier, taken, () => 0, 'x');
+    if (e.kind === 'relic') return relicTierAllowed(e.tier, u.xp) && !!randomRelic(u, e.tier, taken, () => 0, 'x');
     return true;
   }));
 }
@@ -323,7 +334,8 @@ export function validOffer(j: CrossroadsJournal, u: Unit, forces: Force[], ids: 
   const payoff = requiredReward(j);
   if (payoff && ok.has(payoff) && !ids.includes(payoff)) return false;
   // With the payoff and three bad endings due there's no room for one more at the cap: the payoff (above it) stands in.
-  const top = rs.some((r) => r!.tier === tierCap(j)) || (!!payoff && ids.includes(payoff) && minNothing(j) >= 3 && ok.get(payoff)!.tier >= tierCap(j));
+  const cap = tierCap(j, forces);
+  const top = rs.some((r) => r!.tier === cap) || (!!payoff && ids.includes(payoff) && minNothing(j) >= 3 && ok.get(payoff)!.tier >= cap);
   return rs.filter((r) => r!.tier <= 0).length >= minNothing(j) && top;
 }
 
@@ -349,7 +361,7 @@ export function localOffer(j: CrossroadsJournal, u: Unit, forces: Force[], rand:
   const take = (r: JournalReward | undefined) => r && !out.includes(r) && out.push(r);
   take(scored.find((x) => x.r.id === requiredReward(j))?.r);
   scored.filter((x) => x.r.tier <= 0).slice(0, minNothing(j)).forEach((x) => take(x.r));
-  if (out.length < 4) take(scored.find((x) => x.r.tier === tierCap(j))?.r);
+  if (out.length < 4) take(scored.find((x) => x.r.tier === tierCap(j, forces))?.r);
   while (out.length < 4) {
     const used = new Set(out.map((r) => r.table));
     const next = scored.filter((x) => !out.includes(x.r)).map((x) => ({ ...x, score: x.score - (used.has(x.r.table) ? 1.5 : 0) })).sort((a, b) => b.score - a.score)[0];
@@ -512,8 +524,8 @@ export function payJournal(j: CrossroadsJournal, f: Force, date: string, newId: 
       u.xp += e.n;
       bits.push(`${u.name} +${e.n} XP`);
     } else if (e.kind === 'relic' && o.relic) {
-      u.relics.push({ ...o.relic });
-      bits.push(`${o.relic.name} to ${u.name}`);
+      const relic = { ...o.relic };
+      bits.push(grantText(relic, u, grantRelic(f, u, relic)));
     } else if (e.kind === 'scar' && o.scar) {
       const res = applyScar(u, o.scar);
       bits.push(res === 'removed' ? `${u.name} is lost for good` : `${u.name} scarred: ${o.scar.name}`);

@@ -509,8 +509,10 @@ tr.unpicked td { opacity: 0.6; }
 .card-stats { display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; padding: 3px 6px; border-bottom: 1px solid var(--rule); }
 .card-flag { font-weight: 700; text-transform: uppercase; }
 .card-line { padding: 2px 6px; }
-.card-weapons { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 2px 0; font-size: inherit; }
-.card-weapons th, .card-weapons td { border: 0; border-bottom: 1px solid var(--rule); padding: 2px 6px; text-align: left; color: var(--ink); background: none; vertical-align: top; }
+/* A faint grey tint (cheap on ink) and column rules set the weapons apart from the rest of the card. */
+.card-weapons { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 2px 0; font-size: inherit; background: #f2f2f2; border-top: 1px solid var(--rule); print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+.card-weapons th, .card-weapons td { border: 0; border-bottom: 1px solid var(--rule); border-left: 1px solid var(--rule); padding: 2px 6px; text-align: left; color: var(--ink); background: none; vertical-align: top; }
+.card-weapons th:first-child, .card-weapons td:first-child { border-left: 0; }
 .card-weapons th { font-weight: 700; text-transform: none; letter-spacing: 0; font-size: inherit; }
 .card-weapons td:nth-child(2), .card-weapons td:nth-child(3), .card-weapons td:nth-child(4) { white-space: nowrap; }
 .sheet-rules { margin-top: 12px; break-inside: auto; }
@@ -1247,3 +1249,20 @@ table.ledger td:first-child { white-space: nowrap; }
 @media (max-width: 640px) {
   table.ledger td.ledger-entry { max-width: none; width: auto; }
 }
+
+/* Deployment map (TableMap.tsx): drawn in inches, so the stroke and text sizes are in inches too. */
+.table-map { margin: 0.5rem 0; max-width: 26rem; }
+.table-map svg { width: 100%; height: auto; display: block; }
+.table-map .tm-table { fill: var(--bg-2); stroke: var(--line-2); stroke-width: 0.4; }
+.table-map .tm-zone { fill-opacity: 0.2; stroke-width: 0.35; }
+.table-map .tm-zone.dashed { fill-opacity: 0.08; stroke-dasharray: 1.2 0.8; }
+.table-map .tm-guide { stroke: var(--line-2); stroke-width: 0.25; stroke-dasharray: 1 1; }
+.table-map .tm-marker { fill: var(--text); stroke: var(--bg); stroke-width: 0.4; }
+.table-map .tm-dim line { stroke: var(--text); stroke-width: 0.2; }
+.table-map .tm-dim text { fill: var(--text); font-size: 2.4px; font-family: var(--sans); font-weight: 700; }
+.table-map figcaption { display: flex; flex-wrap: wrap; gap: 0.2rem 1rem; margin-top: 0.3rem; }
+.tm-key { display: inline-flex; align-items: center; gap: 0.35rem; }
+.tm-swatch { flex: none; display: inline-block; width: 0.9rem; height: 0.9rem; border: 1px solid; }
+.tm-swatch.dashed { border-style: dashed; }
+.tm-swatch.dot { border-radius: 50%; background: var(--text); border-color: var(--text); }
+.tm-note { flex-basis: 100%; }

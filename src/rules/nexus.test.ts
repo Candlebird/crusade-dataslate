@@ -154,6 +154,12 @@ describe('nexus resolution', () => {
   it('grants trait tokens and relics', () => {
     const { f, input, id } = setup();
     input.nexusPicks = { void: { roll: 6, choice: 'Umbra Claw', target: 'a', alloc: {} } };
+    // Alpha isn't a relic bearer, so the relic waits in the vault; a seasoned Hero carries it.
+    const kept = structuredClone(f);
+    resolveBattle(kept, input, id);
+    expect(kept.units[0].relics).toEqual([]);
+    expect(kept.relicVault?.map((r) => r.name)).toEqual(['Umbra Claw']);
+    Object.assign(f.units[0], { category: 'Hero', xp: 45 });
     resolveBattle(f, input, id);
     expect(f.units[0].relics.map((r) => [r.name, r.tier])).toEqual([['Umbra Claw', 'Rare']]);
     input.nexusPicks.void = { roll: 3, choice: '', target: '', alloc: {} };
@@ -165,7 +171,7 @@ describe('nexus resolution', () => {
     const c = campaign();
     c.sectors[5] = { ...c.sectors[5], owner: ECHOES.id, guardian: { name: 'Vex the Hollow', tier: 'Common', unit: { ...newUnit(), relics: [{ id: 'r', name: 'Umbra Claw', tier: 'Common' }] } } };
     const { f, input, id } = setup();
-    const hero = newUnit({ id: 'h', name: 'Captain', category: 'Hero' });
+    const hero = newUnit({ id: 'h', name: 'Captain', category: 'Hero', xp: 45 });
     f.units.push(hero);
     input.units.h = emptyUnitBattle(hero);
     input.nexus = nexusGeneration(c, 'A', 'v', 'win', true);

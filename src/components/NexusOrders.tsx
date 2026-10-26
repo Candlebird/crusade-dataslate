@@ -61,6 +61,34 @@ export function useSealedOrders(c: Campaign) {
   return { fb, online, round, current, revealed, orders, declared };
 }
 
+/** Which detachments have declared this set of orders. One pick per detachment (older orders were keyed by faction, which still counts for all its detachments). */
+function lockedIn(c: Campaign, forces: Force[], declared: Declared[], round: number) {
+  const expected = playedDetachments(c, forces);
+  const declaredNow = new Set(declared.filter((d) => d.round === round).flatMap((d) => d.factions));
+  const isDeclared = (f: Force) => declaredNow.has(f.id) || declaredNow.has(f.nexus!.factionId);
+  return { expected, isDeclared, waiting: expected.filter((f) => !isDeclared(f)) };
+}
+
+/** A short line near the top of the campaign page: how many detachments have locked in orders, and whose. It never shows the picks. */
+export function OrdersLockStrip({ c }: { c: Campaign }) {
+  const { state } = useStore();
+  const { current, revealed, declared } = useSealedOrders(c);
+  if (!current || revealed) return null;
+  const { expected, isDeclared } = lockedIn(c, state.forces, declared, current.round);
+  if (!expected.length) return null;
+  const done = expected.filter(isDeclared).length;
+  return (
+    <div className="panel row small" style={{ flexWrap: 'wrap', gap: '0.4rem' }}>
+      <b><Icon name="l:lock" /> Orders locked in: {done} of {expected.length}</b>
+      {expected.map((f) => (
+        <span key={f.id} className={`tag${isDeclared(f) ? ' green' : ''}`} data-tip={isDeclared(f) ? 'Locked in' : 'Still picking'}>
+          {isDeclared(f) ? <Icon name="l:check" /> : '…'} {detachmentName(c, state.forces, f)}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** Sealed orders: every player picks a move, an attack or a hold per detachment; the GM reveals them all at once. */
 export default function OrdersPanel({ c }: { c: Campaign }) {
   const { state } = useStore();
@@ -89,11 +117,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
     );
   }
 
-  // One pick per detachment (older orders were keyed by faction, which still counts for all its detachments).
-  const expected = playedDetachments(c, state.forces);
-  const declaredNow = new Set(declared.filter((d) => d.round === current.round).flatMap((d) => d.factions));
-  const isDeclared = (f: Force) => declaredNow.has(f.id) || declaredNow.has(f.nexus!.factionId);
-  const waiting = expected.filter((f) => !isDeclared(f));
+  const { expected, isDeclared, waiting } = lockedIn(c, state.forces, declared, current.round);
   const mine = myDetachments(c, state.forces, cloud.email);
   const own = orders.find((o) => o.email === cloud.email && o.round === current.round);
   const label = (f: Force) => detachmentName(c, state.forces, f);

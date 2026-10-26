@@ -8,6 +8,7 @@ import {
   CATEGORY_HINT,
   MAX_NORMAL_TRAITS,
   MAX_UNIQUE_TRAITS,
+  MAX_WEAPON_TRAITS,
   NEXUS_TRAITS,
   RELICS,
   RELIC_TIER_MIN_XP,
@@ -53,6 +54,7 @@ import { Issues, Panel, Stepper, TextArea, TextField, XpBar, toast } from './ui'
 import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
+import { carryProblem, equipRelic, stowRelic, vaultOf } from '../rules/relicVault';
 
 type Picker =
   | { kind: 'trait' }
@@ -280,7 +282,15 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               <b className="muted small">OR</b>
               <select value="" onChange={(e) => e.target.value && addWeaponTrait(e.target.value)} aria-label="Add a weapon trait">
                 <option value="">Weapon trait for…</option>
-                {u.weapons.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+                {u.weapons.map((w) => {
+                  // A stack of copies always has room: the upgrade splits off a fresh copy.
+                  const full = w.count === 1 && w.traits.length >= MAX_WEAPON_TRAITS;
+                  return (
+                    <option key={w.id} value={w.id} disabled={full} title={full ? 'This weapon has the max upgrades' : undefined}>
+                      {w.name} ({Math.min(w.traits.length, MAX_WEAPON_TRAITS)}/{MAX_WEAPON_TRAITS}){full && ' - max upgrades'}
+                    </option>
+                  );
+                })}
               </select>
               </>
             )}
@@ -457,12 +467,29 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               }
             >
               {u.relics.length === 0 && <p className="muted small">None.</p>}
+              {!theirs && vaultOf(f).length > 0 && (
+                <label className="row small">
+                  From the vault
+                  <select value="" onChange={(e) => e.target.value && updateForce(f.id, (d) => void equipRelic(d, u.id, e.target.value))}>
+                    <option value="">Take a relic…</option>
+                    {vaultOf(f).map((r) => {
+                      const why = carryProblem(u, r);
+                      return <option key={r.id} value={r.id} disabled={!!why} title={why}>{r.name} ({r.tier}){why ? ` - ${why}` : ''}</option>;
+                    })}
+                  </select>
+                </label>
+              )}
               {u.relics.map((r, i) => (
                 <div key={r.id} className="list-item">
                   <div className="grow">
                     <b>{r.name}</b>
                     {r.profile && <div className="muted small">{r.profile}</div>}
                   </div>
+                  {!theirs && (
+                    <button className="ghost small" title="Put it in the force's relic vault, to give to another unit" onClick={() => updateForce(f.id, (d) => void stowRelic(d, u.id, r.id))}>
+                      To vault
+                    </button>
+                  )}
                   {edit ? (
                     <>
                       <select value={r.tier} onChange={(e) => set((d) => void (d.relics[i].tier = e.target.value as RelicTier))}>

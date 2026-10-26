@@ -3,7 +3,8 @@ import { useStore } from '../model/store';
 import { useCloud } from '../cloud/CloudSync';
 import { exportForce, readImageAsDataUrl } from '../model/io';
 import { uid } from '../model/factory';
-import { battlePoints, forceTotals, levelForXp, pendingLevels, validateUnit } from '../rules/engine';
+import { battlePoints, forceTotals, levelForXp, pendingLevels, relicBearer, validateUnit } from '../rules/engine';
+import { carryProblem, equipRelic, vaultOf } from '../rules/relicVault';
 import { forceArmyUrl } from '../armyforge/book';
 import { go, href } from '../route';
 import AddUnitModal from './AddUnitModal';
@@ -351,6 +352,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
               <label className="field span-all">Description / lore<TextArea rows={5} value={f.description} onCommit={(v) => set((d) => void (d.description = v))} /></label>
             </div>
           </Panel>
+          <RelicVault f={f} readOnly={theirs} />
           <NexusPanel f={f} onShop={() => setUmbra(true)} />
           {theirs ? null : <div className="panel">
             <div className="panel-title"><h3>Danger zone</h3></div>
@@ -389,6 +391,40 @@ export default function ForceView({ forceId }: { forceId: string }) {
 }
 
 /** Producing new units at one of the faction's planets, paid from its bank (Nexus Wars). */
+/** Relics none of the force's units carry: give one to any unit with room, or stow one from a unit's sheet. */
+function RelicVault({ f, readOnly }: { f: Force; readOnly: boolean }) {
+  const { updateForce } = useStore();
+  const vault = vaultOf(f);
+  const carried = f.units.filter((u) => u.status !== 'removed' && u.relics.length);
+  if (!vault.length && !carried.length) return null;
+  const bearers = f.units.filter((u) => u.status !== 'removed' && relicBearer(u));
+  return (
+    <Panel id="force.vault" title="Relic vault" h={3} extra={<span className="muted small">{vault.length} stored</span>}>
+      {vault.length === 0 && <p className="muted small">Empty. Use "To vault" on a unit's relic to store it here and hand it to another unit.</p>}
+      {vault.map((r) => (
+        <div key={r.id} className="list-item">
+          <div className="grow">
+            <b>{r.name}</b> <span className="tag gold">{r.tier}</span>
+            {r.profile && <div className="muted small">{r.profile}</div>}
+          </div>
+          {!readOnly && (
+            <select value="" aria-label={`Give ${r.name} to`} onChange={(e) => e.target.value && updateForce(f.id, (d) => void equipRelic(d, e.target.value, r.id))}>
+              <option value="">Give to…</option>
+              {bearers.map((u) => {
+                const why = carryProblem(u, r);
+                return <option key={u.id} value={u.id} disabled={!!why} title={why}>{unitName(u)}{why ? ` - ${why}` : ''}</option>;
+              })}
+            </select>
+          )}
+        </div>
+      ))}
+      {carried.length > 0 && (
+        <p className="muted small">Carried: {carried.map((u) => `${unitName(u)} (${u.relics.map((r) => r.name).join(', ')})`).join('; ')}.</p>
+      )}
+    </Panel>
+  );
+}
+
 function ProductionBox({ f, c }: { f: Force; c: Campaign }) {
   const { state, update } = useStore();
   const sites = productionSites(c, f.nexus!.factionId);

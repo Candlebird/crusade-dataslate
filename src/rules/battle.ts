@@ -12,6 +12,7 @@ import {
   type RewardTableKey,
 } from './data';
 import { applyScar, levelForXp, previousBracketXp, relicBearer, sufferingRolls, type DeathOutcome, type ScarResult } from './engine';
+import { grantRelic } from './relicVault';
 import { MANIPULATION_PREFIX, NEXUS_ROUNDS, RELIC_TAKEN, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
 
 // Post-battle resolution ("Gaining Experience", "Gaining RP", "Deaths").
@@ -446,8 +447,8 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
   for (const g of relicGains) {
     const u = byId.get(g.unitId)!;
     const def = RELICS.find((r) => r.name === g.name);
-    u.relics.push({ id: newId(), name: g.name, tier: def?.tier ?? 'Common', profile: def?.profile, note: def?.note });
-    nexusLines.push(`${unitName(u)} gains ${g.name}.`);
+    const relic = { id: newId(), name: g.name, tier: def?.tier ?? 'Common', profile: def?.profile, note: def?.note };
+    nexusLines.push(grantRelic(force, u, relic) === 'unit' ? `${unitName(u)} gains ${g.name}.` : `${g.name} goes to the relic vault (${unitName(u)} has no room for it).`);
   }
 
   force.battles += 1;

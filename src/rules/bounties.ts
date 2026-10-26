@@ -9,6 +9,7 @@ import { currentRound, factionName } from './nexus';
 import { BOUNTY, BOUNTY_KINDS, STRONGHOLDS } from './nexusData';
 import { depositNearest, depositText, rewardOrigin } from './production';
 import { randomRelic } from './relicPick';
+import { grantRelic, grantText } from './relicVault';
 import type { FinishedBattle } from './tracker';
 import { resultFor } from './tracker';
 
@@ -294,13 +295,10 @@ export function payBounty(c: Campaign, b: Bounty, f: Force, date: string, newId:
       f.nexus.traitTokens += r.n;
       bits.push(`+${rewardText(r)}`);
     } else if (r.kind === 'relic') {
-      const taken = new Set(f.units.flatMap((u) => u.relics.map((x) => x.name)));
+      const taken = new Set([...f.units.flatMap((u) => u.relics), ...(f.relicVault ?? [])].map((x) => x.name));
       const u = [...relicCarriers(f)].sort((a, b) => a.relics.length - b.relics.length)[0];
       const relic = u && randomRelic(u, r.tier, taken, rand, newId());
-      if (u && relic) {
-        u.relics.push(relic);
-        bits.push(`${relic.name} to ${u.name}`);
-      }
+      if (u && relic) bits.push(grantText(relic, u, grantRelic(f, u, relic)));
     }
   }
   (f.nexus.bountiesPaid ??= []).push(b.id);

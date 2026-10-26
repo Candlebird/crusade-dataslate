@@ -28,6 +28,7 @@ function campaign(): Campaign {
 function forces(): Force[] {
   const a: Force = { ...newForce('Alpha Host'), id: 'fA', umbraShards: 3, nexus: { factionId: 'A', permanentTables: [], tempTables: [], traitTokens: 0, pending: [] } };
   a.units = [newUnit({ id: 'w', name: 'Vex', category: 'Hero', quality: 4, defense: 4, rules: ['Hero', 'Fearless', 'Tough(3)'] })];
+  a.units[0].xp = 60; // seasoned, so every ending tier and relic is open
   return [a];
 }
 
@@ -94,7 +95,28 @@ describe('crossroads journal', () => {
     expect(j.climax).toMatchObject({ rolls: [3, 4], pass: true });
     expect(canReroll(j, 'climax')).toBe(false);
     expect(successes(j)).toBe(2);
-    expect(tierCap(j)).toBe(2);
+    expect(tierCap(j, fs)).toBe(2);
+  });
+
+  it('keeps tier-3 endings for seasoned forces and relics to the tiers the Warlord could take', () => {
+    const c = campaign();
+    const fs = forces();
+    const u = fs[0].units[0];
+    const j = deal(c, 'A', fs, () => 0, 'j1', '2026-10-21')!;
+    j.approach = { id: 'a', roll: { skill: 'might', target: 3, rolls: [6], pass: true } };
+    j.choice = { id: 'b', roll: { skill: 'might', target: 3, rolls: [6], pass: true } };
+    j.climax = { skill: 'might', target: 3, rolls: [6], pass: true };
+    u.xp = 25; // level 2, but alone that's a level-2 force
+    const ids = () => eligibleRewards(j, u, fs).map((r) => r.id);
+    expect(tierCap(j, fs)).toBe(3);
+    expect(ids()).not.toContain('cursedArtefact'); // Legendary needs 60 XP
+    expect(ids()).not.toContain('bloodPrice'); // Rare needs 41
+    fs[0].units.push(...[1, 2, 3].map((n) => newUnit({ id: `g${n}`, name: 'Grunts', quality: 5, defense: 5 })));
+    expect(tierCap(j, fs)).toBe(2); // the force averages level 0.5
+    expect(ids().every((id) => rewardById(id)!.tier <= 2)).toBe(true);
+    fs[0].units.forEach((x) => (x.xp = 60));
+    expect(tierCap(j, fs)).toBe(3);
+    expect(ids()).toContain('cursedArtefact');
   });
 
   it('offers four rewards up to the cap, with at least one bad one', () => {
@@ -106,7 +128,7 @@ describe('crossroads journal', () => {
     rollApproach(j, 'board', u, 1, () => face(1));
     chooseComplication(j, 'cut', u, 1, () => face(1));
     rollClimax(j, 'might', u, 1, () => face(1));
-    expect(tierCap(j)).toBe(1);
+    expect(tierCap(j, fs)).toBe(1);
     expect(eligibleRewards(j, u, fs).every((r) => r.tier <= 1)).toBe(true);
     const offer = localOffer(j, u, fs, seq(0.3, 0.7));
     expect(new Set(offer).size).toBe(4);

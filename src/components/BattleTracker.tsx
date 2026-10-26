@@ -59,6 +59,8 @@ import { forceTotals } from '../rules/engine';
 import { SOLO_PATROL } from '../rules/downtimeData';
 import { MAX_PLAYERS, randomForces, randomFormat, type Format } from '../rules/randomBattle';
 import AiActivation from './AiActivation';
+import TableMap from './TableMap';
+import { deploymentMap, suggestTable } from '../rules/tableMap';
 import PatrolModal from './PatrolModal';
 import AutoBattleModal from './AutoBattleModal';
 import { overrunBlock } from '../rules/overrun';
@@ -235,6 +237,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
           <p>{b.mission.summary}</p>
           {b.deploymentStyle && <p className="small"><b>Deployment style.</b> {b.deploymentStyle} <span className="muted">(map in the OPR Advanced Rules)</span></p>}
           {b.mission.deployment && <p className="small"><b>Deployment.</b> {b.mission.deployment}</p>}
+          <TableSetup b={b} />
           {roundRules(b).map((r, i) => (
             <p key={i} className="small"><b>{r.title}{r.round ? ` (round ${r.round})` : ''}.</b> {r.text}</p>
           ))}
@@ -817,5 +820,19 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
         {side.units.some((u) => u.activated) && <button className="ghost small" onClick={() => setSide((s) => s.units.forEach((u) => (u.activated = false)))}>Clear activations</button>}
       </div>
     </div>
+  );
+}
+
+/** The suggested table for the biggest team's points, and the mission's deployment map unless a rolled style replaces it. */
+function TableSetup({ b }: { b: TrackedBattle }) {
+  const points = Math.max(0, ...teamsOf(b).map((t) => b.sides.filter((x) => x.team === t).reduce((n, x) => n + sidePoints(x), 0)));
+  const table = suggestTable(points);
+  // Frontline is the core-rules deployment, which is what the mission map already draws.
+  const map = !b.deploymentStyle || b.deploymentStyle === 'Frontline' ? deploymentMap(b.mission, points) : undefined;
+  return (
+    <>
+      <p className="small"><b>Table.</b> {table.label}, {table.why}{points ? ` (biggest side: ${points} pts)` : ''}.</p>
+      {map && <TableMap map={map} />}
+    </>
   );
 }

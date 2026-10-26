@@ -71,7 +71,7 @@ export function journalRequest(c: Campaign, j: CrossroadsJournal, u: Unit, force
     },
     steps,
     successes: successes(j),
-    tierCap: tierCap(j),
+    tierCap: tierCap(j, forces),
     minNothing: minNothing(j),
     ...(requiredReward(j) ? { required: requiredReward(j) } : {}),
     rewards: eligibleRewards(j, u, forces).map((r) => ({ id: r.id, name: r.name, desc: r.desc, tier: r.tier, ...(recent.has(r.id) ? { recent: true } : {}) })),

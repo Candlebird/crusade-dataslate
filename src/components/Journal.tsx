@@ -273,7 +273,7 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
       {/* The tally. */}
       {status === 'play' && checksDone(j) && (
         <div className="row">
-          <span className="small">{successes(j)} of {j.twist ? 4 : 3} checks passed: endings up to tier {tierCap(j)}.</span>
+          <span className="small">{successes(j)} of {j.twist ? 4 : 3} checks passed: endings up to tier {tierCap(j, state.forces)}{tierCap(j, state.forces) < Math.min(3, successes(j)) && ' (tier 3 waits until the force averages level 2)'}.</span>
           {canPlay && <button className="primary" disabled={busy} onClick={tally}>{busy ? 'The story turns…' : 'See how it ends'}</button>}
         </div>
       )}

@@ -94,7 +94,7 @@ function RelicCase({ relics, source }: { relics: RelicDef[]; source?: (r: RelicD
                     {source && <p className="small muted">{source(r)}</p>}
                     <div className="relic-held small">
                       {by.length
-                        ? <>Carried by {by.map((h, i) => <span key={i}>{i ? ', ' : ''}<a href={href.unit(h.forceId, h.unitId)}>{relicHolderText(h)}</a></span>)}</>
+                        ? <>Carried by {by.map((h, i) => <span key={i}>{i ? ', ' : ''}<a href={h.unitId ? href.unit(h.forceId, h.unitId) : href.force(h.forceId)}>{relicHolderText(h)}</a></span>)}</>
                         : <span className="muted">Unclaimed</span>}
                     </div>
                   </div>

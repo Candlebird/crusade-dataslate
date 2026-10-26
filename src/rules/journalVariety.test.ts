@@ -35,6 +35,7 @@ function campaign(): Campaign {
 function forces(): Force[] {
   const a: Force = { ...newForce('Alpha Host'), id: 'fA', umbraShards: 3, nexus: { factionId: 'A', permanentTables: [], tempTables: [], traitTokens: 0, pending: [] } };
   a.units = [newUnit({ id: 'w', name: 'Vex', category: 'Hero', quality: 4, defense: 4, rules: ['Hero', 'Fearless', 'Tough(3)'] })];
+  a.units[0].xp = 60; // seasoned, so every ending tier and relic is open
   return [a];
 }
 
@@ -130,7 +131,10 @@ describe('journal variety', () => {
     expect(minNothing(j)).toBe(2);
     j.twist.roll = pass;
     expect(successes(j)).toBe(4);
-    expect(tierCap(j)).toBe(3);
+    u.xp = 0;
+    expect(tierCap(j, fs)).toBe(2); // a level-0 force tops out at tier 2
+    u.xp = 40;
+    expect(tierCap(j, fs)).toBe(3);
     expect(minNothing(j)).toBe(1);
   });
 

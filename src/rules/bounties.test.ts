@@ -37,7 +37,7 @@ function force(factionId: string, hero = false): Force {
   const f = newForce(`${factionId} force`);
   f.nexus = emptyNexus(factionId);
   f.units.push(newUnit({ id: `${factionId}-u`, name: 'Grunts' }));
-  if (hero) f.units.push(newUnit({ id: `${factionId}-h`, name: 'Boss', category: 'Hero' }));
+  if (hero) f.units.push(newUnit({ id: `${factionId}-h`, name: 'Boss', category: 'Hero', xp: 60 }));
   return f;
 }
 

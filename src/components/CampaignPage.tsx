@@ -9,7 +9,7 @@ import { useCloud } from '../cloud/CloudSync';
 import { logFor, type ChronicleEntry } from '../rules/chronicle';
 import { placeGuardians, rerollGuardians } from '../rules/guardians';
 import { reportFor } from '../rules/report';
-import OrdersPanel from './NexusOrders';
+import OrdersPanel, { OrdersLockStrip } from './NexusOrders';
 import RoundPanel from './RoundPanel';
 import TechTreePanel from './TechTree';
 import WarlordsPanel from './Warlords';
@@ -184,6 +184,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         </p>
 
         <RoundPanel c={c} gm={false} viewer={fog} />
+        <OrdersLockStrip c={c} />
         <CampaignTabs tab={tab} setTab={setTab} />
         {tab === 'map' && (
           <>
@@ -248,6 +249,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
       </p>
 
       <RoundPanel c={c} />
+      <OrdersLockStrip c={c} />
       <CampaignTabs tab={tab} setTab={setTab} />
       {tab === 'map' && (
         <>

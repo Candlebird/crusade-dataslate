@@ -82,6 +82,9 @@ export function relicHolders(forces: Force[], campaign?: Campaign): Map<string, 
         const h = { forceId: f.id, unitId: u.id, unit: u.name || u.unitType || 'Unnamed unit', force: f.name, faction };
         held.set(r.name, [...(held.get(r.name) ?? []), h]);
       }
+    // A relic in the vault is still the force's (unitId '').
+    for (const r of f.relicVault ?? [])
+      held.set(r.name, [...(held.get(r.name) ?? []), { forceId: f.id, unitId: '', unit: 'Relic vault', force: f.name, faction }]);
   }
   return held;
 }
@@ -235,7 +238,7 @@ export function validateUnit(u: Unit): Issue[] {
   if (u.relics.length > 0 && u.category !== 'Hero' && !u.heroicRise && u.bpAdjust <= 0)
     out.push({ level: 'warn', text: 'Relics are for Heroes only (or units with Heroic Rise).' });
   if (u.relics.length > slots)
-    out.push({ level: 'error', text: `${u.relics.length} relics but only ${slots} relic slot(s) at ${u.xp} XP.` });
+    out.push({ level: 'error', text: `${u.relics.length} relics but only ${slots} relic slot(s) at ${u.xp} XP; move one to the relic vault.` });
   for (const r of u.relics)
     if (!relicTierAllowed(r.tier, u.xp))
       out.push({ level: 'warn', text: `${r.name} is ${r.tier}; needs ${RELIC_TIER_MIN_XP[r.tier]}+ XP.` });

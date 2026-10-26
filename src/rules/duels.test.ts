@@ -29,7 +29,7 @@ function forces(): Force[] {
   const a: Force = { ...newForce('Alpha Host'), id: 'fA', umbraShards: 6, nexus: nexus('A') };
   a.units = [newUnit({ id: 'uA', name: 'Hero A', category: 'Hero', relics: [{ id: 'r1', name: 'Blade of Ages', tier: 'Rare' }] })];
   const b: Force = { ...newForce('Bravo Host'), id: 'fB', umbraShards: 2, nexus: nexus('B') };
-  b.units = [newUnit({ id: 'trooper', name: 'Trooper', category: 'Infantry' }), newUnit({ id: 'uB', name: 'Hero B', category: 'Hero' })];
+  b.units = [newUnit({ id: 'trooper', name: 'Trooper', category: 'Infantry' }), newUnit({ id: 'uB', name: 'Hero B', category: 'Hero', xp: 45 })];
   return [a, b];
 }
 

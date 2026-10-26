@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { ArmyList, CatalogBook, Force, RuleText, Settings, Unit } from '../model/types';
-import { battlePoints, hasRule, levelForXp } from '../rules/engine';
+import { battlePoints, hasRule, levelForXp, ruleRating } from '../rules/engine';
 import { glossary, isHero, joinedTo, label, listIssues, listSpells, listTotals, listUnits, weaponColumns } from '../rules/lists';
 import { go, href } from '../route';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
@@ -241,7 +241,9 @@ export function ListSheet({ force: f, list: l, settings: s, books, coreRules }: 
 
 function UnitCard({ u, joined, s }: { u: Unit; joined?: Unit; s: Settings }) {
   const level = levelForXp(u.xp);
-  const showTough = u.tough > 1 && !hasRule(u.rules, 'Tough');
+  // Tough gets its own stat (1 when the unit has no Tough rule), so it's left out of Rules.
+  const tough = Math.max(u.tough || 1, ruleRating(u.rules, 'Tough') ?? 1);
+  const rules = u.rules.filter((r) => !hasRule([r], 'Tough'));
   return (
     <article className={`sheet-card${joined ? ' joined' : ''}`}>
       <div className="card-head">
@@ -255,12 +257,12 @@ function UnitCard({ u, joined, s }: { u: Unit; joined?: Unit; s: Settings }) {
       <div className="card-stats">
         <span><b>Qua</b> {u.quality}+</span>
         <span><b>Def</b> {u.defense}+</span>
-        {showTough && <span><b>Tough</b> {u.tough}</span>}
         <span><b>Lvl</b> {level} ({u.xp} XP)</span>
+        <span><b>Tough</b> {tough}</span>
         <span><b>BP</b> {battlePoints(u, s)}</span>
         {u.status === 'comatose' && <span className="card-flag">Comatose</span>}
       </div>
-      {u.rules.length > 0 && <div className="card-line"><b>Rules:</b> {u.rules.join(', ')}</div>}
+      {rules.length > 0 && <div className="card-line"><b>Rules:</b> {rules.join(', ')}</div>}
 
       {u.weapons.length > 0 && (
         <table className="card-weapons">
