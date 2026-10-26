@@ -13,9 +13,9 @@ import { applySortie, offTableKey, offTableLeft, postWeekly, weekBoard } from '.
 import { partyProblem, sortieProblem, sortieScout, startSortie } from '../rules/tasks';
 import { SORTIE, SORTIE_BOONS, type SortieLength, type SortieMarkId, type SortieMode } from '../rules/downtimeData';
 import {
-  active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, startRound, act, braceFor, omensRead, sigWeaker,
+  active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, startRound, nextTurn, braceFor, omensRead, sigWeaker,
   isFort, keepsHaul, leaveCombat, leaveEvent, memberName, memberUp, nextSlots, onField, patchUp, pickBoon, quitRun, distOf, DISTANCES, reachText, reachable, runXp, skillProblem,
-  skillTargets, skillsOf, slotOf, SLOTS, turnModel, trinketInfo, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
+  skillTargets, skillsOf, slotOf, SLOTS, trinketInfo, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
   ambushOdds, beastInfo, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons,
   type SortieFx, type SortieIntentKind, type SortieModel, type SortieNode, type SortieNodeKind, type SortieRun, type SortieSkill, type SortieSkillKind, type SortieSquad,
 } from '../rules/sortie';
@@ -45,6 +45,8 @@ const OVER: Record<NonNullable<SortieRun['over']>, string> = {
   quit: 'The party turned back.',
 };
 const AUTO_STEP = 380;
+/** The pause after each squad's turn in a fight, in ms. */
+const TURN_PAUSE = 1000;
 /** How long a blow's trail and number stay up, and the gap between blows that land together (ms). */
 const BLOW_MS = 950;
 const BLOW_GAP = 120;
@@ -274,6 +276,19 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
     setSkill(null);
     after();
   };
+
+  // After each squad's turn the fight waits a moment, so each move can be seen before the next one comes.
+  const pausing = run?.screen === 'combat' && run.combat?.need === 'next' && !run.combat.over;
+  const turnsLeft = run?.combat?.queue.length;
+  useEffect(() => {
+    if (!pausing || auto) return;
+    const t = window.setTimeout(() => {
+      const r = runRef.current;
+      if (r?.combat?.need === 'next') doit(() => nextTurn(r));
+    }, TURN_PAUSE);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pausing, auto, turnsLeft]);
 
   // Auto: the run plays itself, a step at a time so it can be watched.
   useEffect(() => {
@@ -596,7 +611,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               run={run}
               skill={skill}
               setSkill={setSkill}
-              onUse={(id, target) => doit(() => (run.combat!.need === 'order' ? giveOrder(run, id, target) : act(run, id, target)))}
+              onUse={(id, target) => doit(() => giveOrder(run, id, target))}
               onAuto={() => doit(() => autoMove(run))}
               onStart={() => doit(() => startRound(run))}
               onBrace={(id) => doit(() => braceFor(run, id))}
@@ -908,8 +923,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
   const me = actingSquad(run);
   // Auto only helps a squad whose models carry different weapons; elsewhere it's for testing.
   const mixed = !!me && new Set(active(me).map((m) => m.guns.map((g) => g.name).sort().join('|'))).size > 1;
-  const current = turnModel(run);
-  const skills = skillsOf(run, current);
+  const skills = skillsOf(run);
   const chosen = skills.find((s) => s.id === skill);
   const targets = chosen ? skillTargets(run, chosen) : [];
   const field = onField(c);
@@ -945,7 +959,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
   };
 
   const at = me ? SLOTS[slotOf(me)] : '';
-  const who = c.over || !me ? '' : c.need === 'order' ? `Round ${c.round}: ${me.name} (${at}) is up. Give its order for the round.` : current ? `Round ${c.round}: ${me.name} (${at}), this model’s turn.` : '';
+  const who = c.over || !me ? '' : c.need === 'order' ? `Round ${c.round}: ${me.name} (${at}) is up. Give its order for the round.` : '';
 
   return (
     <div className="sortie-panel">
@@ -994,7 +1008,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
                       {c.orders[p.key] && <span className="sortie-ordered" data-tip="Has its order for the round"><Icon name="l:check" /></span>}
                     </div>
                     <div className="sortie-models">
-                      {p.models.map((m, j) => <Token key={j} face={null} m={m} current={m === current} />)}
+                      {p.models.map((m, j) => <Token key={j} face={null} m={m} />)}
                     </div>
                     {p.member !== undefined && run.party[p.member] && (
                       <div className="row small" style={{ gap: 6 }}>
@@ -1087,6 +1101,8 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
             })}
           </div>
         </div>
+      ) : c.need === 'next' ? (
+        <p className="small muted" style={{ marginTop: 8 }}>{(() => { const n = squad(c.queue[0]?.key ?? ''); return n ? `Next: ${n.name}…` : '…'; })()}</p>
       ) : c.need === 'start' ? (
         <div className="row" style={{ gap: 6, marginTop: 8 }}>
           <span className="grow small">

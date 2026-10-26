@@ -1294,7 +1294,7 @@ export const SORTIE = {
    * Sizing the unit up (sortie.ts sizeUp): trial fights per step, halving steps, the range of scales, and the share of
    * its wounds the fresh unit should keep on average (a loss keeps none) in each kind of fight.
    */
-  sizeUp: { tries: 30, steps: 6, min: 0.2, max: 5, left: { fight: 0.82, elite: 0.65, boss: 0.4 } as Record<'fight' | 'elite' | 'boss', number> },
+  sizeUp: { tries: 30, steps: 6, min: 0.2, max: 5, left: { fight: 0.81, elite: 0.64, boss: 0.39 } as Record<'fight' | 'elite' | 'boss', number> },
   ramp: 0.5,
   /** At most this many Echo squads in a fight. */
   squads: 3,
@@ -1305,6 +1305,8 @@ export const SORTIE = {
   lordShare: 0.7,
   /** The share of the lord's fight's budget its escorts always get on top, enough to hold the field until it comes. */
   escortShare: 0.5,
+  /** A lord's escorts are never this Tough or tougher (and at most one is Tough 6 or more). */
+  escortMaxTough: 12,
   /**
    * Camp: rest mends this share of each model's wounds and brings back `raise` of the squad's fallen (at least one).
    * After a fight, patching up mends `patch` and brings one back.

@@ -245,7 +245,7 @@ export function incomeItems(s: Sector, prefix = ''): NexusItem[] {
   if (hasBuilding(s, 'refinery')) out.push({ key: `${key}:refinery`, kind: 'shardRoll', source: `${place}: Shard Refinery` });
   if (hasBuilding(s, 'depot')) out.push({ key: `${key}:depot`, kind: 'supply', source: `${place}: Supply Depot`, supply: PRODUCTION.depotSupply });
   if (hasBuilding(s, 'medicae')) out.push({ key: `${key}:medicae`, kind: 'medicae', source: `${place}: Medicae Ward` });
-  if (hasBuilding(s, 'spire')) out.push({ key: `${key}:spire`, kind: 'us', source: `${place}: Umbral Spire`, us: 3 });
+  if (hasBuilding(s, 'spire')) out.push({ key: `${key}:spire`, kind: 'us', source: `${place}: Umbral Spire`, us: PRODUCTION.spire.us });
   return out;
 }
 

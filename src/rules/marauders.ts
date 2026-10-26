@@ -6,7 +6,7 @@ import { colOf, hexKey, isPlaced, neighbors, type Hex, type Rand } from './hexma
 import { positionOf } from './movement';
 import { rollGuardianLoot } from './nexus';
 import { MARAUDERS, NEXUS_ROUNDS, WARLORDS } from './nexusData';
-import { depositBanked, isReinforced, produces, productionRate, withdrawBanked } from './production';
+import { depositBanked, hasBuilding, isReinforced, produces, productionRate, withdrawBanked } from './production';
 import { hasPerk } from './warlords';
 
 // Marauders (Nexus Wars): raider bands that belong to no one. Once the opening rounds are over, a band can turn up at a
@@ -78,8 +78,8 @@ function standers(c: Campaign, sectorId: string, forces?: Force[]) {
   return [...new Set(ids)];
 }
 
-/** Walls, Reinforce or a garrison throw a raid back. */
-export const repels = (c: Campaign, s: Sector, forces?: Force[]) => isReinforced(s) || garrisoned(c, s, forces);
+/** Walls, Reinforce, a Militia Muster or a garrison throw a raid back. */
+export const repels = (c: Campaign, s: Sector, forces?: Force[]) => isReinforced(s) || hasBuilding(s, 'militia') || garrisoned(c, s, forces);
 
 /** Steps from a hex to every placed sector, over placed sectors; with the step before each, to walk the way back. */
 function paths(c: Campaign, from: Sector & Hex) {

@@ -95,7 +95,8 @@ export function nextThreat(c: Campaign) {
   const { wins, voidspawn, patrols } = echoWins(c, currentRound(c));
   const R = NEXUS_ROUNDS;
   const event = activeEvent(c)?.threat ?? 0;
-  const spires = c.factions.reduce((n, f) => n + buildingsHeld(c, f.id, 'spire'), 0) * PRODUCTION.spire.threat;
+  // However many Umbral Spires stand, the threat drops by one Spire's worth.
+  const spires = c.factions.some((f) => buildingsHeld(c, f.id, 'spire') > 0) ? PRODUCTION.spire.threat : 0;
   const threat = clamp(threatOf(c) + R.threatPerRound + event - wins * R.threatPerWin - voidspawn * R.threatPerVoidspawnWin - patrols * R.threatPerPatrolWin - spires, 0, R.threatMax);
   // The Crisis: a win pushes the Echoes back further; otherwise they rage at full threat.
   const crisis = activeCrisis(c);

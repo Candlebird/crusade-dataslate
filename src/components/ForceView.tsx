@@ -439,7 +439,7 @@ function ProductionBox({ f, c }: { f: Force; c: Campaign }) {
   const budget = Math.min(room, site ? Math.floor(bank / (1 - produceDiscount(site, { tough: 0 }))) : 0);
   return (
     <div className="span-all small">
-      <div className="muted" data-tip="Each planet banks Materials every round. Spend them to raise units there. Barracks double the bank; Training Grounds give new units XP.">Production</div>
+      <div className="muted" data-tip="Each planet banks Materials every round. Spend them to raise units there. Barracks and a Logistics Hub raise what it banks; Training Grounds give new units XP.">Production</div>
       <div className="row">
         <select value={site.id} onChange={(e) => setSite(e.target.value)} aria-label="Where to produce" style={{ minWidth: 0, flex: 1 }}>
           {sites.map((x) => <option key={x.id} value={x.id}>{x.name}: {x.bank ?? 0} Materials banked</option>)}

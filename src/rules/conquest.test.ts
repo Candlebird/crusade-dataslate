@@ -114,7 +114,7 @@ describe('planet production', () => {
     expect(build(c, s, 'depot')).toBe(true); // no shards needed
     finishConstruction(c);
     expect(buildBlock(s, 'watchtower', f)).toMatch(/No free slot/);
-    expect(BUILDINGS.filter((b) => b.shards === 0).every((b) => b.cost <= 200)).toBe(true);
+    expect(BUILDINGS.filter((b) => b.shards === 0).every((b) => b.cost <= 300)).toBe(true);
   });
 
   it('loses a building going up when the sector is taken, and ends the round with it built', () => {

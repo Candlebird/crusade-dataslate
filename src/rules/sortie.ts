@@ -73,8 +73,6 @@ export interface SortieSquad {
   slow: boolean;
   fearless: boolean;
   hero: boolean;
-  /** Turns each model takes a round: big models (Tough 6 and up) act more than once. */
-  turns: number;
   abilities: Ability[];
   points: number;
   /** Statuses, each to the last round it lasts (a stun is spent on the next turn it costs). */
@@ -126,10 +124,11 @@ export interface SortieSkill {
   blocked?: string;
 }
 
-/** One model's place in the round's initiative. */
+/** A squad's place in the round's initiative: every squad acts once a round, all its models together. */
 export interface SortieTurn {
   key: string;
-  i: number;
+  /** @deprecated Old saves queued each model; a squad now acts once. */
+  i?: number;
   init: number;
 }
 
@@ -144,11 +143,12 @@ export interface SortieCombat {
   /** The party's units, in the run's order (slots say where each stands). */
   party: SortieSquad[];
   enemies: SortieSquad[];
-  /** Models still to act this round, fastest first. */
+  /** Squads still to act this round, fastest first. */
   queue: SortieTurn[];
   /** What the game waits on: the player to brace for a signature (before a lord's fight), to start the round, a unit's
-   *  order for the round, or a Hero's (or lone model's) own turn. */
-  need?: 'brace' | 'start' | 'order' | 'turn';
+   *  order for the round, or the short pause after a squad has acted ('next', see nextTurn). ('turn' is from old saves
+   *  and is taken as 'order'.) */
+  need?: 'brace' | 'start' | 'order' | 'next' | 'turn';
   /** The party unit the game waits on. */
   acting?: string;
   /** Each unit's order this round. */
@@ -367,9 +367,10 @@ export function squadOf(u: Unit, key: string, opts: { n?: number; extraTough?: n
     ignore: clamp(1 - (1 - Math.max(f.ignore, has('Resistance') ? 1 / 6 : 0)) / Math.max(0.5, defBonus), 0, 0.5),
     evasive: has('Evasive') ? 1 : 0, stealth: has('Stealth') || has('Ghostly'), meleeEvasion: has('Melee Evasion'),
     impact: (ruleRating(names, 'Impact') ?? 0) + (3 * countOf(upgrades, 'Impact +3') + 6 * countOf(upgrades, 'Impact +6')) / f.size + (has('Momentum') ? 1 : 0),
-    hitShoot: f.hitShoot, hitMelee: f.hitMelee, atkBonus: f.atkBonus,
+    // A big model acts once a round like any other, but strikes for a Tough of 3 in each blow: Tough 6 twice over, Tough 12 four times.
+    hitShoot: f.hitShoot, hitMelee: f.hitMelee, atkBonus: f.atkBonus * Math.max(1, Math.floor((f.tough + extra) / 3)),
     fast: has('Fast') || has('Flying') || has('Aura of Swiftness'), slow: has('Slow'),
-    fearless: has('Fearless'), hero: has('Hero'), turns: Math.max(1, Math.floor((f.tough + extra) / 3)),
+    fearless: has('Fearless'), hero: has('Hero'),
     abilities: f.abilities, points: Math.round((u.points * n) / f.size),
     status: {}, cooldowns: {}, engaged: -9, shield: 0, revived: false,
   };
@@ -1175,10 +1176,17 @@ export function echoSquads(book: CatalogBook, budget: number, kind: SortieFightK
     if (lead) take(lead, Math.max(left * 0.7, lead.cost));
   }
   // Big Echoes only join fights big enough to hold them, so a pricey unit isn't sized up against a capped fight.
-  const small = units.filter((cu) => cu.cost <= Math.max(BIG_UNIT, budget * 0.5));
+  // A lord's escorts: never the great monsters (Tough 12 and up, worth far more here than their points), and at most one
+  // beast (Tough 6 and up), so one lord's fight isn't a few times another's.
+  const toughOf = (cu: CatalogUnit) => ruleRating(cu.rules, 'Tough') ?? 1;
+  const escorting = kind === 'boss' && !!named;
+  const small = units.filter((cu) => cu.cost <= Math.max(BIG_UNIT, budget * 0.5) && (!escorting || toughOf(cu) < SORTIE.escortMaxTough));
+  let beasts = 0;
   for (let misses = 0; out.length < SORTIE.squads && misses < 40 && small.length; ) {
     const cu = small[Math.floor(r() * small.length)];
-    if (!take(cu)) misses++;
+    const beast = escorting && toughOf(cu) >= 6;
+    if ((beast && beasts >= 1) || !take(cu)) misses++;
+    else if (beast) beasts++;
   }
   if ((!out.length || (named && out.length < 2)) && units.length) {
     const cheapest = [...units].sort((a, b) => a.cost / a.size - b.cost / b.size)[0];
@@ -1214,7 +1222,6 @@ export const partyLine = (c: SortieCombat) => c.party.filter((p) => standing(p) 
 /** The unit at the front of the line. */
 export const frontOf = (c: SortieCombat): SortieSquad | undefined => partyLine(c)[0];
 /** A party unit acts turn by turn, not by orders: a lone model or a Hero. */
-export const perTurn = (s: SortieSquad) => s.models.length === 1 || s.hero;
 /** The party unit the game waits on. */
 export const actingSquad = (run: SortieRun) => (run.combat?.acting ? run.combat.party.find((p) => p.key === run.combat!.acting) : undefined);
 
@@ -1348,6 +1355,8 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
     if (run.nemesis) log(c, `Nemesis: ${Math.round(SORTIE.nemesis.tough * run.nemesis * 100)}% more wounds, and a bounty of ${run.nemesis * SORTIE.nemesis.bounty} RP on its head.`, 'bad');
     if (run.weaken) log(c, `${boss.name} comes into the fight already hurt.`, 'good');
   }
+  // A late lord's escorts hold the field: if every one of them would lie in ambush, none does.
+  if (lord?.arrives && enemies.every((e) => e.arrives)) for (const e of enemies) if (e !== lord) e.arrives = undefined;
   // Nobody standing Close: the nearest squad steps up.
   const near = Math.min(...enemies.filter((e) => !e.arrives).map(distOf));
   if (near > 1) for (const e of enemies) if (!e.arrives && distOf(e) === near) e.dist = near - 1;
@@ -1509,9 +1518,7 @@ function newRound(run: SortieRun) {
     if (refusing(c, s)) continue;
     const mod = (trinketOf(s)?.init ?? 0) + (s.fast ? SORTIE.fast : 0) - (s.slow || statusOn(c, s, 'slow') ? SORTIE.slow : 0) + (!s.echo && has(run, 'drill') ? 1 : 0) + (!s.echo && has(run, 'adrenal') ? 2 : 0)
       + (quirk(s, 'quick') ? 1 : 0) - (quirk(s, 'jumpy') && c.round === 1 ? 2 : 0) + (s.echo && c.ambush && c.round === 1 ? SORTIE.ambush.init : 0);
-    s.models.forEach((m, i) => {
-      if (m.hp > 0 && !m.routed) for (let k = 0; k < s.turns; k++) turns.push({ key: s.key, i, init: d6(run) + mod + rand(run) * 0.1 });
-    });
+    if (standing(s)) turns.push({ key: s.key, init: d6(run) + mod + rand(run) * 0.1 });
   }
   c.queue = turns.sort((a, b) => b.init - a.init);
   for (const e of c.enemies) e.intent = standing(e) ? intentOf(run, e) : undefined;
@@ -1589,55 +1596,56 @@ function signature(run: SortieRun, prev: { did: Record<string, SortieSkillKind[]
   }
 }
 
-/** Run the round on until a player choice is needed or the round ends. */
+/** Run the round on to the next squad's turn: a party unit waits for its order, and after any squad acts the game
+ *  pauses ('next') so each move can be seen before the next; the round ends when every squad has acted. */
 function advance(run: SortieRun) {
   const c = run.combat!;
   c.need = undefined;
   c.acting = undefined;
   while (c.queue.length && !c.over) {
-    const t = c.queue[0];
-    const s = squadByKey(c, t.key);
-    const m = s?.models[t.i];
-    if (!s || !m || m.hp <= 0 || m.routed || s.arrives) { c.queue.shift(); continue; }
-    if (!s.echo && perTurn(s)) {
-      // Its turn begins: a shaken or stunned model just spends it.
-      if (lostTurn(run, s, m)) { c.queue.shift(); continue; }
-      c.need = 'turn';
-      c.acting = s.key;
-      return;
-    }
-    // A unit gets its order for the round when its first model's turn comes up.
+    const s = squadByKey(c, c.queue[0].key);
+    if (!s || !standing(s) || s.arrives) { c.queue.shift(); continue; }
     if (!s.echo && !c.orders[s.key]) {
       c.need = 'order';
       c.acting = s.key;
       return;
     }
-    c.queue.shift();
-    if (!lostTurn(run, s, m)) {
-      if (s.echo) echoAct(run, s, m);
-      else orderAct(run, s, m);
-    }
+    // (Old saves queued every model: the squad's other places go too.)
+    c.queue = c.queue.filter((t) => t.key !== s.key);
+    squadTurn(run, s);
     checkEnd(run);
+    if (c.over) return;
+    if (c.queue.length) {
+      c.need = 'next';
+      return;
+    }
   }
   if (c.over) return;
   for (const e of onField(c)) for (const st of Object.keys(e.status) as Status[]) if ((e.status[st] ?? 0) < c.round) delete e.status[st];
   newRound(run);
 }
 
-/** A shaken model steadies itself, and a stunned squad loses a model's turn. */
-function lostTurn(run: SortieRun, s: SortieSquad, m: SortieModel): boolean {
+/** Go on after the pause that follows a squad's turn. */
+export function nextTurn(run: SortieRun) {
+  const c = run.combat!;
+  if (c.need !== 'next') throw new Error('Nothing to go on with now.');
+  advance(run);
+}
+
+/** A squad's turn: a stunned squad loses it, a shaken model steadies itself instead of acting, and the rest act together. */
+function squadTurn(run: SortieRun, s: SortieSquad) {
   const c = run.combat!;
   if (statusOn(c, s, 'stun')) {
     delete s.status.stun;
-    log(c, `${s.name} ${s.echo ? 'is' : 'are'} stunned and lose${s.echo ? 's' : ''} a turn.`, s.echo ? 'good' : 'bad');
-    return true;
+    return log(c, `${s.name} ${s.echo ? 'is' : 'are'} stunned and lose${s.echo ? 's' : ''} the turn.`, s.echo ? 'good' : 'bad');
   }
-  if (m.shaken) {
-    m.shaken = false;
-    log(c, `A model of ${s.name} steadies itself.`, 'info');
-    return true;
-  }
-  return false;
+  const shaken = active(s).filter((m) => m.shaken);
+  for (const m of shaken) m.shaken = false;
+  if (shaken.length) log(c, shaken.length === active(s).length ? `${s.name} steady themselves.` : `${shaken.length} model${shaken.length === 1 ? '' : 's'} of ${s.name} steady ${shaken.length === 1 ? 'itself' : 'themselves'}.`, 'info');
+  const ms = active(s).filter((m) => !shaken.includes(m));
+  if (!ms.length) return;
+  if (s.echo) echoTurn(run, s, ms);
+  else orderTurn(run, s, ms);
 }
 
 /** Wounds that skip the dice (bleeding, thorns, blasts), most hurt model first. */
@@ -1789,7 +1797,7 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
       if (six6.some((e) => e.again)) n++;
       const rend = six && (g.rending || six6.some((e) => e.rend) || (mine && !a.melee && has(run, 'rounds')));
       const extra = six6.reduce((x, e) => x + (e.dmg ?? 0), 0);
-      const blast = Math.min(g.blast, Math.max(1, active(def).length));
+      const blast = blastOn(g, def);
       for (let b = 0; b < blast; b++) {
         const target = pickHurt(def);
         if (!target) break;
@@ -1912,42 +1920,53 @@ const cool = (c: SortieCombat, s: SortieSquad, id: string, cd: number) => (s.coo
 const weaponText = (g: Gun) =>
   [g.melee ? 'Melee' : `${g.range}"`, `A${+(g.attacks).toFixed(2)}`, g.ap ? `AP(${g.ap})` : '', g.blast > 1 ? `Blast(${g.blast})` : '', g.deadly > 1 ? `Deadly(${g.deadly})` : '', g.rending ? 'Rending' : '', g.reliable ? 'Reliable' : '', g.bane ? 'Bane' : ''].filter(Boolean).join(', ');
 
-/** The skills the unit the game waits on (or, on a Hero's or lone model's turn, that one model) can use. */
-export function skillsOf(run: SortieRun, model?: SortieModel): SortieSkill[] {
+/** The skills the unit the game waits on can use. */
+export function skillsOf(run: SortieRun): SortieSkill[] {
   const s = actingSquad(run);
-  return s ? skillsFor(run, s, model) : [];
+  return s ? skillsFor(run, s) : [];
 }
 
-/** The skills a party unit (or one of its models) can use from where it stands. */
-function skillsFor(run: SortieRun, me: SortieSquad, model?: SortieModel): SortieSkill[] {
+/** A squad's weapons of one kind: "2× Rifle (24", A1), Sword (Melee, A3, AP(1))". */
+function gunList(models: SortieModel[], melee: boolean): string {
+  const seen = new Map<string, { g: Gun; k: number }>();
+  for (const m of models) for (const g of m.guns) if (g.melee === melee) {
+    const x = seen.get(g.name);
+    if (x) x.k++;
+    else seen.set(g.name, { g, k: 1 });
+  }
+  return [...seen.values()].map(({ g, k }) => `${k > 1 ? `${k}× ` : ''}${g.name} (${weaponText(g)})`).join(', ') || 'none';
+}
+
+/** The skills a party unit can use from where it stands: a volley with every gun, a fight with every melee weapon, and its abilities. */
+function skillsFor(run: SortieRun, me: SortieSquad): SortieSkill[] {
   const c = run.combat;
   if (!c) return [];
-  const models = model ? [model] : active(me);
+  const models = active(me);
   const from = SLOTS[slotOf(me)]?.toLowerCase() ?? 'line';
   const front = slotOf(me) === 0;
-  const out: SortieSkill[] = [];
-  const seen = new Set<string>();
-  const real = models.some((m) => m.guns.some((g) => g.melee && g.name !== 'Fists'));
-  for (const m of models) for (const g of m.guns) {
-    if (seen.has(g.name) || (g.name === 'Fists' && real)) continue;
-    seen.add(g.name);
-    const reach = gunReach(run, me, g);
-    const carriers = models.filter((x) => x.guns.some((y) => y.name === g.name)).length;
-    const blocked = reach ? undefined : g.melee ? 'Blades only reach from the front.' : `Out of range from the ${from}.`;
+  const out: SortieSkill[] = [
+    { id: 'atwill', kind: 'atwill', name: 'At will', reach: 0, wait: 0, text: 'The unit shoots or fights, whichever does more, at the nearest squads in reach.' },
+  ];
+  const guns = models.flatMap((m) => m.guns.filter((g) => !g.melee));
+  if (guns.length) {
+    const reach = Math.max(0, ...guns.map((g) => gunReach(run, me, g)));
     out.push({
-      id: `w:${g.name}`, kind: 'weapon', name: g.name, gun: g.name, melee: g.melee, reach, wait: 0, blocked,
-      text: `${weaponText(g)}. ${g.melee ? 'Close only, from the front' : reach ? `From the ${from}, reaches ${reachText(reach)}` : `Reaches nothing from the ${from}`}${!model && models.length > 1 ? `; ${carriers} of ${models.length} carry it, the rest act at will` : ''}.`,
+      id: 'shoot', kind: 'weapon', name: 'Shoot', melee: false, reach, wait: 0, blocked: reach ? undefined : `Out of range from the ${from}.`,
+      text: `Every model fires all its guns: ${gunList(models, false)}. From the ${from} they reach ${reach ? reachText(reach) : 'nothing'}; a gun that can't reach the target shoots the nearest squad it can, or holds its fire.`,
     });
   }
-  out.unshift({ id: 'atwill', kind: 'atwill', name: 'At will', reach: 0, wait: 0, text: model ? 'Fire or fight with the best weapon at the nearest squad in reach.' : 'Each model fires or fights with its best weapon at the nearest squad in reach.' });
+  out.push({
+    id: 'melee', kind: 'weapon', name: 'Fight', melee: true, reach: front ? 1 : 0, wait: 0, blocked: front ? undefined : 'Only the front unit fights in melee.',
+    text: `Every model fights a squad at Close with all its melee weapons: ${gunList(models, true)}. From the front only.`,
+  });
   if (hasBlade(me) && !statusOn(c, me, 'slow')) {
     const reach = front ? chargeReach(run, me) : 0;
     out.push({
       id: 'charge', kind: 'charge', name: 'Charge', melee: true, reach, wait: waitOf(c, me, 'charge'), blocked: front ? undefined : 'Only the front unit can charge.',
-      text: `From the front, bring a squad at ${reachText(chargeReach(run, me))} range in Close${me.impact ? ` with ${+(me.impact * active(me).length).toFixed(1)} impact hits` : ''}, then fight it in melee. Cooldown ${me.fast ? 1 : SORTIE.cooldown.charge}.`,
+      text: `From the front, bring a squad at ${reachText(chargeReach(run, me))} range in Close${me.impact ? ` with ${+(me.impact * active(me).length).toFixed(1)} impact hits` : ''}, then every model fights it in melee. Cooldown ${me.fast ? 1 : SORTIE.cooldown.charge}.`,
     });
   }
-  out.push({ id: 'regroup', kind: 'regroup', name: 'Regroup', reach: 0, wait: waitOf(c, me, 'regroup'), text: `Catch a breath: every model mends a third of its wounds, steadies if shaken, and the unit shakes off slows, dazes and bleeding. Cooldown ${SORTIE.cooldown.regroup}.` });
+  out.push({ id: 'regroup', kind: 'regroup', name: 'Regroup', reach: 0, wait: waitOf(c, me, 'regroup'), text: `Catch a breath: every model mends a third of its wounds and steadies if shaken, and the unit shakes off slows, dazes and bleeding. Cooldown ${SORTIE.cooldown.regroup}.` });
   const b = barrageOf(me);
   const abil: [SortieSkillKind, string | undefined, string, number][] = [
     ['heal', sourceOf(me, 'heal'), `Mend ${healOf(me)} wounds across the party, most hurt models first.`, 0],
@@ -1956,17 +1975,11 @@ function skillsFor(run: SortieRun, me: SortieSquad, model?: SortieModel): Sortie
     ['field', sourceOf(me, 'field'), `The squads at Close and Mid are ${fieldOf(me) === 'slow' ? 'slowed (−2 initiative, no charges)' : 'dazed (−1 to hit)'} this round and next.`, 0],
     ['outflank', sourceOf(me, 'redeploy'), 'Swing round the flank: this round the unit\'s guns reach every distance, from any slot.', 0],
   ];
+  const rest = models.length > 1 ? ' One model sees to it; the rest shoot or fight at will.' : '';
   for (const [kind, src, text, reach] of abil) if (src) {
-    out.push({ id: kind, kind, name: src, text: `${text} Cooldown ${SORTIE.cooldown[kind]}.`, reach, wait: waitOf(c, me, kind) });
+    out.push({ id: kind, kind, name: src, text: `${text}${rest} Cooldown ${SORTIE.cooldown[kind]}.`, reach, wait: waitOf(c, me, kind) });
   }
   return out;
-}
-
-/** The model whose turn it is, on a Hero's or lone model's turn. */
-export function turnModel(run: SortieRun): SortieModel | undefined {
-  const c = run.combat;
-  if (c?.need !== 'turn') return undefined;
-  return actingSquad(run)?.models[c.queue[0]?.i];
 }
 
 /** Echo squads a skill can go on now. */
@@ -1979,8 +1992,8 @@ export function skillTargets(run: SortieRun, skill: SortieSkill): string[] {
 /** Why a skill can't be used on this target now, or null. */
 export function skillProblem(run: SortieRun, id: string, target?: string): string | null {
   const c = run.combat;
-  if (!c || c.over || !c.need || c.need === 'start' || c.need === 'brace') return 'Not your move.';
-  const sk = skillsOf(run, turnModel(run)).find((x) => x.id === id);
+  if (!c || c.over || (c.need !== 'order' && c.need !== 'turn')) return 'Not your move.';
+  const sk = skillsOf(run).find((x) => x.id === id);
   if (!sk) return 'No such skill.';
   if (sk.blocked) return sk.blocked;
   if (sk.wait) return `Ready in ${sk.wait} round${sk.wait === 1 ? '' : 's'}.`;
@@ -1994,11 +2007,11 @@ export function skillProblem(run: SortieRun, id: string, target?: string): strin
   return null;
 }
 
-/** Give the unit the game waits on its order for the round. */
+/** Give the unit the game waits on its order: it carries it out at once, every model together. */
 export function giveOrder(run: SortieRun, id: string, target?: string) {
   const c = run.combat!;
   const s = actingSquad(run);
-  if (c.need !== 'order' || !s) throw new Error('No order needed now.');
+  if ((c.need !== 'order' && c.need !== 'turn') || !s) throw new Error('No order needed now.');
   const p = skillProblem(run, id, target);
   if (p) throw new Error(p);
   c.orders[s.key] = { skill: id, target };
@@ -2008,56 +2021,30 @@ export function giveOrder(run: SortieRun, id: string, target?: string) {
   advance(run);
 }
 
-/** Start the round the game is waiting on: turns run fastest first, Echoes included, until a party unit is up. */
+/** Start the round the game is waiting on: squads take their turns fastest first, Echoes included. */
 export function startRound(run: SortieRun) {
   const c = run.combat!;
   if (c.need !== 'start') throw new Error('The round is already under way.');
   advance(run);
 }
 
-/** A Hero's or lone model's own turn. */
-export function act(run: SortieRun, id: string, target?: string) {
-  const c = run.combat!;
-  const s = actingSquad(run);
-  if (c.need !== 'turn' || !s) throw new Error('Not a turn to take now.');
-  const p = skillProblem(run, id, target);
-  if (p) throw new Error(p);
-  const m = turnModel(run)!;
-  const sk = skillsFor(run, s, m).find((x) => x.id === id)!;
-  (c.did ??= {})[s.key] = [...(c.did[s.key] ?? []), sk.kind];
-  c.queue.shift();
-  log(c, `▸ ${s.name}: ${sk.name}${target ? ` on ${squadByKey(c, target)?.name}` : ''}.`, 'info');
-  useSkill(run, s, m, sk, target);
-  checkEnd(run);
-  if (!c.over) advance(run);
-}
-
-/** One model carries out its unit's order; one without the weapon ordered, or after the order's one-off, acts at will. */
-function orderAct(run: SortieRun, s: SortieSquad, m: SortieModel) {
+/** A party unit carries out its order with every model together; an ability takes one model, and the rest act at will. */
+function orderTurn(run: SortieRun, s: SortieSquad, ms: SortieModel[]) {
   const c = run.combat!;
   const o = c.orders[s.key];
   const sk = o && skillsFor(run, s).find((x) => x.id === o.skill);
-  if (!sk || sk.kind === 'atwill') return atWill(run, s, m, !!sk);
-  if (sk.kind === 'weapon') return m.guns.some((g) => g.name === sk.gun) ? useSkill(run, s, m, sk, o.target) : atWill(run, s, m);
-  if (sk.kind === 'regroup') return useSkill(run, s, m, sk, o.target);
+  if (!sk || sk.kind === 'atwill') return atWill(run, s, ms, !!sk);
+  if (sk.kind === 'weapon') return volley(run, s, ms, !!sk.melee, o.target);
   if (sk.kind === 'charge') {
-    // The first to act leads the charge; the rest pile into whatever it brought in.
-    if (!c.cast[s.key]) {
-      c.cast[s.key] = true;
-      return useSkill(run, s, m, sk, o.target);
-    }
-    const t = squadByKey(c, o.target ?? '');
-    return fight(run, s, m, t && standing(t) && distOf(t) === 1 ? t : onField(c)[0]);
+    const t = slotOf(s) === 0 ? retarget(run, o.target, chargeReach(run, s)) : undefined;
+    if (!t) return atWill(run, s, ms);
+    charge(run, s, t);
+    if (standing(t) && standing(s)) volley(run, s, ms.filter((m) => m.hp > 0 && !m.routed), true, t.key);
+    return;
   }
-  if (c.cast[s.key]) return atWill(run, s, m);
-  c.cast[s.key] = true;
-  useSkill(run, s, m, sk, o.target);
-}
-
-/** The model fights in melee with every melee weapon it has, if its unit holds the front. */
-function fight(run: SortieRun, s: SortieSquad, m: SortieModel, t: SortieSquad | undefined) {
-  if (!t || slotOf(s) !== 0 || distOf(t) !== 1) return atWill(run, s, m);
-  strike(run, s, t, { melee: true, dist: 1, guns: m.guns.filter((g) => g.melee) });
+  if (sk.kind === 'regroup') return regroup(run, s);
+  useAbility(run, s, sk, o.target);
+  if (ms.length > 1 && !c.over) atWill(run, s, ms.slice(1));
 }
 
 /** A target still standing and in reach, or the nearest one that is. */
@@ -2068,36 +2055,83 @@ function retarget(run: SortieRun, key: string | undefined, reach: number): Sorti
   return onField(c).find((e) => distOf(e) <= reach);
 }
 
-function useSkill(run: SortieRun, me: SortieSquad, m: SortieModel, sk: SortieSkill, target?: string) {
+/**
+ * The models attack together with every weapon of one kind. In melee (only from the front) they fight a squad at
+ * Close. Shooting, each gun fires at the target if it reaches, else at the nearest squad it does reach, else holds fire.
+ */
+function volley(run: SortieRun, s: SortieSquad, ms: SortieModel[], melee: boolean, target?: string, loose = false) {
+  const c = run.combat!;
+  if (melee) {
+    const t = slotOf(s) === 0 ? retarget(run, target, 1) : undefined;
+    if (!t) return atWill(run, s, ms);
+    return void strike(run, s, t, { melee: true, dist: 1, guns: ms.flatMap((m) => m.guns.filter((g) => g.melee)), loose });
+  }
+  let left = ms.flatMap((m) => m.guns.filter((g) => !g.melee).map((g) => ({ g, reach: gunReach(run, s, g) })));
+  let fired = false;
+  while (left.length && !c.over) {
+    const t = retarget(run, target, left[0].reach);
+    if (!t) { left.shift(); continue; }
+    const now = left.filter((x) => retarget(run, target, x.reach) === t);
+    left = left.filter((x) => !now.includes(x));
+    strike(run, s, t, { melee: false, dist: gap(t, s), guns: now.map((x) => x.g), loose });
+    fired = true;
+  }
+  if (!fired) log(c, `${s.name} have nothing in reach to shoot.`, 'info');
+}
+
+/** Expected value of a volley, fired as volley() would fire it. */
+function volleyWorth(run: SortieRun, s: SortieSquad, ms: SortieModel[], melee: boolean, t: SortieSquad, loose = false): number {
+  if (melee) return worth(t, expect(run, s, ms.flatMap((m) => m.guns.filter((g) => g.melee)), t, 1, true, loose));
+  const by = new Map<SortieSquad, Gun[]>();
+  for (const m of ms) for (const g of m.guns) if (!g.melee) {
+    const x = retarget(run, t.key, gunReach(run, s, g));
+    if (x) by.set(x, [...(by.get(x) ?? []), g]);
+  }
+  let v = 0;
+  for (const [x, guns] of by) v += worth(x, expect(run, s, guns, x, gap(x, s), false, loose));
+  return v;
+}
+
+/** The squad's best volley: a fight from the front, or shooting at the squad it's worth most on. Loose (At will) it
+ *  only looks at the nearest squads it can hurt. */
+function bestVolley(run: SortieRun, s: SortieSquad, ms: SortieModel[], loose = false): { melee: boolean; t: SortieSquad; v: number } | null {
+  const c = run.combat!;
+  const close = (t: SortieSquad) => slotOf(s) === 0 && distOf(t) === 1;
+  let field = onField(c).filter((t) => close(t) || ms.some((m) => m.guns.some((g) => !g.melee && distOf(t) <= gunReach(run, s, g))));
+  if (loose && field.length) field = field.filter((t) => distOf(t) === distOf(field[0]));
+  let best: { melee: boolean; t: SortieSquad; v: number } | null = null;
+  for (const t of field) for (const melee of [true, false]) {
+    if (melee && !close(t)) continue;
+    const v = volleyWorth(run, s, ms, melee, t, loose);
+    if (v > 0 && (!best || v > best.v)) best = { melee, t, v };
+  }
+  return best;
+}
+
+function atWill(run: SortieRun, s: SortieSquad, ms: SortieModel[], loose = false) {
+  const b = bestVolley(run, s, ms, loose);
+  if (b) volley(run, s, ms, b.melee, b.t.key, loose);
+}
+
+/** Every model mends a third of its wounds and steadies, and the unit shakes off its statuses. */
+function regroup(run: SortieRun, s: SortieSquad) {
+  const c = run.combat!;
+  cool(c, s, 'regroup', SORTIE.cooldown.regroup);
+  let mended = 0;
+  for (const m of active(s)) {
+    m.shaken = false;
+    const before = m.hp;
+    m.hp = Math.min(m.max, m.hp + Math.ceil(m.max / 3));
+    mended += m.hp - before;
+  }
+  if (Object.keys(s.status).length) { s.status = {}; log(c, `${s.name} shake it off.`, 'good'); }
+  if (mended) log(c, `${s.name} regroup: mended ${mended}.`, 'good');
+}
+
+/** A party unit's ability: heal, shield, barrage, field or outflank. */
+function useAbility(run: SortieRun, me: SortieSquad, sk: SortieSkill, target?: string) {
   const c = run.combat!;
   switch (sk.kind) {
-    case 'atwill': return atWill(run, me, m, true);
-    case 'weapon': {
-      const g0 = m.guns.find((g) => g.name === sk.gun);
-      const reach = g0 ? gunReach(run, me, g0) : 0;
-      const t = retarget(run, target, reach);
-      const main = m.guns.filter((g) => g.name === sk.gun);
-      if (!t || !main.length) return atWill(run, me, m);
-      // The model's other weapons of the same kind join in where they reach.
-      const guns = [...main, ...m.guns.filter((g) => g.name !== sk.gun && g.melee === !!sk.melee && g.name !== 'Fists' && distOf(t) <= gunReach(run, me, g))];
-      return void strike(run, me, t, { melee: !!sk.melee, dist: gap(t, me), guns });
-    }
-    case 'charge': {
-      const t = slotOf(me) === 0 ? retarget(run, target, chargeReach(run, me)) : undefined;
-      if (!t) return atWill(run, me, m);
-      charge(run, me, t);
-      if (standing(t) && standing(me)) fight(run, me, m, t);
-      return;
-    }
-    case 'regroup': {
-      cool(c, me, 'regroup', SORTIE.cooldown.regroup);
-      m.shaken = false;
-      const before = m.hp;
-      m.hp = Math.min(m.max, m.hp + Math.ceil(m.max / 3));
-      if (Object.keys(me.status).length) { me.status = {}; log(c, `${me.name} shake it off.`, 'good'); }
-      if (m.hp > before) log(c, `${me.name} regroup: mended ${m.hp - before}.`, 'good');
-      return;
-    }
     case 'heal': cool(c, me, 'heal', SORTIE.cooldown.heal); return log(c, `${sk.name}: mended ${mendAll(partyLine(c), healOf(me))} wounds across the party.`, 'good');
     case 'shield': {
       cool(c, me, 'shield', SORTIE.cooldown.shield);
@@ -2125,6 +2159,9 @@ function useSkill(run: SortieRun, me: SortieSquad, m: SortieModel, sk: SortieSki
   }
 }
 
+/** Hits a Blast weapon lands per hit on this squad: its Blast value, up to the wounds the squad has left to take. */
+const blastOn = (g: Gun, def: SortieSquad) => Math.min(g.blast, Math.max(1, active(def).length) * SORTIE.hpMul);
+
 /** Expected wounds from some of a squad's weapons on a target at this distance. */
 function expect(run: SortieRun, att: SortieSquad, guns: Gun[], def: SortieSquad, dist: number, melee: boolean, loose = false): number {
   let n = 0;
@@ -2135,7 +2172,7 @@ function expect(run: SortieRun, att: SortieSquad, guns: Gun[], def: SortieSquad,
     const ap = g.ap + (melee && !att.echo ? (has(run, 'blades') ? 1 : 0) + (has(run, 'fury') ? 2 : 0) : 0) - (def.fortified ? 1 : 0);
     const fail = 1 - clamp((7 - def.defense - Math.max(0, ap) + def.defMod) / 6, 0, 5 / 6);
     const per = Math.min(g.deadly, def.models[0]?.max ?? 1);
-    n += g.attacks * att.atkBonus * hit * Math.min(g.blast, active(def).length) * fail * per * (1 - def.ignore);
+    n += g.attacks * att.atkBonus * hit * blastOn(g, def) * fail * per * (1 - def.ignore);
   }
   return n;
 }
@@ -2147,44 +2184,6 @@ function worth(def: SortieSquad, dmg: number): number {
   return Math.min(dmg, left) * threat * (dmg >= left ? 1.5 : 1);
 }
 
-interface Attack {
-  guns: Gun[];
-  t: SortieSquad;
-  melee: boolean;
-  v: number;
-}
-
-/**
- * The best weapon and target for one model of a party unit: a melee blow from the front at Close or a shot as deep as
- * its guns reach from its slot. Loose (At will) it only looks at the nearest squads it can hurt.
- */
-function bestAttack(run: SortieRun, s: SortieSquad, m: SortieModel, loose = false): Attack | null {
-  const c = run.combat!;
-  let best: Attack | null = null;
-  const consider = (guns: Gun[], t: SortieSquad, melee: boolean) => {
-    if (!guns.length) return;
-    const v = worth(t, expect(run, s, guns, t, melee ? 1 : gap(t, s), melee, loose));
-    if (!best || v > best.v) best = { guns, t, melee, v };
-  };
-  const front = slotOf(s) === 0;
-  let field = onField(c);
-  if (loose) {
-    const hits = (t: SortieSquad) => m.guns.some((g) => (g.melee ? front && distOf(t) === 1 : distOf(t) <= gunReach(run, s, g)));
-    const near = Math.min(...field.filter(hits).map(distOf));
-    field = field.filter((t) => hits(t) && distOf(t) === near);
-  }
-  for (const t of field) {
-    if (front && distOf(t) === 1) consider(m.guns.filter((g) => g.melee), t, true);
-    consider(m.guns.filter((g) => !g.melee && distOf(t) <= gunReach(run, s, g)), t, false);
-  }
-  return best;
-}
-
-function atWill(run: SortieRun, s: SortieSquad, m: SortieModel, loose = false) {
-  const b = bestAttack(run, s, m, loose);
-  if (b) strike(run, s, b.t, { melee: b.melee, dist: b.melee ? 1 : gap(b.t, s), guns: b.guns, loose });
-}
-
 // --- The Echoes --------------------------------------------------------------------------------------------------
 
 /** The party units an Echo model's guns reach, and the guns that reach each. */
@@ -2194,17 +2193,19 @@ function echoShots(run: SortieRun, e: SortieSquad, m: SortieModel): { t: SortieS
     .filter((x) => x.guns.length);
 }
 
-/** What an Echo model does best: fight the front unit in melee, or shoot (at a party unit picked at random as it fires). */
-function echoBest(run: SortieRun, e: SortieSquad, m: SortieModel): { melee: boolean; v: number } | null {
+/** What an Echo squad does best, all its models together: fight the front unit in melee, or shoot (each model at a
+ *  party unit picked at random as it fires). */
+function echoBest(run: SortieRun, e: SortieSquad, ms: SortieModel[]): { melee: boolean; v: number } | null {
   const front = frontOf(run.combat!);
   let best: { melee: boolean; v: number } | null = null;
-  const melee = m.guns.filter((g) => g.melee);
+  const melee = ms.flatMap((m) => m.guns.filter((g) => g.melee));
   if (front && distOf(e) === 1 && melee.length) best = { melee: true, v: worth(front, expect(run, e, melee, front, 1, true)) };
-  const shots = echoShots(run, e, m);
-  if (shots.length) {
-    const v = shots.reduce((n, x) => n + worth(x.t, expect(run, e, x.guns, x.t, gap(e, x.t), false)), 0) / shots.length;
-    if (!best || v > best.v) best = { melee: false, v };
+  let v = 0;
+  for (const m of ms) {
+    const shots = echoShots(run, e, m);
+    if (shots.length) v += shots.reduce((n, x) => n + worth(x.t, expect(run, e, x.guns, x.t, gap(e, x.t), false)), 0) / shots.length;
   }
+  if (v > 0 && (!best || v > best.v)) best = { melee: false, v };
   return best;
 }
 
@@ -2218,14 +2219,13 @@ function echoAbility(run: SortieRun, e: SortieSquad): 'heal' | 'shield' | 'barra
   return null;
 }
 
-const firstUp = (s: SortieSquad, m: SortieModel) => active(s)[0] === m;
 const canCharge = (run: SortieRun, e: SortieSquad) => {
   const c = run.combat!;
   const dist = distOf(e);
   return !!frontOf(c) && hasBlade(e) && dist > 1 && dist <= SORTIE.chargeReach && ready(c, e, 'charge') && !statusOn(c, e, 'slow') && output(e, true) > output(e, false);
 };
 
-/** What an Echo squad means to do, as its first model would see it. */
+/** What an Echo squad means to do on its turn. */
 export function intentOf(run: SortieRun, e: SortieSquad): SortieIntentKind {
   const c = run.combat!;
   if (e.arrives) return 'waiting';
@@ -2233,45 +2233,63 @@ export function intentOf(run: SortieRun, e: SortieSquad): SortieIntentKind {
   if (up.every((m) => m.shaken) || statusOn(c, e, 'stun')) return 'shaken';
   if (echoAbility(run, e)) return 'ability';
   if (canCharge(run, e)) return 'charge';
-  const b = echoBest(run, e, up[0]);
+  const b = echoBest(run, e, up.filter((m) => !m.shaken));
   if (b) return b.melee ? 'melee' : 'shoot';
   return 'advance';
 }
 
-function echoAct(run: SortieRun, e: SortieSquad, m: SortieModel) {
+/** An Echo squad's turn: an ability (one model sees to it, the rest attack), a charge, a fight, a volley, or moving up. */
+function echoTurn(run: SortieRun, e: SortieSquad, ms: SortieModel[]) {
   const c = run.combat!;
   const line = partyLine(c);
-  const front = line[0];
-  if (!front) return;
-  const ab = firstUp(e, m) ? echoAbility(run, e) : null;
+  if (!line.length) return;
+  const ab = echoAbility(run, e);
   if (ab) {
     cool(c, e, ab, SORTIE.cooldown[ab]);
     const src = sourceOf(e, ab);
-    if (ab === 'heal') return log(c, `${e.name} (${src}): mends ${mend(e, healOf(e))} wounds.`, 'bad');
-    if (ab === 'shield') { e.shield = Math.max(e.shield, shieldOf(e)); return log(c, `${e.name} (${src}): a ${e.shield}-wound shield.`, 'bad'); }
-    if (ab === 'field') {
+    if (ab === 'heal') log(c, `${e.name} (${src}): mends ${mend(e, healOf(e))} wounds.`, 'bad');
+    else if (ab === 'shield') { e.shield = Math.max(e.shield, shieldOf(e)); log(c, `${e.name} (${src}): a ${e.shield}-wound shield.`, 'bad'); }
+    else if (ab === 'field') {
       const t = pickOf(run, line.filter((p) => !statusOn(c, p, fieldOf(e))));
       t.status[fieldOf(e)] = c.round + 1;
-      return log(c, `${e.name} (${src}): ${t.name} are ${STATUS_TEXT[fieldOf(e)]}.`, 'bad');
+      log(c, `${e.name} (${src}): ${t.name} are ${STATUS_TEXT[fieldOf(e)]}.`, 'bad');
+    } else {
+      const b = barrageOf(e);
+      strike(run, e, pickOf(run, line), { melee: false, dist: 1, guns: [{ ...FISTS, name: src ?? 'Barrage', melee: false, range: 99, attacks: b.hits, ap: b.ap, reliable: true }], label: src });
     }
-    const b = barrageOf(e);
-    return void strike(run, e, pickOf(run, line), { melee: false, dist: 1, guns: [{ ...FISTS, name: src ?? 'Barrage', melee: false, range: 99, attacks: b.hits, ap: b.ap, reliable: true }], label: src });
-  }
-  if (canCharge(run, e)) {
-    charge(run, e, front);
-    if (standing(e) && standing(front)) strike(run, e, front, { melee: true, dist: 1, guns: m.guns.filter((g) => g.melee) });
+    if (ms.length > 1 && !c.over) echoAttack(run, e, ms.slice(1));
     return;
   }
-  const b = echoBest(run, e, m);
-  if (b?.melee) return void strike(run, e, front, { melee: true, dist: 1, guns: m.guns.filter((g) => g.melee) });
-  if (b) {
-    const shots = echoShots(run, e, m);
-    const w = shots.map((x) => SORTIE.aim[slotOf(x.t)] ?? 1);
-    let r = rand(run) * w.reduce((n, x) => n + x, 0);
-    const shot = shots.find((_, i) => (r -= w[i]) < 0) ?? shots[shots.length - 1];
-    return void strike(run, e, shot.t, { melee: false, dist: gap(e, shot.t), guns: shot.guns });
+  const front = line[0];
+  if (canCharge(run, e)) {
+    charge(run, e, front);
+    if (standing(e) && standing(front)) strike(run, e, front, { melee: true, dist: 1, guns: ms.filter((m) => m.hp > 0 && !m.routed).flatMap((m) => m.guns.filter((g) => g.melee)) });
+    return;
   }
-  // Nothing in reach: the squad moves up a distance (once a round).
+  echoAttack(run, e, ms);
+}
+
+/** Echo models fight or shoot together; shooting, each picks its party unit (the front most often) and the guns aimed
+ *  at the same unit fire as one. With nothing in reach the squad moves up a distance. */
+function echoAttack(run: SortieRun, e: SortieSquad, ms: SortieModel[]) {
+  const c = run.combat!;
+  const front = frontOf(c);
+  if (!front) return;
+  const b = echoBest(run, e, ms);
+  if (b?.melee) return void strike(run, e, front, { melee: true, dist: 1, guns: ms.flatMap((m) => m.guns.filter((g) => g.melee)) });
+  if (b) {
+    const by = new Map<SortieSquad, Gun[]>();
+    for (const m of ms) {
+      const shots = echoShots(run, e, m);
+      if (!shots.length) continue;
+      const w = shots.map((x) => SORTIE.aim[slotOf(x.t)] ?? 1);
+      let r = rand(run) * w.reduce((n, x) => n + x, 0);
+      const shot = shots.find((_, i) => (r -= w[i]) < 0) ?? shots[shots.length - 1];
+      by.set(shot.t, [...(by.get(shot.t) ?? []), ...shot.guns]);
+    }
+    for (const [t, guns] of by) if (standing(t) && !c.over) strike(run, e, t, { melee: false, dist: gap(e, t), guns });
+    return;
+  }
   if (distOf(e) > 1 && !c.moved.includes(e.key)) {
     e.dist = distOf(e) - 1;
     c.moved.push(e.key);
@@ -2449,14 +2467,14 @@ export const canSortie = (u: Unit) => u.status === 'active';
 
 // --- Auto-play: the balance tests and the Auto button --------------------------------------------------------------
 
-/** The best skill for the unit the game waits on to use now (as its order or turn), and its target. */
+/** The best order for the unit the game waits on, and its target. */
 export function autoChoice(run: SortieRun): { id: string; target?: string } | null {
   const c = run.combat;
   const me = actingSquad(run);
   if (!c?.need || !me) return null;
-  const model = turnModel(run);
-  const models = model ? [model] : active(me);
-  const skills = skillsFor(run, me, model).filter((s) => !s.wait && !s.blocked);
+  const models = active(me);
+  const up = models.filter((m) => !m.shaken);
+  const skills = skillsFor(run, me).filter((s) => !s.wait && !s.blocked);
   const ok = (id: string) => skills.some((s) => s.id === id);
   const hurt = partyLine(c).reduce((n, p) => n + active(p).reduce((x, m) => x + m.max - m.hp, 0), 0);
   const shaken = models.filter((m) => m.shaken).length;
@@ -2475,18 +2493,13 @@ export function autoChoice(run: SortieRun): { id: string; target?: string } | nu
   const incoming = onField(c).filter((e) => e.intent === 'melee' || e.intent === 'shoot' || e.intent === 'charge').length;
   if (ok('shield') && incoming >= 2) return { id: 'shield' };
   if (ok('outflank') && onField(c).some((e) => gap(e, me) > 2)) return { id: 'outflank' };
-  // Attacks: what each would do this round, summed over the models carrying it out.
-  const atwill = models.reduce((n, m) => n + (bestAttack(run, me, m, true)?.v ?? 0), 0);
-  let best: { id: string; target?: string; v: number } = { id: 'atwill', v: atwill };
+  // Attacks: what the unit's volley would do this round.
+  let best: { id: string; target?: string; v: number } = { id: 'atwill', v: bestVolley(run, me, up, true)?.v ?? 0 };
   for (const sk of skills) {
     if (sk.kind !== 'weapon' && sk.kind !== 'charge') continue;
     for (const key of skillTargets(run, sk)) {
       const t = squadByKey(c, key)!;
-      let v = 0;
-      for (const m of models) {
-        const guns = sk.kind === 'charge' ? m.guns.filter((g) => g.melee) : m.guns.filter((g) => g.name === sk.gun);
-        v += guns.length ? worth(t, expect(run, me, guns, t, sk.melee ? 1 : gap(t, me), !!sk.melee)) : bestAttack(run, me, m)?.v ?? 0;
-      }
+      let v = volleyWorth(run, me, up, !!sk.melee, t);
       if (sk.kind === 'charge') v += me.impact * models.length * 0.5 + (distOf(t) > 1 ? 1 : 0);
       if (v > best.v * 1.05) best = { id: sk.id, target: key, v };
     }
@@ -2509,9 +2522,9 @@ export function autoMove(run: SortieRun) {
   if (!c?.need) return;
   if (c.need === 'brace') return braceFor(run, autoBrace(run));
   if (c.need === 'start') return startRound(run);
+  if (c.need === 'next') return nextTurn(run);
   const p = autoChoice(run) ?? { id: 'atwill' };
-  if (c.need === 'order') giveOrder(run, p.id, p.target);
-  else act(run, p.id, p.target);
+  giveOrder(run, p.id, p.target);
 }
 
 /** How hurt the party is, as a share of all its wounds. */

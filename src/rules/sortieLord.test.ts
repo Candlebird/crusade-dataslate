@@ -5,7 +5,7 @@ import { normalizeBook } from '../armyforge/book';
 import { newUnit } from '../model/factory';
 import { SORTIE } from './downtimeData';
 import { SORTIE_BOSSES } from './sortieStory';
-import { act, autoStep, bossOf, braceFor, createRun, giveOrder, onField, sigStrength, sigWeaker, standing, startCombat, startRound, type SortieRun, type SortieSquad } from './sortie';
+import { nextTurn, autoStep, bossOf, braceFor, createRun, giveOrder, onField, sigStrength, sigWeaker, standing, startCombat, startRound, type SortieRun, type SortieSquad } from './sortie';
 
 // The Echo lord's fight: foretold by omens on the road, it comes in late, mid-fight, and the fight is won only with it
 // down. (A party once beat a Carrion Crown fight without ever seeing the Crown.)
@@ -149,7 +149,7 @@ describe('omens, the brace and the lord’s tells', () => {
     for (let i = 0; i < 500 && !c.over && c.round === r; i++) {
       if (c.need === 'start') startRound(run);
       else if (c.need === 'order') giveOrder(run, 'atwill');
-      else act(run, 'atwill');
+      else if (c?.need === 'next') nextTurn(run);
     }
   };
   const toRound = (run: SortieRun, n: number) => {

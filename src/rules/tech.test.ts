@@ -9,6 +9,7 @@ import { BUILDINGS, GUARDIAN_LOOT, NEXUS_TECH, PRODUCTION, TECH_BRANCHES } from 
 import {
   bankCap, buildBlock, buildingSlots, depositNearest, depositText, rewardOrigin, coreBlock, exchange, exchangeBlock, installCore, produceCost, productionRate, tradeBonus,
 } from './production';
+import { repels } from './marauders';
 import { accrueResearch, knows, research, researchBlock, researchRate, techStatus } from './tech';
 
 // The tech tree, the buildings it unlocks, and Guardian loot (Nexus Wars).
@@ -109,7 +110,8 @@ describe('buildings', () => {
     expect(productionRate(s, c)).toBe(PRODUCTION.perRound + 2 * PRODUCTION.tradeHub.perPlanet);
     expect(tradeBonus(s)).toBe(0);
     s.buildings = ['logistics'];
-    expect(bankCap(s, c)).toBe(PRODUCTION.perRound * (PRODUCTION.bankRounds + PRODUCTION.logisticsRounds));
+    expect(productionRate(s, c)).toBe(PRODUCTION.perRound + PRODUCTION.logisticsBonus);
+    expect(bankCap(s, c)).toBe((PRODUCTION.perRound + PRODUCTION.logisticsBonus) * (PRODUCTION.bankRounds + PRODUCTION.logisticsRounds));
   });
 
   it('Foundry and Vehicle Bay make units cheaper', () => {
@@ -128,9 +130,14 @@ describe('buildings', () => {
     s.buildings = ['exchange'];
     s.bank = PRODUCTION.exchange.materials;
     expect(exchange(c, s, 'buyShard', f)).toBe(true);
-    expect([s.bank, f.umbraShards, f.ledger[f.ledger.length - 1]?.us]).toEqual([0, 3, 3]);
+    expect([s.bank, f.umbraShards, f.ledger[f.ledger.length - 1]?.us]).toEqual([0, PRODUCTION.exchange.shards, PRODUCTION.exchange.shards]);
     expect(exchangeBlock(c, s, 'sellShard', f)).toMatch(/this round/);
     c.round = 2;
+    s.bank = bankCap(s, c); // a full bank: selling would waste the shards, so it's refused
+    expect(exchangeBlock(c, s, 'sellShard', f)).toMatch(/No room in the bank/);
+    expect(exchange(c, s, 'sellShard', f)).toBe(false);
+    expect(f.umbraShards).toBe(PRODUCTION.exchange.shards);
+    s.bank = 0;
     expect(exchange(c, s, 'sellShard', f)).toBe(true);
     expect([s.bank, f.umbraShards]).toEqual([PRODUCTION.exchange.back, 0]);
   });
@@ -142,7 +149,24 @@ describe('buildings', () => {
     const items = incomeItems(s);
     const medicae = items.find((i) => i.kind === 'medicae')!;
     expect(nexusEntry(medicae, undefined)?.removeScar).toBe(true);
-    expect(items.find((i) => i.source.includes('Umbral Spire'))?.us).toBe(3);
+    expect(items.find((i) => i.source.includes('Umbral Spire'))?.us).toBe(PRODUCTION.spire.us);
+  });
+
+  it('Warp Gate: one per faction', () => {
+    const c = campaign();
+    sector(c, 'hA').buildings = ['warpGate'];
+    expect(buildBlock(sector(c, 'pA'), 'warpGate', force('A'), c)).toBe('Only one Warp Gate per faction');
+    sector(c, 'hA').buildings = [];
+    sector(c, 'pA2').construction = { id: 'warpGate', round: 1, supply: 0, shards: 0 };
+    expect(buildBlock(sector(c, 'pA'), 'warpGate', force('A'), c)).toBe('Only one Warp Gate per faction');
+  });
+
+  it('Militia Muster throws raids back', () => {
+    const c = campaign();
+    const s = sector(c, 'pA');
+    expect(repels(c, s, [])).toBe(false);
+    s.buildings = ['militia'];
+    expect(repels(c, s, [])).toBe(true);
   });
 });
 

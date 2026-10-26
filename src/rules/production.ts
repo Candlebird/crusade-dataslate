@@ -33,7 +33,8 @@ export function tradeBonus(s: Sector, c?: Campaign): number {
 }
 
 /** Materials the sector banks each round (pass the campaign to count a Trade Hub). */
-export const productionRate = (s: Sector, c?: Campaign) => (hasBuilding(s, 'barracks') ? PRODUCTION.barracks : PRODUCTION.perRound) + tradeBonus(s, c);
+export const productionRate = (s: Sector, c?: Campaign) => (hasBuilding(s, 'barracks') ? PRODUCTION.barracks : PRODUCTION.perRound)
+  + (hasBuilding(s, 'logistics') ? PRODUCTION.logisticsBonus : 0) + tradeBonus(s, c);
 /** The most Materials the bank holds. */
 export const bankCap = (s: Sector, c?: Campaign) =>
   productionRate(s, c) * (PRODUCTION.bankRounds + (hasBuilding(s, 'logistics') ? PRODUCTION.logisticsRounds : 0));
@@ -142,6 +143,8 @@ export function buildBlock(s: Sector, id: string, payer?: Force, c?: Campaign): 
   if (!produces(s)) return 'Only planets and home sectors have buildings';
   if (hasBuilding(s, id)) return 'Already built';
   if (b.homeOnly && s.type !== 'home') return 'Only a home sector can build it';
+  if (b.onePerFaction && c && s.owner && c.sectors.some((x) => x.owner === s.owner && (hasBuilding(x, id) || x.construction?.id === id)))
+    return `Only one ${b.name} per faction`;
   if (c && !knows(c.factions.find((f) => f.id === s.owner), b)) return 'Not researched yet (see the tech tree)';
   if (s.construction) return `${buildingById(s.construction.id)?.name ?? 'A building'} is already being built here: one at a time`;
   if (freeSlots(s, c) <= 0) return `No free slot (${buildingSlots(s, c)})`;
@@ -209,21 +212,20 @@ export const produceCost = (s: Sector, units: Pick<Unit, 'points' | 'tough'>[]) 
 
 /**
  * Produce units at a sector: pay their Materials from its bank. Training Grounds give them their starting XP, an
- * Armoury a free weapon upgrade (noted on the unit), a War Academy a trait token for `force`, a Warmaster Warlord more
- * XP (pass the campaign). False when the bank is short.
+ * Armoury a free weapon upgrade and a War Academy a free trait (both noted on the unit, taken on its unit sheet), a
+ * Warmaster Warlord more XP (pass the campaign). False when the bank is short.
  */
-export function produce(s: Sector, units: Unit[], force?: Force, c?: Campaign): boolean {
+export function produce(s: Sector, units: Unit[], _force?: Force, c?: Campaign): boolean {
   const cost = produceCost(s, units);
   if (cost > (s.bank ?? 0)) return false;
   s.bank = (s.bank ?? 0) - cost;
   const xp = (hasBuilding(s, 'training') ? PRODUCTION.trainingXp : 0)
     + (hasPerk(c, s.owner, 'drilled') ? WARLORDS.drilledXp : 0) + (hasPerk(c, s.owner, 'veterans') ? WARLORDS.veteransXp : 0);
-  const perks = [hasBuilding(s, 'armoury') && 'a free weapon upgrade (Armoury)', hasBuilding(s, 'academy') && 'a free trait token (War Academy)'].filter(Boolean);
+  const perks = [hasBuilding(s, 'armoury') && 'a free weapon upgrade (Armoury)', hasBuilding(s, 'academy') && 'a free trait (War Academy)'].filter(Boolean);
   for (const u of units) {
     u.xp = Math.max(u.xp, xp);
     u.notes = [u.notes, `Produced at ${s.name}${perks.length ? `, with ${perks.join(' and ')}` : ''}.`].filter(Boolean).join(' ');
   }
-  if (hasBuilding(s, 'academy') && force?.nexus) force.nexus.traitTokens += units.length;
   return true;
 }
 
@@ -237,6 +239,7 @@ export function exchangeBlock(c: Campaign, s: Sector, trade: ExchangeTrade, f?: 
   if (!f) return 'Needs one of your forces to hold the shards';
   if (trade === 'buyShard' && (s.bank ?? 0) < X.materials) return `Needs ${X.materials} Materials (${s.bank ?? 0} banked)`;
   if (trade === 'sellShard' && f.umbraShards < X.shards) return `${f.name} needs ${X.shards} Umbra Shards`;
+  if (trade === 'sellShard' && bankCap(s, c) - (s.bank ?? 0) < X.back) return `No room in the bank for ${X.back} Materials (${s.bank ?? 0} of ${bankCap(s, c)})`;
   return undefined;
 }
 
@@ -245,7 +248,7 @@ export function exchange(c: Campaign, s: Sector, trade: ExchangeTrade, f: Force,
   if (exchangeBlock(c, s, trade, f)) return false;
   const X = PRODUCTION.exchange;
   const buy = trade === 'buyShard';
-  s.bank = buy ? (s.bank ?? 0) - X.materials : Math.max(s.bank ?? 0, Math.min(bankCap(s, c), (s.bank ?? 0) + X.back));
+  s.bank = (s.bank ?? 0) + (buy ? -X.materials : X.back);
   f.umbraShards += buy ? X.shards : -X.shards;
   f.ledger.push({ id: newId(), date, label: `Nexus — Grand Exchange at ${s.name}`, rp: 0, supply: 0, us: buy ? X.shards : -X.shards });
   s.exchanged = c.round ?? 1;
