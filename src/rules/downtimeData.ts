@@ -573,7 +573,8 @@ export const TRAINING = {
    * are `ease` times as tough a wave (the run-up to the wave-25 Lord, held after: later waves climb as before from there).
    * The first waves, while a Shard or two holds the maze, are gentler: wave w has `earlyBudget`[w-1] of its budget (fewer
    * enemies), `earlyHp`[w-1] of its wounds and walks at `earlyPace`[w-1]. Every flying wave is as it was. Every `flyEvery`th wave flies, with `flyShare` of the budget (flyers skip the maze), its flyers `flyHp` × `flyFade`^(w-1)
-   * as tough (thinner as the maze grows). Every `bossEvery`th brings an Echo Lord with `escorts` of its budget as escorts
+   * as tough (thinner as the maze grows). Every enemy but the Lord is `minionGrowth` times tougher again a wave from wave 1
+   * (waves.ts minionHpAt; the Lord's wounds go by `bossHp` alone). Every `bossEvery`th brings an Echo Lord with `escorts` of its budget as escorts
    * (the rest toughens the boss, never below `bossMin` of its wounds), the Lord `bossHp` times tougher again (one entry a
    * boss wave, the last holding on); every `flyBossEvery`th the Lord flies (`flyBossHp` as tough; its escorts walk).
    * Scouts come in with `scoutHp` of their wounds, Ambushers with `ambushHp`. Enemies come in `gap` seconds apart
@@ -601,6 +602,7 @@ export const TRAINING = {
     groundTo: 16,
     groundGrowth: 1.05,
     groundLate: 1.02,
+    minionGrowth: 1.008,
     earlyHp: [0.5, 0.65, 0.8] as number[],
     earlyPace: [0.5, 0.7, 0.9] as number[],
     earlyBudget: [0.4, 0.6, 1] as number[],
@@ -639,7 +641,7 @@ export const TRAINING = {
    */
   defaults: {
     upgrade: { dmg: 0.25, reach: 1, perValue: 4, min: 10 },
-    dpsShare: 0.75,
+    dpsShare: 0.85,
     unitDps: 1.384,
     dpsDefense: 5,
     qualityBonus: 1,
@@ -722,18 +724,20 @@ export const TRAINING = {
     odds: [
       [1, 0, 0, 0, 0],
       [0.85, 0.15, 0, 0, 0],
-      [0.7, 0.3, 0, 0, 0],
-      [0.6, 0.33, 0.07, 0, 0],
-      [0.5, 0.35, 0.15, 0, 0],
-      [0.42, 0.35, 0.18, 0.05, 0],
-      [0.35, 0.35, 0.2, 0.1, 0],
-      [0.3, 0.32, 0.23, 0.13, 0.02],
+      [0.67, 0.31, 0.02, 0, 0],
+      [0.57, 0.34, 0.08, 0.01, 0],
+      [0.47, 0.35, 0.16, 0.02, 0],
+      [0.4, 0.35, 0.19, 0.06, 0],
+      [0.33, 0.35, 0.21, 0.1, 0.01],
+      [0.29, 0.32, 0.23, 0.13, 0.03],
       [0.25, 0.3, 0.25, 0.15, 0.05],
       [0.2, 0.28, 0.27, 0.17, 0.08],
       [0.15, 0.25, 0.3, 0.2, 0.1],
     ],
-    luckCost: [15, 20, 30, 40, 45, 55, 70, 90, 110, 130],
+    luckCost: [12, 16, 25, 33, 38, 46, 60, 76, 94, 110],
     quality: [5, 4, 4, 3, 3],
+    /** Every Shard tower's hits do this many times their damage (a plain Shard holds the maze a little longer). */
+    dmg: 1.3,
     recipes: [
       { upTo: 99, count: 2, grades: [1, 2] as [number, number] },
       { upTo: 249, count: 3, grades: [2, 3] as [number, number] },

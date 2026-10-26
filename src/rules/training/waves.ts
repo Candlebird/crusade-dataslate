@@ -71,6 +71,9 @@ export function climbAt(w: number, final: number = F.from): number {
 /** How many times its wounds every enemy has on wave `w` past the level's own: lateHp at its level × climbAt. */
 export const climbHp = (w: number, final: number = F.from) => lateHp(levelOf(w)) * climbAt(w, final);
 
+/** How many times tougher every enemy but the Lord is on wave `w`: minionGrowth a wave from wave 1 (bosses go by bossHp). */
+export const minionHpAt = (w: number) => W.minionGrowth ** Math.max(0, w - 1);
+
 /** How tough the Echo Lord is on wave `w`, beside its share of the budget: bossHp by boss wave, the last holding on. */
 export const bossHpAt = (w: number) => W.bossHp[Math.min(W.bossHp.length, Math.max(1, Math.floor(w / W.bossEvery))) - 1];
 
@@ -93,7 +96,7 @@ export function planFor(r: Rng, power: number, w: number, final: number = F.from
   const tough = climbHp(w, final) * groundHpAt(w, lv) * TRAINING.enemyHp;
   // Endless lords and flyers climb faster still (a wave's walking escorts are what keeps the climb free of cliffs).
   const deep = Math.max(0, w - final);
-  const hp = hpMul * tough * (flies ? flyHpAt(lv) * F.endlessFly ** deep : 1);
+  const hp = hpMul * tough * minionHpAt(lv) * (flies ? flyHpAt(lv) * F.endlessFly ** deep : 1);
   const bossMul = Math.max(W.bossMin, (budget * (1 - W.escorts)) / costOf('lord'));
 
   const out: SpawnPlan[] = [];

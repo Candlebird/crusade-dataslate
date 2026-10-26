@@ -121,11 +121,11 @@ describe('default strength', () => {
     expect(Math.abs(unitPer / TRAINING.defaults.unitDps - 1)).toBeLessThan(0.1);
   });
 
-  it.each(DEFAULTS.map((d) => [d.key, d] as const))('%s is 20-30%% weaker than a unit of the same Shards', (_k, d) => {
+  it.each(DEFAULTS.map((d) => [d.key, d] as const))('%s is 10-20%% weaker than a unit of the same Shards', (_k, d) => {
     const t = defaultTower(d, 1, { x: 10, y: 10 });
     const ratio = towerDps(t, TRAINING.defaults.dpsDefense) / defaultValue(d) / unitPer;
-    expect(ratio).toBeGreaterThanOrEqual(0.7);
-    expect(ratio).toBeLessThanOrEqual(0.8);
+    expect(ratio).toBeGreaterThanOrEqual(0.8);
+    expect(ratio).toBeLessThanOrEqual(0.9);
   });
 
   it('takes no XP, levels, traits or relics', () => {

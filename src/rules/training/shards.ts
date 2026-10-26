@@ -55,7 +55,7 @@ export function shardGun(type: ShardType, grade: Grade): TowerGun {
 export function shardPiece(id: number, at: Tile, type: ShardType, grade: Grade, draft: boolean): ShardPiece {
   return {
     id, x: at.x, y: at.y, kind: 'shard', type, grade, draft,
-    quality: TRAINING.shards.quality[grade - 1], guns: [shardGun(type, grade)], hitShoot: 0, hitMelee: 0, atkBonus: 1,
+    quality: TRAINING.shards.quality[grade - 1], guns: [shardGun(type, grade)], hitShoot: 0, hitMelee: 0, atkBonus: TRAINING.shards.dmg,
     boost: { hit: 0, save: 0, rate: 0, range: 0 }, dmgBoost: { mul: 0, left: 0 }, kills: 0, dealt: 0,
   };
 }
@@ -65,7 +65,7 @@ export function shardDps(type: ShardType, grade: Grade, defense = 5): number {
   const g = shardGun(type, grade);
   const every = g.melee ? TRAINING.meleeEvery : TRAINING.shootEvery;
   const hits = g.attacks * hitChance(TRAINING.shards.quality[grade - 1], 0) * (1 - saveChance(defense, g.ap));
-  return (hits * Math.max(1, g.blast)) / every;
+  return (hits * Math.max(1, g.blast) * TRAINING.shards.dmg) / every;
 }
 
 const draftPieces = (run: TrainingRun): ShardPiece[] =>

@@ -5,7 +5,7 @@ import { WAYPOINTS, centre, mapFor, open, route, routeLength } from './map';
 import { blankRun } from './testRun';
 import type { Enemy, RubblePiece, TrainingRun } from './types';
 import {
-  bossHpAt, groundHpAt, isBossWave, isFlyBossWave, isFlyWave, lateHp, layCover, leakCost, planWave, previewGroups, previewWave,
+  bossHpAt, groundHpAt, isBossWave, isFlyBossWave, isFlyWave, lateHp, layCover, leakCost, minionHpAt, planWave, previewGroups, previewWave,
   runCover, spawnDue, speedOf, walk, waveBudget, wavePoints,
 } from './waves';
 import { costOf, countFor } from './waveKinds';
@@ -93,7 +93,7 @@ describe('planWave', () => {
   it('sends Scouts in on pad 1 and Ambushers from the spawn, both with less HP', () => {
     // One kind a wave, so it takes more seeds to meet both.
     const plans = Array.from({ length: 60 }, (_, i) => planWave({ ...blankRun(i + 1), power: BIG }, 9)).flat();
-    const base = (k: Enemy['kind']) => TRAINING_ENEMIES[k].hp * TRAINING.enemyHp * countFor(k, waveBudget(2000, 9), W.maxCount).hpMul * lateHp(9) * groundHpAt(9);
+    const base = (k: Enemy['kind']) => TRAINING_ENEMIES[k].hp * TRAINING.enemyHp * countFor(k, waveBudget(2000, 9), W.maxCount).hpMul * lateHp(9) * groundHpAt(9) * minionHpAt(9);
     const scout = plans.find((s) => s.kind === 'outrider' && !s.elite)!;
     const amb = plans.find((s) => s.kind === 'stalker' && !s.elite)!;
     expect(scout.leg).toBe(TRAINING.route.scoutAt);
@@ -109,7 +109,7 @@ describe('planWave', () => {
     const w = W.hpFrom + 6;
     const plain = planWave({ ...blankRun(), power: BIG }, w).find((s) => !s.elite && TRAINING_ENEMIES[s.kind].spawn === 'main')!;
     const { hpMul } = countFor(plain.kind, waveBudget(2000, w), W.maxCount);
-    expect(plain.hp).toBeCloseTo(TRAINING_ENEMIES[plain.kind].hp * TRAINING.enemyHp * hpMul * lateHp(w) * groundHpAt(w));
+    expect(plain.hp).toBeCloseTo(TRAINING_ENEMIES[plain.kind].hp * TRAINING.enemyHp * hpMul * lateHp(w) * groundHpAt(w) * minionHpAt(w));
   });
 
   it('grows wounds hpGrowth a wave from hpFrom to hpTo, lateGrowth after', () => {
@@ -136,6 +136,19 @@ describe('planWave', () => {
     expect(bossHpAt(10)).toBe(W.bossHp[1]);
     expect(bossHpAt(W.bossEvery * W.bossHp.length)).toBe(W.bossHp[W.bossHp.length - 1]);
     expect(bossHpAt(W.bossEvery * (W.bossHp.length + 4))).toBe(W.bossHp[W.bossHp.length - 1]);
+  });
+
+  it('toughens every Echo but the Lord minionGrowth a wave from wave 1; the Lord goes by bossHp alone', () => {
+    expect(minionHpAt(1)).toBe(1);
+    expect(minionHpAt(11)).toBeCloseTo(W.minionGrowth ** 10);
+    const plans = planWave({ ...blankRun(2), power: BIG }, 15);
+    const was = W.minionGrowth;
+    try {
+      (W as { minionGrowth: number }).minionGrowth = 1;
+      const flat = planWave({ ...blankRun(2), power: BIG }, 15);
+      expect(plans.find((s) => s.kind === 'lord')!.hp).toBeCloseTo(flat.find((s) => s.kind === 'lord')!.hp);
+      expect(plans.find((s) => s.kind !== 'lord')!.hp / flat.find((s) => s.kind !== 'lord')!.hp).toBeCloseTo(was ** 14);
+    } finally { (W as { minionGrowth: number }).minionGrowth = was; }
   });
 
   it('brings one kind a wave (a boss wave: the boss and one escort kind)', () => {
