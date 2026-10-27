@@ -390,17 +390,18 @@ export function actions(b: ZBattle, u: ZUnit): Action[] {
 }
 
 /**
- * Plays one activation. Returns what happened, for the log and the map. With `split`, a unit that moves and then shoots
- * stops after its move: `b.pending` holds it, and `attackNow` plays the shooting (on the screen, a stage of its own).
+ * Plays one activation. Returns what happened, for the log and the map. With `split`, a unit that holds or moves and
+ * then shoots stops before its shooting: `b.pending` holds it, and `attackNow` plays the shooting (on the screen, a
+ * stage of its own). `split` true does so only when there's something in reach; 'always' whenever the unit has guns.
  */
-export function act(b: ZBattle, o: Order, split = false): LogLine[] {
+export function act(b: ZBattle, o: Order, split: boolean | 'always' = false): LogLine[] {
   const u = unitById(b, o.unit);
   if (!u || b.phase !== 'battle' || b.pending || u.side !== b.turn || !ready(b, u.side).includes(u)) return [];
   return withDice(b, (c) => {
     const next = activate(c, u, o);
-    if (next === 'shoot' && fighting(u) && u.sq >= 0 && shootable(c, u).length) {
-      if (split) { b.pending = { unit: u.id, target: o.target }; sweep(c); return; }
-      shoot(c, u, o.target);
+    if (next === 'shoot' && fighting(u) && u.sq >= 0) {
+      if (split && hasGuns(u) && (split === 'always' || shootable(c, u).length)) { b.pending = { unit: u.id, target: unitById(b, o.target ?? '')?.side === u.side ? undefined : o.target }; sweep(c); return; }
+      shootOrHold(c, u, o.target);
     }
     wrapUp(c, u, next !== 'quiet');
   }).out;
@@ -413,10 +414,20 @@ export function attackNow(b: ZBattle, target?: string, holdFire = false): LogLin
   delete b.pending;
   if (!u || b.phase !== 'battle') return [];
   return withDice(b, (c) => {
-    if (!holdFire && fighting(u) && u.sq >= 0) shoot(c, u, target ?? p!.target);
+    if (!holdFire && fighting(u) && u.sq >= 0) shootOrHold(c, u, target ?? p!.target);
     else if (holdFire) line(c, { side: u.side, unit: u.id, kind: 'move', text: `${u.name} holds its fire.` });
     wrapUp(c, u);
   }).out;
+}
+
+/** Does `u` carry a gun (a weapon with a range)? */
+export const hasGuns = (u: ZUnit) => u.p.guns.some((g) => g.range > 0);
+
+/** Shoots; a unit that held and had nothing to shoot at still shows in the log, so nobody wonders what it did. */
+function shootOrHold(c: Ctx, u: ZUnit, target?: string) {
+  const logged = c.out.length;
+  shoot(c, u, target);
+  if (c.out.length === logged && u.held) line(c, { side: u.side, unit: u.id, kind: 'move', text: `${u.name} holds.` });
 }
 
 /** Ends an activation: the gifts it used up go and it picks up what it stands on (unless `full` is false), then the turn passes. */
@@ -479,11 +490,8 @@ function activate(c: Ctx, u: ZUnit, o: Order): 'shoot' | 'done' | 'quiet' {
     move(c, u, to, action);
     return !u.destroyed && (action === 'advance' || has(rulesOf(b, u), 'rushShoot')) ? 'shoot' : 'done';
   } else {
-    const logged = c.out.length;
     if (action === 'hold') fire(c, u, 'hold');
-    shoot(c, u, o.target);
-    // a quiet turn still shows in the log, so nobody wonders what the unit did
-    if (c.out.length === logged && action === 'hold') line(c, { side: u.side, unit: u.id, kind: 'move', text: `${u.name} holds.` });
+    return u.destroyed ? 'done' : 'shoot';
   }
   return 'done';
 }

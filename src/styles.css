@@ -1289,7 +1289,16 @@ table.ledger td:first-child { white-space: nowrap; }
 .zb-sq.depmine { box-shadow: inset 0 0 0 999px rgba(201, 162, 74, 0.07); }
 .zb-sq.depfoe { box-shadow: inset 0 0 0 999px rgba(179, 53, 43, 0.07); }
 .zb-sq.lit { box-shadow: inset 0 0 0 2px var(--cyan); background-color: rgba(95, 179, 179, 0.12); cursor: pointer; }
-.zb-sq.to { box-shadow: inset 0 0 0 3px var(--gold); }
+.zb-sq.lit.far { box-shadow: inset 0 0 0 2px rgba(201, 162, 74, 0.75); background-color: rgba(201, 162, 74, 0.1); }
+.zb-sq.lit:hover { background-color: rgba(95, 179, 179, 0.3); }
+.zb-sq.lit.far:hover { background-color: rgba(201, 162, 74, 0.26); }
+.zb-sq.here { box-shadow: inset 0 0 0 2px var(--text); cursor: pointer; }
+.zb-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 8px; color: var(--muted); }
+.zb-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.zb-legend i { width: 12px; height: 12px; border-radius: 2px; }
+.zb-legend i.adv { box-shadow: inset 0 0 0 2px var(--cyan); background: rgba(95, 179, 179, 0.12); }
+.zb-legend i.far { box-shadow: inset 0 0 0 2px rgba(201, 162, 74, 0.75); background: rgba(201, 162, 74, 0.1); }
+.zb-legend i.chg { border-radius: 50%; box-shadow: 0 0 0 2px var(--red); }
 .zb-sq.last { outline: 1px dashed var(--muted); outline-offset: -3px; }
 .zb-terrain { position: absolute; left: 2px; top: 0; font-size: 0.6rem; color: var(--muted); pointer-events: none; }
 .zb-obj { position: absolute; right: 2px; top: 0; font-size: 0.75rem; color: var(--text); pointer-events: none; }

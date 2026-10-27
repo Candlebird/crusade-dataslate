@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiTurn } from '../rules/zone/ai';
 import { xy, zoneOf } from '../rules/zone/board';
-import { castable, act, attackNow, actions, arriveSquares, autoDeploy, autoJoin, chargeTargets, deploy, deploySquares, endNow, isHeroUnit, joinHero, joinTargets, moves, ready, startDeploy, toDeploy, vpOf, type Action, type Order } from '../rules/zone/engine';
+import { castable, act, attackNow, actions, hasGuns, arriveSquares, autoDeploy, autoJoin, chargeTargets, deploy, deploySquares, endNow, isHeroUnit, joinHero, joinTargets, moves, ready, startDeploy, toDeploy, vpOf, type Action, type Order } from '../rules/zone/engine';
 import { shootable, woundsLeft } from '../rules/zone/combat';
 import { forecastSims, type ZForecast } from '../rules/zone/forecast';
 import { alive, maxWoundsOf } from '../rules/zone/profile';
@@ -17,16 +17,15 @@ import type { Unit } from '../model/types';
 
 // The zone battle on screen: the board in 6" squares (zones of 2×2 drawn bold), each side's units on it, and the
 // orders for whoever is up. The AI's moves play one at a time with a short pause; every step is saved as it goes.
-// A unit that moves and then shoots does it in two steps: the move, then (with the board as it now stands) the shooting.
+// On the player's turn a tap on one of their units lights where it can go (Advance squares, and further out the Rush
+// ones) and rings the enemies it can charge; a tap on a square or an enemy gives the order, a tap on the unit itself
+// holds. A unit that moves and then shoots does it in two steps: the move, then (with the board as it now stands) the shooting.
 
 /** The pause after each action, in ms (the same as the Sortie's). */
 export const ACTION_PAUSE = 600;
 
-const ACTION_TEXT: Record<Action, string> = {
-  hold: 'Hold', advance: 'Advance', rush: 'Rush', charge: 'Charge', idle: 'Recover', arrive: 'Arrive',
-};
 const ACTION_TIP: Record<Action, string> = {
-  hold: 'Stay put and shoot with every gun that reaches',
+  hold: 'Stay put, then shoot with every gun that reaches',
   advance: 'Move 1 square (6"), then shoot',
   rush: 'Move 2 squares (12"), no shooting',
   charge: 'Move up to 2 squares into an enemy and fight in melee',
@@ -44,10 +43,9 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const [z, setZ] = useState<ZBattle>(() => structuredClone(battle));
   const [mode, setMode] = useState<ZoneMode>(mode0);
   const [sel, setSel] = useState<string>();
-  const [action, setAction] = useState<Action>();
-  const [to, setTo] = useState<number>();
   const [target, setTarget] = useState<string>();
-  const [spell, setSpell] = useState<string>('');
+  // The spell to cast with the next order, as 'name|target id'.
+  const [cast, setCast] = useState('');
   const [open, setOpen] = useState<Set<number>>(new Set());
   const [odds, setOdds] = useState<ZForecast | 'busy' | null>(null);
   const worker = useRef<Worker | null>(null);
@@ -69,7 +67,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     onSave(next, mode);
     return next;
   };
-  const clearPick = () => { setAction(undefined); setTo(undefined); setTarget(undefined); setSpell(''); };
+  const clearPick = () => { setTarget(undefined); setCast(''); };
 
   // The AI's turns (and the join step when nobody needs to pick), one at a time with a pause between.
   const aiDue = z.phase === 'join' ? !anyMine : (z.phase === 'deploy' || z.phase === 'battle') && !mine(z.turn);
@@ -104,54 +102,72 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const canAct = !!unit && z.phase === 'battle' && myTurn && !pend && unit.side === z.turn && ready(z, unit.side).some((u) => u.id === unit.id);
   const canDeploy = !!unit && z.phase === 'deploy' && myTurn && unit.side === z.turn && toDeploy(z, unit.side).some((u) => u.id === unit.id);
   const acts = canAct ? actions(z, unit!) : [];
-  const moveMap = useMemo(() => (canAct && (action === 'advance' || action === 'rush') ? moves(z, unit!, action) : undefined), [z, sel, action, canAct]);
-  const charges = useMemo(() => (canAct && action === 'charge' ? chargeTargets(z, unit!) : []), [z, sel, action, canAct]);
+  const mineReady = z.phase === 'battle' && myTurn ? ready(z, z.turn) : [];
+  // Where the picked unit can go: the Advance squares, and the Rush squares past them.
+  const reach = useMemo(() => {
+    const adv = new Set<number>(), far = new Set<number>();
+    if (!canAct || unit!.sq < 0) return { adv, far };
+    const can = actions(z, unit!);
+    if (can.includes('advance')) for (const sq of moves(z, unit!, 'advance').keys()) if (sq !== unit!.sq) adv.add(sq);
+    if (can.includes('rush')) for (const sq of moves(z, unit!, 'rush').keys()) if (sq !== unit!.sq && !adv.has(sq)) far.add(sq);
+    return { adv, far };
+  }, [z, sel, canAct]);
+  const charges = useMemo(() => (canAct && acts.includes('charge') ? chargeTargets(z, unit!) : []), [z, sel, canAct]);
+  // On a phone the panel sits under the board: bring the shooting step into view when it comes up.
+  const panel = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (attacking) panel.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }); }, [attacking]);
   const shots = useMemo(() => {
-    if (attacking) return shootable({ b: z }, pend!);
-    return canAct && unit!.sq >= 0 && action === 'hold' ? shootable({ b: z }, unit!) : [];
-  }, [z, sel, action, canAct, attacking]);
+    return attacking ? shootable({ b: z }, pend!) : [];
+  }, [z, attacking]);
   const spells = useMemo(() => (canAct ? castable(z, unit!) : []), [z, sel, canAct]);
   const lit = useMemo(() => {
     if (canDeploy) return new Set(deploySquares(z, unit!));
-    if (canAct && action === 'arrive') return new Set(arriveSquares(z, unit!));
-    if (moveMap) return new Set([...moveMap.keys()].filter((sq) => sq !== unit!.sq));
-    return new Set<number>();
-  }, [z, sel, action, canDeploy, canAct, moveMap]);
-  const targetable = new Set(action === 'charge' ? charges.map((c) => c.target.id) : shots.map((t) => t.id));
+    if (canAct && acts.includes('arrive')) return new Set(arriveSquares(z, unit!));
+    return new Set([...reach.adv, ...reach.far]);
+  }, [z, sel, canDeploy, canAct, reach]);
+  // The enemies ringed in red: the ones the picked unit can charge, or in the shooting step the ones in reach.
+  const targetable = new Set(attacking ? shots.map((t) => t.id) : charges.map((c) => c.target.id));
 
-  // Picks the unit to deploy or activate when it's the player's turn and nothing is picked.
+  // Picks the unit to deploy when it's the player's turn and nothing is picked, and the unit that's to shoot. In the
+  // battle the player picks the unit to activate (a tap on it once picked holds it, so it isn't picked for them).
   useEffect(() => {
     if (!myTurn) return;
     if (pend) { if (sel !== pend.id) setSel(pend.id); return; }
-    const pool = z.phase === 'deploy' ? toDeploy(z, z.turn) : ready(z, z.turn);
+    if (z.phase !== 'deploy') return;
+    const pool = toDeploy(z, z.turn);
     if (!pool.some((u) => u.id === sel)) { setSel(pool[0]?.id); clearPick(); }
   }, [z, myTurn]);
+  // Each of the player's turns in the battle starts with nothing picked.
+  useEffect(() => { if (myTurn && z.phase === 'battle' && !z.pending) { setSel(undefined); clearPick(); } }, [myTurn, z.phase]);
 
-  const go = (o: Partial<Order> = {}) => {
-    if (!unit || !action) return;
-    const order: Order = { unit: unit.id, action, to, target, ...(spell ? { spell: { name: spell, targets: [spellTarget()].filter(Boolean) as string[] } } : {}), ...o };
-    step((b) => act(b, order, true));
+  const go = (action: Action, o: Partial<Order> = {}) => {
+    if (!canAct) return;
+    const k = cast.lastIndexOf('|');
+    const order: Order = { unit: unit!.id, action, ...(cast ? { spell: { name: cast.slice(0, k), targets: [cast.slice(k + 1)] } } : {}), ...o };
+    step((b) => act(b, order, 'always'));
     clearPick();
   };
   const attackGo = (holdFire = false) => {
     step((b) => attackNow(b, holdFire ? undefined : target, holdFire));
     clearPick();
   };
-  const spellTarget = () => {
-    const s = spells.find((x) => x.spell.name === spell);
-    if (!s) return undefined;
-    return s.targets.find((t) => t.id === target)?.id ?? s.targets[0]?.id;
-  };
+  // The picked unit staying where it is: Hold (then shoot), or Recover when Shaken.
+  const stay = () => go(acts.includes('idle') ? 'idle' : 'hold');
 
   const clickSquare = (sq: number) => {
     if (canDeploy && lit.has(sq)) { step((b) => deploy(b, unit!.id, sq)); return; }
-    if (canAct && lit.has(sq)) {
-      if (action === 'arrive') { step((b) => act(b, { unit: unit!.id, action: 'arrive', to: sq })); clearPick(); return; }
-      setTo(sq);
-    }
+    if (!canAct) return;
+    if (acts.includes('arrive')) { if (lit.has(sq)) go('arrive', { to: sq }); return; }
+    if (sq === unit!.sq) stay();
+    else if (reach.adv.has(sq)) go('advance', { to: sq });
+    else if (reach.far.has(sq)) go('rush', { to: sq });
   };
   const clickUnit = (u: ZUnit) => {
-    if ((canAct || attacking) && u.side !== unit!.side && targetable.has(u.id)) { setTarget(u.id === target ? undefined : u.id); return; }
+    if (attacking && targetable.has(u.id)) { setTarget(u.id === target ? undefined : u.id); return; }
+    if (canAct && targetable.has(u.id)) { go('charge', { target: u.id }); return; }
+    if (canAct && u.id === unit!.id) { stay(); return; }
+    // A unit of the player's that has already acted, on a square the picked unit can reach: the tap is for the square.
+    if (canAct && u.side === unit!.side && !mineReady.includes(u) && lit.has(u.sq)) { clickSquare(u.sq); return; }
     setSel(u.id);
     clearPick();
   };
@@ -194,10 +210,11 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
           (x + 1) % 2 === 0 && x < W - 1 ? 'zr' : '', (y + 1) % 2 === 0 && y < z.board.h - 1 ? 'zb' : '',
           t ? (t.blocking ? 'blocking' : t.dangerous ? 'dangerous' : t.difficult ? 'difficult' : 'cover') : '',
           deployOf.has(i) ? `dep${tone(deployOf.get(i)!)}` : '',
-          lit.has(i) ? 'lit' : '', to === i ? 'to' : '',
+          lit.has(i) ? 'lit' : '', reach.far.has(i) ? 'far' : '', canAct && unit!.sq === i ? 'here' : '',
           lastPath && (lastPath[0] === i || lastPath[1] === i) ? 'last' : '',
         ].filter(Boolean).join(' ');
-        const tip = [t ? `${t.name}: ${[t.cover && 'cover', t.difficult && 'difficult', t.dangerous && 'dangerous', t.blocking && 'impassable'].filter(Boolean).join(', ')}` : '', m !== undefined ? `Objective ${m + 1}${holder === '' || holder === undefined ? '' : holder === 'x' ? ' (contested)' : ` (held by ${sideName(holder)})`}${z.gone[m] ? ' (gone)' : ''}` : ''].filter(Boolean).join(' · ');
+        const how = canAct && unit!.sq === i ? ACTION_TIP[acts.includes('idle') ? 'idle' : 'hold'] : reach.adv.has(i) ? ACTION_TIP.advance : reach.far.has(i) ? ACTION_TIP.rush : '';
+        const tip = [how, t ? `${t.name}: ${[t.cover && 'cover', t.difficult && 'difficult', t.dangerous && 'dangerous', t.blocking && 'impassable'].filter(Boolean).join(', ')}` : '', m !== undefined ? `Objective ${m + 1}${holder === '' || holder === undefined ? '' : holder === 'x' ? ' (contested)' : ` (held by ${sideName(holder)})`}${z.gone[m] ? ' (gone)' : ''}` : ''].filter(Boolean).join(' · ');
         return (
           <div key={i} className={cls} onClick={() => clickSquare(i)} data-tip={tip || undefined} data-zone={zoneOf(z.board, i)}>
             {t && <span className="zb-terrain">{t.name.slice(0, 1)}</span>}
@@ -262,53 +279,55 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
       </div>
     );
   } else if (z.phase === 'battle') {
-    const mineReady = myTurn ? ready(z, z.turn) : [];
     orders = (
-      <div className="zb-panel">
+      <div className="zb-panel" ref={panel}>
         <h3>{attacking ? `${pend!.name}: shoot` : myTurn ? 'Your activation' : `${sideName(z.turn)} is acting…`}</h3>
         {attacking && (
           <>
             <p className="small muted">
-              {target ? `Shooting at ${unitById(z, target)?.name}; guns that can't reach it pick the nearest they can.` : 'Guns shoot at the nearest enemy they reach; tap a ringed enemy to pick a target.'}
+              {!shots.length ? 'No enemy in reach from here.' : target ? `Shooting at ${unitById(z, target)?.name}; guns that can't reach it pick the nearest they can.` : `${shots.length} enem${shots.length === 1 ? 'y' : 'ies'} in reach, ringed in red. Guns shoot at the nearest they reach; tap one to pick it.`}
             </p>
             <div className="row wrap">
-              <button className="primary" onClick={() => attackGo()}>Shoot</button>
-              <button className="small" onClick={() => attackGo(true)} data-tip="End the activation without shooting">Hold fire</button>
+              {shots.length > 0 && <button className="primary" onClick={() => attackGo()}>Shoot{target ? ` ${unitById(z, target)?.name}` : ''}</button>}
+              <button className={shots.length ? 'small' : 'primary'} onClick={() => attackGo(shots.length > 0)} data-tip="End the activation without shooting">{shots.length ? 'Hold fire' : 'End activation'}</button>
             </div>
           </>
         )}
-        {myTurn && !attacking && (
-          <>
-            <div className="zb-list">
-              {mineReady.map((u) => <button key={u.id} className={`ghost small${u.id === sel ? ' on' : ''}`} onClick={() => { setSel(u.id); clearPick(); }}>{u.name}{u.shaken ? ' (Shaken)' : ''}{u.sq < 0 ? ' (Ambush)' : ''}</button>)}
-            </div>
-            {canAct && (
-              <>
-                <div className="row wrap">
-                  {acts.map((a) => <button key={a} className={action === a ? 'primary small' : 'small'} onClick={() => { setAction(a); setTo(undefined); setTarget(undefined); }} data-tip={ACTION_TIP[a]}>{ACTION_TEXT[a]}</button>)}
+        {myTurn && !attacking && (() => {
+          const reserve = mineReady.filter((u) => u.sq < 0 && actions(z, u).includes('arrive'));
+          const name = unit?.name;
+          return (
+            <>
+              <p className="small muted">
+                {!canAct ? 'Tap one of your units that has yet to act.'
+                  : acts.includes('arrive') ? `${name} waits in Ambush: tap a lit square to bring it on.`
+                  : acts.includes('idle') ? `${name} is Shaken: tap it to spend the activation recovering.`
+                  : `${name}: tap a square to move there${charges.length ? ', an enemy ringed in red to charge it' : ''}, or the unit itself to hold${hasGuns(unit!) ? ' and shoot' : ''}.`}
+              </p>
+              {canAct && !acts.includes('arrive') && !acts.includes('idle') && (reach.adv.size > 0 || reach.far.size > 0 || charges.length > 0) && (
+                <div className="zb-legend small">
+                  {reach.adv.size > 0 && <span><i className="adv" />Advance{hasGuns(unit!) ? ', then shoot' : ''}</span>}
+                  {reach.far.size > 0 && <span><i className="far" />Rush</span>}
+                  {charges.length > 0 && <span><i className="chg" />Charge</span>}
                 </div>
-                {spells.length > 0 && action && action !== 'idle' && (
-                  <label className="field small">Cast ({unit!.tokens} token{unit!.tokens === 1 ? '' : 's'})
-                    <select value={spell} onChange={(e) => setSpell(e.target.value)}>
-                      <option value="">No spell</option>
-                      {spells.map((s) => <option key={s.spell.name} value={s.spell.name}>{s.spell.name} ({s.spell.threshold}) on {s.targets.find((t) => t.id === target)?.name ?? s.targets[0].name}</option>)}
-                    </select>
-                  </label>
-                )}
-                {action && (
-                  <p className="small muted">
-                    {action === 'advance' || action === 'rush' ? (to === undefined ? 'Pick a lit square to move to (or go to stay put). ' : 'Square picked. ') : ''}
-                    {action === 'charge' ? (target ? `Charging ${unitById(z, target)?.name}. ` : 'Pick an enemy ringed in red to charge. ') : ''}
-                    {action === 'advance' ? 'It shoots after the move, at what it can see from there. ' : ''}
-                    {action === 'hold' && shots.length ? (target ? `Shooting at ${unitById(z, target)?.name}; guns that can't reach it pick the nearest they can. ` : 'Guns shoot at the nearest enemy they reach; tap a ringed enemy to pick a target. ') : ''}
-                    {action === 'arrive' ? 'Pick a lit square to arrive on.' : ''}
-                  </p>
-                )}
-                {action && action !== 'arrive' && <button className="primary" disabled={action === 'charge' && !target} onClick={() => go()}>Go</button>}
-              </>
-            )}
-          </>
-        )}
+              )}
+              {canAct && spells.length > 0 && !acts.includes('idle') && (
+                <label className="field small">Cast with this order ({unit!.tokens} token{unit!.tokens === 1 ? '' : 's'})
+                  <select value={cast} onChange={(e) => setCast(e.target.value)}>
+                    <option value="">No spell</option>
+                    {spells.flatMap((s) => s.targets.map((t) => <option key={`${s.spell.name}|${t.id}`} value={`${s.spell.name}|${t.id}`}>{s.spell.name} ({s.spell.threshold}) on {t.name}</option>))}
+                  </select>
+                </label>
+              )}
+              {reserve.length > 0 && (
+                <div className="zb-list">
+                  <span className="small muted">In Ambush:</span>
+                  {reserve.map((u) => <button key={u.id} className={`ghost small${u.id === sel ? ' on' : ''}`} onClick={() => { setSel(u.id); clearPick(); }}>{u.name}</button>)}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
     );
   } else {
