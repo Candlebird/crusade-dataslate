@@ -5,14 +5,14 @@ import type { Force, Unit } from '../model/types';
 import { NEXUS_TRAITS, RELICS, type RelicTier } from '../rules/data';
 import { forceTotals, relicCost as relicRp, relicHolders, relicTaken } from '../rules/engine';
 import { unitName } from '../rules/battle';
-import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_ROUNDS, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
+import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_RELIC_US, NEXUS_ROUNDS, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
 import { isReinforced } from '../rules/production';
 import { Modal, RelicOption, toast } from './ui';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
-const NEEDS_UNIT = new Set<UmbraBuy>(['knowledge', 'relic', 'evolution']);
+const NEEDS_UNIT = new Set<UmbraBuy>(['knowledge', 'revive', 'relic', 'evolution']);
 
 export default function UmbraShop({ force, onClose }: { force: Force; onClose: () => void }) {
   const { state, update } = useStore();
@@ -28,11 +28,13 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
 
   // A Relic Collector home world makes Nexus relics cheaper.
   const collector = !!c && !!fid && homeOf(c, fid)?.benefit === 'relicCollector';
-  const costOf = (x: (typeof UMBRA_SHOP)[number]) => (x.key === 'relic' && collector ? Math.max(0, x.cost - NEXUS_ROUNDS.relicCollectorDiscount) : x.cost);
+  const relicUs = (t: RelicTier) => Math.max(0, NEXUS_RELIC_US[t] - (collector ? NEXUS_ROUNDS.relicCollectorDiscount : 0));
+  // A relic's price is its tier's; the list shows the cheapest.
+  const costOf = (x: (typeof UMBRA_SHOP)[number]) => (x.key === 'relic' ? relicUs(x.key === sel ? tier : 'Common') : x.cost);
   const item = UMBRA_SHOP.find((x) => x.key === sel);
   const cost = item ? costOf(item) : 0;
   const held = relicHolders(state.forces, state.campaign);
-  const units = force.units.filter((u) => u.status !== 'removed');
+  const units = force.units.filter((u) => (sel === 'revive' ? u.status === 'comatose' : u.status !== 'removed'));
   const unit = units.find((u) => u.id === unitId);
   const rpCost = sel === 'relic' ? relicRp(tier) : 0;
 
@@ -50,6 +52,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
     if (!item) return 'Choose something to buy.';
     if (cost > us) return `Needs ${cost} Umbra Shards (you have ${us}).`;
     if (rpCost > rp) return `Also needs ${rpCost} RP for the relic (you have ${rp}).`;
+    if (item.key === 'revive' && !units.length) return 'No unit is comatose.';
     if (NEEDS_UNIT.has(item.key) && !unit) return 'Choose a unit.';
     if ((item.key === 'manipulation' || item.key === 'relic' || item.key === 'evolution') && !choice) return 'Make a choice.';
     if ((item.key === 'reinforce' || item.key === 'expansion') && !choice) return c && fid ? 'Choose a sector.' : 'Link this force to a campaign faction first.';
@@ -78,6 +81,11 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
         label += ` — ${unitName(unit!)}: +3 XP`;
         mutate = (_f, u) => void (u!.xp += 3);
         outcome = `${unitName(unit!)} gains 3 XP.`;
+        break;
+      case 'revive':
+        label += ` — ${unitName(unit!)}`;
+        mutate = (_f, u) => void (u!.status = 'active');
+        outcome = `${unitName(unit!)} wakes up and can fight in your next game.`;
         break;
       case 'manipulation':
         label += `: ${choice}`;
@@ -130,6 +138,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
     });
     setResult(outcome);
     setChoice('');
+    if (item.key === 'revive') setUnitId('');
     toast(outcome);
   };
 
@@ -140,7 +149,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
         <div>
           {UMBRA_SHOP.map((x) => (
             <div key={x.key} className={`shop-item${sel === x.key ? ' selected' : ''}${costOf(x) > us ? ' disabled' : ''}`} onClick={() => pick(x.key)}>
-              <span className="cost" data-tip={costOf(x) < x.cost ? 'Relic Collector discount' : undefined}>{costOf(x)} US</span>
+              <span className="cost" data-tip={x.key === 'relic' && collector ? 'Relic Collector discount' : undefined}>{costOf(x)}{x.key === 'relic' && x.key !== sel ? '+' : ''} US</span>
               <div className="grow"><b>{x.name}</b><div className="muted small">{x.desc}</div></div>
             </div>
           ))}
@@ -174,7 +183,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
                   <label className="field">
                     Tier
                     <select value={tier} onChange={(e) => { setTier(e.target.value as RelicTier); setChoice(''); }}>
-                      {TIERS.map((t) => <option key={t} value={t}>{t} (+{relicRp(t)} RP)</option>)}
+                      {TIERS.map((t) => <option key={t} value={t}>{t} ({relicUs(t)} US + {relicRp(t)} RP)</option>)}
                     </select>
                   </label>
                   <label className="field">

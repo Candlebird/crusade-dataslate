@@ -1,4 +1,5 @@
 import type { BountyKind, SectorType } from '../model/types';
+import type { RelicTier } from './data';
 
 // Nexus Wars homebrew values: sector types, benefits, the Anomaly / Void tables, Combat Manipulations
 // and the Umbra Shard shop. Tweak them here; the logic in nexus.ts reads everything from this file.
@@ -34,7 +35,7 @@ export interface Benefit {
 export const BENEFITS: Benefit[] = [
   { id: 'largeShardMine', type: 'home', name: 'Large Shard Mine', desc: '+3 Umbra Shards each round.' },
   { id: 'researchStation', type: 'home', name: 'Research Station', desc: 'Unlock one Nexus Traits table permanently.' },
-  { id: 'relicCollector', type: 'home', name: 'Relic Collector', desc: 'On a win, roll a D6: on a 6 gain a Common Relic. Nexus Relics cost 9 Umbra Shards less.' },
+  { id: 'relicCollector', type: 'home', name: 'Relic Collector', desc: 'On a win, roll a D6: on a 6 gain a Common Relic. Nexus Relics cost 6 Umbra Shards less.' },
   { id: 'biomassPool', type: 'home', name: 'Biomass Pool', desc: '+100 Supply each round.' },
   { id: 'shardMine', type: 'planet', name: 'Shard Mine', desc: 'Each round, roll a D6: on a 3+ gain 3 Umbra Shards.' },
   { id: 'fertileLand', type: 'planet', name: 'Fertile Land', desc: '+50 Supply each round.' },
@@ -73,7 +74,7 @@ export const NEXUS_ROUNDS = {
   shardMineRoll: 3,
   shardMineUs: 3,
   /** Relic Collector: Nexus Relics cost this many fewer Umbra Shards. */
-  relicCollectorDiscount: 9,
+  relicCollectorDiscount: 6,
   /** How many ended rounds the campaign keeps, so players who miss a few can still claim their income. */
   keepRounds: 8,
 };
@@ -182,15 +183,26 @@ export const STRATEGIC_ASSETS: { key: string; name: string; desc: string }[] = [
 
 export const ORGANIZED_STRIKE = 'Organized Strike';
 
-export type UmbraBuy = 'rp' | 'knowledge' | 'manipulation' | 'strike' | 'reinforce' | 'expansion' | 'relic' | 'evolution';
+/**
+ * Nexus Relics by tier, in Umbra Shards on top of the relic's RP. The reward tables trade a Common Nexus relic for
+ * 6–9 US, so a Common costs 9; Rare and Legendary climb with their power instead of one flat price for all three.
+ */
+export const NEXUS_RELIC_US: Record<RelicTier, number> = { Common: 9, Rare: 15, Legendary: 24 };
+
+export type UmbraBuy = 'rp' | 'knowledge' | 'revive' | 'manipulation' | 'strike' | 'reinforce' | 'expansion' | 'relic' | 'evolution';
+/**
+ * Priced against a faction's income, about 8–14 US a round (2 match bonuses, sectors, reward rolls): small tactical
+ * buys cost 3, lasting ones a round's income or more. 9 US is 1 RP, so 1 US is worth about 1 XP or 22 Supply.
+ */
 export const UMBRA_SHOP: { key: UmbraBuy; name: string; cost: number; desc: string }[] = [
   { key: 'rp', name: 'Requisition', cost: 9, desc: 'Convert into 1 RP.' },
   { key: 'knowledge', name: 'Umbral Knowledge', cost: 3, desc: '+3 XP to one unit.' },
+  { key: 'revive', name: 'Umbral Revival', cost: 3, desc: 'Wake a comatose unit: it can fight in your next game instead of sitting it out.' },
   { key: 'manipulation', name: 'Combat Manipulation', cost: 3, desc: 'One tactical advantage for your next match.' },
   { key: 'strike', name: ORGANIZED_STRIKE, cost: 6, desc: '+200 Supply Limit once, when attacking a sector.' },
   { key: 'reinforce', name: 'Reinforce Sector', cost: 9, desc: '+200 Supply Limit when defending that sector. One per sector; lost if the sector changes hands.' },
   { key: 'expansion', name: 'Forced Expansion', cost: 15, desc: 'Take an uncontrolled sector without a match (no match rewards).' },
-  { key: 'relic', name: 'Nexus Relic', cost: 18, desc: 'Bought together with the normal Crusade relic requisition (its RP cost too).' },
+  { key: 'relic', name: 'Nexus Relic', cost: NEXUS_RELIC_US.Common, desc: `${NEXUS_RELIC_US.Common} / ${NEXUS_RELIC_US.Rare} / ${NEXUS_RELIC_US.Legendary} US for a Common / Rare / Legendary, bought together with the normal Crusade relic requisition (its RP cost too).` },
   { key: 'evolution', name: 'Umbral Evolution', cost: 36, desc: 'A free unique Nexus trait: BP goes up, but it does not use a level.' },
 ];
 

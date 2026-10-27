@@ -3,7 +3,7 @@ import {
   NO_AGENDA_XP, PARTICIPATION_XP, POST_MAX_REPLACE_STEP, STARTING_SUPPLY, SUFFERING_BP_STEP,
 } from './data';
 import { AUTO_BATTLE, STANCES } from './autoBattle';
-import { BOUNTY, ECHOES, ECHO_MARKS, DIFFICULTY_LEVELS, FOG, GALACTIC_EVENTS, GAME_NIGHT, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_DUELS, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_ROUNDS, OVERRUN, PRODUCTION, UMBRA_SHOP, WARLORDS } from './nexusData';
+import { BOUNTY, ECHOES, ECHO_MARKS, DIFFICULTY_LEVELS, FOG, GALACTIC_EVENTS, GAME_NIGHT, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_DUELS, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_RELIC_US, NEXUS_ROUNDS, OVERRUN, PRODUCTION, WARLORDS } from './nexusData';
 import { BIG_UNIT, BIG_UNIT_PER } from './echoForce';
 import { FEATS, rewardText } from './feats';
 import { TITLES } from './training/titles';
@@ -58,7 +58,7 @@ export const CRUSADE_TEXT = {
     'Wagering Relics (optional, both players must agree): players may bet relics on a match. The winner takes them and assigns them under the normal relic rules; the loser removes them and adjusts BP.',
   ],
   nexusRelics: [
-    `Nexus relics are only found in the Nexus Umbra. Buy one in the Umbra Shard shop (${UMBRA_SHOP.find((x) => x.key === 'relic')?.cost} US on top of the normal relic requisition, ${NEXUS_ROUNDS.relicCollectorDiscount} US less with a Relic Collector home), or roll a 6 on the Void table. Otherwise they follow the normal relic rules.`,
+    `Nexus relics are only found in the Nexus Umbra. Buy one in the Umbra Shard shop (${NEXUS_RELIC_US.Common} / ${NEXUS_RELIC_US.Rare} / ${NEXUS_RELIC_US.Legendary} US for a Common / Rare / Legendary, on top of the normal relic requisition, ${NEXUS_ROUNDS.relicCollectorDiscount} US less with a Relic Collector home), or roll a 6 on the Void table. Otherwise they follow the normal relic rules.`,
   ],
 };
 
