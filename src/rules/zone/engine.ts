@@ -389,29 +389,63 @@ export function actions(b: ZBattle, u: ZUnit): Action[] {
   return out;
 }
 
-/** Plays one activation. Returns what happened, for the log and the map. */
-export function act(b: ZBattle, o: Order): LogLine[] {
+/**
+ * Plays one activation. Returns what happened, for the log and the map. With `split`, a unit that moves and then shoots
+ * stops after its move: `b.pending` holds it, and `attackNow` plays the shooting (on the screen, a stage of its own).
+ */
+export function act(b: ZBattle, o: Order, split = false): LogLine[] {
   const u = unitById(b, o.unit);
-  if (!u || b.phase !== 'battle' || u.side !== b.turn || !ready(b, u.side).includes(u)) return [];
+  if (!u || b.phase !== 'battle' || b.pending || u.side !== b.turn || !ready(b, u.side).includes(u)) return [];
   return withDice(b, (c) => {
-    activate(c, u, o);
-    sweep(c);
-    passTurn(c, u.side);
+    const next = activate(c, u, o);
+    if (next === 'shoot' && fighting(u) && u.sq >= 0 && shootable(c, u).length) {
+      if (split) { b.pending = { unit: u.id, target: o.target }; sweep(c); return; }
+      shoot(c, u, o.target);
+    }
+    wrapUp(c, u, next !== 'quiet');
   }).out;
 }
 
-function activate(c: Ctx, u: ZUnit, o: Order) {
+/** The second stage of a split activation: the moved unit shoots (at `target`, or as it planned), unless it holds its fire. */
+export function attackNow(b: ZBattle, target?: string, holdFire = false): LogLine[] {
+  const p = b.pending;
+  const u = p && unitById(b, p.unit);
+  delete b.pending;
+  if (!u || b.phase !== 'battle') return [];
+  return withDice(b, (c) => {
+    if (!holdFire && fighting(u) && u.sq >= 0) shoot(c, u, target ?? p!.target);
+    else if (holdFire) line(c, { side: u.side, unit: u.id, kind: 'move', text: `${u.name} holds its fire.` });
+    wrapUp(c, u);
+  }).out;
+}
+
+/** Ends an activation: the gifts it used up go and it picks up what it stands on (unless `full` is false), then the turn passes. */
+function wrapUp(c: Ctx, u: ZUnit, full = true) {
+  if (full) {
+    u.charging = false;
+    u.effects = u.effects.filter((e) => !e.spend);
+    if (!u.destroyed && !u.routed) pickUp(c, u);
+  } else for (const e of u.effects) delete e.spend;
+  sweep(c);
+  passTurn(c, u.side);
+}
+
+/**
+ * Plays an activation up to its shooting: 'shoot' when shooting follows (after an Advance, or a Rush that may shoot),
+ * 'done' when it's over, 'quiet' when it only arrived or recovered (nothing used up, nothing picked up).
+ */
+function activate(c: Ctx, u: ZUnit, o: Order): 'shoot' | 'done' | 'quiet' {
   const b = c.b;
   u.activated = true;
-  const onceBefore = u.effects.filter((e) => e.until === 'once' && e.mark === undefined);
+  for (const e of u.effects) if (e.until === 'once' && e.mark === undefined) e.spend = true;
   if (u.sq < 0) {
     const sq = o.to !== undefined && arriveSquares(b, u).includes(o.to) ? o.to : arriveSquares(b, u)[0];
-    if (sq === undefined) return;
+    if (sq === undefined) return 'quiet';
     u.sq = sq;
     delete u.used.ambushing;
     line(c, { side: u.side, unit: u.id, kind: 'move', text: `${u.name} arrives from Ambush.`, path: [sq, sq] });
     u.held = false;
-    return;
+    return 'quiet';
   }
   if (u.shaken) {
     const rally = has(rulesOf(b, u), 'rally');
@@ -420,7 +454,7 @@ function activate(c: Ctx, u: ZUnit, o: Order) {
       u.shaken = false;
       u.held = true;
       line(c, { side: u.side, unit: u.id, kind: 'morale', text: `${u.name} stays put and recovers from Shaken.`, dice: rally ? [{ label: 'Rally', need: 4, rolls: [r], ok: 0 }] : undefined });
-      return;
+      return 'quiet';
     }
     u.shaken = false;
     line(c, { side: u.side, unit: u.id, kind: 'morale', text: `${u.name} rallies.`, dice: [{ label: 'Rally', need: 4, rolls: [r], ok: 1 }] });
@@ -431,7 +465,7 @@ function activate(c: Ctx, u: ZUnit, o: Order) {
   }
   fire(c, u, 'activation', o.target);
   if (o.spell) cast(c, u, o.spell.name, o.spell.targets);
-  if (u.destroyed || u.routed) return;
+  if (u.destroyed || u.routed) return 'quiet';
   const action = actions(b, u).includes(o.action) ? o.action : 'hold';
   u.held = action === 'hold';
   u.charging = false;
@@ -443,7 +477,7 @@ function activate(c: Ctx, u: ZUnit, o: Order) {
     const opts = moves(b, u, action);
     const to = o.to !== undefined && opts.has(o.to) ? o.to : u.sq;
     move(c, u, to, action);
-    if (!u.destroyed && (action === 'advance' || has(rulesOf(b, u), 'rushShoot'))) shoot(c, u, o.target);
+    return !u.destroyed && (action === 'advance' || has(rulesOf(b, u), 'rushShoot')) ? 'shoot' : 'done';
   } else {
     const logged = c.out.length;
     if (action === 'hold') fire(c, u, 'hold');
@@ -451,9 +485,7 @@ function activate(c: Ctx, u: ZUnit, o: Order) {
     // a quiet turn still shows in the log, so nobody wonders what the unit did
     if (c.out.length === logged && action === 'hold') line(c, { side: u.side, unit: u.id, kind: 'move', text: `${u.name} holds.` });
   }
-  u.charging = false;
-  u.effects = u.effects.filter((e) => !onceBefore.includes(e));
-  pickUp(c, u);
+  return 'done';
 }
 
 function move(c: Ctx, u: ZUnit, to: number, action: string) {
@@ -514,7 +546,7 @@ export function shoot(c: Ctx, u: ZUnit, targetId?: string) {
     const names = [...guns].map((i) => u.p.guns[i].name).join(', ');
     const killed = before.models - alive(t.p).length;
     line(c, {
-      side: u.side, unit: u.id, target: t.id, kind: 'shoot',
+      side: u.side, unit: u.id, target: t.id, kind: 'shoot', wounds: r.wounds,
       text: `${u.name} shoots ${t.name} (${names}): ${r.wounds} wound${r.wounds === 1 ? '' : 's'}${killed ? `, ${killed} model${killed === 1 ? '' : 's'} down` : ''}${t.destroyed ? ' — destroyed' : ''}.`,
       dice: r.dice,
     });
@@ -546,7 +578,7 @@ function charge(c: Ctx, u: ZUnit, t: ZUnit, from: number) {
     const hits = rolls.filter((r) => r >= 2).length;
     const res = hits ? defendRaw(c, t, hits, 0, 'Impact', [], u) : { wounds: 0, kills: 0, dice: [] };
     dealt[0] += res.wounds;
-    line(c, { side: u.side, unit: u.id, target: t.id, kind: 'melee', text: `${u.name} slams into ${t.name}: ${res.wounds} wound${res.wounds === 1 ? '' : 's'} from Impact.`, dice: [{ label: 'Impact', need: 2, rolls, ok: hits }, ...res.dice] });
+    line(c, { side: u.side, unit: u.id, target: t.id, kind: 'melee', wounds: res.wounds, text: `${u.name} slams into ${t.name}: ${res.wounds} wound${res.wounds === 1 ? '' : 's'} from Impact.`, dice: [{ label: 'Impact', need: 2, rolls, ok: hits }, ...res.dice] });
   }
   const strike = (a: ZUnit, d: ZUnit, guns: (gi: number) => boolean, who: 'first' | 'charge' | 'back') => {
     if (a.destroyed || a.routed || d.destroyed || d.routed || !alive(a.p).length) return;
@@ -566,7 +598,7 @@ function charge(c: Ctx, u: ZUnit, t: ZUnit, from: number) {
     dealt[a === u ? 0 : 1] += r.wounds + ravW;
     const verb = who === 'first' ? 'strikes first at' : who === 'charge' ? 'fights' : 'strikes back at';
     line(c, {
-      side: a.side, unit: a.id, target: d.id, kind: 'melee',
+      side: a.side, unit: a.id, target: d.id, kind: 'melee', wounds: r.wounds + ravW,
       text: `${a.name} ${verb} ${d.name}${sixes ? ' (6s only)' : ''}: ${r.wounds + ravW} wound${r.wounds + ravW === 1 ? '' : 's'}${d.destroyed ? ' — destroyed' : ''}.`,
       dice: r.dice,
     });
@@ -689,7 +721,7 @@ function fire(c: Ctx, u: ZUnit, at: string, targetId?: string) {
       for (const t of pool) {
         if (h.on) { const r = d6(c.rng); if (r < h.on) continue; }
         const res = defendRaw(c, t, roll(h.n, c.rng), h.ap, '', h.rules ?? [], u);
-        line(c, { side: u.side, unit: u.id, target: t.id, kind: 'ability', text: `${u.name} hits ${t.name}: ${res.wounds} wound${res.wounds === 1 ? '' : 's'}${t.destroyed ? ' — destroyed' : ''}.`, dice: res.dice });
+        line(c, { side: u.side, unit: u.id, target: t.id, kind: 'ability', wounds: res.wounds, text: `${u.name} hits ${t.name}: ${res.wounds} wound${res.wounds === 1 ? '' : 's'}${t.destroyed ? ' — destroyed' : ''}.`, dice: res.dice });
         settle(c);
         if (!t.destroyed && res.wounds && atHalf(t) && at !== 'charge') morale(c, t, 'half strength');
       }
@@ -991,6 +1023,7 @@ function finish(c: Ctx) {
 /** Ends the battle now (a side concedes, or the table calls it). */
 export function endNow(b: ZBattle) {
   if (b.phase === 'ended') return;
+  delete b.pending;
   withDice(b, (c) => { if (b.phase === 'battle') { seize(c); b.history.push([...b.control]); } finish(c); });
 }
 

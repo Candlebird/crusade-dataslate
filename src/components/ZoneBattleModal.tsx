@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiTurn } from '../rules/zone/ai';
 import { xy, zoneOf } from '../rules/zone/board';
-import { castable, act, actions, arriveSquares, autoDeploy, autoJoin, chargeTargets, deploy, deploySquares, endNow, isHeroUnit, joinHero, joinTargets, moves, ready, startDeploy, toDeploy, vpOf, type Action, type Order } from '../rules/zone/engine';
+import { castable, act, attackNow, actions, arriveSquares, autoDeploy, autoJoin, chargeTargets, deploy, deploySquares, endNow, isHeroUnit, joinHero, joinTargets, moves, ready, startDeploy, toDeploy, vpOf, type Action, type Order } from '../rules/zone/engine';
 import { shootable, woundsLeft } from '../rules/zone/combat';
 import { forecastSims, type ZForecast } from '../rules/zone/forecast';
 import { alive, maxWoundsOf } from '../rules/zone/profile';
@@ -9,9 +9,15 @@ import { playOut } from '../rules/zone/sim';
 import { ZONE_REWARDS, type ZoneMode } from '../rules/zone/setup';
 import { onTable, unitById, type LogLine, type SideIx, type ZBattle, type ZUnit } from '../rules/zone/state';
 import { Modal, confirmAction } from './ui';
+import { EmblemBadge, Portrait } from './Emblem';
+import { ZoneFx } from './ZoneFx';
+import { useStore } from '../model/store';
+import { echoPortrait } from '../model/emblem';
+import type { Unit } from '../model/types';
 
 // The zone battle on screen: the board in 6" squares (zones of 2×2 drawn bold), each side's units on it, and the
 // orders for whoever is up. The AI's moves play one at a time with a short pause; every step is saved as it goes.
+// A unit that moves and then shoots does it in two steps: the move, then (with the board as it now stands) the shooting.
 
 /** The pause after each action, in ms (the same as the Sortie's). */
 export const ACTION_PAUSE = 600;
@@ -21,14 +27,13 @@ const ACTION_TEXT: Record<Action, string> = {
 };
 const ACTION_TIP: Record<Action, string> = {
   hold: 'Stay put and shoot with every gun that reaches',
-  advance: 'Move 1 square (6") and shoot',
+  advance: 'Move 1 square (6"), then shoot',
   rush: 'Move 2 squares (12"), no shooting',
   charge: 'Move up to 2 squares into an enemy and fight in melee',
   idle: 'Shaken: spend the activation recovering',
   arrive: 'Come on from Ambush, over 9" from every enemy',
 };
 
-const initials = (name: string) => name.split(/[\s-]+/).filter((w) => /[A-Za-z0-9]/.test(w[0] ?? '')).slice(0, 3).map((w) => w[0]).join('').toUpperCase() || name.slice(0, 2);
 const isPhone = () => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 700px)').matches;
 
 /** Plays a battle on screen. `onSave` gets every step; `onDone` the ended battle, once the player takes the result. */
@@ -46,6 +51,10 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const [open, setOpen] = useState<Set<number>>(new Set());
   const [odds, setOdds] = useState<ZForecast | 'busy' | null>(null);
   const worker = useRef<Worker | null>(null);
+  const field = useRef<HTMLDivElement>(null);
+  const { state } = useStore();
+  // Each unit's portrait: its force's unit when it has one (the tracker's unit id is the force's), else one from its name.
+  const forceUnits = useMemo(() => new Map(state.forces.flatMap((f) => f.units.map((u) => [u.id, u] as const))), [state.forces]);
 
   const mine = (s: SideIx) => z.members.some((m) => m.side === s && !m.ai);
   const anyMine = mine(0) || mine(1);
@@ -69,8 +78,9 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     const t = window.setTimeout(() => step((b) => {
       if (b.phase === 'join') { autoJoin(b, 0); autoJoin(b, 1); startDeploy(b); return; }
       if (b.phase === 'deploy') { autoDeploy(b, b.turn); return; }
+      if (b.pending) { attackNow(b); return; }
       const o = aiTurn(b, b.turn);
-      if (o) act(b, o);
+      if (o) act(b, o, true);
       else endNow(b);
     }), ACTION_PAUSE);
     return () => window.clearTimeout(t);
@@ -88,12 +98,18 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
 
   const unit = sel ? unitById(z, sel) : undefined;
   const myTurn = (z.phase === 'deploy' || z.phase === 'battle') && mine(z.turn);
-  const canAct = !!unit && z.phase === 'battle' && myTurn && unit.side === z.turn && ready(z, unit.side).some((u) => u.id === unit.id);
+  // The second step of a move-then-shoot: the unit that moved, to shoot now.
+  const pend = z.phase === 'battle' && z.pending ? unitById(z, z.pending.unit) : undefined;
+  const attacking = !!pend && myTurn;
+  const canAct = !!unit && z.phase === 'battle' && myTurn && !pend && unit.side === z.turn && ready(z, unit.side).some((u) => u.id === unit.id);
   const canDeploy = !!unit && z.phase === 'deploy' && myTurn && unit.side === z.turn && toDeploy(z, unit.side).some((u) => u.id === unit.id);
   const acts = canAct ? actions(z, unit!) : [];
   const moveMap = useMemo(() => (canAct && (action === 'advance' || action === 'rush') ? moves(z, unit!, action) : undefined), [z, sel, action, canAct]);
   const charges = useMemo(() => (canAct && action === 'charge' ? chargeTargets(z, unit!) : []), [z, sel, action, canAct]);
-  const shots = useMemo(() => (canAct && unit!.sq >= 0 && (action === 'hold' || action === 'advance') ? shootable({ b: z }, unit!) : []), [z, sel, action, canAct]);
+  const shots = useMemo(() => {
+    if (attacking) return shootable({ b: z }, pend!);
+    return canAct && unit!.sq >= 0 && action === 'hold' ? shootable({ b: z }, unit!) : [];
+  }, [z, sel, action, canAct, attacking]);
   const spells = useMemo(() => (canAct ? castable(z, unit!) : []), [z, sel, canAct]);
   const lit = useMemo(() => {
     if (canDeploy) return new Set(deploySquares(z, unit!));
@@ -106,6 +122,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   // Picks the unit to deploy or activate when it's the player's turn and nothing is picked.
   useEffect(() => {
     if (!myTurn) return;
+    if (pend) { if (sel !== pend.id) setSel(pend.id); return; }
     const pool = z.phase === 'deploy' ? toDeploy(z, z.turn) : ready(z, z.turn);
     if (!pool.some((u) => u.id === sel)) { setSel(pool[0]?.id); clearPick(); }
   }, [z, myTurn]);
@@ -113,7 +130,11 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const go = (o: Partial<Order> = {}) => {
     if (!unit || !action) return;
     const order: Order = { unit: unit.id, action, to, target, ...(spell ? { spell: { name: spell, targets: [spellTarget()].filter(Boolean) as string[] } } : {}), ...o };
-    step((b) => act(b, order));
+    step((b) => act(b, order, true));
+    clearPick();
+  };
+  const attackGo = (holdFire = false) => {
+    step((b) => attackNow(b, holdFire ? undefined : target, holdFire));
     clearPick();
   };
   const spellTarget = () => {
@@ -130,7 +151,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     }
   };
   const clickUnit = (u: ZUnit) => {
-    if (canAct && u.side !== unit!.side && targetable.has(u.id)) { setTarget(u.id === target ? undefined : u.id); return; }
+    if ((canAct || attacking) && u.side !== unit!.side && targetable.has(u.id)) { setTarget(u.id === target ? undefined : u.id); return; }
     setSel(u.id);
     clearPick();
   };
@@ -157,6 +178,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const lastPath = [...z.log].reverse().find((l) => l.path)?.path;
 
   const board = (
+    <div className="zb-field" ref={field}>
     <div className="zb-board" style={{
       gridTemplateColumns: `repeat(${W}, minmax(0, 1fr))`,
       // Short of the screen's height, so the whole board shows without scrolling (on a phone the width rules).
@@ -180,10 +202,12 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
           <div key={i} className={cls} onClick={() => clickSquare(i)} data-tip={tip || undefined} data-zone={zoneOf(z.board, i)}>
             {t && <span className="zb-terrain">{t.name.slice(0, 1)}</span>}
             {m !== undefined && !z.gone[m] && <span className={`zb-obj${holder === 0 || holder === 1 ? ` ${tone(holder)}` : holder === 'x' ? ' x' : ''}`}>◆</span>}
-            {(here.get(i) ?? []).map((u) => <Token key={u.id} u={u} tone={tone(u.side)} sel={u.id === sel} aim={u.id === target} can={targetable.has(u.id)} done={u.activated && z.phase === 'battle'} onClick={(e) => { e.stopPropagation(); clickUnit(u); }} />)}
+            {(here.get(i) ?? []).map((u) => <Token key={u.id} u={u} fu={forceUnits.get(u.id.slice(u.id.indexOf('|') + 1))} tone={tone(u.side)} sel={u.id === sel} aim={u.id === target} can={targetable.has(u.id)} done={u.activated && z.phase === 'battle'} onClick={(e) => { e.stopPropagation(); clickUnit(u); }} />)}
           </div>
         );
       })}
+    </div>
+    <ZoneFx z={z} field={field} mine={(s) => tone(s) === 'mine'} />
     </div>
   );
 
@@ -241,8 +265,19 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     const mineReady = myTurn ? ready(z, z.turn) : [];
     orders = (
       <div className="zb-panel">
-        <h3>{myTurn ? 'Your activation' : `${sideName(z.turn)} is acting…`}</h3>
-        {myTurn && (
+        <h3>{attacking ? `${pend!.name}: shoot` : myTurn ? 'Your activation' : `${sideName(z.turn)} is acting…`}</h3>
+        {attacking && (
+          <>
+            <p className="small muted">
+              {target ? `Shooting at ${unitById(z, target)?.name}; guns that can't reach it pick the nearest they can.` : 'Guns shoot at the nearest enemy they reach; tap a ringed enemy to pick a target.'}
+            </p>
+            <div className="row wrap">
+              <button className="primary" onClick={() => attackGo()}>Shoot</button>
+              <button className="small" onClick={() => attackGo(true)} data-tip="End the activation without shooting">Hold fire</button>
+            </div>
+          </>
+        )}
+        {myTurn && !attacking && (
           <>
             <div className="zb-list">
               {mineReady.map((u) => <button key={u.id} className={`ghost small${u.id === sel ? ' on' : ''}`} onClick={() => { setSel(u.id); clearPick(); }}>{u.name}{u.shaken ? ' (Shaken)' : ''}{u.sq < 0 ? ' (Ambush)' : ''}</button>)}
@@ -264,7 +299,8 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
                   <p className="small muted">
                     {action === 'advance' || action === 'rush' ? (to === undefined ? 'Pick a lit square to move to (or go to stay put). ' : 'Square picked. ') : ''}
                     {action === 'charge' ? (target ? `Charging ${unitById(z, target)?.name}. ` : 'Pick an enemy ringed in red to charge. ') : ''}
-                    {(action === 'hold' || action === 'advance') && shots.length ? (target ? `Shooting at ${unitById(z, target)?.name}; guns that can't reach it pick the nearest they can. ` : 'Guns shoot at the nearest enemy they reach; tap a ringed enemy to pick a target. ') : ''}
+                    {action === 'advance' ? 'It shoots after the move, at what it can see from there. ' : ''}
+                    {action === 'hold' && shots.length ? (target ? `Shooting at ${unitById(z, target)?.name}; guns that can't reach it pick the nearest they can. ` : 'Guns shoot at the nearest enemy they reach; tap a ringed enemy to pick a target. ') : ''}
                     {action === 'arrive' ? 'Pick a lit square to arrive on.' : ''}
                   </p>
                 )}
@@ -320,13 +356,13 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   );
 }
 
-function Token({ u, tone, sel, aim, can, done, onClick }: { u: ZUnit; tone: string; sel: boolean; aim: boolean; can: boolean; done: boolean; onClick: (e: React.MouseEvent) => void }) {
+function Token({ u, fu, tone, sel, aim, can, done, onClick }: { u: ZUnit; fu?: Unit; tone: string; sel: boolean; aim: boolean; can: boolean; done: boolean; onClick: (e: React.MouseEvent) => void }) {
   const left = woundsLeft(u);
   const max = maxWoundsOf(u.p);
   return (
-    <button className={`zb-unit ${tone}${sel ? ' sel' : ''}${aim ? ' aim' : ''}${can ? ' can' : ''}${done ? ' done' : ''}${u.shaken ? ' shaken' : ''}`} onClick={onClick}
+    <button data-zu={u.id} className={`zb-unit ${tone}${sel ? ' sel' : ''}${aim ? ' aim' : ''}${can ? ' can' : ''}${done ? ' done' : ''}${u.shaken ? ' shaken' : ''}`} onClick={onClick}
       data-tip={`${u.name}: ${alive(u.p).length} model${alive(u.p).length === 1 ? '' : 's'}, ${left}/${max} wounds${u.shaken ? ', Shaken' : ''}${done ? ', has acted' : ''}`}>
-      {initials(u.name)}
+      {fu ? <Portrait unit={fu} title={u.name} /> : <EmblemBadge emblem={echoPortrait(u.name)} title={u.name} />}
       <span className="zb-hp" style={{ width: `${Math.round((left / Math.max(1, max)) * 100)}%` }} />
     </button>
   );

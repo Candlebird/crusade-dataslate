@@ -22,6 +22,8 @@ export interface Effect {
   round: number;
   /** Who gave it, for the log. */
   from: string;
+  /** A 'once' gift held when an activation began: it goes when that activation ends. */
+  spend?: boolean;
 }
 
 export interface ZUnit {
@@ -90,6 +92,8 @@ export interface LogLine {
   dice?: LogDice[];
   /** Where it moved, for the map: from and to squares. */
   path?: [number, number];
+  /** Wounds a shot or blow dealt, for the map. */
+  wounds?: number;
 }
 
 export type ZHolder = '' | SideIx | 'x';
@@ -133,6 +137,8 @@ export interface ZBattle {
   /** How the side's AI plays: Command = smart picks, otherwise the decision trees only. */
   smart: [boolean, boolean];
   result?: { winner: SideIx | 'draw'; vp: [number, number]; lost: [number, number]; share: [number, number]; why: string };
+  /** A unit that has moved and has its shooting still to come (the second stage of an Advance, or a Rush that can shoot). */
+  pending?: { unit: string; target?: string };
   /** Practice battles don't write anything back. */
   practice?: boolean;
 }

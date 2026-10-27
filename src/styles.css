@@ -1304,7 +1304,23 @@ table.ledger td:first-child { white-space: nowrap; }
 .zb-unit.sel { box-shadow: 0 0 0 2px var(--text); }
 .zb-unit.can { box-shadow: 0 0 0 2px var(--red); }
 .zb-unit.aim { box-shadow: 0 0 0 3px #ff6a5c; }
-.zb-hp { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--green); }
+.zb-unit .emblem { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.zb-hp { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--green); z-index: 1; }
+.zb-field { position: relative; }
+.zfx { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; z-index: 3; }
+.zfx line, .zfx path, .zfx circle { opacity: 0; }
+.zfx-blow.miss { opacity: 0.45; }
+.zfx-shot { stroke-width: 2.5; stroke-linecap: round; animation: zfx-fade 0.9s ease-out both; filter: drop-shadow(0 0 3px currentColor); }
+.zfx-shot.bolt { stroke-width: 3.5; }
+.zfx-spark { transform-box: fill-box; transform-origin: center; animation: zfx-spark 0.9s ease-out both; }
+.zfx-slash { fill: none; stroke-width: 3.5; stroke-linecap: round; stroke-dasharray: 200; stroke-dashoffset: 200; animation: zfx-slash 0.9s ease-out both; }
+.zfx-bit { animation: zfx-bit 0.9s ease-out both; }
+.zfx-ring { fill: none; stroke-width: 3; transform-box: fill-box; transform-origin: center; animation: zfx-ring 0.9s ease-out both; }
+@keyframes zfx-fade { 0% { opacity: 0; } 10% { opacity: 1; } 55% { opacity: 0.9; } 100% { opacity: 0; } }
+@keyframes zfx-spark { 0% { opacity: 0; transform: scale(0.4); } 15% { opacity: 1; } 100% { opacity: 0; transform: scale(1.8); } }
+@keyframes zfx-slash { 0% { opacity: 1; stroke-dashoffset: 200; } 35% { opacity: 1; stroke-dashoffset: 0; } 100% { opacity: 0; stroke-dashoffset: 0; } }
+@keyframes zfx-bit { 0% { opacity: 0; transform: translate(0, 0); } 15% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--dx), var(--dy)); } }
+@keyframes zfx-ring { 0% { opacity: 1; transform: scale(0.6); } 100% { opacity: 0; transform: scale(2); } }
 .zb-panel { display: flex; flex-direction: column; gap: 6px; }
 .zb-panel h3 { margin: 0; }
 .zb-list { display: flex; flex-wrap: wrap; gap: 4px; max-height: 160px; overflow-y: auto; }

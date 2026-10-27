@@ -5,7 +5,7 @@ import { aiStyleFor } from '../aiTrees';
 import type { MissionDef } from '../missions';
 import { bookRules, parseSpell, type BookRules } from '../oprRules';
 import { aiTurn } from './ai';
-import { act, autoDeploy, autoJoin, createBattle, startDeploy, type ZSetup, type ZSetupUnit } from './engine';
+import { act, attackNow, autoDeploy, autoJoin, createBattle, startDeploy, type ZSetup, type ZSetupUnit } from './engine';
 import { mulberry32, type Rng } from './dice';
 import { profileOf } from './profile';
 import type { SideIx, ZBattle } from './state';
@@ -69,6 +69,7 @@ export function playOut(b: ZBattle, sides: SideIx[] = [0, 1], maxActs = 2000): Z
   }
   if (b.phase === 'deploy' && sides.length === 2) autoDeploy(b, b.turn, true);
   else if (b.phase === 'deploy') autoDeploy(b, sides[0]);
+  if (b.pending && sides.includes(b.turn)) attackNow(b);
   for (let n = 0; b.phase === 'battle' && n < maxActs; n++) {
     if (!sides.includes(b.turn)) break;
     const o = aiTurn(b, b.turn);

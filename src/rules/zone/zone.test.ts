@@ -8,7 +8,8 @@ import { dist, los, makeBoard, reachable, zoneOf } from './board';
 import { mulberry32 } from './dice';
 import { join, maxWoundsOf, profileOf, unitHooks, woundsOf } from './profile';
 import { playOut, quickBattle, randomArmy, simSetup } from './sim';
-import { createBattle, deploy, pickDeploy, startDeploy, toDeploy } from './engine';
+import { act, attackNow, createBattle, ready, deploy, pickDeploy, startDeploy, toDeploy } from './engine';
+import { aiTurn } from './ai';
 import type { ZBattle } from './state';
 import { applyZoneBattle, startZoneBattle, zoneKey, ZONE_REWARDS } from './setup';
 import { newBattle, trackerUnit } from '../tracker';
@@ -88,6 +89,28 @@ describe('battle', () => {
       expect(b.result, m.id).toBeDefined();
       expect(b.log.some((l) => l.kind === 'shoot' || l.kind === 'melee'), m.id).toBe(true);
     }
+  });
+  it('plays a move and its shooting as two stages, when split', () => {
+    const rng = mulberry32(7);
+    const a = { book: ECHOES, units: randomArmy(ECHOES, 1500, rng, 'e') };
+    const d = { book: DOTHEA, units: randomArmy(DOTHEA, 1500, rng, 'd') };
+    const b = playOut(createBattle(simSetup(STANDARD_MISSION, a, d, 7)), [0, 1], 0);
+    let stages = 0;
+    for (let n = 0; b.phase === 'battle' && n < 2000; n++) {
+      const o = aiTurn(b, b.turn)!;
+      const out = act(b, o, true);
+      if (!b.pending) continue;
+      stages++;
+      expect(out.some((l) => l.kind === 'shoot'), 'no shooting in the move stage').toBe(false);
+      expect(act(b, o, true), 'nothing else acts while one is pending').toEqual([]);
+      const turn = b.turn;
+      const shots = attackNow(b, o.target).filter((l) => l.kind === 'shoot');
+      expect(b.pending).toBeUndefined();
+      expect(ready(b, turn).map((u) => u.id), 'its activation is over').not.toContain(o.unit);
+      for (const l of shots) expect(typeof l.wounds).toBe('number');
+    }
+    expect(b.phase).toBe('ended');
+    expect(stages).toBeGreaterThan(0);
   });
 });
 
