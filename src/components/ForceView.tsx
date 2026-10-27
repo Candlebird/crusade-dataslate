@@ -567,7 +567,7 @@ function UnitTasksRow({ f, c, onOpen }: { f: Force; c: Campaign; onOpen: () => v
     <>
       <div className="span-all row">
         <span className="grow small">
-          <b>Unit tasks:</b> Mentoring, Project, Recon or Garrison. <span className="muted">The unit is busy all round and can't fight, including the main Battle.</span>
+          <b>Unit tasks:</b> Mentoring, Project, Recon or Garrison. <span className="muted">The unit is busy all round: it can still fight, Battle-Worn (-1 Quality and -1 Defense).</span>
         </span>
         <button disabled={!freeUnits(f, c).length} onClick={onOpen}>Unit task…</button>
       </div>
@@ -612,11 +612,9 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const patrolRow = (
     <div className="span-all row">
       <span className="grow small">
-        {expedited
-          ? <span className="muted">Every unit has fought this round. They're free again when the GM ends the round.</span>
-          : <><b>Solo patrol:</b> send up to {SOLO_PATROL.points} pts to find a {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts enemy, then fight or turn back.</>}
+        <b>Solo patrol:</b> send up to {SOLO_PATROL.points} pts to find a {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts enemy, then fight or turn back.
       </span>
-      <button disabled={expedited || !f.units.some((u) => u.status === 'active')} onClick={() => setPatrol(true)}>Patrol…</button>
+      <button disabled={!f.units.some((u) => u.status === 'active')} onClick={() => setPatrol(true)}>Patrol…</button>
       {patrol && <PatrolModal force={f} onClose={() => setPatrol(false)} />}
     </div>
   );

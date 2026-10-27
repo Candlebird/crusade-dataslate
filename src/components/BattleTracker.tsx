@@ -826,6 +826,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
                 <tr key={u.id} className={u.destroyed ? 'dead' : u.activated ? 'done' : ''}>
                   <td className="s-2">
                     <b>{u.name}</b>
+                    {u.worn && <> <span className="tag gold" data-tip="Already fought this round: -1 Quality and -1 Defense">Battle-Worn</span></>}
                     {side.ai && !u.destroyed && (
                       <div className="row small">
                         <span className="muted">{AI_TREES[u.aiStyle ?? 'hybrid'].label}</span>

@@ -44,7 +44,7 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
     if (!found) return;
     if (done && !confirmAction(`${force.name} already recorded a patrol this round. Fight another anyway?`)) return;
     if (state.battle && !confirmAction('A battle is already in progress. Replace it with this patrol?')) return;
-    update((s) => void (s.battle = patrolBattle(found.mission, uid(), nowIso(), force, picked, s.settings, found.echoes)));
+    update((s) => void (s.battle = patrolBattle(found.mission, uid(), nowIso(), force, picked, s.settings, found.echoes, linked ? s.campaign : undefined)));
     onClose();
     go(href.tracker());
   };
@@ -71,19 +71,19 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
           {linked ? ' Either way, the units have gone out for this round.' : ''}
         </p>
         {done && <p className="small"><span className="tag gold">{force.name} already recorded a patrol this round.</span></p>}
-        {used.length > 0 && <p className="muted small">Each unit gets 1 Solo patrol or Expedition a round. Games at the table don't count.</p>}
+        {used.length > 0 && <p className="muted small">Units that already fought this round can go again, Battle-Worn: -1 Quality and -1 Defense.</p>}
         <div className="mission-pick">
           {active.length === 0 && <span className="muted small">No active units.</span>}
           {active.map((u) => {
             const on = picked.includes(u.id);
             const spent = used.includes(u.id);
-            const over = !on && (spent || points + u.points > SOLO_PATROL.points);
+            const over = !on && points + u.points > SOLO_PATROL.points;
             return (
               <label key={u.id} className={`shop-item${on ? ' selected' : ''}${over ? ' disabled' : ''}`}>
                 <input type="checkbox" checked={on} disabled={over} onChange={() => setPicked(on ? picked.filter((x) => x !== u.id) : [...picked, u.id])} />
                 <div className="grow">
                   <b>{unitName(u)}</b> <span className="muted small">{u.points} pts · {battlePoints(u, state.settings)} BP</span>
-                  {spent && <> <span className="tag gold">Already fought this round</span></>}
+                  {spent && <> <span className="tag gold" data-tip="Already fought this round: -1 Quality and -1 Defense">Battle-Worn</span></>}
                 </div>
               </label>
             );

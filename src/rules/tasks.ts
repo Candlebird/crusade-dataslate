@@ -20,7 +20,7 @@ export function tasksOf(f: Force, c: Campaign | undefined): Record<string, UnitT
   return c && t && t.round === currentRound(c) ? t.units : {};
 }
 
-/** Units on a task this round: they can't fight in any battle, the main Battle included. */
+/** Units on a task this round (they also count as used: in a battle they're Battle-Worn). */
 export const unitsBusy = (f: Force, c: Campaign | undefined) => Object.keys(tasksOf(f, c));
 
 /** Units that can still be set to a task: active, and not in a game, an Expedition or another task this round. */

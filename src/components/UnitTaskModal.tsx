@@ -57,7 +57,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
     : null;
 
   const busyNames = unit ? [unit, ...(task === 'mentor' && pupil ? [pupil] : [])].map(unitName).join(' and ') : '';
-  const warning = busyNames && `${busyNames} can't fight, patrol or go on an Expedition for the rest of round ${currentRound(c)}, including the main Battle.`;
+  const warning = busyNames && `${busyNames} can't go on an Expedition for the rest of round ${currentRound(c)}, and fight${unit && task === 'mentor' && pupil ? '' : 's'} Battle-Worn (-1 Quality and -1 Defense).`;
 
   const apply = () => {
     if (problem || !confirmAction(`${warning}\n\nSet ${TASK_NAMES[task]}?`)) return;

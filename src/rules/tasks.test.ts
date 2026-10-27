@@ -177,17 +177,29 @@ describe('garrison', () => {
 });
 
 describe('busy units', () => {
-  it('stay out of tracked battles until the round ends', () => {
+  it('fight Battle-Worn until the round ends', () => {
     const c = campaign();
     const f = force();
     garrison(c, f, 'vet', 'pA', '', newId);
     expect(unitsBusy(f, c)).toEqual(['vet']);
     const side = newSide('s', 'Alpha', 'A');
     loadForce(side, f, undefined, DEFAULT_SETTINGS, c);
-    expect(side.units.map((u) => u.id)).not.toContain('vet');
-    expect(side.units).toHaveLength(3);
+    expect(side.units).toHaveLength(4);
+    expect(side.units.filter((u) => u.worn).map((u) => u.id)).toEqual(['vet']);
     c.round! += 1;
     expect(unitsBusy(f, c)).toEqual([]);
+    loadForce(side, f, undefined, DEFAULT_SETTINGS, c);
+    expect(side.units.some((u) => u.worn)).toBe(false);
+  });
+
+  it('leave only comatose units home', () => {
+    const c = campaign();
+    const f = force();
+    f.units.find((u) => u.id === 'vet')!.status = 'comatose';
+    const side = newSide('s', 'Alpha', 'A');
+    loadForce(side, f, undefined, DEFAULT_SETTINGS, c);
+    expect(side.units.map((u) => u.id)).not.toContain('vet');
+    expect(side.units).toHaveLength(3);
   });
 
   it('follow a copied force', () => {

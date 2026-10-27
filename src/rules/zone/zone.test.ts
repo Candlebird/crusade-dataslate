@@ -126,8 +126,13 @@ describe('campaign hookup', () => {
     });
     // An old wound carries in.
     t.sides[1].units[0].wounds = t.sides[1].units[0].maxWounds - 1;
+    // A Battle-Worn unit fights at -1 Quality and -1 Defense.
+    t.sides[0].units[0].worn = true;
     const { battle } = startZoneBattle(t, [], books, 'quick', undefined, 9);
     expect(battle.units.length).toBe(armies[0].length + armies[1].length);
+    const worn = battle.units.find((u) => u.id === zoneKey(t.sides[0].id, t.sides[0].units[0].id))!;
+    expect(worn.p.kits[0].quality).toBe(Math.min(6, armies[0][0].quality + 1));
+    expect(worn.p.kits[0].defense).toBe(Math.min(6, armies[0][0].defense + 1));
     const hurt = battle.units.find((u) => u.id === zoneKey(t.sides[1].id, t.sides[1].units[0].id))!;
     expect(woundsOf(hurt.p, hurt.id)).toBe(t.sides[1].units[0].maxWounds - 1);
     playOut(battle);

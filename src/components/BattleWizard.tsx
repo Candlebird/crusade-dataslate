@@ -6,7 +6,6 @@ import { uid } from '../model/factory';
 import type { BattleResult, Campaign, Force, Unit } from '../model/types';
 import { AGENDAS, MARKED_XP, MAX_AGENDAS, REWARD_TABLES, SCAR_TABLE, type RewardTableKey } from '../rules/data';
 import { matchBonusesEarned } from '../rules/detachments';
-import { unitsBusy } from '../rules/tasks';
 import { ECHOES, currentRound, emptyNexusPick, markUnitsUsed, nexusEntry, nexusGeneration, recordSectorGame, unitsUsed, type NexusContext, type NexusPick } from '../rules/nexus';
 import { depositNearest, depositText, rewardOrigin } from '../rules/production';
 import { deathDiceCount, deathOutcome, forceTotals, levelForXp, rollDice, rollDie, type DeathOutcome } from '../rules/engine';
@@ -61,20 +60,17 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
     const side = sideOfForce(state.battle, forceId);
     return side && state.battle ? { battle: state.battle, side, past: '' } : undefined;
   });
-  // Each unit goes on one Solo patrol or Expedition a campaign round: units that already have sit a patrol out. Games played at
-  // the table (skirmishes, the main Battle, a Crisis battle) don't use a unit up: every unit can fight them, but for units busy on a task.
-  const [{ used, busy }] = useState(() => {
+  // Every unit but a comatose one can fight any battle: one that already fought this round (a Solo patrol, an Expedition
+  // or a task) is just Battle-Worn.
+  const [worn] = useState(() => {
     const c = state.campaign;
     const on = f && c?.factions.some((x) => x.id === f.nexus?.factionId);
-    return on ? { used: unitsUsed(f, c), busy: unitsBusy(f, c) } : { used: [], busy: [] };
+    return on ? unitsUsed(f, c) : [];
   });
   const [input, setInput] = useState<BattleInput | null>(() => {
     if (!f) return null;
     const blank = initialInput(f, forceTotals(f, state.settings).bp);
-    const filled = source ? wizardPrefill(source.battle, source.side, blank, f, state.campaign) : blank;
-    const out = filled.patrol ? used : busy;
-    for (const id of out) if (filled.units[id]) filled.units[id] = { ...filled.units[id], in: false };
-    return filled;
+    return source ? wizardPrefill(source.battle, source.side, blank, f, state.campaign) : blank;
   });
   const [applied, setApplied] = useState<BattleOutcome | null>(null);
 
@@ -114,7 +110,6 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
   const setNexusPick = (key: string, patch: Partial<NexusPick>) =>
     set({ nexusPicks: { ...input.nexusPicks, [key]: { ...(input.nexusPicks?.[key] ?? emptyNexusPick()), ...patch } } });
   const linked = !!(campaign && f.nexus && campaign.factions.some((x) => x.id === f.nexus!.factionId));
-  const locked = input.patrol ? used : busy;
 
   const apply = () => {
     const msg = preview.warnings.length
@@ -183,7 +178,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
         <p className="panel notice small">
           Filled in from {source.past ? 'past battle' : 'the battle tracker'} <a href={href.tracker()}>{source.battle.mission.name}</a>
           {source.past && ` (${localDate(source.past)}, as ${source.battle.sides.find((x) => x.id === source.side)?.name})`}. Check it, then add XP and rewards.
-          {' '}<button className="ghost small" onClick={() => setInput(restartInput(initialInput(f, forceTotals(f, state.settings).bp), input, input.patrol ? used : busy))}>Start blank instead</button>
+          {' '}<button className="ghost small" onClick={() => setInput(restartInput(initialInput(f, forceTotals(f, state.settings).bp), input, []))}>Start blank instead</button>
         </p>
       )}
       {source && claimedBy && (
@@ -215,7 +210,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       </div>
 
       {step === 0 && <SetupStep input={input} set={set} campaign={linked ? campaign : undefined} />}
-      {step === 1 && <UnitsStep units={units} input={input} setUnit={setUnit} used={locked} busy={busy} />}
+      {step === 1 && <UnitsStep units={units} input={input} setUnit={setUnit} worn={worn} />}
       {step === 2 && <DeathsStep units={units} input={input} setUnit={setUnit} />}
       {step === 3 && <RewardsStep units={units} input={full} set={set} setPick={setPick} />}
       {step === 3 && linked && <NexusRewards units={units} input={input} nexus={nexus} setPick={setNexusPick} />}
@@ -316,7 +311,7 @@ function SetupStep({ input, set, campaign }: { input: BattleInput; set: (p: Part
 
 // ---- Step 2: units ----
 
-function UnitsStep({ units, input, setUnit, used, busy }: { units: Unit[]; input: BattleInput; setUnit: (id: string, p: Partial<UnitBattle>) => void; used: string[]; busy: string[] }) {
+function UnitsStep({ units, input, setUnit, worn }: { units: Unit[]; input: BattleInput; setUnit: (id: string, p: Partial<UnitBattle>) => void; worn: string[] }) {
   const part = participationXp(input);
   return (
     <div className="panel">
@@ -339,12 +334,11 @@ function UnitsStep({ units, input, setUnit, used, busy }: { units: Unit[]; input
               const total = r.in ? part + (input.patrol ? r.killXp : (r.marked ? MARKED_XP : 0) + r.killXp + r.bonusXp) : 0;
               return (
                 <tr key={u.id} className={r.in ? '' : 'removed'}>
-                  <td data-label="Fought"><input type="checkbox" checked={r.in} disabled={used.includes(u.id)} onChange={(e) => setUnit(u.id, { in: e.target.checked })} /></td>
+                  <td data-label="Fought"><input type="checkbox" checked={r.in} onChange={(e) => setUnit(u.id, { in: e.target.checked })} /></td>
                   <td className="s-2">
                     <b>{unitName(u)}</b>
                     <div className="muted small">{u.name && u.unitType} {comatose && <span className="tag cyan" data-tip="Sits this battle out; recovers afterwards">Comatose</span>}
-                      {busy.includes(u.id) ? <span className="tag gold" data-tip="On a downtime task this round: can't fight, including the main Battle">Busy on a task</span>
-                        : used.includes(u.id) && <span className="tag gold" data-tip="1 Solo patrol or Expedition per unit per campaign round">Already fought this round</span>}</div>
+                      {worn.includes(u.id) && <span className="tag gold" data-tip="Already fought this round: -1 Quality and -1 Defense">Battle-Worn</span>}</div>
                   </td>
                   <td data-label="Destroyed"><input type="checkbox" disabled={!r.in} checked={r.destroyed} onChange={(e) => setUnit(u.id, { destroyed: e.target.checked, death: e.target.checked ? r.death : null })} /></td>
                   <td data-label="Marked"><input type="radio" name="marked" disabled={!r.in || input.patrol} checked={r.marked} onChange={() => setUnit(u.id, { marked: true })} onClick={() => r.marked && setUnit(u.id, { marked: false })} /></td>
@@ -360,11 +354,8 @@ function UnitsStep({ units, input, setUnit, used, busy }: { units: Unit[]; input
         </table>
       </div>
       <p className="muted small">Total excludes death rolls and table rewards. Comatose units sit out by default and recover once the battle is applied.</p>
-      {units.some((u) => used.includes(u.id) && !busy.includes(u.id)) && (
-        <p className="muted small">Each unit gets 1 Solo patrol or Expedition per campaign round. Units that already went earn nothing here until the GM ends the round. Games at the table don't count: every unit can still fight a skirmish or the main Battle.</p>
-      )}
-      {units.some((u) => busy.includes(u.id)) && (
-        <p className="muted small">Units on a downtime task (Mentoring, Project, Recon, Garrison) can't fight this round, including the main Battle. They're free again when the GM ends the round.</p>
+      {units.some((u) => worn.includes(u.id)) && (
+        <p className="muted small">Battle-Worn units already fought this round (a Solo patrol, an Expedition or a task): they fight at -1 Quality and -1 Defense until the GM ends the round.</p>
       )}
     </div>
   );

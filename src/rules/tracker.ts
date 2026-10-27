@@ -2,12 +2,11 @@ import type { ArmyList, BattleResult, Campaign, CampaignEvent, Force, Settings, 
 import { battlePoints } from './engine';
 import { listUnits } from './lists';
 import { emptyUnitBattle, unitName, type BattleInput } from './battle';
-import { NEXUS_CRISIS, activeEvent, benefitOf, ECHOES, factionName, lordById, ORGANIZED_STRIKE, ownedSectors } from './nexus';
+import { NEXUS_CRISIS, activeEvent, unitsUsed, benefitOf, ECHOES, factionName, lordById, ORGANIZED_STRIKE, ownedSectors } from './nexus';
 import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
 import { aiStyleFor, type AiStyle } from './aiTrees';
 import { aiDefended, modifierOf, ratingFor } from './difficulty';
 import { isReinforced } from './production';
-import { unitsBusy } from './tasks';
 import type { ZoneMode } from './zone/rewards';
 
 // The battle tracker: one game in progress, scored from the mission it was started with.
@@ -51,6 +50,8 @@ export interface TrackerUnit {
   points?: number;
   /** Which AI decision tree the unit follows when its side is run by the AI (hybrid if unset). */
   aiStyle?: AiStyle;
+  /** Battle-Worn: it already fought this round (a Solo patrol, an Expedition or a task), so it fights at -1 Quality and -1 Defense. */
+  worn?: boolean;
 }
 
 export interface TrackerAgenda {
@@ -193,27 +194,32 @@ export function trackerUnit(u: Unit): TrackerUnit {
   return { id: u.id, unitId: u.id, name: unitName(u), maxWounds, wounds: maxWounds, shaken: false, activated: false, destroyed: false, xp: 0, points: u.points, aiStyle: aiStyleFor(u) };
 }
 
-/** Fill a side from a force (and one of its lists, or every active unit). Units busy on a task this round (with the campaign) stay home. */
+/** A force's unit on the tracker, Battle-Worn when it already fought this round. */
+const wornUnit = (worn: Set<string>) => (u: Unit): TrackerUnit => ({ ...trackerUnit(u), ...(worn.has(u.id) ? { worn: true } : {}) });
+
+/**
+ * Fill a side from a force (and one of its lists, or every active unit). Only comatose units stay home: with the
+ * campaign, units that already fought this round come Battle-Worn.
+ */
 export function loadForce(side: TrackerSide, f: Force, list: ArmyList | undefined, s: Settings, c?: Campaign) {
-  const busy = new Set(unitsBusy(f, c));
-  const units = (list ? listUnits(f, list) : f.units.filter((u) => u.status === 'active')).filter((u) => !busy.has(u.id));
+  const units = (list ? listUnits(f, list) : f.units).filter((u) => u.status === 'active');
   side.name = f.name;
   side.forceId = f.id;
   side.listId = list?.id;
   side.roster = undefined;
-  side.units = units.map(trackerUnit);
+  side.units = units.map(wornUnit(new Set(unitsUsed(f, c))));
   side.bp = units.reduce((n, u) => n + battlePoints(u, s), 0);
   side.manipulations = (f.nexus?.pending ?? []).map((text) => ({ text, used: false }));
 }
 
 /** A solo patrol: some of one force's active units against the AI, and a random Void Echoes army when one is given. */
-export function patrolBattle(mission: MissionDef, id: string, startedAt: string, f: Force, unitIds: string[], s: Settings, echoes?: Unit[]): TrackedBattle {
+export function patrolBattle(mission: MissionDef, id: string, startedAt: string, f: Force, unitIds: string[], s: Settings, echoes?: Unit[], c?: Campaign): TrackedBattle {
   const b = newBattle(mission, id, startedAt, Math.random, FORMATS.find((x) => x.label === '1 v AI'));
   b.patrol = true;
   const me = b.sides.find((x) => !x.ai)!;
   const units = f.units.filter((u) => u.status === 'active' && unitIds.includes(u.id));
   loadForce(me, f, undefined, s);
-  me.units = units.map(trackerUnit);
+  me.units = units.map(wornUnit(new Set(unitsUsed(f, c))));
   me.bp = units.reduce((n, u) => n + battlePoints(u, s), 0);
   const ai = b.sides.find((x) => x.ai);
   if (ai && echoes) loadUnits(ai, ECHOES.name, echoes);
