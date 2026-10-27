@@ -43,7 +43,8 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const [z, setZ] = useState<ZBattle>(() => structuredClone(battle));
   const [mode, setMode] = useState<ZoneMode>(mode0);
   const [sel, setSel] = useState<string>();
-  const [target, setTarget] = useState<string>();
+  // In the shooting step: Shoot was pressed, and a tap on an enemy in reach fires at it.
+  const [aiming, setAiming] = useState(false);
   // The spell to cast with the next order, as 'name|target id'.
   const [cast, setCast] = useState('');
   const [open, setOpen] = useState<Set<number>>(new Set());
@@ -67,7 +68,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     onSave(next, mode);
     return next;
   };
-  const clearPick = () => { setTarget(undefined); setCast(''); };
+  const clearPick = () => { setAiming(false); setCast(''); };
 
   // The AI's turns (and the join step when nobody needs to pick), one at a time with a pause between.
   const aiDue = z.phase === 'join' ? !anyMine : (z.phase === 'deploy' || z.phase === 'battle') && !mine(z.turn);
@@ -125,8 +126,8 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     if (canAct && acts.includes('arrive')) return new Set(arriveSquares(z, unit!));
     return new Set([...reach.adv, ...reach.far]);
   }, [z, sel, canDeploy, canAct, reach]);
-  // The enemies ringed in red: the ones the picked unit can charge, or in the shooting step the ones in reach.
-  const targetable = new Set(attacking ? shots.map((t) => t.id) : charges.map((c) => c.target.id));
+  // The enemies ringed in red: the ones the picked unit can charge, or once Shoot is pressed the ones in reach.
+  const targetable = new Set(attacking ? (aiming ? shots.map((t) => t.id) : []) : charges.map((c) => c.target.id));
 
   // Picks the unit to deploy when it's the player's turn and nothing is picked, and the unit that's to shoot. In the
   // battle the player picks the unit to activate (a tap on it once picked holds it, so it isn't picked for them).
@@ -147,8 +148,8 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     step((b) => act(b, order, 'always'));
     clearPick();
   };
-  const attackGo = (holdFire = false) => {
-    step((b) => attackNow(b, holdFire ? undefined : target, holdFire));
+  const attackGo = (target?: string) => {
+    step((b) => attackNow(b, target, !target));
     clearPick();
   };
   // The picked unit staying where it is: Hold (then shoot), or Recover when Shaken.
@@ -163,7 +164,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     else if (reach.far.has(sq)) go('rush', { to: sq });
   };
   const clickUnit = (u: ZUnit) => {
-    if (attacking && targetable.has(u.id)) { setTarget(u.id === target ? undefined : u.id); return; }
+    if (attacking) { if (targetable.has(u.id)) attackGo(u.id); return; }
     if (canAct && targetable.has(u.id)) { go('charge', { target: u.id }); return; }
     if (canAct && u.id === unit!.id) { stay(); return; }
     // A unit of the player's that has already acted, on a square the picked unit can reach: the tap is for the square.
@@ -219,7 +220,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
           <div key={i} className={cls} onClick={() => clickSquare(i)} data-tip={tip || undefined} data-zone={zoneOf(z.board, i)}>
             {t && <span className="zb-terrain">{t.name.slice(0, 1)}</span>}
             {m !== undefined && !z.gone[m] && <span className={`zb-obj${holder === 0 || holder === 1 ? ` ${tone(holder)}` : holder === 'x' ? ' x' : ''}`}>◆</span>}
-            {(here.get(i) ?? []).map((u) => <Token key={u.id} u={u} fu={forceUnits.get(u.id.slice(u.id.indexOf('|') + 1))} tone={tone(u.side)} sel={u.id === sel} aim={u.id === target} can={targetable.has(u.id)} done={u.activated && z.phase === 'battle'} onClick={(e) => { e.stopPropagation(); clickUnit(u); }} />)}
+            {(here.get(i) ?? []).map((u) => <Token key={u.id} u={u} fu={forceUnits.get(u.id.slice(u.id.indexOf('|') + 1))} tone={tone(u.side)} sel={u.id === sel} can={targetable.has(u.id)} done={u.activated && z.phase === 'battle'} onClick={(e) => { e.stopPropagation(); clickUnit(u); }} />)}
           </div>
         );
       })}
@@ -285,11 +286,15 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
         {attacking && (
           <>
             <p className="small muted">
-              {!shots.length ? 'No enemy in reach from here.' : target ? `Shooting at ${unitById(z, target)?.name}; guns that can't reach it pick the nearest they can.` : `${shots.length} enem${shots.length === 1 ? 'y' : 'ies'} in reach, ringed in red. Guns shoot at the nearest they reach; tap one to pick it.`}
+              {!shots.length ? 'No enemy in reach from here.'
+                : aiming ? `Tap an enemy ringed in red to shoot it. Guns that can't reach it fire at the nearest they can.`
+                : `${shots.length} enem${shots.length === 1 ? 'y' : 'ies'} in reach.`}
             </p>
             <div className="row wrap">
-              {shots.length > 0 && <button className="primary" onClick={() => attackGo()}>Shoot{target ? ` ${unitById(z, target)?.name}` : ''}</button>}
-              <button className={shots.length ? 'small' : 'primary'} onClick={() => attackGo(shots.length > 0)} data-tip="End the activation without shooting">{shots.length ? 'Hold fire' : 'End activation'}</button>
+              {shots.length > 0 && (aiming
+                ? <button className="small" onClick={() => setAiming(false)}>Cancel</button>
+                : <button className="primary" onClick={() => setAiming(true)}>Shoot</button>)}
+              <button className={shots.length ? 'small' : 'primary'} onClick={() => attackGo()} data-tip="End the activation without shooting">{shots.length ? 'Hold fire' : 'End activation'}</button>
             </div>
           </>
         )}
@@ -375,11 +380,11 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   );
 }
 
-function Token({ u, fu, tone, sel, aim, can, done, onClick }: { u: ZUnit; fu?: Unit; tone: string; sel: boolean; aim: boolean; can: boolean; done: boolean; onClick: (e: React.MouseEvent) => void }) {
+function Token({ u, fu, tone, sel, can, done, onClick }: { u: ZUnit; fu?: Unit; tone: string; sel: boolean; can: boolean; done: boolean; onClick: (e: React.MouseEvent) => void }) {
   const left = woundsLeft(u);
   const max = maxWoundsOf(u.p);
   return (
-    <button data-zu={u.id} className={`zb-unit ${tone}${sel ? ' sel' : ''}${aim ? ' aim' : ''}${can ? ' can' : ''}${done ? ' done' : ''}${u.shaken ? ' shaken' : ''}`} onClick={onClick}
+    <button data-zu={u.id} className={`zb-unit ${tone}${sel ? ' sel' : ''}${can ? ' can' : ''}${done ? ' done' : ''}${u.shaken ? ' shaken' : ''}`} onClick={onClick}
       data-tip={`${u.name}: ${alive(u.p).length} model${alive(u.p).length === 1 ? '' : 's'}, ${left}/${max} wounds${u.shaken ? ', Shaken' : ''}${done ? ', has acted' : ''}`}>
       {fu ? <Portrait unit={fu} title={u.name} /> : <EmblemBadge emblem={echoPortrait(u.name)} title={u.name} />}
       <span className="zb-hp" style={{ width: `${Math.round((left / Math.max(1, max)) * 100)}%` }} />
