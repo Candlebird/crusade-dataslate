@@ -1,7 +1,7 @@
-import { dist, SQUARE, zoneOf } from './board';
+import { dist, SQUARE, zoneOf, zoneSquares } from './board';
 import { canShoot, gunRange, has, mainKit, rulesOf, woundsLeft } from './combat';
 import { average, resume } from './dice';
-import { actions, arriveSquares, castable, chargeTargets, moves, ready, type Order } from './engine';
+import { actions, arriveSquares, castable, chargeTargets, moves, ready, speed, type Order } from './engine';
 import { alive, toughOf } from './profile';
 import { onTable, type SideIx, type ZBattle, type ZUnit } from './state';
 
@@ -65,7 +65,22 @@ const wanted = (b: ZBattle, side: SideIx) => b.board.objectives
   .map((o, i) => ({ sq: o.sq, i, owner: o.owner }))
   .filter((o) => !b.gone[o.i] && b.control[o.i] !== side && o.owner !== side && !(b.carried[o.i] && onTable(b).some((u) => u.id === b.carried[o.i] && u.side === side)));
 
-const nearestSq = (b: ZBattle, from: number, squares: number[]) => squares.sort((x, y) => dist(b.board, from, x) - dist(b.board, from, y))[0];
+/**
+ * The nearest marker the side still wants that fewer than two friends are closer to: a side with markers to spare
+ * sends a unit or two to each, and the rest are free to fight.
+ */
+function goalFor(b: ZBattle, u: ZUnit): number | undefined {
+  const mates = onTable(b).filter((x) => x.side === u.side && x.id !== u.id && !x.shaken);
+  return wanted(b, u.side).map((o) => o.sq)
+    .filter((sq) => mates.filter((x) => dist(b.board, x.sq, sq) < dist(b.board, u.sq, sq)).length < 2)
+    .sort((x, y) => dist(b.board, u.sq, x) - dist(b.board, u.sq, y))[0];
+}
+
+/** An enemy could get into the zone on its next activation (a Rush or a Charge, with a square to spare). */
+function threatened(b: ZBattle, side: SideIx, z: number): boolean {
+  const squares = zoneSquares(b.board, z);
+  return onTable(b).some((e) => e.side !== side && Math.min(...squares.map((sq) => dist(b.board, e.sq, sq))) <= speed(b, e).rush + 1);
+}
 
 /** A square to move to on the way to `goal`, picked well: closer, in cover for shooters, room in the zone. */
 function stepTo(b: ZBattle, u: ZUnit, action: 'advance' | 'rush', goal: number, smart: boolean): number {
@@ -83,11 +98,18 @@ function stepTo(b: ZBattle, u: ZUnit, action: 'advance' | 'rush', goal: number, 
   return best;
 }
 
-/** Holding a marker: a unit in a marker's zone that it's needed to keep stays and shoots. */
+/**
+ * Holding a marker: a marker stays with its side until the enemy takes the zone, so it only needs a guard while an
+ * enemy could reach it. Then the cheapest unit there with guns stays; the others (and every unit, once no enemy is
+ * near) are free to go. Melee units never guard: they go after the enemy.
+ */
 function guarding(b: ZBattle, u: ZUnit): boolean {
   const z = zoneOf(b.board, u.sq);
-  return b.board.objectives.some((o, i) => !b.gone[i] && zoneOf(b.board, o.sq) === z && (b.control[i] === u.side || b.control[i] === 'x' || o.owner === u.side)
-    && onTable(b).filter((x) => x.side === u.side && zoneOf(b.board, x.sq) === z && !x.shaken).length <= 1);
+  const held = b.board.objectives.some((o, i) => !b.gone[i] && zoneOf(b.board, o.sq) === z && (b.control[i] === u.side || b.control[i] === 'x' || o.owner === u.side));
+  if (!held || !threatened(b, u.side, z)) return false;
+  const guard = onTable(b).filter((x) => x.side === u.side && zoneOf(b.board, x.sq) === z && !x.shaken && x.ai !== 'melee')
+    .sort((x, y) => x.points - y.points || (x.id < y.id ? -1 : 1))[0];
+  return guard?.id === u.id;
 }
 
 /** The order the unit's decision tree gives, with the AI's picks filled in. */
@@ -112,8 +134,7 @@ export function orderFor(b: ZBattle, u: ZUnit, smart = true): Order {
   };
   const enemies = onTable(b).filter((x) => x.side !== u.side);
   const nearestEnemy = enemies.sort((x, y) => dist(b.board, u.sq, x.sq) - dist(b.board, u.sq, y.sq))[0];
-  const goals = wanted(b, u.side);
-  const goal = goals.length ? nearestSq(b, u.sq, goals.map((o) => o.sq)) : undefined;
+  const goal = goalFor(b, u);
   const advShot = (to: number) => bestShot(b, u, to, smart);
   const charge = (c: { target: ZUnit }) => ({ ...base, action: 'charge' as const, target: c.target.id });
   const advance = (towards: number) => {
@@ -123,10 +144,10 @@ export function orderFor(b: ZBattle, u: ZUnit, smart = true): Order {
   const rush = (towards: number) => (can.includes('rush') ? { ...base, action: 'rush' as const, to: stepTo(b, u, 'rush', towards, smart) } : advance(towards));
   const hold = () => ({ ...base, action: 'hold' as const, target: advShot(u.sq).t?.id });
 
-  // A unit keeping a marker it alone holds stays on it (and shoots, or charges what's in reach).
+  // A unit guarding a marker stays on it and shoots, or charges what's in its zone (anything in reach, for a hybrid).
   if (smart && u.sq >= 0 && guarding(b, u)) {
     const c = pickCharge();
-    if (c && zoneOf(b.board, c.target.sq) === zoneOf(b.board, u.sq)) return charge(c);
+    if (c && (u.ai === 'hybrid' || zoneOf(b.board, c.target.sq) === zoneOf(b.board, u.sq))) return charge(c);
     const inZone = moves(b, u, 'advance');
     const z = zoneOf(b.board, u.sq);
     const stay = [...inZone.keys()].filter((sq) => zoneOf(b.board, sq) === z);
