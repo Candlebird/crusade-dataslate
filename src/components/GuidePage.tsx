@@ -133,6 +133,12 @@ export default function GuidePage() {
           half strength, or beaten in melee, tests Morale and may be Shaken, losing its next turn. Nexus sector fights add the sector's
           modifiers, plus any Ion Storm that round. Apply and claim it like any battle: losses and kill XP carry over.
         </p>
+        <p className="muted small">
+          Once the GM switches on zone battles, the button reads <b><Icon name="g:crossed-swords" /> Zone battle</b> instead: the battle is
+          played out on a board of 12" zones, either in <b>Command</b> (you order your side, for ¾ of the XP and the reward rolls) or
+          <b> Quick</b> (the AI plays both, for half the XP). It's saved after every step, so you can close it and pick it up later.
+          The Voidspawn, the Echo Lord, home challenges and battles between players stay at the table.
+        </p>
         <Step n={1} title="Open Past battles" where={<a href={href.tracker()}>Battle</a>}>
           <p>The <b>Past battles</b> panel is at the bottom of the Battle page.</p>
         </Step>

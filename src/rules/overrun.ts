@@ -33,7 +33,7 @@ export function overrunBlock(s: Sector, force: Force | undefined): string {
 }
 
 /** The defender's detachment for an attack fought without the table: the one dug in, else one there, else any of theirs. */
-function defenderForce(c: Campaign, a: Attack, forces: Force[]): Force | undefined {
+export function defenderForce(c: Campaign, a: Attack, forces: Force[]): Force | undefined {
   const theirs = forces.filter((f) => f.nexus?.factionId === a.defender);
   return theirs.find((f) => f.id === a.dugIn) ?? theirs.find((f) => positionOf(c, f)?.id === a.sectorId) ?? theirs[0];
 }

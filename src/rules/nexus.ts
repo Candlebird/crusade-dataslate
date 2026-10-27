@@ -10,6 +10,7 @@ import { settleGame, unsettleGame } from './movement';
 import { isPlaced } from './hexmap';
 import { deposited, depositNearest, hasBuilding, loseBank } from './production';
 import { hasPerk } from './warlords';
+import { ZONE_REWARDS, type ZoneMode } from './zone/rewards';
 
 // Nexus Wars: what a faction earns each round and after each match. The tables and costs live in nexusData.ts;
 // the round itself (ending it, income, threat) is in rounds.ts.
@@ -82,7 +83,12 @@ export function markUnitsUsed(f: Force, c: Campaign, ids: string[]) {
   f.nexus.usedUnits = { round: currentRound(c), ids: [...new Set([...unitsUsed(f, c), ...ids])] };
 }
 
-export const activeCrisis = (c: Campaign) => (c.crisis && c.crisis.round === currentRound(c) ? c.crisis : undefined);
+export const activeCrisis = (c: Campaign) => {
+  const r = currentRound(c);
+  return c.crisis && r >= c.crisis.round && r <= crisisUntil(c.crisis) ? c.crisis : undefined;
+};
+/** The last round the Crisis can be fought in. */
+export const crisisUntil = (crisis: NonNullable<Campaign['crisis']>) => crisis.until ?? crisis.round;
 
 /** Hand a sector to a new owner, noting the old one. A Reinforce, the production bank and a guardian don't survive the change (buildings do; a guardian stays when the Echoes take it). */
 export function changeHands(s: Sector, owner: string, undo: NonNullable<CampaignEvent['undo']>) {
@@ -324,7 +330,7 @@ export function homeChallengeBlock(c: Campaign, s: Sector | undefined): string |
 export function nexusGeneration(
   c: Campaign | undefined, factionId: string | undefined, sectorId: string, result: BattleResult, vsAi: boolean, opponent?: string,
   /** From a tracked battle: its Crisis round (if it was the Nexus Crisis), the recording force, and the battle's MVP force. */
-  battle?: { crisis?: number; forceId?: string; mvp?: string },
+  battle?: { crisis?: number; forceId?: string; mvp?: string; zone?: ZoneMode },
 ): NexusContext {
   if (!c || !factionId || !c.factions.some((f) => f.id === factionId)) return { items: [], notes: [] };
   const won = result === 'win';
@@ -349,14 +355,16 @@ export function nexusGeneration(
     } else notes.push('Held your home sector. Log the game with the challenger to claim 1 round of their sector income.');
   }
 
-  if (!fought && won) {
+  if (!fought && won && battle?.zone) notes.push('A zone battle earns no Strategic Asset.');
+  else if (!fought && won) {
     const wins = c.log.filter((e) => e.skirmish && e.winner === factionId && (e.round ?? 1) === ctx.round).length;
     notes.push(wins < NEXUS_ROUNDS.assetsMax
       ? `Skirmish win: +1 Strategic Asset for ${factionName(c, factionId)} to spend in this round's Battle (${wins + 1} of ${NEXUS_ROUNDS.assetsMax}).`
       : `Skirmish win: ${factionName(c, factionId)} already has its ${NEXUS_ROUNDS.assetsMax} Strategic Assets this round.`);
     if (vsAi) notes.push(`A patrol against the ${ECHOES.name}: their threat drops ${NEXUS_ROUNDS.threatPerPatrolWin} at round end.`);
   }
-  items.push({ key: 'matchBonus', kind: 'matchBonus', source: 'Match bonus', us: NEXUS_ROUNDS.matchBonusUs });
+  if (battle?.zone) notes.push('A zone battle earns no match bonus.');
+  else items.push({ key: 'matchBonus', kind: 'matchBonus', source: 'Match bonus', us: NEXUS_ROUNDS.matchBonusUs });
   // A Reaver Warlord's force takes more from its wins.
   const lord = c.factions.find((f) => f.id === factionId)?.warlord;
   const reaver = won && battle?.forceId && lord?.forceId === battle.forceId
@@ -385,6 +393,11 @@ export function nexusGeneration(
     ctx.bounty = true;
     notes.push(`Retook ${fought.name} from the ${ECHOES.name}: a bounty roll on the AI special table.`);
   }
+  // Quick: no rolls of any kind, only what's paid outright.
+  if (battle?.zone && !ZONE_REWARDS[battle.zone].rolls) {
+    ctx.items = items.filter((i) => i.kind !== 'relicRoll' && i.kind !== 'shardRoll');
+    if (ctx.bounty) { delete ctx.bounty; notes.push('Quick battle: no bounty roll.'); }
+  }
   return ctx;
 }
 
@@ -397,7 +410,7 @@ function crisisGeneration(c: Campaign, won: boolean, forceId: string | undefined
   if (won) {
     items.push({ key: 'crisis', kind: 'us', source: `Nexus Crisis — ${lord} defeated`, us: NEXUS_CRISIS.winUs });
     if (forceId && mvp === forceId) items.push({ key: 'crisisMvp', kind: 'relic', source: `Nexus Crisis MVP: a ${NEXUS_CRISIS.mvpTier} relic` });
-  } else notes.push(`The Nexus Crisis was lost: the ${ECHOES.name} take each faction's sector nearest ${lord} at round end.`);
+  } else notes.push(`${lord} still stands. Unless it's beaten by the end of round ${crisisUntil(crisis)}, the ${ECHOES.name} take each faction's sector nearest it.`);
   return { items, notes, round: crisis.round };
 }
 

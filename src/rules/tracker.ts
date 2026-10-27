@@ -8,6 +8,7 @@ import { aiStyleFor, type AiStyle } from './aiTrees';
 import { aiDefended, modifierOf, ratingFor } from './difficulty';
 import { isReinforced } from './production';
 import { unitsBusy } from './tasks';
+import type { ZoneMode } from './zone/rewards';
 
 // The battle tracker: one game in progress, scored from the mission it was started with.
 // The mission is copied in, so editing the library mid-game doesn't change a running battle.
@@ -96,6 +97,8 @@ export interface TrackedBattle {
   crisis?: number;
   /** A solo patrol (downtime): reduced rewards, see SOLO_PATROL. */
   patrol?: boolean;
+  /** Fought as a zone battle instead of at the table: Command or Quick rewards (zone/setup.ts ZONE_REWARDS). */
+  zoneMode?: ZoneMode;
   /** OPR Advanced deployment style, if one was picked or rolled. */
   deploymentStyle?: string;
   notes: string;
@@ -470,7 +473,9 @@ export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInp
     sectorId: sector?.id ?? input.sectorId,
     sectorName: sector?.name ?? input.sectorName,
     notes: [
-      b.auto
+      b.zoneMode
+        ? `Zone battle, ${b.zoneMode === 'command' ? 'Command' : 'Quick'} (${b.mission.name}): destroyed ${b.auto?.dealt[side.team] ?? 0} pts, lost ${teamsOf(b).filter((t) => t !== side.team).reduce((n, t) => n + (b.auto?.dealt[t] ?? 0), 0)} pts.`
+        : b.auto
         ? `Auto-battle (${b.mission.name}): destroyed ${b.auto.dealt[side.team] ?? 0} pts, lost ${teamsOf(b).filter((t) => t !== side.team).reduce((n, t) => n + (b.auto!.dealt[t] ?? 0), 0)} pts.`
         : `${b.mission.name}, ${scores} VP after round ${b.round}.`,
       allies.length ? `Allied with ${allies.map((x) => x.name).join(' & ')}.` : '',
@@ -480,6 +485,7 @@ export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInp
     units,
     from: { battleId: b.id, sideId },
     ...(b.patrol ? { patrol: true } : {}),
+    ...(b.zoneMode ? { zone: b.zoneMode } : {}),
   };
 }
 

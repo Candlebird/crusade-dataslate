@@ -82,9 +82,12 @@ function markers(m: MissionDef, t: TableSize): { shapes: MapShape[]; notes: stri
   return { shapes: [], notes: [] };
 }
 
-/** The map for each mission whose deployment it can draw; undefined for a custom deployment it can't read. */
-export function deploymentMap(m: MissionDef, points: number): DeploymentMap | undefined {
-  const t = suggestTable(points);
+/**
+ * The map for each mission whose deployment it can draw; undefined for a custom deployment it can't read.
+ * `table` overrides the suggested table (the zone battle's deep board is 48" × 72").
+ */
+export function deploymentMap(m: MissionDef, points: number, table?: TableSize): DeploymentMap | undefined {
+  const t = table ?? suggestTable(points);
   const cx = t.w / 2, cy = t.h / 2;
   const centre = (label: string, side: ZoneSide, dashed = false): MapShape[] => [
     { kind: 'circle', cx, cy, r: ZONE, side, label, dashed },

@@ -14,6 +14,7 @@ import {
 import { applyScar, levelForXp, previousBracketXp, relicBearer, sufferingRolls, type DeathOutcome, type ScarResult } from './engine';
 import { grantRelic } from './relicVault';
 import { MANIPULATION_PREFIX, NEXUS_ROUNDS, RELIC_TAKEN, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
+import { ZONE_REWARDS, type ZoneMode } from './zone/rewards';
 
 // Post-battle resolution ("Gaining Experience", "Gaining RP", "Deaths").
 // resolveBattle() mutates a force draft, so the wizard can preview on a clone and apply the same code for real.
@@ -71,6 +72,8 @@ export interface BattleInput {
   from?: { battleId: string; sideId: string };
   /** Solo patrol (downtime): participation and kill XP only — no RP, reward rolls or Marked for Greatness. */
   patrol?: boolean;
+  /** Fought as a zone battle: Command (3/4 XP) or Quick (1/2 XP, no reward rolls). Neither earns the match bonus. */
+  zone?: ZoneMode;
 }
 
 export interface RewardRow {
@@ -96,6 +99,7 @@ export function emptyUnitBattle(u: Unit): UnitBattle {
 export function restartInput(blank: BattleInput, prev: BattleInput, used: string[]): BattleInput {
   const next: BattleInput = { ...blank, units: { ...blank.units }, from: prev.from };
   if (prev.patrol) Object.assign(next, { patrol: true, vsAi: prev.vsAi });
+  if (prev.zone) next.zone = prev.zone;
   for (const id of used) if (next.units[id]) next.units[id] = { ...next.units[id], in: false };
   return next;
 }
@@ -120,7 +124,7 @@ export function sufferingCount(input: BattleInput): number {
 
 /** Every reward roll this battle earns, with special-table follow-ups inserted after their parent. */
 export function rewardRows(input: BattleInput): RewardRow[] {
-  if (input.patrol) return [];
+  if (input.patrol || (input.zone && !ZONE_REWARDS[input.zone].rolls)) return [];
   const entryOf = (key: string, table: RewardTableKey) => {
     const roll = input.rewards[key]?.roll;
     return roll ? REWARD_TABLES[table].entries[roll - 1] ?? null : null;
@@ -411,6 +415,8 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
       if (r.bonusXp && !input.patrol) parts.push({ label: 'Agendas / bonus', xp: r.bonusXp });
       if (r.destroyed && r.death?.outcome === 'xp') parts.push({ label: 'Death roll', xp: 1 });
     }
+    // A zone battle earns a share of the XP a table game would (what its reward rolls give comes on top, in full).
+    if (input.zone) for (const p of parts) p.xp = Math.round(p.xp * ZONE_REWARDS[input.zone].xp * 10) / 10;
     parts.push(...(extra[u.id] ?? []));
 
     const o: UnitOutcome = { unitId: u.id, name, played: r.in, parts, gain: 0, xpBefore, xpAfter: 0, levelsGained: 0, removedScars: [], free: free[u.id] ?? [], wokeUp };

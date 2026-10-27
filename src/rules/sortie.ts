@@ -4,6 +4,7 @@ import { unitFromCatalog } from '../model/factory';
 import { fighter, type Fighter, type Gun } from './autoBattle';
 import { effects, type Ability, type Status } from './abilities';
 import { hasRule, ruleRating } from './engine';
+import { d6 as coreD6 } from './zone/dice';
 import { BIG_UNIT, randomSelection } from './echoForce';
 import { builtinEchoes } from '../model/seed';
 import { squadPower } from './training/economy';
@@ -27,7 +28,7 @@ import { pickRaiders, raidBand, type Raider } from './raiders';
 // in); guns reach as far as their range allows. Every model on both sides rolls initiative each round and acts on its
 // own: the player gives each unit one order a round (a Hero or a lone model picks each turn), and each model carries
 // it out with its own weapons. Echoes fight the front unit in melee and shoot at random at whatever their guns reach.
-// Models wounded in melee or seeing a squadmate fall test morale and can be Shaken or rout, as in OPR. Wounds stay
+// A unit tests morale as one, as in OPR: on dropping to half strength and on taking wounds in melee, Shaken or routed. Wounds stay
 // between fights. The Echoes are real datasheets from the imported Void Echoes book, trimmed model by model to the
 // fight's budget, and they show what kind of thing they'll do next.
 
@@ -85,6 +86,8 @@ export interface SortieSquad {
   /** The last round a raised shield holds: one raised mid-round lasts through the next, so a late turn doesn't waste it. */
   shieldUntil?: number;
   revived: boolean;
+  /** Has taken its half-strength Morale test this fight. */
+  tested?: boolean;
   /** Cracked under stress this round: it refuses its orders, or fights wild at -1 to hit. */
   crack?: { round: number; kind: 'refuse' | 'wild' };
   /** Not on the field yet (Ambush): turns up at Close range at the start of this round. */
@@ -320,7 +323,8 @@ function rand(run: { rng: number }): number {
   t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
   return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
-const d6 = (run: SortieRun) => 1 + Math.floor(rand(run) * 6);
+/** The shared core's d6, on the run's own dice. */
+const d6 = (run: SortieRun) => coreD6(() => rand(run));
 /** A to-hit roll: in a Sortie, the better of two dice (SORTIE.hitTwice), shown as the one roll kept. */
 const hitRoll = (run: SortieRun) => (SORTIE.hitTwice ? Math.max(d6(run), d6(run)) : d6(run));
 /** 2.3 → 2 or 3, 3 30% of the time. */
@@ -1587,7 +1591,7 @@ function signature(run: SortieRun, prev: { did: Record<string, SortieSkillKind[]
     if (sig.id === 'dread') {
       const f = line[0];
       if (did(f)) log(c, `${sig.name}: ${f.name} hold their nerve.`, 'good');
-      else for (const m of active(f)) if (rand(run) < s) morale(run, f, m, false);
+      else if (rand(run) < s) morale(run, f, sig.name);
     }
     if (sig.id === 'brood' && c.brood) {
       const n = Math.max(1, stoch(run, 2 * s * (anyDid ? half : 1)));
@@ -1784,8 +1788,6 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
   const mine = !att.echo;
   let dealt = 0;
   let hits = 0;
-  const wounded = new Set<SortieModel>();
-  let fallen = 0;
   const mul = att.atkBonus * fury(c, att);
   const sixes = effects(att.abilities, 'sixes');
   for (const g of a.guns) {
@@ -1821,12 +1823,7 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
         const lost = Math.min(target.hp, w - soak);
         target.hp -= lost;
         dealt += lost;
-        if (lost && target.hp > 0) wounded.add(target);
-        if (target.hp <= 0) {
-          wounded.delete(target);
-          fallen++;
-          fell(run, def, front, att);
-        }
+        if (target.hp <= 0) fell(run, def, front, att);
       }
     }
   }
@@ -1842,34 +1839,41 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
   }
   // Morale: a model wounded in melee down to half its wounds tests, and a squadmate tests for each model that falls.
   if (dealt) lastStand(run, def, before, hp0);
-  if (a.melee) for (const m of wounded) if (m.hp <= m.max / 2) morale(run, def, m, true);
-  for (let k = 0; k < fallen; k++) {
-    const up = active(def);
-    if (up.length) morale(run, def, pickOf(run, up), a.melee);
+  // Morale, per unit as in OPR: once on dropping to half strength, and whenever it takes wounds in melee.
+  if (dealt && standing(def)) {
+    if (!def.tested && atHalf(def)) { def.tested = true; morale(run, def, 'half strength'); }
+    else if (a.melee) morale(run, def, 'melee');
   }
   return dealt;
 }
 
-/** An OPR morale test for one model: Quality or better on a d6. A fail shakes it; failing again in melee while shaken and down to half its wounds routs it. */
-function morale(run: SortieRun, s: SortieSquad, m: SortieModel, melee: boolean) {
+/** At half strength: half its models down, or a lone model at half its wounds. */
+const atHalf = (s: SortieSquad) => (s.models.length > 1 ? active(s).length * 2 <= s.models.length : hpOf(s) * 2 <= maxOf(s));
+
+/**
+ * An OPR Morale test for the whole unit, by the shared core's rules: Quality or better on a d6, natural 1s fail and 6s pass,
+ * Fearless re-tests a fail on 4+. A fail shakes every model still in the fight, or routs them all at half strength.
+ */
+function morale(run: SortieRun, s: SortieSquad, why: string) {
   const c = run.combat!;
-  if (m.hp <= 0 || m.routed || lastStanding(c, s)) return;
+  if (!standing(s) || lastStanding(c, s)) return;
   const bonus = (s.hero ? SORTIE.heroMorale : 0) + (!s.echo && has(run, 'stims') ? SORTIE.heroMorale : 0) - (!s.echo && has(run, 'adrenal') ? 1 : 0)
     + (quirk(s, 'steady') ? 1 : 0) - (quirk(s, 'shaky') ? 1 : 0) + (trinketOf(s)?.morale ?? 0) + (scarred(run, s, 'blooded') ? 1 : 0);
-  const pass = () => d6(run) + bonus >= s.quality;
-  if (pass() || (s.fearless && pass())) return;
-  if (m.shaken && melee && m.hp <= m.max / 2) {
-    m.routed = true;
-    log(c, `A model of ${s.name} breaks and flees!`, s.echo ? 'good' : 'bad');
-    if (!standing(s)) log(c, `${s.name} ${s.echo ? 'is' : 'are'} routed.`, s.echo ? 'good' : 'bad');
+  const need = clamp(s.quality - bonus, 2, 6);
+  const r = d6(run);
+  if (r !== 1 && (r === 6 || r >= need)) return;
+  if (s.fearless && d6(run) >= 4) return;
+  const up = active(s);
+  if (atHalf(s)) {
+    for (const m of up) m.routed = true;
+    log(c, `${s.name} fail${s.echo ? 's' : ''} Morale (${why}) and ${s.echo ? 'is' : 'are'} routed.`, s.echo ? 'good' : 'bad');
     return;
   }
-  if (!m.shaken) {
-    m.shaken = true;
-    log(c, `A model of ${s.name} is shaken.`, s.echo ? 'good' : 'bad');
-    const mem = memberOf(run, s);
-    if (mem) stress(run, mem, SORTIE.stress.shaken);
-  }
+  if (up.every((m) => m.shaken)) return;
+  for (const m of up) m.shaken = true;
+  log(c, `${s.name} fail${s.echo ? 's' : ''} Morale (${why}) and ${s.echo ? 'is' : 'are'} shaken.`, s.echo ? 'good' : 'bad');
+  const mem = memberOf(run, s);
+  if (mem) stress(run, mem, SORTIE.stress.shaken);
 }
 
 const STATUS_TEXT: Record<Status, string> = { slow: 'slowed', stun: 'stunned', daze: 'dazed', mark: 'marked', bleed: 'bleeding', knock: 'knocked back', execute: 'finished off' };

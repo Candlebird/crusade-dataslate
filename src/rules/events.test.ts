@@ -104,6 +104,23 @@ describe('the Nexus Crisis', () => {
     expect(settleCrisis(c, '')).toBeUndefined(); // the next round has none
   });
 
+  it('stays up for its window, and falls on its last round if nobody beats it', () => {
+    const c = campaign();
+    expect(placeCrisis(c, () => 0)).toBe(true);
+    expect(c.crisis!.until).toBe(c.round! + NEXUS_CRISIS.window - 1);
+    const plain = nextThreat(c);
+    // Not its last round: nothing is settled, and the threat climbs as usual.
+    const r = endRound(c, () => 0.5, '2026-10-20');
+    expect(r.crisis).toBeUndefined();
+    expect(r.threat).toBe(plain);
+    expect(activeCrisis(c)).toBe(c.crisis);
+    for (let i = 1; i < NEXUS_CRISIS.window - 1; i++) endRound(c, () => 0.5, '2026-10-21');
+    expect(nextThreat(c)).toBe(NEXUS_ROUNDS.threatMax);
+    const last = endRound(c, () => 0.5, '2026-10-22');
+    expect(last.crisis?.result).toBe('lost');
+    expect(activeCrisis(c)).toBeUndefined();
+  });
+
   it('rises when a Crisis round begins', () => {
     const c = campaign();
     c.round = NEXUS_CRISIS.everyRounds - 1;
@@ -123,7 +140,7 @@ describe('the Nexus Crisis', () => {
     expect(keys(other)).toEqual(['crisis']);
     const lost = nexusGeneration(c, 'B', 'vs', 'loss', true, undefined, { crisis: 4, forceId: 'f2' });
     expect(keys(lost)).toEqual([]);
-    expect(lost.notes[0]).toMatch(/Nexus Crisis was lost/);
+    expect(lost.notes[0]).toMatch(/still stands/);
   });
 
   it('can be fought again when its log entry is deleted', () => {

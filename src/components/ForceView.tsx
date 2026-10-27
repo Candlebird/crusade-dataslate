@@ -10,12 +10,15 @@ import { go, href } from '../route';
 import AddUnitModal from './AddUnitModal';
 import RequisitionShop from './RequisitionShop';
 import UmbraShop from './UmbraShop';
-import RoundIncome from './RoundIncome';
+import RoundIncome, { ClaimAll } from './RoundIncome';
 import ExpeditionModal from './ExpeditionModal';
 import PatrolModal from './PatrolModal';
 import UnitTaskModal from './UnitTaskModal';
 import TrainingModal from './TrainingModal';
 import SortieModal from './SortieModal';
+import ZoneFight, { useZoneBattles, useZoneSave } from './ZoneFight';
+import { practiceBattle, practiceId } from '../rules/zone/practice';
+import type { TrackedBattle } from '../rules/tracker';
 import { LEDGER_RECENT, LedgerTable } from './Ledger';
 import type { Campaign, Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
@@ -84,6 +87,9 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const [shopping, setShopping] = useState(false);
   const [umbra, setUmbra] = useState(false);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [practice, setPractice] = useState<TrackedBattle | null>(null);
+  const zoneOn = useZoneBattles();
+  const practiceSave = useZoneSave(practiceId(forceId));
   const f = state.forces.find((x) => x.id === forceId);
   const { edit } = useEditMode(f);
   const theirs = !!f && !!cloud.email && !!f.owner && f.owner !== cloud.email;
@@ -126,6 +132,11 @@ export default function ForceView({ forceId }: { forceId: string }) {
           <button onClick={() => exportForce(f)}>Export force file</button>
           {/* A Nexus Wars force raises its units at its planets (Production, in the Nexus Wars panel); adding one here skips the bank. */}
           {edit && <button onClick={() => setAdding(true)}>+ Add unit</button>}
+          {zoneOn && !theirs && (
+            <button disabled={!f.units.some((u) => u.status === 'active')} onClick={() => setPractice(practiceBattle(f, state.books, s, state.campaign))}
+              data-tip="A zone battle against Void Echoes of about the same points. Nothing is lost and nothing is earned">
+              <Icon name="g:archery-target" /> {practiceSave ? 'Resume practice' : 'Practice'}</button>
+          )}
           <button className="primary" onClick={() => go(href.battle(f.id))}><Icon name="g:crossed-swords" /> Record battle</button>
           {!theirs && <EditModeButton f={f} />}
         </div>
@@ -373,6 +384,10 @@ export default function ForceView({ forceId }: { forceId: string }) {
       </div>
 
       {umbra && <UmbraShop force={f} onClose={() => setUmbra(false)} />}
+      {practice && (
+        <ZoneFight id={practiceId(f.id)} title={`${f.name}: practice`} tracked={practice} ctx={{ kind: 'practice', forceId: f.id }} modes={['command', 'quick']} practice
+          onApply={() => undefined} onClose={() => setPractice(null)} />
+      )}
       {shopping && <RequisitionShop force={f} onClose={() => setShopping(false)} />}
       {adding && (
         <AddUnitModal
@@ -660,13 +675,14 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
           {!(n && faction) && sortieRow}
           {n && faction && (
             <>
-              <div className="span-all row">
-                <span className="grow small">
+              <div className="span-all row wrap">
+                <span className="grow small" style={{ minWidth: '12em' }}>
                   {toClaim.length
                     ? <><b>Income ready</b> for {toClaim.length === 1 ? `round ${toClaim[0].round}` : `${toClaim.length} rounds`}.</>
                     : <span className="muted">Round income claimed{claimedThrough ? ` through round ${claimedThrough}` : ''}{factionForces(state.forces, n.factionId).length > 1 ? ' for the faction' : ''}. More arrives when the GM ends the round.</span>}
                 </span>
-                <button className={toClaim.length ? 'primary' : ''} disabled={!toClaim.length} onClick={() => setClaiming(true)}>Claim round income…</button>
+                {toClaim.length > 0 && <ClaimAll force={f} c={c} onPick={() => setClaiming(true)} />}
+                <button disabled={!toClaim.length} onClick={() => setClaiming(true)}>Claim round income…</button>
               </div>
               {claiming && <RoundIncome force={f} c={c} onClose={() => setClaiming(false)} />}
               <div className="span-all row">

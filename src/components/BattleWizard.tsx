@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useStore } from '../model/store';
+import { ZONE_REWARDS } from '../rules/zone/rewards';
 import { claims, mvpForce, sideOfForce, wizardPrefill } from '../rules/tracker';
 import { uid } from '../model/factory';
 import type { BattleResult, Campaign, Force, Unit } from '../model/types';
@@ -83,10 +84,10 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
     const crisis = source?.battle.crisis;
     // A solo patrol earns no Nexus rewards (a win still counts as a patrol, below).
     const ctx = nexusGeneration(input?.patrol ? undefined : campaign, factionId, input?.sectorId ?? '', input?.result ?? 'draw', !!input?.vsAi, undefined,
-      { forceId: f?.id, ...(crisis ? { crisis, mvp: mvpForce(source.battle) } : {}) });
+      { forceId: f?.id, ...(crisis ? { crisis, mvp: mvpForce(source.battle) } : {}), ...(input?.zone ? { zone: input.zone } : {}) });
     if (factionId && ctx.round) ctx.matchesElsewhere = matchBonusesEarned(state.forces, factionId, ctx.round, f?.id);
     return ctx;
-  }, [campaign, factionId, input?.sectorId, input?.result, input?.vsAi, input?.patrol, state.forces, f?.id, source]);
+  }, [campaign, factionId, input?.sectorId, input?.result, input?.vsAi, input?.patrol, input?.zone, state.forces, f?.id, source]);
   const full = useMemo(() => (input ? { ...input, nexus } : null), [input, nexus]);
 
   const preview = useMemo(() => {
@@ -146,7 +147,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       });
     // A won skirmish goes into the campaign log: it earns a Strategic Asset, and against the Echoes it's a patrol.
     const battleId = source?.battle.id;
-    if (linked && !input.sectorId && !source?.battle.crisis && input.result === 'win')
+    if (linked && !input.sectorId && !source?.battle.crisis && !input.zone && input.result === 'win')
       update((d) => {
         const c = d.campaign;
         if (!c || (battleId && c.log.some((e) => e.skirmish && e.battleId === battleId && e.winner === factionId))) return;
@@ -191,6 +192,12 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
         </p>
       )}
 
+      {input.zone && !input.patrol && (
+        <p className="panel notice small">
+          <span className="tag cyan">Zone battle · {input.zone === 'command' ? 'Command' : 'Quick'}</span> Fought on the zone board, not at the table.
+          {' '}Units earn {Math.round(ZONE_REWARDS[input.zone].xp * 100)}% of the usual XP{ZONE_REWARDS[input.zone].rolls ? ' and roll rewards as usual' : ' and roll no rewards'}; there's no match bonus or Strategic Asset.
+        </p>
+      )}
       {input.patrol && (
         <p className="panel notice small">
           <span className="tag cyan">Solo patrol</span> A downtime game of up to {SOLO_PATROL.points} pts vs the AI. Units earn participation and kill XP only: no RP, reward rolls or Marked for Greatness.

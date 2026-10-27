@@ -7,6 +7,7 @@ import type { AppState, Force, Settings } from '../model/types';
 import type { FinishedBattle } from '../rules/tracker';
 import type { LocalDoc } from './sync';
 import { canWriteForce } from '../model/owner';
+import { ZONE_SAVE_PREFIX, type ZoneSave } from '../rules/zone/save';
 
 export const IMG_PREFIX = 'img:';
 
@@ -92,6 +93,11 @@ export function localDocs(state: AppState, who: Who, images: Map<string, string>
   }
   // Finished battles are shared with the group; rewards are claimed in each player's own force.
   for (const b of state.battleHistory ?? []) docs.push({ path: `battles/${b.id}`, json: JSON.stringify(b), updatedAt: b.finishedAt, canWrite: true });
+  // Zone battles in progress, so their player can pick them up on another device.
+  for (const z of state.zoneSaves ?? []) {
+    if (!z.owner) continue;
+    docs.push({ path: `${ZONE_SAVE_PREFIX}${z.id}`, json: toCloudJson(z, images), updatedAt: z.updatedAt, canWrite: who.isGm || z.owner === who.email });
+  }
   return docs;
 }
 
@@ -113,6 +119,11 @@ export function applyDoc(d: AppState, path: string, value: unknown): void {
     if (value !== null) d.books.push(value as AppState['books'][number]);
   } else if (path === CAMPAIGN_PATH) {
     d.campaign = value === null ? undefined : (value as AppState['campaign']);
+  } else if (path.startsWith(ZONE_SAVE_PREFIX)) {
+    const zid = path.slice(ZONE_SAVE_PREFIX.length);
+    const rest = (d.zoneSaves ?? []).filter((z) => z.id !== zid);
+    if (value !== null) rest.push(value as ZoneSave);
+    d.zoneSaves = rest;
   } else if (path === SETTINGS_PATH) {
     if (value !== null) d.settings = { ...d.settings, ...(value as ReturnType<typeof sharedSettings>) };
   } else if (path === CORE_RULES_PATH) {

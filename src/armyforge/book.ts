@@ -60,7 +60,7 @@ function normWeapon(w: Raw): Omit<Weapon, 'id' | 'traits'> {
 function normGain(g: Raw): Gain {
   if (g.type === 'ArmyBookWeapon') return { kind: 'weapon', weapon: normWeapon(g) };
   if (g.type === 'ArmyBookItem')
-    return { kind: 'item', name: g.name, label: g.label ?? g.name, rules: (g.content ?? []).map(ruleLabel) };
+    return { kind: 'item', name: g.name, label: g.label ?? g.name, rules: (g.content ?? []).filter((c: Raw) => c.type !== 'ArmyBookWeapon').map(ruleLabel) };
   return { kind: 'rule', label: ruleLabel(g) };
 }
 
@@ -120,7 +120,11 @@ export function normalizeBook(raw: Raw): CatalogBook {
     version: raw.versionString ?? '',
     importedAt: new Date().toISOString(),
     units,
-    rules: (raw.specialRules ?? []).map((r: Raw) => ({ name: r.name, desc: r.description ?? '' })),
+    // A book's renamed rules (Heal for Mend and the like) sit in customRules, with the rule they stand for.
+    rules: [
+      ...(raw.specialRules ?? []).map((r: Raw) => ({ name: r.name, desc: r.description ?? '' })),
+      ...(raw.customRules ?? []).map((r: Raw) => ({ name: r.name, desc: r.description ?? '', ...(r.originalName ? { alias: r.originalName } : {}) })),
+    ],
     spells: (raw.spells ?? []).map((s: Raw) => ({ name: s.name, threshold: s.threshold ?? 0, effect: s.effect ?? '' })),
   };
 }

@@ -13,6 +13,7 @@ import type { CatalogBook, CatalogUnit } from '../model/types';
 import { useImporter } from './importer';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
+import { KNOWN_ALIASES, auditBook, type AuditStatus } from '../rules/oprRules';
 
 export default function BooksPage() {
   const { state, update, addBook } = useStore();
@@ -176,7 +177,8 @@ function BookBrowser({ uid }: { uid: string }) {
       fn(b);
       b.updatedAt = new Date().toISOString();
     });
-  const [tab, setTab] = useState<'units' | 'rules' | 'spells'>('units');
+  const [tab, setTab] = useState<'units' | 'rules' | 'spells' | 'battle'>('units');
+  const [shown, setShown] = useState<AuditStatus | 'all'>('all');
   const [query, setQuery] = useState('');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const book = state.books.find((b) => b.uid === uid);
@@ -186,6 +188,7 @@ function BookBrowser({ uid }: { uid: string }) {
     [book, q, tagFilter],
   );
   const rules = useMemo(() => (book?.rules ?? []).filter((r) => (r.name + r.desc).toLowerCase().includes(q)), [book, q]);
+  const audit = useMemo(() => (book ? auditBook(book) : []), [book]);
   if (!book) return null;
 
   return (
@@ -194,8 +197,8 @@ function BookBrowser({ uid }: { uid: string }) {
       title={book.name}
       extra={
         <div className="row">
-          {(['units', 'rules', 'spells'] as const).map((t) => (
-            <button key={t} className={tab === t ? 'primary' : ''} onClick={() => setTab(t)}>{t[0].toUpperCase() + t.slice(1)}</button>
+          {(['units', 'rules', 'spells', 'battle'] as const).map((t) => (
+            <button key={t} className={tab === t ? 'primary' : ''} onClick={() => setTab(t)} {...(t === 'battle' ? { 'data-tip': 'How the zone battle plays each rule and spell' } : {})}>{t === 'battle' ? 'In battle' : t[0].toUpperCase() + t.slice(1)}</button>
           ))}
           <input placeholder="Search…" value={query} onChange={(e) => setQuery(e.target.value)} />
           {tab === 'units' && (
@@ -267,11 +270,34 @@ function BookBrowser({ uid }: { uid: string }) {
         <div>
           {rules.map((r) => (
             <div key={r.name} className="list-item" style={{ display: 'block' }}>
-              <b>{r.name}</b>
+              <b>{r.name}</b>{(r.alias ?? KNOWN_ALIASES[r.name.toLowerCase()]) && <span className="muted small"> (Army Forge's {r.alias ?? KNOWN_ALIASES[r.name.toLowerCase()]})</span>}
               <div className="small muted">{r.desc}</div>
             </div>
           ))}
           {!rules.length && <p className="muted small">{book.rules.length ? 'No rules match the search.' : 'No special rules in this book.'}</p>}
+        </div>
+      )}
+      {tab === 'battle' && (
+        <div>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            How a zone battle plays each rule and spell this book uses. <b>Partly</b> rules are played a simpler way, and rules marked <b>Not played</b> do
+            nothing in the battle (at the table they work as written).
+          </p>
+          <div className="row" style={{ marginBottom: 8 }}>
+            {(['all', 'full', 'partial', 'none'] as const).map((k) => (
+              <button key={k} className={shown === k ? 'primary' : ''} onClick={() => setShown(k)}>
+                {k === 'all' ? 'All' : AUDIT_LABEL[k]} ({k === 'all' ? audit.length : audit.filter((r) => r.status === k).length})
+              </button>
+            ))}
+          </div>
+          {audit.filter((r) => (shown === 'all' || r.status === shown) && (r.name + r.plays).toLowerCase().includes(q)).map((r) => (
+            <div key={r.kind + r.name} className="list-item" style={{ display: 'block' }}>
+              <b>{r.name}</b>{r.kind === 'spell' && <span className="muted small"> (spell)</span>}{' '}
+              <span className={`tag ${r.status === 'full' ? 'green' : r.status === 'partial' ? 'gold' : 'red'}`}>{AUDIT_LABEL[r.status]}</span>
+              <div className="small">{r.plays}</div>
+              {r.note && <div className="small muted">{r.note}</div>}
+            </div>
+          ))}
         </div>
       )}
       {tab === 'spells' && (
@@ -288,3 +314,5 @@ function BookBrowser({ uid }: { uid: string }) {
     </Panel>
   );
 }
+
+const AUDIT_LABEL: Record<AuditStatus, string> = { full: 'Played', partial: 'Partly', none: 'Not played' };

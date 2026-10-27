@@ -2,12 +2,13 @@ import { unitFromCatalog } from '../model/factory';
 import type { Campaign, CatalogBook, Force, Sector, SectorGuardian, Unit } from '../model/types';
 import type { RelicTier } from './data';
 import { aiDefended, sectorThreat } from './difficulty';
-import { echoesBook, pick, randomEchoes, randomLoadout } from './echoForce';
+import { echoesBook, pick, randomLoadout, roleEchoes } from './echoForce';
 import { hasRule, ruleRating } from './engine';
 import { takenRelics } from './heroes';
 import type { Rand } from './hexmap';
 import { GUARDIANS } from './nexusData';
 import { randomRelic } from './relicPick';
+import { hashSeed, mulberry32 } from './zone/dice';
 
 // Guardian sites (Nexus Wars). AI-held planets, research stations, anomalies and void sectors are watched over by a
 // guardian: a Void Echoes Hero with a relic and doubled Tough. Its tier (Common/Rare/Legendary) follows how deep in the
@@ -83,9 +84,12 @@ export function rerollGuardians(c: Campaign, books: CatalogBook[], forces: Force
   return placeGuardians(c, books, forces, rand, newId);
 }
 
-/** The sector's AI garrison: its guardian (if any) leading random Echoes for the rest of the Supply. */
-export function garrison(s: Sector, book: CatalogBook, target: number, rand: Rand = Math.random): Unit[] {
-  if (!s.guardian) return randomEchoes(book, target, rand);
+/** The dice a sector's garrison is drawn with: the same sector in the same round always fields the same Echoes. */
+export const garrisonRand = (s: Sector, round = 1): Rand => mulberry32(hashSeed(`garrison:${s.id}:${round}`));
+
+/** The sector's AI garrison at its full Supply: its guardian (if any) leading Echoes picked by role for the rest. */
+export function garrison(s: Sector, book: CatalogBook, target: number, rand: Rand = garrisonRand(s)): Unit[] {
+  if (!s.guardian) return roleEchoes(book, target, rand);
   const lead: Unit = structuredClone(s.guardian.unit);
-  return [lead, ...randomEchoes(book, Math.max(0, target - lead.points), rand)];
+  return [lead, ...roleEchoes(book, Math.max(0, target - lead.points), rand)];
 }

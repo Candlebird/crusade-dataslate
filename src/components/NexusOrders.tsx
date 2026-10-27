@@ -15,6 +15,9 @@ import { callMeeting, meetingBattle, meetingState, meetings, settleMeeting, unse
 import type { AutoResult } from '../rules/autoBattle';
 import type { TrackedBattle } from '../rules/tracker';
 import AutoBattleModal from './AutoBattleModal';
+import ZoneFight, { useZoneBattles } from './ZoneFight';
+import { attackTableOnly } from '../rules/zone/eligible';
+import { SIEGE, openSieges, siegeOf, siegesToOpen } from '../rules/sieges';
 import { go, href } from '../route';
 import { attackBattle, overrunBlock } from '../rules/overrun';
 import { useEndRound } from './RoundPanel';
@@ -121,6 +124,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
   const mine = myDetachments(c, state.forces, cloud.email);
   const own = orders.find((o) => o.email === cloud.email && o.round === current.round);
   const label = (f: Force) => detachmentName(c, state.forces, f);
+  const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
 
   const pick = (forceId: string, target: string) => {
     const picks = { ...(own?.picks ?? {}) };
@@ -157,6 +161,13 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
             const { moves, attacks } = moveTargets(c, f);
             const at = positionOf(c, f);
             const { move, why } = moveOf(c, f);
+            const siege = siegeOf(c, f.id);
+            if (siege) return (
+              <div key={f.id} className="field">
+                <span>{label(f)} <span className="muted small">at {at?.name ?? '—'}</span></span>
+                <span className="small"><span className="tag red"><Icon name="g:camping-tent" /> Pinned</span> Besieging <b>{sectorName(siege.sectorId)}</b> until round {siege.until}: it attacks again this round and can't move. Play the battle at the table to end it.</span>
+              </div>
+            );
             // What standing there does when the round ends: holding a mark, barring a band's road, guarding a world.
             const fx = (id: string | undefined) => {
               const t = id ? standingEffects(c, id, f.nexus!.factionId) : [];
@@ -213,6 +224,18 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
   const cloud = useCloud();
   const { attacks, moves, holds } = revealOrders(c, orders, round, state.forces);
   const moved = c.movedOrders === round;
+  // An attack for the table that isn't played this round becomes a siege: on the GM's screen, as soon as it's revealed.
+  const besiege = gm ? siegesToOpen(c, attacks, state.forces).map((a) => `${a.forceId}:${a.sectorId}`).join(',') : '';
+  useEffect(() => {
+    if (!besiege) return;
+    let n = 0;
+    update((s) => {
+      if (!s.campaign) return;
+      n = openSieges(s.campaign, revealOrders(s.campaign, orders, round, s.forces).attacks, s.forces).length;
+      if (n) s.campaign.updatedAt = nowIso();
+    });
+    if (n) toast(`${n} attack${n === 1 ? '' : 's'} for the table: a siege opens, its detachment pinned for up to ${SIEGE.rounds} rounds.`);
+  }, [besiege]); // eslint-disable-line react-hooks/exhaustive-deps
   const met = moved ? [] : meetings(c, { moves }, state.forces);
   const unsettled = met.filter((m) => ['open', 'fight'].includes(meetingState(c, m, round))).length;
   const makeMoves = () => {
@@ -235,6 +258,14 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
   };
   const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
   // Off the table: set the attack up on the tracker for its auto-battle; finishing it there logs it like any battle.
+  const zoneOn = useZoneBattles();
+  // A zone battle is set up on the tracker too, so it's finished and logged there like any battle.
+  const zoneBattle = (a: (typeof attacks)[number]) => {
+    if (state.battle) return toast('A battle is already on the tracker. Finish or discard it first.');
+    update((s) => void (s.battle = attackBattle(c, a, s.forces, s.books, s.settings)));
+    go(href.tracker());
+    toast('On the tracker: press Zone battle to fight it.');
+  };
   const autoBattle = (a: (typeof attacks)[number]) => {
     if (state.battle) return toast('A battle is already on the tracker. Finish or discard it first.');
     update((s) => void (s.battle = attackBattle(c, a, s.forces, s.books, s.settings)));
@@ -280,7 +311,21 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
             ) : (
               <span className="row" style={{ gap: 4 }}>
                 <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}><Icon name="g:crossed-swords" /> Start battle</a>
-                {!block && mine ? (
+                {siegeOf(c, a.forceId) && mine && (
+                  <button className="small" data-tip="Call the siege off: the detachment is free to move from the next orders" onClick={() => {
+                    if (!confirmAction('Lift the siege? The attack is called off.')) return;
+                    update((s) => {
+                      if (!s.campaign) return;
+                      s.campaign.sieges = (s.campaign.sieges ?? []).filter((x) => x.forceId !== a.forceId);
+                      s.campaign.updatedAt = nowIso();
+                    });
+                  }}>Lift siege</button>
+                )}
+                {zoneOn ? (() => {
+                  const why = attackTableOnly(c, a, state.forces);
+                  return mine && <button className="small" disabled={!!why} onClick={() => zoneBattle(a)}
+                    data-tip={why ? `${why}: it opens a siege until it's played` : 'Fight it as a zone battle, giving the orders yourself or watching the AI. Fight it this round or the attack lapses'}><Icon name="g:crossed-swords" /> Zone battle</button>;
+                })() : !block && mine ? (
                   <button className="small" onClick={() => autoBattle(a)} data-tip="The garrison is small enough to auto-battle instead of playing at the table. It can still go wrong."><Icon name="g:power-lightning" /> Overrun</button>
                 ) : gm && sector ? (
                   <button className="small" onClick={() => autoBattle(a)} data-tip={`GM fallback for an attack nobody can play at the table (no overrun: ${block})`}><Icon name="g:perspective-dice-six-faces-six" /> Auto-battle</button>
@@ -309,6 +354,10 @@ function MeetingRow({ c, m, round, gm, who, sectorName }: {
   const { state, update } = useStore();
   const cloud = useCloud();
   const [auto, setAuto] = useState<TrackedBattle | null>(null);
+  const [zone, setZone] = useState<TrackedBattle | null>(null);
+  const zoneOn = useZoneBattles();
+  const zoneId = `meet-${round}-${m.key}`;
+  const zoneSaved = state.zoneSaves?.some((z) => z.id === zoneId);
   const status = meetingState(c, m, round);
   const calls = c.meetings?.round === round ? c.meetings.calls[m.key] ?? {} : {};
   const result = c.meetings?.round === round ? c.meetings.results[m.key] : undefined;
@@ -353,10 +402,28 @@ function MeetingRow({ c, m, round, gm, who, sectorName }: {
       ))}
       {status === 'fight' && either && (
         <span className="row" style={{ gap: 4 }}>
-          <button className="small" onClick={() => setAuto(meetingBattle(c, m, state.forces, state.settings))}><Icon name="g:power-lightning" /> Auto-battle</button>
+          {zoneOn ? (
+            <button className="small" onClick={() => {
+              const t = meetingBattle(c, m, state.forces, state.settings);
+              // You give your own side's orders; the AI plays the other (or the GM plays both).
+              t.sides.forEach((x, i) => { if (m.sides[i] && !mine(m.sides[i])) x.ai = true; });
+              setZone(t);
+            }} data-tip={zoneSaved ? 'Pick the zone battle up where you left it' : 'Fight it as a zone battle: the winner takes the hex, and the forces keep no losses'}>
+              <Icon name="g:crossed-swords" /> {zoneSaved ? 'Resume zone battle' : 'Zone battle'}</button>
+          ) : <button className="small" onClick={() => setAuto(meetingBattle(c, m, state.forces, state.settings))}><Icon name="g:power-lightning" /> Auto-battle</button>}
           {m.sides.map((id) => <button key={id} className="small" data-tip="Played at the table" onClick={() => settle(id, 'At the table')}>{who(id)} won</button>)}
           <button className="small" data-tip="Played at the table" onClick={() => settle('', 'At the table')}>Draw</button>
         </span>
+      )}
+      {zone && (
+        <ZoneFight id={zoneId} title={`${who(a)} meets ${who(b)}`} tracked={zone} ctx={{ kind: 'meeting', key: m.key }} onClose={() => setZone(null)}
+          stakes="Only the outcome counts: the winner takes the hex and the loser falls back to its nearest sector. The forces keep no losses and earn no XP."
+          onApply={(z) => {
+            const w = z.result?.winner;
+            const team = w === undefined || w === 'draw' ? '' : z.teams[w];
+            const ix = zone.sides.findIndex((x) => x.team === team);
+            settle(ix >= 0 ? m.sides[ix] : '', 'Zone battle', z.result ? [z.result.why] : []);
+          }} />
       )}
       {auto && (
         <AutoBattleModal b={auto} onClose={() => setAuto(null)} onApply={applyAuto}

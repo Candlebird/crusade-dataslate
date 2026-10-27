@@ -1,4 +1,5 @@
 import type { Unit } from '../model/types';
+import { KNOWN_ALIASES } from './oprRules';
 
 // Abilities: what a unit's special rules, traits, relics and scars do in the training sim and the auto-battle, beyond
 // the plain numbers. Each source maps to one or more effects; both games read the same list and play it out their own
@@ -86,6 +87,11 @@ const TABLE: Record<string, Effect[]> = {
   strider: [redeploy(1)],
   flying: [redeploy(2)],
   fearless: [lastStand(1.5)],
+  // Army book rules (renamed ones, like Heal for Mend, are looked up by the rule they stand for).
+  mend: [heal(2, 1, 1)],
+  'regeneration aura': [heal(1, 1, 2)],
+  resistance: [shield(1, 2)],
+  'breath attack': [barrage(1, 1, 1, { range: 1.5, radius: 1 })],
   // Hero traits.
   'aura of blinding': [field('daze', 1.5)],
   'aura of swiftness': [aura('rate', 0.25, 2)],
@@ -289,6 +295,10 @@ export function effectsOf(name: string, guess = true): Effect[] | undefined {
   const b = bare(name);
   if (b === 'caster') return [barrage(Math.max(1, rating(name)), 1, 1, { range: 4.5 })];
   if (TABLE[b]) return TABLE[b];
+  const original = KNOWN_ALIASES[b];
+  if (original) return effectsOf(original, guess);
+  const inner = b.match(/^(.+) aura$/)?.[1];
+  if (inner && TABLE[inner]) return TABLE[inner];
   if (!guess || STAT_RULES.includes(b)) return undefined;
   return KEYWORDS.find(([re]) => re.test(b))?.[1];
 }

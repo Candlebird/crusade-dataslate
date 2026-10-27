@@ -5,7 +5,7 @@ import type { Force } from '../model/types';
 import { go, href } from '../route';
 import { useCloud } from '../cloud/CloudSync';
 import { AGENDAS, MAX_AGENDAS } from '../rules/data';
-import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES, activeCrisis, factionName, homeChallengeBlock, lordById, recordSectorGame, sectorEffect } from '../rules/nexus';
+import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, SECTOR_TYPES, activeCrisis, crisisUntil, factionName, homeChallengeBlock, lordById, recordSectorGame, sectorEffect } from '../rules/nexus';
 import { DEPLOYMENT_STYLES, SEIZE_RULE, allMissions, rollAdvancedMission, rollDeployment, type MissionDef } from '../rules/missions';
 import {
   FORMATS,
@@ -50,7 +50,7 @@ import {
 } from '../rules/tracker';
 import { AI_TREES } from '../rules/aiTrees';
 import { echoesBook, randomEchoes } from '../rules/echoForce';
-import { garrison as guardedGarrison } from '../rules/guardians';
+import { garrison as guardedGarrison, garrisonRand } from '../rules/guardians';
 import { ECHOES, NEXUS_CRISIS, NEXUS_REINFORCE_BONUS } from '../rules/nexusData';
 import { aiDefended, ratingFor } from '../rules/difficulty';
 import { isReinforced } from '../rules/production';
@@ -63,6 +63,9 @@ import TableMap from './TableMap';
 import { deploymentMap, suggestTable } from '../rules/tableMap';
 import PatrolModal from './PatrolModal';
 import AutoBattleModal from './AutoBattleModal';
+import ZoneFight, { useZoneBattles, useZoneSave } from './ZoneFight';
+import { applyZoneBattle } from '../rules/zone/setup';
+import { zoneBattleBlock } from '../rules/zone/eligible';
 import { overrunBlock } from '../rules/overrun';
 import { Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
@@ -74,7 +77,10 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
   const b = state.battle;
   const sector = state.campaign?.sectors.find((s) => s.id === sectorId);
   const [auto, setAuto] = useState(false);
+  const [zone, setZone] = useState(false);
   const cloud = useCloud();
+  const zoneOn = useZoneBattles();
+  const zoneSave = useZoneSave(b?.id);
   if (!b) return <StartBattle sectorId={sector?.id} preset={attacker} presetForce={forceId} crisis={crisis} />;
 
   const set = (fn: (d: TrackedBattle) => void) => update((s) => void (s.battle && fn(s.battle)));
@@ -93,6 +99,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
   const autoBlock = fought && b.attacker && cloud.email && !cloud.isGm
     ? overrunBlock(fought, state.forces.find((f) => membersOf(b, b.attacker!).some((x) => x.forceId === f.id)))
     : '';
+  const zoneWhy = zoneBattleBlock(b, state.campaign);
   const finish = () => {
     update((s) => {
       // Already finished (a second click, or on another device): don't put it in the history twice.
@@ -104,9 +111,10 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
         recordSectorGame(s.campaign, { id: uid(), date: localDate(), ...game.event });
         s.campaign.updatedAt = nowIso();
       }
-      // The Crisis isn't fought over a sector: it only settles whether the Lord was stopped, and who was MVP. Only the first battle counts.
-      if (cg && s.campaign && activeCrisis(s.campaign) && !s.campaign.crisis!.battleId) {
-        Object.assign(s.campaign.crisis!, { result: cg.result, mvp: cg.mvp, battleId: b.id });
+      // The Crisis isn't fought over a sector: it only settles whether the Lord was stopped, and who was MVP. The first win
+      // settles it; a loss leaves it standing to be fought again while its rounds last.
+      if (cg && s.campaign && activeCrisis(s.campaign) && !s.campaign.crisis!.battleId && !s.campaign.log.some((e) => e.battleId === b.id)) {
+        if (cg.result === 'won') Object.assign(s.campaign.crisis!, { result: cg.result, mvp: cg.mvp, battleId: b.id });
         s.campaign.log.push({ id: uid(), date: localDate(), ...cg.event });
         s.campaign.updatedAt = nowIso();
       }
@@ -116,7 +124,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
       const mvp = state.forces.find((f) => f.id === cg.mvp);
       toast(cg.result === 'won'
         ? `The Echo Lord is defeated!${mvp ? ` MVP: ${mvp.name}, who takes a ${NEXUS_CRISIS.mvpTier} relic.` : ''} Each side claims its rewards from the battle.`
-        : 'The Echo Lord stands. Win the Crisis before the round ends, or the Echoes take a sector from each faction.');
+        : `The Echo Lord stands. Beat it by the end of round ${crisisUntil(state.campaign.crisis!)}, or the Echoes take a sector from each faction.`);
     }
     go(href.tracker());
   };
@@ -130,7 +138,10 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
         </div>
         <div className="row">
           <a className="btn" href={href.missions()}>Mission library</a>
-          {!b.ended && <button onClick={() => setAuto(true)} disabled={!!autoBlock}
+          {!b.ended && zoneOn && <button onClick={() => setZone(true)} disabled={!zoneSave && !!zoneWhy}
+            data-tip={zoneSave ? 'Pick the zone battle up where you left it' : zoneWhy ? `${zoneWhy}.` : 'Fight it out on a board of zones: you give the orders, or the AI plays it while you watch'}>
+            <Icon name="g:crossed-swords" /> {zoneSave ? 'Resume zone battle' : 'Zone battle'}</button>}
+          {!b.ended && !zoneOn && <button onClick={() => setAuto(true)} disabled={!!autoBlock}
             data-tip={autoBlock ? `Play this one at the table (no overrun: ${autoBlock}). The GM can still auto-battle it.` : 'Let the units fight it out on their stats'}><Icon name="g:power-lightning" /> Auto-battle</button>}
           {!b.ended && <button className="primary" onClick={() => set((d) => void (d.ended = true))}>End battle</button>}
           <button className="danger" onClick={() => confirmAction('Throw away this battle?') && update((s) => void delete s.battle)}>Discard</button>
@@ -156,6 +167,14 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
       )}
 
       {auto && !b.ended && <AutoBattleModal b={b} set={set} onClose={() => setAuto(false)} />}
+      {zone && !b.ended && (
+        <ZoneFight id={b.id} title={`${b.mission.name}: zone battle`} tracked={b} ctx={{ kind: 'tracker' }} onClose={() => setZone(false)}
+          onApply={(z, mode, tracked) => update((s) => {
+            if (s.battle?.id !== tracked.id) s.battle = structuredClone(tracked);
+            applyZoneBattle(s.battle!, z, 1, [z.result!.why]);
+            s.battle!.zoneMode = mode;
+          })} />
+      )}
 
       {b.ended && <Result b={b} set={set} onFinish={finish} game={game} crisis={cg} />}
 
@@ -328,6 +347,8 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
   // Attack for my own force's faction if I have one, else for anyone but the sector's owner.
   const myFaction = state.forces.find((f) => f.nexus?.factionId && f.nexus.factionId !== sector?.owner && (!f.owner || f.owner === cloud.email))?.nexus?.factionId;
   const [attacker, setAttacker] = useState(() => (preset && c?.factions.some((f) => f.id === preset) ? preset : undefined) ?? myFaction ?? c?.factions.find((f) => f.id !== sector?.owner)?.id ?? '');
+  // Zone battles fought from the tracker and left half-way (here or on another device).
+  const resumable = (state.zoneSaves ?? []).filter((z) => z.ctx.kind === 'tracker' && (!z.owner || z.owner === cloud.email || cloud.isGm));
   const missions = allMissions(state.customMissions);
   const [id, setId] = useState(missions[0]?.id ?? '');
   // An unclaimed or void sector is held by the AI; a claimed one by its faction's player.
@@ -377,6 +398,17 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
         <div><h1>Battle</h1></div>
         <div className="row"><a className="btn" href={href.missions()}>Mission library</a></div>
       </div>
+      {resumable.length > 0 && (
+        <Panel id="battle.zones" title="Zone battles in progress">
+          {resumable.map((z) => (
+            <div key={z.id} className="list-item small">
+              <span className="grow"><Icon name="g:crossed-swords" /> <b>{z.title}</b> <span className="muted">· round {Math.max(1, z.battle.round)} · saved {localDate(z.updatedAt)}</span></span>
+              <button className="small primary" onClick={() => update((s) => void (s.battle = structuredClone(z.tracked)))}>Back to it</button>
+              <button className="small danger" onClick={() => confirmAction(`Throw away ${z.title}?`) && update((s) => void (s.zoneSaves = (s.zoneSaves ?? []).filter((x) => x.id !== z.id)))}>Discard</button>
+            </div>
+          ))}
+        </Panel>
+      )}
       <Panel id="battle.start" title="Start a battle">
         <p className="muted">Pick players and a mission, then load each side's force on the next screen. The battle stays on this device until you finish or discard it.</p>
         {c && wantCrisis && !crisis && <p className="small"><span className="tag red">There is no Nexus Crisis this round.</span> <a href={href.tracker()}>Start an ordinary battle</a></p>}
@@ -392,7 +424,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
               Generate the {ECHOES.name}' army to match your points. Their most expensive unit is the Lord (+{NEXUS_CRISIS.lordVp} VP to destroy it).
               The result goes into the campaign log. Win and the threat drops. The side whose units earned the most XP is MVP and takes a {NEXUS_CRISIS.mvpTier} relic.
             </p>
-            {crisis.battleId && <p className="small"><span className="tag red">Already fought: {crisis.result}</span> Only the first Crisis battle counts. Delete its log entry to fight it again.</p>}
+            {crisis.battleId && <p className="small"><span className="tag gold">Already beaten</span> The Lord fell in an earlier battle. Delete its log entry to fight it again.</p>}
           </>
         )}
         {c && sector && (
@@ -587,9 +619,9 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
   return (
     <div className="panel result-panel">
       <div className="panel-title">
-        <h2>{title} · {b.auto ? `auto-battle, ${teams.map((t) => b.auto!.dealt[t] ?? 0).join('–')} pts destroyed` : teams.map((t) => sc[t]!.total).join('–')}</h2>
-        <button className="ghost" onClick={() => set((d) => { d.ended = false; delete d.auto; })}
-          data-tip={b.auto ? 'Back to the tracker. Drops the auto-battle result, but its losses and kill XP stay on the units.' : undefined}>Resume</button>
+        <h2>{title} · {b.auto ? `${b.zoneMode ? 'zone battle' : 'auto-battle'}, ${teams.map((t) => b.auto!.dealt[t] ?? 0).join('–')} pts destroyed` : teams.map((t) => sc[t]!.total).join('–')}</h2>
+        <button className="ghost" onClick={() => set((d) => { d.ended = false; delete d.auto; delete d.zoneMode; })}
+          data-tip={b.auto ? 'Back to the tracker. Drops the battle result, but its losses and kill XP stay on the units.' : undefined}>Resume</button>
       </div>
       <p className="muted small">Record the result in each crusade force's log. The wizard is pre-filled from this battle: check it, then apply.</p>
       <div className="row">
@@ -618,7 +650,7 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
                 {crisis.mvp
                   ? <>MVP, for the most XP: <b>{state.forces.find((f) => f.id === crisis.mvp)?.name ?? 'a force not on this device'}</b>, who takes a {NEXUS_CRISIS.mvpTier} relic.</>
                   : `No unit earned XP, so there's no MVP.`}</>
-              : `Finishing marks the Crisis lost. When the round ends, the ${ECHOES.name} take a sector from each faction.`}
+              : `A loss leaves the Lord standing: it can be fought again until the end of round ${crisisUntil(c.crisis!)}. Still standing then, the ${ECHOES.name} take a sector from each faction.`}
         </p>
       )}
       <div className="row" style={{ marginTop: '0.75rem' }}>
@@ -660,8 +692,8 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
   const [target, setTarget] = useState(() => garrison || enemies || 1000);
   const generate = () => {
     if (!book) return;
-    // A guarded sector's garrison is led by its guardian; the rest is random Echoes.
-    const units = garrison && sector?.guardian ? guardedGarrison(sector, book, target) : randomEchoes(book, target);
+    // A sector's garrison is drawn by role from its own dice (led by its guardian if it has one); otherwise random Echoes.
+    const units = garrison && sector ? guardedGarrison(sector, book, target, garrisonRand(sector, state.campaign?.round)) : randomEchoes(book, target);
     if (side.units.length && !confirmAction(`Replace ${side.name}'s ${side.units.length} units with a random ${ECHOES.name} army?`)) return;
     setSide((s) => loadUnits(s, ECHOES.name, units));
     toast(`${ECHOES.name}: ${units.length} units, ${units.reduce((n, u) => n + u.points, 0)} pts.`);

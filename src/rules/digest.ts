@@ -4,7 +4,7 @@ import { gameLine, logFor } from './chronicle';
 import { featInfo } from './feats';
 import { comingTonight } from './gameNight';
 import { journalStatus } from './journal';
-import { currentRound, eventById, factionName } from './nexus';
+import { activeCrisis, crisisUntil, currentRound, eventById, factionName } from './nexus';
 import { reportFor } from './report';
 
 // Since You Last Looked (the home page): what changed in the war and on your forces. Each item has a key that stays
@@ -30,8 +30,9 @@ export function digest(c: Campaign | undefined, myForces: Force[], me?: string):
     const e = eventById(c.event.id);
     out.push({ key: `event:${c.event.id}:${round}`, icon: '✺', text: `Galactic event this round: ${e?.name ?? c.event.id}.`, href: href.campaign() });
   }
-  if (c.crisis?.round === round && !c.crisis.result)
-    out.push({ key: `crisis:${round}`, icon: '☄', text: 'Nexus Crisis this round: all factions against an Echo Lord.', href: href.campaign('map', c.crisis.sectorId) });
+  const crisis = activeCrisis(c);
+  if (crisis && !crisis.result)
+    out.push({ key: `crisis:${crisis.round}:${round}`, icon: '☄', text: `Nexus Crisis: all factions against an Echo Lord, until the end of round ${crisisUntil(crisis)}.`, href: href.campaign('map', crisis.sectorId) });
 
   const report = c.reports?.[c.reports.length - 1];
   if (report) {

@@ -9,10 +9,12 @@ import NexusBox from './NexusBox';
 import { Modal, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
 
-/** Collect the sector income of every ended round this force's faction hasn't claimed yet (on any of its detachments). */
-export default function RoundIncome({ force, c, onClose }: { force: Force; c: Campaign; onClose: () => void }) {
+/**
+ * Claiming this force's unclaimed round income with `picks` (an empty set for a one-tap claim): the preview, and
+ * `commit` to bank it. Anomaly Materials go to the faction's bank nearest the force.
+ */
+export function useRoundClaim(force: Force, c: Campaign, picks: Record<string, NexusPick> = NO_PICKS) {
   const { state, update, updateForce } = useStore();
-  const [picks, setPicks] = useState<Record<string, NexusPick>>({});
   const n = force.nexus!;
   const rounds = useMemo(() => claimableRounds(c, n, state.forces), [c, n, state.forces]);
   const items = useMemo(() => rounds.flatMap((r) => roundIncomeItems(c, n.factionId, r)), [c, n.factionId, rounds]);
@@ -21,13 +23,8 @@ export default function RoundIncome({ force, c, onClose }: { force: Force; c: Ca
     let k = 0;
     return resolveRoundIncome(structuredClone(force), c, rounds, items, picks, date, () => `p${k++}`);
   }, [force, c, rounds, items, picks, date]);
-  const units = force.units.filter((u) => u.status !== 'removed');
-  const setPick = (key: string, p: Partial<NexusPick>) => setPicks({ ...picks, [key]: { ...(picks[key] ?? emptyNexusPick()), ...p } });
-
-  const claim = () => {
-    if (preview.warnings.length && !confirmAction(`${preview.warnings.join('\n')}\n\nClaim anyway? Anything unresolved is lost.`)) return;
+  const commit = () => {
     updateForce(force.id, (d) => void resolveRoundIncome(d, c, rounds, items, picks, date, uid));
-    // Anomaly Materials go to the faction's bank nearest this force.
     let banked = '';
     if (preview.materials)
       update((s) => {
@@ -37,6 +34,21 @@ export default function RoundIncome({ force, c, onClose }: { force: Force; c: Ca
         cc.updatedAt = new Date().toISOString();
       });
     toast(banked ? `${preview.lines[0]} ${banked}.` : preview.lines[0]);
+  };
+  return { rounds, items, preview, commit };
+}
+const NO_PICKS: Record<string, NexusPick> = {};
+
+/** Collect the sector income of every ended round this force's faction hasn't claimed yet (on any of its detachments). */
+export default function RoundIncome({ force, c, onClose }: { force: Force; c: Campaign; onClose: () => void }) {
+  const [picks, setPicks] = useState<Record<string, NexusPick>>({});
+  const { rounds, items, preview, commit } = useRoundClaim(force, c, picks);
+  const units = force.units.filter((u) => u.status !== 'removed');
+  const setPick = (key: string, p: Partial<NexusPick>) => setPicks({ ...picks, [key]: { ...(picks[key] ?? emptyNexusPick()), ...p } });
+
+  const claim = () => {
+    if (preview.warnings.length && !confirmAction(`${preview.warnings.join('\n')}\n\nClaim anyway? Anything unresolved is lost.`)) return;
+    commit();
     onClose();
   };
 
@@ -57,5 +69,17 @@ export default function RoundIncome({ force, c, onClose }: { force: Force; c: Ca
         </>
       )}
     </Modal>
+  );
+}
+
+/** One tap for every unclaimed round. When a Nexus table still wants a roll or a choice, it opens the full claim instead. */
+export function ClaimAll({ force, c, onPick }: { force: Force; c: Campaign; onPick: () => void }) {
+  const { preview, commit } = useRoundClaim(force, c);
+  const asks = preview.warnings.length;
+  return (
+    <button className="primary" onClick={() => (asks ? onPick() : commit())}
+      data-tip={asks ? `${asks} Nexus roll${asks === 1 ? '' : 's'} or choice${asks === 1 ? '' : 's'} to make first: this opens them` : preview.lines[0]}>
+      Claim all
+    </button>
   );
 }

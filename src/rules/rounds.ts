@@ -3,9 +3,10 @@ import type { AssetUse, Campaign, CatalogBook, EchoMark, Force, ForceNexus, Hero
 import { CATEGORIES } from './data';
 import { refreshSectors, type Rand } from './hexmap';
 import {
-  ECHOES, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRATEGIC_ASSETS, activeCrisis, activeEvent, currentRound, emptyNexusPick, eventById, nexusEntry,
+  ECHOES, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRATEGIC_ASSETS, activeCrisis, activeEvent, crisisUntil, currentRound, emptyNexusPick, eventById, nexusEntry,
   WARLORDS, factionName, incomeItems, lordById, type NexusItem, type NexusPick,
 } from './nexus';
+import { endSieges } from './sieges';
 import { crisisRound, placeCrisis, rollEvent, settleCrisis, type CrisisEnd } from './events';
 import { pickSpread, resolveMarks, type MarkEnd } from './voidspawn';
 import { factionClaimedRound } from './detachments';
@@ -98,10 +99,11 @@ export function nextThreat(c: Campaign) {
   // However many Umbral Spires stand, the threat drops by one Spire's worth.
   const spires = c.factions.some((f) => buildingsHeld(c, f.id, 'spire') > 0) ? PRODUCTION.spire.threat : 0;
   const threat = clamp(threatOf(c) + R.threatPerRound + event - wins * R.threatPerWin - voidspawn * R.threatPerVoidspawnWin - patrols * R.threatPerPatrolWin - spires, 0, R.threatMax);
-  // The Crisis: a win pushes the Echoes back further; otherwise they rage at full threat.
+  // The Crisis: a win pushes the Echoes back further; left standing to its last round, they rage at full threat.
   const crisis = activeCrisis(c);
   if (!crisis) return threat;
-  return crisis.result === 'won' ? clamp(threat - NEXUS_CRISIS.threatDrop, 0, R.threatMax) : R.threatMax;
+  if (crisis.result === 'won') return clamp(threat - NEXUS_CRISIS.threatDrop, 0, R.threatMax);
+  return currentRound(c) >= crisisUntil(crisis) ? R.threatMax : threat;
 }
 
 // ---- skirmishes and Strategic Assets ----
@@ -228,6 +230,8 @@ export function endRound(
   const threat = nextThreat(c);
   // The Crisis, unless it was won, takes a sector from everyone.
   const crisis = settleCrisis(c, date);
+  // Sieges fought (or won) end; ones past their last round lapse.
+  const lapsed = endSieges(c, forces);
 
   // The Echoes take the round's marked sectors, unless the line was held. A campaign from before marks rolls them now.
   const marked = c.echoMarks?.round === round ? c.echoMarks.marks : placeEchoMarks(c, rand, threat);
@@ -267,6 +271,10 @@ export function endRound(
   };
   const report = buildReport(c, end, { production, research, built, offers, guardians }, date, rand);
   report.lines.push(...bounties.map((text) => ({ icon: '🎯', text })));
+  for (const x of lapsed) {
+    const f = forces?.find((y) => y.id === x.forceId);
+    report.lines.push({ icon: '⛺', text: `${f?.name ?? factionName(c, x.factionId)}'s siege of ${c.sectors.find((y) => y.id === x.sectorId)?.name ?? 'a sector'} lapsed unfought.` });
+  }
   if (posted.length) report.lines.push({ icon: '🎯', text: `${posted.length} new bount${posted.length === 1 ? 'y is' : 'ies are'} on the Bounty Board.` });
   return { ...end, report };
 }
@@ -406,4 +414,12 @@ export function resolveRoundIncome(
   const which = rounds.length === 1 ? `round ${rounds[0].round}` : `rounds ${rounds[0].round}–${rounds[rounds.length - 1].round}`;
   out.lines.unshift(`${factionName(c, n.factionId)} income for ${which}: +${out.us} Umbra Shard${out.us === 1 ? '' : 's'}, +${out.supply} Supply${out.materials ? `, +${out.materials} Materials` : ''}.`);
   return out;
+}
+
+/** Days since the last round ended (undefined before the first has). Past NEXUS_ROUNDS.overdueDays, the round is overdue. */
+export function roundAge(c: Campaign, today = localDate()): number | undefined {
+  const last = c.rounds?.[c.rounds.length - 1]?.date;
+  if (!last) return undefined;
+  const day = (d: string) => Date.UTC(+d.slice(0, 4), +d.slice(5, 7) - 1, +d.slice(8, 10));
+  return Math.max(0, Math.round((day(today) - day(localDate(last))) / 86400000));
 }

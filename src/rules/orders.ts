@@ -4,6 +4,7 @@ import { PRODUCTION, homeChallengeBlock, stormed } from './nexus';
 import { hasBuilding } from './production';
 import { isOpen, positionOf, reach, setPosition } from './movement';
 import { fallBack, meetingOutcomes, meetings } from './meetings';
+import { siegeAttack, siegeOf } from './sieges';
 
 // Nexus Wars sealed orders: each player picks where their detachments move or what they attack next game (or holds),
 // nobody sees anyone else's picks until the GM reveals them. Each force linked to a faction is a
@@ -100,6 +101,12 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
       const forceId = force?.id;
       if (seen.has(key) || !factionId || !c.factions.some((f) => f.id === factionId)) continue;
       seen.add(key);
+      // A detachment pinned by a siege can't move or attack anywhere else: it keeps the siege up (added below).
+      const siege = siegeOf(c, forceId);
+      if (siege) {
+        seen.delete(key);
+        continue;
+      }
       if (pick === HOLD) {
         holds.push({ email: o.email, factionId, ...(forceId ? { forceId } : {}) });
         continue;
@@ -119,6 +126,16 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
       if (blocked) flags.push(blocked);
       attacks.push({ email: o.email, factionId, ...(forceId ? { forceId } : {}), sectorId: s.id, defender: s.owner ?? '', flags });
     }
+  }
+  // Standing sieges attack again every round.
+  for (const f of forces) {
+    const siege = siegeOf(c, f.id);
+    if (!siege || seen.has(f.id)) continue;
+    seen.add(f.id);
+    const own = orders.find((o) => o.round === round && (o.picks[f.id] ?? HOLD) !== HOLD && o.picks[f.id] !== siege.sectorId && o.picks[f.id] !== undefined);
+    const a = siegeAttack(c, siege, f.owner ?? '');
+    if (own) a.flags.push(`Pinned by the siege: its order to ${c.sectors.find((x) => x.id === own.picks[f.id])?.name ?? 'move'} doesn't count`);
+    attacks.push(a);
   }
   const name = (id: string) => c.factions.find((f) => f.id === id)?.name ?? id;
   for (const a of attacks) {

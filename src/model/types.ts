@@ -2,6 +2,7 @@ import type { Category, RelicTier } from '../rules/data';
 import type { MissionDef } from '../rules/missions';
 import type { FinishedBattle, TrackedBattle } from '../rules/tracker';
 import type { SymbolShape } from './emblemSymbols';
+import type { ZoneSave } from '../rules/zone/save';
 
 export interface WeaponTrait {
   id: string;
@@ -485,7 +486,8 @@ export interface CatalogBook {
   version: string;
   importedAt: string;
   units: CatalogUnit[];
-  rules: { name: string; desc: string }[];
+  /** `alias`: the Army Forge rule a renamed rule stands for (Heal → Mend). */
+  rules: { name: string; desc: string; alias?: string }[];
   spells: { name: string; threshold: number; effect: string }[];
   /** Custom tags per datasheet name (see model/tags.ts); kept when the book is imported again. */
   unitTags?: Record<string, string[]>;
@@ -778,6 +780,10 @@ export interface Campaign {
   bounties?: Bounty[];
   /** Claimed bounties taken off the board, kept until their forces have been paid (the last BOUNTY.keepClaimed). */
   claimedBounties?: Bounty[];
+  /** Attacks that must be played at the table, held open for a few rounds with their detachment pinned (rules/sieges.ts). */
+  sieges?: Siege[];
+  /** The GM has opened zone battles to every player (until then only the GM sees them, and players keep the old auto-battle). */
+  zoneOpen?: boolean;
 }
 
 export type BountyKind = 'band' | 'hold' | 'take' | 'topple' | 'guardian' | 'noHero' | 'void';
@@ -942,9 +948,21 @@ export interface GalacticEventState {
   sectorIds?: string[];
 }
 
+/** A detachment besieging a sector it attacked: pinned outside it until the battle is played at the table, or the siege lapses. */
+export interface Siege {
+  forceId: string;
+  factionId: string;
+  sectorId: string;
+  /** The campaign round it opened, and the last round it stands. */
+  since: number;
+  until: number;
+}
+
 export interface NexusCrisis {
-  /** The round it must be fought in. */
+  /** The round it rose (it names the Crisis: a battle against it keeps this). */
   round: number;
+  /** The last round it can be fought in (`round` when unset, as before the window); set to the round it was settled once it is. */
+  until?: number;
   /** ECHO_LORDS id. */
   lord: string;
   /** Where the Lord rose (an Echo-held sector). */
@@ -987,6 +1005,8 @@ export interface AppState {
   battle?: TrackedBattle;
   /** Finished battles, shared with the group, so players can look back and claim their rewards. */
   battleHistory?: FinishedBattle[];
+  /** Zone battles in progress, saved after every step (synced, so they can be picked up on another device). */
+  zoneSaves?: ZoneSave[];
 }
 
 /** A side's pick when its detachment runs into another faction's on the map. */

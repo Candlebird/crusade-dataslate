@@ -46,7 +46,7 @@ const OVER: Record<NonNullable<SortieRun['over']>, string> = {
 };
 const AUTO_STEP = 380;
 /** The pause after each squad's turn in a fight, in ms. */
-const TURN_PAUSE = 1000;
+const TURN_PAUSE = 600;
 /** How long a blow's trail and number stay up, and the gap between blows that land together (ms). */
 const BLOW_MS = 950;
 const BLOW_GAP = 120;

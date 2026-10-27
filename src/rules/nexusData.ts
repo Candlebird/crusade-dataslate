@@ -44,6 +44,8 @@ export const BENEFITS: Benefit[] = [
 
 /** The campaign round: income, catch-up and the Void Echoes' threat. */
 export const NEXUS_ROUNDS = {
+  /** The GM ends a round about twice a week (rounds never wait on table games); after this many days it's overdue. */
+  overdueDays: 4,
   /** Umbra Shards for each match a force plays, at most `matchBonusMax` per round. */
   matchBonusUs: 3,
   matchBonusMax: 2,
@@ -325,8 +327,10 @@ export const GALACTIC_EVENTS: GalacticEvent[] = [
  *    goes to its maximum.
  */
 export const NEXUS_CRISIS = {
-  /** A Crisis begins every this many rounds (rounds 3, 6, 9…). */
-  everyRounds: 3,
+  /** A Crisis begins every this many rounds (rounds 4, 8, 12…)… */
+  everyRounds: 4,
+  /** …and can be fought for this many rounds (the round it rises and the next two). */
+  window: 3,
   threatDrop: 2,
   winUs: 6,
   mvpTier: 'Legendary' as const,

@@ -1,6 +1,6 @@
 import type { Campaign, Sector } from '../model/types';
 import { hexDistance, isPlaced, type Hex, type Rand } from './hexmap';
-import { ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_CRISIS, activeCrisis, currentRound, eventById, isStronghold, lordById } from './nexus';
+import { ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_CRISIS, activeCrisis, crisisUntil, currentRound, eventById, isStronghold, lordById } from './nexus';
 import { spreadInto } from './voidspawn';
 
 // Galactic Events and the Nexus Crisis (values in nexusData.ts).
@@ -35,7 +35,7 @@ export const crisisRound = (round: number) => round > 0 && round % NEXUS_CRISIS.
 export function placeCrisis(c: Campaign, rand: Rand = Math.random, round = currentRound(c)): boolean {
   const held = c.sectors.filter((s) => isPlaced(s) && (s.owner === ECHOES.id || s.type === 'voidspawn'));
   if (!held.length) return false;
-  c.crisis = { round, lord: pick(ECHO_LORDS, rand).id, sectorId: pick(held, rand).id };
+  c.crisis = { round, until: round + NEXUS_CRISIS.window - 1, lord: pick(ECHO_LORDS, rand).id, sectorId: pick(held, rand).id };
   return true;
 }
 
@@ -62,14 +62,15 @@ export function crisisForfeits(c: Campaign): Sector[] {
 }
 
 /**
- * Settle this round's Crisis as the round ends: unless it was won, the Echoes take each faction's sector nearest the
- * Lord. Undefined when there is no Crisis this round. (The threat change is endRound's.)
+ * Settle the Crisis as a round ends, once it's won or its last round is over: unless it was won, the Echoes take each
+ * faction's sector nearest the Lord. Undefined when there's none to settle yet. (The threat change is endRound's.)
  */
 export function settleCrisis(c: Campaign, date: string): CrisisEnd | undefined {
   const crisis = activeCrisis(c);
-  if (!crisis) return undefined;
+  if (!crisis || (crisis.result !== 'won' && currentRound(c) < crisisUntil(crisis))) return undefined;
   const result = crisis.result === 'won' ? 'won' : 'lost';
   crisis.result = result;
+  crisis.until = currentRound(c);
   const lost = result === 'won' ? [] : crisisForfeits(c).filter((s) => spreadInto(c, s.id, date));
   return { lord: lordById(crisis.lord)?.name ?? crisis.lord, sectorName: c.sectors.find((s) => s.id === crisis.sectorId)?.name ?? '?', result, lost };
 }

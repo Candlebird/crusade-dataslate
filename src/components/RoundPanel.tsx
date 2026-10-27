@@ -2,14 +2,14 @@ import { nowIso, uid } from '../model/factory';
 import { useStore } from '../model/store';
 import type { Campaign } from '../model/types';
 import {
-  ECHOES, GALACTIC_EVENTS, NEXUS_CRISIS, NEXUS_ROUNDS, STRATEGIC_ASSETS, activeCrisis, activeEvent, currentRound, factionColor, factionName, lordById,
+  ECHOES, GALACTIC_EVENTS, NEXUS_CRISIS, NEXUS_ROUNDS, STRATEGIC_ASSETS, activeCrisis, activeEvent, crisisUntil, currentRound, factionColor, factionName, lordById,
 } from '../rules/nexus';
 import { crisisForfeits, rollEvent, setEvent } from '../rules/events';
 import { detachmentName } from '../rules/detachments';
 import { href } from '../route';
 import {
   assetName, assetsOf, echoWins, endRound, inGrace, leaders, nextThreat, placeEchoMarks, refundAsset, roundEndText, sectorCounts, spendAsset, spreadsAt,
-  threatOf, underdogBonus, type RoundEnd,
+  roundAge, threatOf, underdogBonus, type RoundEnd,
 } from '../rules/rounds';
 import { difficultyLevel, difficultyRange, rateSectors } from '../rules/difficulty';
 import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY } from '../rules/nexusData';
@@ -56,6 +56,8 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
   const unspent = c.factions.reduce((n, f) => n + assetsOf(c, f.id).left, 0);
   const event = activeEvent(c);
   const crisis = activeCrisis(c);
+  const age = roundAge(c);
+  const overdue = age !== undefined && age >= NEXUS_ROUNDS.overdueDays;
   const spreads = Math.max(0, spreadsAt(coming) + (event?.spread ?? 0));
   // Where the Echoes are massing, and whether the line holds there so far.
   const marked = c.echoMarks?.round === round;
@@ -84,7 +86,7 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
         ? `the ${ECHOES.name} take ${open.length ? open.join(', ') : 'nothing (the line held everywhere)'}, and their threat goes to ${coming}.`
         : `the ${ECHOES.name}' threat goes to ${coming} and they spread ${spreads} sector${spreads === 1 ? '' : 's'}${grace ? ' (into unclaimed space only)' : ''}.`)
       + (breakers.length ? ` ${breakers.map((f) => f.name).join(', ')} still ha${breakers.length === 1 ? 's' : 've'} a mark to break: it goes to their own marked sector.` : '')
-      + (crisis && crisis.result !== 'won' ? ` The Nexus Crisis wasn't won: the ${ECHOES.name} take each faction's sector nearest ${lordById(crisis.lord)?.name ?? 'the Lord'}.` : '')
+      + (crisis && crisis.result !== 'won' && round >= crisisUntil(crisis) ? ` The Nexus Crisis wasn't won: the ${ECHOES.name} take each faction's sector nearest ${lordById(crisis.lord)?.name ?? 'the Lord'}.` : '')
       + (unspent ? ` ${unspent} unspent Strategic Asset${unspent === 1 ? ' is' : 's are'} lost.` : '')
       + ' Claimed space hulks drift off, new points of interest appear and a Galactic Event is rolled.'
       + ` Sectors rescale to ${range.min}–${range.max} Supply; AI-held sectors roll new modifiers.`)) return;
@@ -117,7 +119,14 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
   return (
     <Panel id="campaign.round" title={`Round ${round}`}
       extra={gm && <button className="primary" onClick={endNow} data-tip="When everyone has played this round">End round…</button>}>
+      {gm && overdue && (
+        <p className="small" style={{ margin: '0 0 0.5rem' }}>
+          <span className="tag gold"><Icon name="g:hazard-sign" /> Round overdue</span> The last one ended {age} days ago. Rounds run about twice a week and never wait on table games:
+          battles not played yet carry on as sieges, or lapse.
+        </p>
+      )}
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
+        {age !== undefined && <span className="tag" data-tip={`The GM ends a round about twice a week; after ${NEXUS_ROUNDS.overdueDays} days it's overdue`}>Round {round} began {age === 0 ? 'today' : age === 1 ? 'yesterday' : `${age} days ago`}</span>}
         <span className="tag red" data-tip={`Up ${NEXUS_ROUNDS.threatPerRound} each round, down ${NEXUS_ROUNDS.threatPerWin} per Battle won against them (${NEXUS_ROUNDS.threatPerVoidspawnWin} at a Voidspawn) and ${NEXUS_ROUNDS.threatPerPatrolWin} per patrol (a skirmish won against them)`}>
           <Icon name="g:biohazard" /> {ECHOES.name} threat {threat}/{NEXUS_ROUNDS.threatMax}
         </span>
@@ -160,6 +169,14 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
               <option key={l.id} value={l.id}>{l.name} (×{l.scale})</option>
             ))}
           </select>
+        </label>
+        <label className="row" style={{ gap: '0.35rem' }} data-tip="Until then only you see zone battles, and players keep the old auto-battle">
+          <input type="checkbox" checked={!!c.zoneOpen} onChange={(e) => update((d) => {
+            if (!d.campaign) return;
+            d.campaign.zoneOpen = e.target.checked || undefined;
+            d.campaign.updatedAt = nowIso();
+          })} />
+          <span className="muted">Zone battles for everyone</span>
         </label></>}
       </div>
       {grace && (
@@ -223,18 +240,20 @@ function CrisisRow({ c }: { c: Campaign }) {
   const lord = lordById(crisis.lord);
   const at = c.sectors.find((x) => x.id === crisis.sectorId);
   const forfeits = crisisForfeits(c);
+  const left = crisisUntil(crisis) - currentRound(c);
   return (
     <div className="small" style={{ marginTop: '0.5rem' }}>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         <span className="tag red"><Icon name="g:crowned-skull" /> Nexus Crisis: {lord?.name ?? 'an Echo Lord'} at {at?.name ?? 'the Voidspawn'}</span>
-        <span className={`tag${crisis.result === 'won' ? ' gold' : ''}`}>{crisis.result === 'won' ? 'Won' : crisis.result === 'lost' ? 'Lost' : 'Not fought yet'}</span>
+        <span className={`tag${crisis.result === 'won' ? ' gold' : ''}`}>{crisis.result === 'won' ? 'Won'
+          : left > 0 ? `Not beaten yet · ${left + 1} rounds left, this one too` : 'Last round to beat it'}</span>
         {!crisis.battleId && <a className="btn small" href={href.crisis()}>Start the Crisis battle</a>}
       </div>
       <p style={{ margin: '0.25rem 0 0' }}>
-        {lord?.desc} All factions fight it together against the AI before round end.
+        {lord?.desc} All factions fight it together against the AI, by the end of round {crisisUntil(crisis)}; a lost battle can be fought again.
         Win: the threat drops {NEXUS_CRISIS.threatDrop}, each side claims +{NEXUS_CRISIS.winUs} US and the side whose units earned the most XP takes a {NEXUS_CRISIS.mvpTier} relic
         {crisis.mvp ? ` (MVP: ${state.forces.find((f) => f.id === crisis.mvp)?.name ?? 'a force not on this device'})` : ''}.
-        {crisis.result !== 'won' && <> Lose, or don't fight it: the threat goes to {NEXUS_ROUNDS.threatMax} and the {ECHOES.name} take {forfeits.length
+        {crisis.result !== 'won' && <> Still standing after round {crisisUntil(crisis)}: the threat goes to {NEXUS_ROUNDS.threatMax} and the {ECHOES.name} take {forfeits.length
           ? forfeits.map((x) => `${x.name} (${factionName(c, x.owner)})`).join(', ')
           : "each faction's sector nearest the Lord"}.</>}
       </p>

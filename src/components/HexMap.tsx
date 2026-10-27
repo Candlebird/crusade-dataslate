@@ -25,6 +25,7 @@ import { EmblemBadge, EmblemShapes } from './Emblem';
 import { MARAUDER_ID, bandHeading, bandsAt, isRaided, marauderTier, payToll, recordMarauderGame } from '../rules/marauders';
 import { bandBattle, bandBlocker } from '../rules/bandBattle';
 import type { AutoResult } from '../rules/autoBattle';
+import ZoneFight, { useZoneBattles } from './ZoneFight';
 import type { TrackedBattle } from '../rules/tracker';
 import AutoBattleModal from './AutoBattleModal';
 import { BUILDINGS, GUARDIANS, MARAUDERS, PRODUCTION } from '../rules/nexusData';
@@ -565,6 +566,9 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
   const [by, setBy] = useState('');
   // A band's fight against a faction that barred it, out on the auto-battle.
   const [auto, setAuto] = useState<{ bandId: string; factionId: string; b: TrackedBattle } | null>(null);
+  const [zone, setZone] = useState<{ bandId: string; factionId: string; b: TrackedBattle } | null>(null);
+  const zoneOn = useZoneBattles();
+  const zoneId = (bandId: string, fid: string) => `band-${bandId}-${fid}`;
   // Bands coming for this sector, and the ones whose road runs through it.
   const coming = (c.marauders ?? []).flatMap((m) => {
     const h = bandHeading(c, m);
@@ -585,7 +589,10 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
   };
   const startAuto = (bandId: string, fid: string) => {
     const m = c.marauders?.find((x) => x.id === bandId);
-    if (m) setAuto({ bandId, factionId: fid, b: bandBattle(c, m, fid, state.forces, state.books, state.settings) });
+    if (!m) return;
+    const v = { bandId, factionId: fid, b: bandBattle(c, m, fid, state.forces, state.books, state.settings) };
+    if (zoneOn) setZone(v);
+    else setAuto(v);
   };
   const applyAuto = (r: AutoResult, stories: string[]) => {
     if (!auto) return;
@@ -614,7 +621,10 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
                 {m.barred.by.filter((id) => gm || id === viewer).map((id) => (
                   <div key={id} className="row" style={{ marginTop: '0.35rem' }}>
                     <b>{factionName(c, id)}</b>
-                    <button onClick={() => startAuto(m.id, id)} data-tip="Auto-battle the band with the detachment that barred them"><Icon name="g:power-lightning" /> Auto-battle</button>
+                    {zoneOn ? (
+                      <button onClick={() => startAuto(m.id, id)} data-tip="Fight the band as a zone battle with the detachment that barred them. The force keeps no losses">
+                        <Icon name="g:crossed-swords" /> {state.zoneSaves?.some((z) => z.id === zoneId(m.id, id)) ? 'Resume zone battle' : 'Zone battle'}</button>
+                    ) : <button onClick={() => startAuto(m.id, id)} data-tip="Auto-battle the band with the detachment that barred them"><Icon name="g:power-lightning" /> Auto-battle</button>}
                     <button onClick={() => pay(m.id, id)} data-tip={`Pay ${MARAUDERS.toll} Materials from your banks`}>Pay {MARAUDERS.toll}</button>
                   </div>
                 ))}
@@ -640,6 +650,19 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
             : `${m.name} (${m.strength} Supply) pass through here toward ${h.target.name}. Any faction's detachment here bars the road: they halt, raid nothing, then turn on it (fight or pay ${MARAUDERS.toll} Materials).`}
         </div>
       ))}
+      {zone && (
+        <ZoneFight id={zoneId(zone.bandId, zone.factionId)} title={`${factionName(c, zone.factionId)} against the Marauders`} tracked={zone.b}
+          ctx={{ kind: 'band', bandId: zone.bandId, factionId: zone.factionId }} onClose={() => setZone(null)}
+          stakes="Only the outcome counts: win and the band is broken, lose and it takes its toll. The force keeps no losses and earns no XP."
+          onApply={(z) => {
+            const w = z.result?.winner;
+            const team = w === undefined || w === 'draw' ? '' : z.teams[w];
+            const side = zone.b.sides.find((x) => x.team === team);
+            const winner = !side ? '' : side.ai ? MARAUDER_ID : zone.factionId;
+            const m = c.marauders?.find((x) => x.id === zone.bandId);
+            record(zone.bandId, zone.factionId, winner, 'Zone battle', m && bandBlocker(c, m, zone.factionId, state.forces)?.id, z.result ? [z.result.why] : []);
+          }} />
+      )}
       {auto && (
         <AutoBattleModal b={auto.b} onClose={() => setAuto(null)} onApply={applyAuto}
           set={(fn) => setAuto((a) => { if (!a) return a; const b = structuredClone(a.b); fn(b); return { ...a, b }; })}
