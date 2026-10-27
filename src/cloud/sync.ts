@@ -53,6 +53,8 @@ export class SyncEngine {
   private applying = new Map<string, { json: string | null; until: number }>();
   /** Writes the server refused, so they aren't retried in a loop. */
   private failed = new Map<string, string>();
+  /** Documents the local state has shown since we last pulled them: only these can be deleted locally. */
+  private landed = new Set<string>();
 
   constructor(
     private host: SyncHost,
@@ -62,6 +64,7 @@ export class SyncEngine {
 
   setLocal(docs: LocalDoc[]): void {
     this.local = new Map(docs.map((d) => [d.path, d]));
+    for (const d of docs) this.landed.add(d.path);
     for (const c of this.ready) this.reconcile(c);
   }
 
@@ -123,6 +126,9 @@ export class SyncEngine {
     }
     if (rj === null) return;
     if (S !== undefined) {
+      // A pulled copy that never reached the local state (a background tab can lag well past the grace period)
+      // wasn't deleted here: pull it again rather than delete it for everyone.
+      if (!this.landed.has(path)) return this.pull(path, rj);
       // Deleted locally since the last sync. With no remote copy yet, it is our own new document whose write
       // hasn't shown up in a snapshot: take it back.
       if (R ? this.host.canDelete(R) : this.pushing.has(path)) return this.remove(path, rj);
@@ -155,6 +161,7 @@ export class SyncEngine {
   }
 
   private pull(path: string, json: string | null, readOnly = false): void {
+    this.landed.delete(path);
     if (json === null) this.synced.delete(path);
     else this.synced.set(path, json);
     const entry = { json, until: Infinity };

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useRef, useState } from 'react';
 import { useStore } from '../model/store';
 import { useCloud } from '../cloud/CloudSync';
 import { nowIso } from '../model/factory';
@@ -45,7 +45,13 @@ export default function ZoneFight({ id, title, tracked, ctx, modes = ['command',
 }) {
   const { state, update } = useStore();
   const cloud = useCloud();
-  const save = useZoneSave(id);
+  const saved = useZoneSave(id);
+  // Once a battle is on screen it stays there, even if its save goes missing under it (a sync from another device):
+  // the next step saves it again.
+  const last = useRef<ZoneSave>();
+  const ended = useRef(false);
+  if (saved) last.current = saved;
+  const save = saved ?? (ended.current ? undefined : last.current);
   const [err, setErr] = useState('');
 
   const start = (mode: ZoneMode) => {
@@ -61,9 +67,12 @@ export default function ZoneFight({ id, title, tracked, ctx, modes = ['command',
   };
   const store = (z: ZBattle, mode: ZoneMode) => update((d) => {
     const s = d.zoneSaves?.find((x) => x.id === id);
-    if (s) Object.assign(s, { battle: savedBattle(z), mode, updatedAt: nowIso() });
+    const step = { battle: savedBattle(z), mode, updatedAt: nowIso() };
+    if (s) Object.assign(s, step);
+    else if (last.current) d.zoneSaves = [...(d.zoneSaves ?? []), { ...structuredClone(last.current), ...step }];
   });
   const done = (z: ZBattle, mode: ZoneMode) => {
+    ended.current = true;
     if (!practice) onApply(z, mode, save?.tracked ?? tracked);
     update((d) => { d.zoneSaves = (d.zoneSaves ?? []).filter((x) => x.id !== id); });
     onClose();

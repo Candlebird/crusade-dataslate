@@ -233,4 +233,24 @@ describe('SyncEngine', () => {
     engine.setRemote('forces', [], false);
     expect(log).toEqual(['push forces/a 1', 'remove forces/a']);
   });
+
+  it('never deletes a document whose pulled copy the local state has not shown yet', async () => {
+    let t = 0;
+    const { engine, log } = setup([], () => t);
+    engine.setLocal([]);
+    engine.setRemote('forces', [], false);
+    // Another device starts a document and keeps saving it, while this tab's local state lags far behind.
+    engine.setRemote('forces', [R('a', '1')], false);
+    await flush();
+    t = 10_000;
+    engine.setRemote('forces', [R('a', '2')], false);
+    await flush();
+    t = 20_000;
+    engine.setLocal([]);
+    expect(log).toEqual(['apply forces/a 1', 'apply forces/a 2', 'apply forces/a 2']);
+    // Once it lands, deleting it here deletes it everywhere.
+    engine.setLocal([L('a', '2')]);
+    engine.setLocal([]);
+    expect(log[log.length - 1]).toBe('remove forces/a');
+  });
 });
