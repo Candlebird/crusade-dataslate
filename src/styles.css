@@ -1382,3 +1382,7 @@ table.ledger td:first-child { white-space: nowrap; }
 .map-reach-swatch { background: transparent !important; border: 2px solid #5fb3b3; }
 .map-seen-swatch { background: #121418 !important; border: 1px dashed #4a525c; opacity: 0.8; }
 .hex-diff-key { color: #e08a7a; font-size: 0.85em; }
+/* Sealed orders (NexusOrders.tsx): what a detachment's pick will do, under its select. */
+.order-means { text-transform: none; letter-spacing: normal; color: var(--text); font-size: 0.85rem; }
+.order-means.muted { color: var(--muted); }
+.order-means .tag { margin-right: 0.3rem; }

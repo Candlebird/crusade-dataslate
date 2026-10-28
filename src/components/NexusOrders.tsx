@@ -95,6 +95,7 @@ export function OrdersLockStrip({ c }: { c: Campaign }) {
 /** Sealed orders: every player picks a move, an attack or a hold per detachment; the GM reveals them all at once. */
 export default function OrdersPanel({ c }: { c: Campaign }) {
   const { state } = useStore();
+  const zoneOn = useZoneBattles();
   const endRound = useEndRound();
   const cloud = useCloud();
   const { fb, online, round, current, revealed, orders, declared } = useSealedOrders(c);
@@ -102,7 +103,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
   const status = round && round.campaignId === c.id && <span className="muted small">Round {currentRound(c)} · orders #{round.round}{revealed ? ' · revealed' : ' · open'}</span>;
   // Every state renders in the same collapsible panel.
   const panel = (body: ReactNode) => <Panel id="campaign.orders" title="Sealed orders" extra={status}>{body}</Panel>;
-  if (!online || !cloud.email) return panel(<p className="muted small">Sign in to declare sealed orders.</p>);
+  if (!online || !cloud.email) return panel(<p className="muted small">Before each game every detachment secretly picks a move, an attack or a hold. The orders live in the cloud: sign in to declare yours.</p>);
   if (round === undefined || !fb) return panel(<p className="muted small">Loading orders…</p>);
 
   const fail = (what: string) => (err: unknown) => toast(`Couldn't ${what}: ${errorText(err)}`, 'error');
@@ -173,6 +174,17 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
               const t = id ? standingEffects(c, id, f.nexus!.factionId) : [];
               return t.length ? ` · ${t.join(' · ')}` : '';
             };
+            // In words, what the pick will do once it's revealed.
+            const picked = own?.picks[f.id] ?? own?.picks[f.nexus!.factionId] ?? '';
+            const target = attacks.find((s) => s.id === picked) ?? moves.find((s) => s.id === picked);
+            const isAttack = !!target && attacks.includes(target);
+            const rating = isAttack && aiDefended(target!) ? ratingFor(target!, f.nexus!.factionId) : undefined;
+            const means = !picked ? <>Not declared yet: pick before the GM reveals, or it just stays where it is.</>
+              : picked === HOLD ? <>Stays at {at?.name ?? 'its sector'}.{digsIn(c, f) && ' Dug in: if attacked it fights and picks the deployment.'}{fx(at?.id)}</>
+              : !target ? <>That sector is out of reach now: pick again.</>
+              : isAttack ? <>Attacks {target.name}: a battle against {rating !== undefined ? `its ${rating} Supply AI garrison` : factionName(c, target.owner)}, at the table
+                {zoneOn ? ' or as a zone battle' : !overrunBlock(target, f) ? ' or overrun (an auto-battle)' : ''}, from this panel after the reveal. Win and it moves in.</>
+              : <>Moves to {target.name} when the GM moves detachments after the reveal.{fx(target.id)}</>;
             return (
               <label key={f.id} className="field">
                 <span>{label(f)} <span className="muted small" data-tip={why.join(', ')}>at {at?.name ?? '—'}, moves {move}</span></span>
@@ -193,10 +205,13 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
                     </optgroup>
                   )}
                 </select>
+                <span className={`order-means${picked ? '' : ' muted'}`}>
+                  {picked && <span className="tag green" data-tip="Saved and sealed: you can change it until the GM reveals"><Icon name="l:lock" /> Locked in</span>} {means}
+                </span>
               </label>
             );
           })}
-          <h3>Declared</h3>
+          <h3>Who has locked in</h3>
           {expected.length === 0 ? <p className="muted small">No forces are linked to factions yet.</p> : (
             <div className="row">
               {expected.map((f) => <span key={f.id} className="tag" data-tip={isDeclared(f) ? 'Declared' : 'Waiting'}>{isDeclared(f) ? <Icon name="l:check" /> : '…'} {label(f)}</span>)}
