@@ -20,6 +20,20 @@ export interface RuleHit {
   /** A trait, relic or table entry name; unset for a paragraph of rules text. */
   title?: string;
   text: string;
+  /** The element id of the exact entry (a paragraph, a table row, a relic card) on the page: see entryId. */
+  entry: string;
+}
+
+/**
+ * A stable element id for one entry on a rules page, from its section anchor and its key: its name, or for a paragraph or
+ * a roll-table row its text (a reward-table row is "<table>: <text>", as the same result sits in several tables). The
+ * rules pages give each entry this id, so a search hit can scroll to it. Rows of tables that share names (the trait and
+ * weapon tables, the Anomaly and Void tables) are keyed "<table>: <name>" too.
+ */
+export function entryId(anchor: string, key: string): string {
+  let h = 5381;
+  for (const ch of `${anchor}|${key}`) h = ((h * 33) ^ ch.charCodeAt(0)) >>> 0;
+  return `rule-${anchor || 'top'}-${h.toString(36)}`;
 }
 
 const CRUSADE_SECTIONS: Record<keyof typeof CRUSADE_TEXT, [RulesSub | undefined, string, string]> = {
@@ -64,15 +78,17 @@ const NEXUS_SECTIONS: Record<keyof typeof NEXUS_TEXT, [string, string]> = {
 };
 
 type Named = { name: string; desc?: string };
-const named = (page: RulesSub | undefined, anchor: string, section: string, list: Named[]): RuleHit[] =>
-  list.map((e) => ({ page, anchor, section, title: e.name, text: e.desc ?? '' }));
+type Hit = Omit<RuleHit, 'entry'> & { entry?: string };
+/** Named entries of one table; grouped, each is keyed by the table as well as its name (see entryId). */
+const named = (page: RulesSub | undefined, anchor: string, section: string, list: Named[], grouped = false): Hit[] =>
+  list.map((e) => ({ page, anchor, section, title: e.name, text: e.desc ?? '', ...(grouped ? { entry: entryId(anchor, `${section}: ${e.name}`) } : {}) }));
 
 let cache: RuleHit[] | null = null;
 
 /** Everything on the four rules pages, flattened for searching. */
 export function rulesIndex(): RuleHit[] {
   if (cache) return cache;
-  const out: RuleHit[] = [];
+  const out: Hit[] = [];
   for (const [k, lines] of Object.entries(CRUSADE_TEXT) as [keyof typeof CRUSADE_TEXT, string[]][]) {
     const [page, anchor, section] = CRUSADE_SECTIONS[k] ?? [undefined, '', 'Crusade rules'];
     for (const text of lines) out.push({ page, anchor, section, text });
@@ -81,17 +97,18 @@ export function rulesIndex(): RuleHit[] {
   out.push(...named(undefined, 'r-agendas', 'Agendas', AGENDAS));
   out.push(...named(undefined, 'r-req', 'Requisitions', REQUISITIONS.map((r) => ({ name: r.name, desc: `${r.cost} RP. ${r.desc ?? ''}` }))));
   for (const k of Object.keys(REWARD_TABLES) as RewardTableKey[]) {
-    for (const e of REWARD_TABLES[k].entries) out.push({ anchor: 'r-rewards', section: REWARD_TABLES[k].label, text: e.text });
+    const section = REWARD_TABLES[k].label;
+    for (const e of REWARD_TABLES[k].entries) out.push({ anchor: 'r-rewards', section, text: e.text, entry: entryId('r-rewards', `${section}: ${e.text}`) });
   }
   out.push(...named(undefined, 'r-deaths', 'Scar table', SCAR_TABLE));
 
-  for (const [k, list] of Object.entries(TRAIT_TABLES)) out.push(...named('traits', 't-traits', `${k} traits`, list));
-  for (const c of CATEGORIES) out.push(...named('traits', 't-unique', `Unique ${c} traits`, UNIQUE_TRAIT_TABLES[c] ?? []));
+  for (const [k, list] of Object.entries(TRAIT_TABLES)) out.push(...named('traits', 't-traits', `${k} traits`, list, true));
+  for (const c of CATEGORIES) out.push(...named('traits', 't-unique', `Unique ${c} traits`, UNIQUE_TRAIT_TABLES[c] ?? [], true));
   for (const k of ['Melee', 'Ranged'] as const) {
-    out.push(...named('traits', 't-weapons', `${k} weapon traits`, WEAPON_TRAIT_TABLES[k]));
-    out.push(...named('traits', 't-weapons', `Unique ${k.toLowerCase()} weapon traits`, UNIQUE_WEAPON_TRAIT_TABLES[k]));
+    out.push(...named('traits', 't-weapons', `${k} weapon traits`, WEAPON_TRAIT_TABLES[k], true));
+    out.push(...named('traits', 't-weapons', `Unique ${k.toLowerCase()} weapon traits`, UNIQUE_WEAPON_TRAIT_TABLES[k], true));
   }
-  for (const c of CATEGORIES) out.push(...named('traits', 't-nexus', `Nexus ${c} traits`, NEXUS_TRAITS[c] ?? []));
+  for (const c of CATEGORIES) out.push(...named('traits', 't-nexus', `Nexus ${c} traits`, NEXUS_TRAITS[c] ?? [], true));
 
   for (const r of RELICS) {
     const [anchor, kind] = r.nexus ? ['x-nexus', 'Nexus'] : r.sortie ? ['x-sortie', 'Sortie'] : r.training ? ['x-training', 'Training'] : ['x-crusade', 'Crusade'];
@@ -112,12 +129,12 @@ export function rulesIndex(): RuleHit[] {
   out.push(...named('nexus', 'n-downtime', 'Expedition sites', EXPEDITION_SITES));
   out.push(...named('nexus', 'n-tech', 'Buildings', BUILDINGS));
   for (const p of WARLORDS.paths) out.push(...named('nexus', 'n-warlords', `Warlords: ${p.name}`, p.perks));
-  for (const e of ANOMALY_TABLE) out.push({ page: 'nexus', anchor: 'n-tables', section: 'Anomaly table', text: e.text });
-  for (const e of VOID_TABLE) out.push({ page: 'nexus', anchor: 'n-tables', section: 'Void table', text: e.text });
+  for (const [section, list] of [['Anomaly table', ANOMALY_TABLE], ['Void table', VOID_TABLE]] as const)
+    for (const e of list) out.push({ page: 'nexus', anchor: 'n-tables', section, text: e.text, entry: entryId('n-tables', `${section}: ${e.text}`) });
   out.push(...named('nexus', 'n-shop', 'Umbra Shard shop', UMBRA_SHOP));
   out.push(...named('nexus', 'n-shop', 'Combat manipulations', COMBAT_MANIPULATIONS));
-  cache = out;
-  return out;
+  cache = out.map((h) => ({ ...h, entry: h.entry ?? entryId(h.anchor, h.title ?? h.text) }));
+  return cache;
 }
 
 /** Hits holding every word of the query, names that match listed first. */

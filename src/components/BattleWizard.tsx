@@ -20,6 +20,7 @@ import {
   resolveBattle,
   restartInput,
   rewardRows,
+  rollReward,
   sufferingCount,
   unitName,
   xpCandidates,
@@ -161,7 +162,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
   };
 
   // Recording from the battle tracker leads back to it; a claimed past battle back to the Battle page's list.
-  const back = source ? { href: href.tracker(), label: source.past ? 'Back to past battles' : 'Back to the battle' } : undefined;
+  const back = source ? { href: source.past ? href.pastBattles() : href.tracker(), label: source.past ? 'Back to past battles' : 'Back to the battle' } : undefined;
   // Forces from the same tracker battle that still have to record it.
   const waiting = source && !source.past
     ? source.battle.sides.filter((x) => x.forceId && x.id !== source.side && !state.battle?.recorded.includes(x.id) && state.forces.some((g) => g.id === x.forceId)).map((x) => x.name)
@@ -182,7 +183,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
 
       {source && (
         <p className="panel notice small">
-          Filled in from {source.past ? 'past battle' : 'the battle tracker'} <a href={href.tracker()}>{source.battle.mission.name}</a>
+          Filled in from {source.past ? 'past battle' : 'the battle tracker'} <a href={source.past ? href.pastBattles() : href.tracker()}>{source.battle.mission.name}</a>
           {source.past && ` (${localDate(source.past)}, as ${source.battle.sides.find((x) => x.id === source.side)?.name})`}. Check it, then add XP and rewards.
           {' '}<button className="ghost small" onClick={() => setInput(restartInput(initialInput(f, forceTotals(f, state.settings).bp), input, []))}>Start blank instead</button>
         </p>
@@ -221,7 +222,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       {step === 0 && <SetupStep input={input} set={set} campaign={linked ? campaign : undefined} />}
       {step === 1 && <UnitsStep units={units} input={input} setUnit={setUnit} worn={worn} />}
       {step === 2 && <DeathsStep units={units} input={input} setUnit={setUnit} />}
-      {step === 3 && <RewardsStep units={units} input={full} set={set} setPick={setPick} warnings={preview.warnings} />}
+      {step === 3 && <RewardsStep units={units} input={full} set={set} setPick={setPick} warnings={preview.warnings} inNexus={!!f.nexus} />}
       {step === 3 && linked && <NexusRewards units={units} input={input} nexus={nexus} setPick={setNexusPick} />}
       {step === 4 && <SummaryStep outcome={preview} />}
 
@@ -452,12 +453,13 @@ function DeathsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInp
 
 // ---- Step 4: rewards ----
 
-function RewardsStep({ units, input, set, setPick, warnings }: {
+function RewardsStep({ units, input, set, setPick, warnings, inNexus }: {
   units: Unit[];
   input: BattleInput;
   set: (p: Partial<BattleInput>) => void;
   setPick: (key: string, p: Partial<RewardPick>) => void;
   warnings: string[];
+  inNexus: boolean;
 }) {
   const rows = rewardRows(input);
   return (
@@ -472,7 +474,7 @@ function RewardsStep({ units, input, set, setPick, warnings }: {
         const todo = warnings.filter((w) => w.startsWith(`${row.source}: `) && !w.endsWith('not rolled yet.')).map((w) => w.slice(row.source.length + 2));
         return (
           <div key={row.key}>
-            <RewardBox row={row} units={units} input={input} pick={input.rewards[row.key] ?? emptyPick()} setPick={(p) => setPick(row.key, p)} />
+            <RewardBox row={row} units={units} input={input} inNexus={inNexus} pick={input.rewards[row.key] ?? emptyPick()} setPick={(p) => setPick(row.key, p)} />
             {todo.map((w) => <p key={w} className="small reward-todo"><span className="tag gold">To do</span> {w[0].toUpperCase() + w.slice(1)}</p>)}
           </div>
         );
@@ -481,10 +483,11 @@ function RewardsStep({ units, input, set, setPick, warnings }: {
   );
 }
 
-function RewardBox({ row, units, input, pick, setPick }: {
+function RewardBox({ row, units, input, inNexus, pick, setPick }: {
   row: RewardRow;
   units: Unit[];
   input: BattleInput;
+  inNexus: boolean;
   pick: RewardPick;
   setPick: (p: Partial<RewardPick>) => void;
 }) {
@@ -507,7 +510,7 @@ function RewardBox({ row, units, input, pick, setPick }: {
         {row.fixed ? <span className="tag green">granted</span> : (
           <>
             <span className="spacer" />
-            <button onClick={() => setPick({ roll: rollDie(table.entries.length) })}><Icon name="g:perspective-dice-six-faces-six" /> Roll D{table.entries.length}</button>
+            <button onClick={() => setPick({ roll: rollReward(row.table, inNexus) })}><Icon name="g:perspective-dice-six-faces-six" /> Roll D{table.entries.length}</button>
             <select value={pick.roll ?? ''} onChange={(ev) => setPick({ roll: Number(ev.target.value) || null })}>
               <option value="">— result —</option>
               {table.entries.map((x, i) => <option key={i} value={i + 1}>{i + 1}. {x.text}</option>)}

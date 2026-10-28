@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import type { Force } from '../model/types';
@@ -72,7 +72,7 @@ import { localDate } from '../model/date';
 import { Icon } from './Icon';
 
 /** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
-export default function BattleTracker({ sectorId, attacker, forceId, crisis }: { sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean }) {
+export default function BattleTracker({ sectorId, attacker, forceId, crisis, past }: { sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean; past?: boolean }) {
   const { state, update } = useStore();
   const b = state.battle;
   const sector = state.campaign?.sectors.find((s) => s.id === sectorId);
@@ -81,6 +81,12 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
   const cloud = useCloud();
   const zoneOn = useZoneBattles();
   const zoneSave = useZoneSave(b?.id);
+  // Opened as "Back to past battles": go straight to the list, past any battle in progress.
+  useEffect(() => {
+    if (!past) return;
+    const t = window.setTimeout(() => document.getElementById('battle-past')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+    return () => window.clearTimeout(t);
+  }, [past]);
   if (!b) return <StartBattle sectorId={sector?.id} preset={attacker} presetForce={forceId} crisis={crisis} />;
 
   const set = (fn: (d: TrackedBattle) => void) => update((s) => void (s.battle && fn(s.battle)));
@@ -333,6 +339,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
           </label>
         </div>
       </Panel>
+      {past && <div id="battle-past"><PastBattles /></div>}
     </div>
   );
 }
@@ -738,7 +745,13 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
       <div className="row">
         <span className="muted small">Finishing closes the battle and shares it under Past battles, where anyone who hasn't recorded it yet can claim their rewards.</span>
         <span className="spacer" />
-        <button className={toRecord.length ? '' : 'primary'} onClick={onFinish}><Icon name="l:check" /> Finish & save result</button>
+        <button
+          className={toRecord.length ? '' : 'primary'}
+          onClick={() => {
+            if (toRecord.length && !confirmAction(`${toRecord.length} force${toRecord.length === 1 ? " hasn't" : "s haven't"} recorded yet (${toRecord.map((s) => s.name).join(', ')}). Finish anyway? ${toRecord.length === 1 ? 'It' : 'They'} can still claim it from Past battles.`)) return;
+            onFinish();
+          }}
+        ><Icon name="l:check" /> Finish & save result</button>
       </div>
     </div>
   );

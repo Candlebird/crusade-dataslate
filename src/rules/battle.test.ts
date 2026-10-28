@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
-import { emptyUnitBattle, materialsLine, participationXp, resolveBattle, restartInput, rewardRows, type BattleInput } from './battle';
+import { href, parseRoute } from '../route';
+import { REWARD_TABLES } from './data';
+import { emptyUnitBattle, materialsLine, nexusOnlyReward, participationXp, resolveBattle, restartInput, rewardRows, rollReward, type BattleInput } from './battle';
 import { emptyNexus } from './nexus';
 
 function setup() {
@@ -114,5 +116,34 @@ describe('starting a filled-in report blank', () => {
     const next = restartInput(input, { ...input, vsAi: true }, []);
     expect(next.patrol).toBeUndefined();
     expect(next.vsAi).toBe(false);
+  });
+});
+
+describe('rolling a reward table', () => {
+  // A die that hands out these results in turn.
+  const dice = (...rolls: number[]) => () => rolls.shift()!;
+  const tokenRoll = REWARD_TABLES.winner.entries.findIndex(nexusOnlyReward) + 1;
+
+  it('rerolls Nexus-only results for a force outside Nexus Wars', () => {
+    expect(nexusOnlyReward(REWARD_TABLES.winner.entries[tokenRoll - 1])).toBe(true);
+    expect(rollReward('winner', false, dice(tokenRoll, tokenRoll, 3))).toBe(3);
+    const manip = REWARD_TABLES.loser.entries.findIndex((e) => e.manipulation) + 1;
+    expect(rollReward('loser', false, dice(manip, 2))).toBe(2);
+  });
+
+  it('keeps Nexus-only results for a Nexus Wars force', () => {
+    expect(rollReward('winner', true, dice(tokenRoll, 3))).toBe(tokenRoll);
+  });
+
+  it('never lands on a Nexus-only result outside Nexus Wars', () => {
+    for (const k of Object.keys(REWARD_TABLES) as (keyof typeof REWARD_TABLES)[])
+      for (let i = 0; i < 200; i++) expect(nexusOnlyReward(REWARD_TABLES[k].entries[rollReward(k, false) - 1])).toBe(false);
+  });
+});
+
+describe('back to past battles', () => {
+  it('opens the Battle page at its Past battles list', () => {
+    expect(parseRoute(href.pastBattles())).toEqual({ page: 'tracker', past: true });
+    expect(parseRoute(href.tracker())).toEqual({ page: 'tracker' });
   });
 });

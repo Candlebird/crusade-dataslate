@@ -103,8 +103,8 @@ function DiceModal({ onClose }: { onClose: () => void }) {
             {last.dice.length > 1 && <span className="muted small">total {last.dice.reduce((a, b) => a + b, 0)}</span>}
           </div>
           <div className="dice-tray">
-            {/* With a target, successes are grouped first so they're easy to count off. */}
-            {(last.target ? [...last.dice].sort((a, b) => b - a) : last.dice).map((d, i) => <DieFace key={i} value={d} item={last} />)}
+            {/* High to low: with a target, successes are grouped first so they're easy to count off; with Any, the best rolls lead. */}
+            {[...last.dice].sort((a, b) => b - a).map((d, i) => <DieFace key={i} value={d} item={last} />)}
           </div>
           {last.result && <div><Icon name="l:arrow-right" /> {last.result}</div>}
         </div>
