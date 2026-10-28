@@ -7,8 +7,9 @@ import { bookRules } from '../oprRules';
 import { dist, los, makeBoard, reachable, zoneOf } from './board';
 import { mulberry32 } from './dice';
 import { join, maxWoundsOf, profileOf, unitHooks, woundsOf } from './profile';
+import { woundsLeft } from './combat';
 import { playOut, quickBattle, randomArmy, simSetup } from './sim';
-import { act, attackNow, createBattle, ready, deploy, pickDeploy, startDeploy, toDeploy } from './engine';
+import { act, attackNow, createBattle, onActivation, ready, deploy, pickDeploy, startDeploy, toDeploy } from './engine';
 import { aiTurn } from './ai';
 import type { ZBattle } from './state';
 import { applyZoneBattle, startZoneBattle, zoneKey, ZONE_REWARDS } from './setup';
@@ -112,7 +113,24 @@ describe('battle', () => {
     expect(b.phase).toBe('ended');
     expect(stages).toBeGreaterThan(0);
   });
+  it('lets the player aim an ability that goes off as the unit activates (Mend)', () => {
+    const a = { book: DOTHEA, units: ['Tech Druid', 'Furious Druid', 'Healing Druid'].map((n) => bookUnit(DOTHEA, n)) };
+    const d = { book: ECHOES, units: randomArmy(ECHOES, 600, mulberry32(3), 'e') };
+    const b = playOut(createBattle(simSetup(STANDARD_MISSION, a, d, 3)), [0, 1], 0);
+    const [druid, x, y] = ['Tech Druid', 'Furious Druid', 'Healing Druid'].map((n) => b.units.find((u) => u.name === n)!);
+    x.sq = y.sq = druid.sq;
+    x.p.models[0].hurt = 1;
+    y.p.models[0].hurt = 1;
+    b.turn = druid.side;
+    const [mend] = onActivation(b, druid);
+    expect(mend.label).toMatch(/^Heals/);
+    expect(mend.targets.map((t) => t.id).sort()).toEqual([x.id, y.id].sort());
+    act(b, { unit: druid.id, action: 'hold', aid: y.id }, true);
+    expect(woundsLeft(y)).toBe(maxWoundsOf(y.p));
+    expect(woundsLeft(x)).toBe(maxWoundsOf(x.p) - 1);
+  });
 });
+
 
 describe('campaign hookup', () => {
   it('fights a tracked battle and writes it back', () => {

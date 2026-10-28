@@ -1273,7 +1273,10 @@ table.ledger td:first-child { white-space: nowrap; }
 .tm-note { flex-basis: 100%; }
 
 /* Zone battle (ZoneBattleModal.tsx): the board in 6" squares, zones of 2x2 drawn bold, the orders and log beside it. */
-.zb { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; }
+.zb { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 12px; }
+/* The battle fills the window but for a small margin (a phone already gets the whole screen). */
+.modal-back:has(> .modal > .modal-body > .zb) { padding: 8px; }
+.modal:has(> .modal-body > .zb) { max-width: none !important; min-height: calc(100vh - 16px); min-height: calc(100dvh - 16px); }
 .zb-main { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .zb-side { min-width: 0; display: flex; flex-direction: column; gap: 8px; border-left: 1px solid var(--line); padding-left: 10px; }
 .zb-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
@@ -1293,25 +1296,36 @@ table.ledger td:first-child { white-space: nowrap; }
 .zb-sq.lit:hover { background-color: rgba(95, 179, 179, 0.3); }
 .zb-sq.lit.far:hover { background-color: rgba(201, 162, 74, 0.26); }
 .zb-sq.here { box-shadow: inset 0 0 0 2px var(--text); cursor: pointer; }
-.zb-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin: 4px 0 8px; color: var(--muted); }
-.zb-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.zb-legend i { width: 12px; height: 12px; border-radius: 2px; }
-.zb-legend i.adv { box-shadow: inset 0 0 0 2px var(--cyan); background: rgba(95, 179, 179, 0.12); }
-.zb-legend i.far { box-shadow: inset 0 0 0 2px rgba(201, 162, 74, 0.75); background: rgba(201, 162, 74, 0.1); }
-.zb-legend i.chg { border-radius: 50%; box-shadow: 0 0 0 2px var(--red); }
+.zb-pop-back { position: absolute; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center; padding: 12px; background: rgba(0, 0, 0, 0.45); }
+.zb-pop { width: 100%; max-width: 340px; max-height: 100%; overflow-y: auto; padding: 0.8rem 1rem; background: var(--panel); border: 1px solid var(--gold-dim); box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7); }
+.zb-pop h3 { margin: 0 0 0.2rem; }
+.zb-pop-acts { display: grid; gap: 6px; margin: 0.5rem 0; }
+.zb-pop-acts button { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.zb-pop-acts button span { text-transform: none; letter-spacing: 0; font-weight: normal; }
+.zb-pop-abil { display: flex; flex-direction: column; gap: 4px; margin-bottom: 0.5rem; }
+.zb-pop-hint { box-sizing: border-box; display: flex; min-height: 2.6rem; align-items: center; gap: 8px; padding: 4px 10px; background: rgba(20, 22, 26, 0.92); border: 1px solid var(--gold-dim); }
+.zb-pop-hint button { min-height: 0; padding-top: 0.2rem; padding-bottom: 0.2rem; }
+.zb-pop-hint.idle { border-color: var(--line); color: var(--muted); }
 .zb-sq.last { outline: 1px dashed var(--muted); outline-offset: -3px; }
 .zb-terrain { position: absolute; left: 2px; top: 0; font-size: 0.6rem; color: var(--muted); pointer-events: none; }
 .zb-obj { position: absolute; right: 2px; top: 0; font-size: 0.75rem; color: var(--text); pointer-events: none; }
 .zb-obj.mine { color: var(--gold); }
 .zb-obj.foe { color: #e08a80; }
 .zb-obj.x { color: var(--cyan); }
-.zb-unit { all: unset; box-sizing: border-box; position: relative; cursor: pointer; width: 44%; min-width: 0; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: clamp(0.5rem, 1.1vw, 0.75rem); font-weight: 700; overflow: hidden; border: 2px solid; }
+.zb-tok { position: relative; width: 44%; min-width: 0; aspect-ratio: 1; display: flex; }
+.zb-unit { all: unset; box-sizing: border-box; position: relative; cursor: pointer; width: 100%; min-width: 0; aspect-ratio: 1; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: clamp(0.5rem, 1.1vw, 0.75rem); font-weight: 700; overflow: hidden; border: 2px solid; }
 .zb-unit.mine { background: #3a3020; border-color: var(--gold); color: var(--gold); }
 .zb-unit.foe { background: #3a1d1a; border-color: var(--red); color: #e8a49b; }
 .zb-unit.done { opacity: 0.55; }
 .zb-unit.shaken { border-style: dashed; }
 .zb-unit.sel { box-shadow: 0 0 0 2px var(--text); }
-.zb-unit.can { box-shadow: 0 0 0 2px var(--red); }
+.zb-unit.can { box-shadow: 0 0 0 3px #ff5a48, 0 0 12px 4px rgba(255, 90, 72, 0.75); animation: zb-target 0.9s ease-in-out infinite alternate; }
+@keyframes zb-target { to { box-shadow: 0 0 0 4px #ff7a6a, 0 0 18px 7px rgba(255, 90, 72, 0.45); } }
+.zb-aim { position: absolute; left: 50%; bottom: calc(100% + 2px); width: 90%; transform: translateX(-50%); z-index: 3; pointer-events: none; overflow: visible;
+  fill: none; stroke: #ff5a48; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 1px 1px #000); animation: zb-bob 0.6s ease-in-out infinite alternate; }
+@keyframes zb-bob { to { transform: translate(-50%, -4px); } }
+.zb-aim.cue { stroke: var(--gold); }
+.zb-unit.cue { box-shadow: 0 0 0 2px var(--gold), 0 0 10px 2px rgba(201, 162, 74, 0.55); }
 .zb-unit .emblem { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
 .zb-hp { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--green); z-index: 1; }
 .zb-field { position: relative; }
@@ -1334,7 +1348,7 @@ table.ledger td:first-child { white-space: nowrap; }
 .zb-list { display: flex; flex-wrap: wrap; gap: 4px; max-height: 160px; overflow-y: auto; }
 .zb-list button.on { border-color: var(--gold); color: var(--gold); }
 .zb-effects { margin: 0; padding-left: 1.1rem; }
-.zb-log { border-top: 1px solid var(--line); padding-top: 4px; max-height: 320px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.zb-log { border-top: 1px solid var(--line); padding-top: 4px; max-height: max(320px, 50vh); overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .zb-line { display: grid; grid-template-columns: 1.4rem minmax(0, 1fr); align-items: start; }
 .zb-line.s0 > span { color: var(--text); }
 .zb-line.s1 > span { color: var(--muted-2); }

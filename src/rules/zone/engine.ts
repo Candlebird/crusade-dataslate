@@ -322,6 +322,8 @@ export interface Order {
   target?: string;
   spell?: { name: string; targets: string[] };
   choice?: 'a' | 'b';
+  /** Who its abilities on activation (a heal, an aid, a hex) go to; left out, the best pick. */
+  aid?: string;
 }
 
 const moveOpts = (b: ZBattle, u: ZUnit): MoveOpts => {
@@ -474,7 +476,7 @@ function activate(c: Ctx, u: ZUnit, o: Order): 'shoot' | 'done' | 'quiet' {
     const ch = unitHooks(u.p).find((h) => h.k === 'choice') as { a: Hook[]; b: Hook[] } | undefined;
     if (ch) { u.choice = o.choice; u.effects.push({ give: o.choice === 'a' ? ch.a : ch.b, until: 'round', round: b.round, from: u.name }); }
   }
-  fire(c, u, 'activation', o.target);
+  fire(c, u, 'activation', o.aid ?? o.target);
   if (o.spell) cast(c, u, o.spell.name, o.spell.targets);
   if (u.destroyed || u.routed) return 'quiet';
   const action = actions(b, u).includes(o.action) ? o.action : 'hold';
@@ -710,8 +712,7 @@ function fire(c: Ctx, u: ZUnit, at: string, targetId?: string) {
     if (u.destroyed || u.routed) return;
     const key = `${at}:${i}:${h.k}`;
     if (h.k === 'heal' && h.at === at) {
-      const pool = h.who === 'self' ? [u] : onTable(b).filter((x) => x.side === u.side && inches(b, u, x) <= (h.range ?? 6) + 2);
-      const hurt = pool.filter((x) => woundsLeft(x) < maxWoundsOf(x.p) && (!h.toughOnly || toughOf(x.p) >= 3)).sort((x, y) => (maxWoundsOf(y.p) - woundsLeft(y)) - (maxWoundsOf(x.p) - woundsLeft(x)));
+      const hurt = healable(b, u, h).sort((x, y) => Number(y.id === targetId) - Number(x.id === targetId) || (maxWoundsOf(y.p) - woundsLeft(y)) - (maxWoundsOf(x.p) - woundsLeft(x)));
       if (!hurt.length || !perOk(u, key, h.per, b.round)) return;
       for (const t of hurt.slice(0, h.targets ?? 1)) {
         const r = h.on ? d6(c.rng) : 7;
@@ -740,7 +741,7 @@ function fire(c: Ctx, u: ZUnit, at: string, targetId?: string) {
       if (enemy) {
         const t = pool.find((x) => x.id === targetId) ?? pool.sort((x, y) => dist(b.board, u.sq, x.sq) - dist(b.board, u.sq, y.sq))[0];
         pool = [t];
-      } else if (!h.self) pool = pool.sort((x, y) => Number(x.activated) - Number(y.activated) || y.points - x.points).slice(0, h.targets ?? 1);
+      } else if (!h.self) pool = pool.sort((x, y) => Number(y.id === targetId) - Number(x.id === targetId) || Number(x.activated) - Number(y.activated) || y.points - x.points).slice(0, h.targets ?? 1);
       if (!perOk(u, key, h.per, b.round)) return;
       if (h.on) { const r = d6(c.rng); if (r < h.on) return; }
       for (const t of pool) {
@@ -765,6 +766,55 @@ function fire(c: Ctx, u: ZUnit, at: string, targetId?: string) {
       line(c, { side: u.side, unit: u.id, target: t.id, kind: 'ability', text: `${u.name} steadies ${t.name}.` });
     }
   });
+}
+
+/** The units a heal can mend: the hurt ones in reach (or the unit itself). */
+function healable(b: ZBattle, u: ZUnit, h: Extract<Hook, { k: 'heal' }>) {
+  const pool = h.who === 'self' ? [u] : onTable(b).filter((x) => x.side === u.side && inches(b, u, x) <= (h.range ?? 6) + 2);
+  return pool.filter((x) => woundsLeft(x) < maxWoundsOf(x.p) && (!h.toughOnly || toughOf(x.p) >= 3));
+}
+
+const perLeft = (b: ZBattle, u: ZUnit, key: string, per: string | undefined) =>
+  !per || (u.used[per === 'round' ? `${key}:${b.round}` : key] ?? 0) < (per === 'twice' ? 2 : 1);
+
+export interface Usable {
+  /** What it does, for the orders. */
+  label: string;
+  /** Who it can go to, where the player picks; empty when nobody is in reach (or it picks itself). */
+  targets: ZUnit[];
+  /** It goes off on its own (on itself, or on everyone in reach), with nothing to pick. */
+  auto?: boolean;
+}
+
+/** What the unit's rules do as it activates, before it moves (Mend, aids, hexes, terror), for the player to see and aim. */
+export function onActivation(b: ZBattle, u: ZUnit): Usable[] {
+  if (u.sq < 0 || !fighting(u)) return [];
+  const out: Usable[] = [];
+  unitHooks(u.p).forEach((h, i) => {
+    const key = `activation:${i}:${h.k}`;
+    const odds = 'on' in h && h.on ? ` on a ${h.on}+` : '';
+    if (h.k === 'heal' && h.at === 'activation') {
+      if (!perLeft(b, u, key, h.per)) return;
+      const t = healable(b, u, h);
+      if (h.who === 'self') out.push({ label: `Heals itself ${h.n}${odds}`, targets: [], auto: true });
+      else out.push({ label: `Heals ${h.n}${odds}: a friend within ${h.range ?? 6}"${h.toughOnly ? ' with Tough' : ''}`, targets: t });
+    } else if (h.k === 'hits' && h.at === 'activation') {
+      if (!perLeft(b, u, key, h.per)) return;
+      const t = onTable(b).filter((x) => (h.who === 'all' ? x !== u : x.side !== u.side) && inches(b, u, x) <= h.range + 2 && (!h.los || canSee(b, u, x)));
+      out.push(h.who === 'enemy' ? { label: `${h.n} hits${odds}: an enemy within ${h.range}"`, targets: t } : { label: `${h.n} hits${odds} on ${h.who === 'all' ? 'every unit' : 'every enemy'} within ${h.range}"`, targets: [], auto: true });
+    } else if (h.k === 'buff' && h.at === 'activation') {
+      if (!perLeft(b, u, key, h.per)) return;
+      const enemy = h.side === 'enemy';
+      if (h.self && !enemy) { out.push({ label: `Aids itself${odds}`, targets: [], auto: true }); return; }
+      const t = onTable(b).filter((x) => (enemy ? x.side !== u.side : x.side === u.side && x !== u) && inches(b, u, x) <= h.range + 2 && (!h.los || canSee(b, u, x)));
+      out.push({ label: `${h.mark ? 'Marks' : enemy ? 'Hinders' : 'Aids'}${odds}: ${enemy ? 'an enemy' : 'a friend'} within ${h.range}"`, targets: t });
+    } else if (h.k === 'terror') {
+      if (!perLeft(b, u, key, h.per)) return;
+      const t = onTable(b).filter((x) => x.side !== u.side && inches(b, u, x) <= h.range + 2);
+      out.push(h.targets ? { label: `Terror on ${h.targets} enem${h.targets === 1 ? 'y' : 'ies'} within ${h.range}"`, targets: [], auto: true } : { label: `Terror: an enemy within ${h.range}" tests morale`, targets: t });
+    }
+  });
+  return out;
 }
 
 const canSee = (b: ZBattle, u: ZUnit, t: ZUnit) => u.sq >= 0 && t.sq >= 0 && (dist(b.board, u.sq, t.sq) <= 1 || los(b.board, u.sq, t.sq));
