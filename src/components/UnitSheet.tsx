@@ -299,7 +299,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           {/* Profile */}
           <Panel id="unit.profile" title="Profile">
             <div className="fields">
-              <label className="field span-2">Crusade name{theirs ? <Fixed>{u.name || '—'}</Fixed> : <TextField value={u.name} onCommit={(v) => set((d) => void (d.name = v))} />}</label>
+              <label className="field span-2">Crusade name{theirs ? <Fixed>{u.name || '—'}</Fixed> : <TextField value={u.name} placeholder="Give it a name, e.g. The Iron Fang" onCommit={(v) => set((d) => void (d.name = v))} />}</label>
               {!edit && (
                 <>
                   <label className="field span-2">Datasheet<Fixed>{u.unitType}</Fixed></label>
