@@ -272,7 +272,7 @@ function CrusadeRules() {
       </Section>
 
       <Section id="r-rewards" title="Reward tables">
-        <p className="muted small" style={{ marginTop: 0 }}>Roll a D10. Umbra Shards, trait tokens and Combat Manipulations are Nexus Wars rewards; a force outside Nexus Wars re-rolls trait tokens and Combat Manipulations.</p>
+        <p className="muted small" style={{ marginTop: 0 }}>Roll a D10. Umbra Shards, trait tokens and Combat Manipulations are Nexus Wars rewards; a force outside Nexus Wars re-rolls trait tokens and Combat Manipulations, and the record wizard's Roll button does that for it.</p>
         {rewardKeys.map((k) => <Rolls key={k} title={REWARD_TABLES[k].label} entries={REWARD_TABLES[k].entries} />)}
       </Section>
 

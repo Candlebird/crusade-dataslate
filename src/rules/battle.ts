@@ -11,7 +11,7 @@ import {
   type RewardEntry,
   type RewardTableKey,
 } from './data';
-import { applyScar, levelForXp, previousBracketXp, relicBearer, sufferingRolls, type DeathOutcome, type ScarResult } from './engine';
+import { applyScar, levelForXp, rollDie, previousBracketXp, relicBearer, sufferingRolls, type DeathOutcome, type ScarResult } from './engine';
 import { grantRelic } from './relicVault';
 import { MANIPULATION_PREFIX, NEXUS_ROUNDS, RELIC_TAKEN, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
 import { ZONE_REWARDS, type ZoneMode } from './zone/rewards';
@@ -148,6 +148,22 @@ export function rewardRows(input: BattleInput): RewardRow[] {
   return rows;
 }
 
+/** A reward only a Nexus Wars force can take (trait tokens, a Combat Manipulation). */
+export const nexusOnlyReward = (e: RewardEntry) => !!(e.traitTokens || e.manipulation);
+
+/**
+ * Roll a reward table. A force outside Nexus Wars rerolls results it can't take, unless the whole table is Nexus-only
+ * (then the result stands and the wizard flags it as a To do).
+ */
+export function rollReward(table: RewardTableKey, inNexus: boolean, die: (sides: number) => number = rollDie): number {
+  const entries = REWARD_TABLES[table].entries;
+  const allowed = inNexus || entries.some((e) => !nexusOnlyReward(e));
+  for (;;) {
+    const roll = die(entries.length);
+    if (!allowed || inNexus || !nexusOnlyReward(entries[roll - 1])) return roll;
+  }
+}
+
 /** Units eligible for a single-unit XP reward. */
 export function xpCandidates(units: Unit[], input: BattleInput, target: RewardEntry['xpTarget']): Unit[] {
   return units.filter((u) => {
@@ -242,7 +258,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
       ledger.push({ label: `${row.source}: ${e.text}`, rp: e.rp ?? 0, supply: e.supply ?? 0, ...(e.us ? { us: e.us } : {}) });
       us += e.us ?? 0;
     }
-    if (e.traitTokens || e.manipulation) {
+    if (nexusOnlyReward(e)) {
       if (force.nexus) nexusRewards.push({ source: row.source, tokens: e.traitTokens ?? 0, manipulation: !!e.manipulation });
       else warnings.push(`${row.source}: this force isn't in Nexus Wars — re-roll.`);
     }
