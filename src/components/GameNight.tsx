@@ -35,8 +35,12 @@ export default function GameNightPanel({ c, setC, me, gm }: { c: Campaign; setC:
   return (
     <div className="cols-2">
       <Panel id="campaign.night.coming" title={`Who's coming · round ${round}`} extra={<span className="muted small">{coming.length} of {c.factions.length}</span>}>
+        <p className="muted small" style={{ marginTop: 0 }}>
+          {me ? 'Tick your faction if you are coming to game night. ' : ''}The app then sets the evening's tables: the attacks from revealed orders first, then marauder hunts and skirmishes for everyone else.
+        </p>
         {c.factions.map((f) => (
-          <label key={f.id} className="list-item small" style={{ cursor: gm || f.id === me ? 'pointer' : undefined }}>
+          <label key={f.id} className="list-item small" style={{ cursor: gm || f.id === me ? 'pointer' : undefined }}
+            data-tip={!gm && f.id !== me ? `Only ${f.name}'s player (or the GM) ticks this` : undefined}>
             <input type="checkbox" checked={coming.includes(f.id)} disabled={!gm && f.id !== me}
               onChange={(e) => setC((d) => setComing(d, f.id, e.target.checked))} />
             <span className="swatch" style={{ background: factionColor(c, f.id) }} />
@@ -70,7 +74,7 @@ function TableRow({ c, t, n }: { c: Campaign; t: NightTable; n: number }) {
         <span className="muted">{t.points} pts · <a href={href.missions()} data-tip={t.mission.summary}>{t.mission.name}</a></span>
         {t.notes.map((x) => <div key={x} className="muted">· {x}</div>)}
       </span>
-      {sector && t.kind !== 'marauder' && <a className="btn" href={href.tracker(sector.id, t.factions[0], t.forceId)}>Start</a>}
+      {sector && t.kind !== 'marauder' && <a className="btn" href={href.tracker(sector.id, t.factions[0], t.forceId)} data-tip="Open the battle tracker for this table">Start</a>}
     </div>
   );
 }

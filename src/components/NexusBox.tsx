@@ -60,7 +60,7 @@ export default function NexusBox({ item, units, fighters, pick, setPick }: {
             {item.kind === 'shardRoll' && <span className="muted small">{NEXUS_ROUNDS.shardMineRoll}+ = 1 shard</span>}
             {item.kind === 'relicRoll' && <span className="muted small">6 = Common relic</span>}
             <button onClick={() => setPick({ roll: rollDie(sides) })}><Icon name="g:perspective-dice-six-faces-six" /> Roll D{sides}</button>
-            <select value={pick.roll ?? ''} onChange={(ev) => setPick({ roll: Number(ev.target.value) || null })}>
+            <select value={pick.roll ?? ''} onChange={(ev) => setPick({ roll: Number(ev.target.value) || null })} aria-label="Result" data-tip="Or pick what you rolled with real dice">
               <option value="">— result —</option>
               {Array.from({ length: sides }, (_, i) => <option key={i} value={i + 1}>{i + 1}{table ? `. ${table[i].text}` : ''}</option>)}
             </select>
