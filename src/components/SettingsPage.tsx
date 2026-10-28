@@ -38,11 +38,11 @@ export default function SettingsPage() {
         <Panel
           id="settings.rules"
           title="House rules"
-          extra={
-            <button className="ghost" disabled={locked} onClick={() => set((d) => Object.assign(d, structuredClone(DEFAULT_SETTINGS), { armyForgeProxy: d.armyForgeProxy }))}>
+          extra={!locked && (
+            <button className="ghost" onClick={() => set((d) => Object.assign(d, structuredClone(DEFAULT_SETTINGS), { armyForgeProxy: d.armyForgeProxy }))}>
               Reset to defaults
             </button>
-          }
+          )}
         >
           <fieldset className="fields" disabled={locked}>
             <label className="field span-all">
