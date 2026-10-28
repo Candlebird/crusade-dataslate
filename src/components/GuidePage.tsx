@@ -120,6 +120,15 @@ export default function GuidePage() {
         <Step n={5} title="Build a battle list" where="Battle lists">
           <p>Press <b>+ New list</b>, pick units for a game, and print them with stats, traits, relics and rules.</p>
         </Step>
+        <Step n={6} title="Play between games" where="Between games">
+          <p>
+            Under the force's stats: <b>Solo patrol</b>, the <b>Training sim</b> and <b>Sortie</b>, plus <b>Expedition</b> and{' '}
+            <b>Unit task</b> in a Nexus War. A greyed-out button says why it can't start yet.
+          </p>
+        </Step>
+        <Step n={7} title="Check what's waiting on you" where="Top of the force page">
+          <p>Units with upgrades to pick and round income ready to claim show in a <b>Waiting on you</b> box at the top.</p>
+        </Step>
       </Panel>
 
       <Panel id="guide.claim" domId="guide-claim" title="4 · Claim rewards from past battles">
