@@ -53,6 +53,14 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
   - The Shop explains luck and shows the Shard grade odds.
   - A live count shows enemies left and how many got through.
   - The run summary opens with how the run ended and the total XP. The boss card offer says the card lasts the run.
+- **Training, round 2** (3 commits):
+  - Flying and Boss waves say what the tag means before they start.
+  - A buy you can't afford says how many credits you're short.
+  - A cleared wave's log line shows the base HP it cost (display only, this sitting).
+  - Narrow desktop windows lose the black bands.
+  - Recipes list ready ones first, then the closest, with "Needs X and Y" and a fold-out "What it does". Each defence shows its text under its Shards.
+  - The Victory dialog explains Bank vs Endless (credits carried, records).
+  - The run summary keeps what the run banked: Final ladder, feats, units held back by the off-table XP limit, and where it all shows later.
 - **Battles, round 1** (6 commits):
   - Starting a battle goes Players → Forces → Mission. A force taken by one side is greyed out for the others, and the randomizer folds away. Start battle sits in a bar at the bottom.
   - The tracker shows each side's units first, with side settings folded. A note names sides with no units, and End battle only turns gold on the last round.
@@ -84,6 +92,7 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
 - **Unit tasks.** They only show when the force is linked to a faction in the loaded campaign, the same as before. Is that intended?
 
 ## Test by hand
+- **Training (long runs, not reached in the browser):** the Victory dialog, the banked block in the run summary, and the "Base −N HP." log line.
 - **Sealed orders (needs sign-in, which was off-limits overnight):**
   - Check that the "what it will do" line reads right for hold, move, attack on an AI sector, attack on a faction and a target out of reach, with zone battles both on and off.
   - Check that "Locked in" shows after saving.
