@@ -126,8 +126,13 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
     body = (
       <>
         <div className="row small">
-          <span className="grow"><b>{s.name}</b> · encounter {Math.min(e.stage + 1, e.deck.length)} of {e.deck.length} · squad: {e.squad.map(name).join(', ')}</span>
-          <span>Bonus <b>+{bonus}</b> · Danger <b>{e.danger}</b></span>
+          <span className="grow">
+            <b>{s.name}</b> · {e.phase === 'done' ? (e.finished ? 'made it all the way' : 'heading home') : `encounter ${Math.min(e.stage + 1, e.deck.length)} of ${e.deck.length}`}
+            {' '}· squad: {e.squad.map(name).join(', ')}
+          </span>
+          <span data-tip="Bonus is added to every roll. Each failed roll raises the danger; pressing on rolls a D6 against it for an ambush.">
+            Bonus <b>+{bonus}</b> · Danger <b>{e.danger}</b>
+          </span>
         </div>
         <p className="small" style={{ margin: '0.5rem 0' }}><span className="muted">Haul so far:</span> {rewardText(e.haul)}</p>
         {e.log.length > 0 && (
@@ -163,8 +168,20 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
             {' '}Rewards deeper in are worth more.
           </p>
         )}
-        {e.phase === 'done' && done && <p className="small panel"><b>Recorded:</b> {done}</p>}
-        {!done && <p className="muted small">Closing this window heads home with the haul so far.</p>}
+        {e.phase === 'done' && done && (
+          <div className="small panel">
+            <b>Recorded on {force.name}:</b> {done}
+            {e.haul.xp > 0 && <div className="muted">The XP went to each of {e.squad.map(name).join(', ')}.</div>}
+            <div className="muted">They count as out for the rest of this round.</div>
+          </div>
+        )}
+        {!done && (
+          <p className="muted small">
+            {e.phase === 'done'
+              ? `The expedition is over. Bring the haul home to record it on ${force.name}; closing this window does the same.`
+              : 'Closing this window heads home with the haul so far.'}
+          </p>
+        )}
       </>
     );
     footer = e.phase === 'crossroads' ? (
