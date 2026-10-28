@@ -105,11 +105,11 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
     - The Training "Flying" tag says "they fly", but a flying boss's escorts walk.
 
 ## Decisions (2026-10-28)
-To do:
+Done on overnight-ux (tsc, 944 tests and the build pass):
 - **Nexus:**
-  - Players see one row per faction saying whether its orders are locked in. They don't see what the orders are.
+  - Players see one row per faction saying whether its orders are locked in. They don't see what the orders are. It shows only when signed in, and it reads the order declarations every player can already read, so the campaign file is unchanged.
   - The GM checklist drops the Income column.
-  - Factions and Sectors start folded but remember if you open them.
+  - Factions and Sectors start folded but remember if you open them. This already worked, so no change was needed.
 - **Battles:**
   - Pressing Finish & save before every force has recorded asks first. The other forces can still claim the battle later.
   - Outside a campaign, the reward roll rerolls Nexus-only results. This is a small rules change.
@@ -119,7 +119,7 @@ To do:
 - **Expedition:** with no bank, the setup screen warns "No bank: any Materials found are lost."
 - **Unit task** is always listed in Between games. Without a link to a Nexus faction it is greyed out and says why.
 - **Ledger:** the duplicate "Increase supply" button is removed; it stays under Requisition….
-- **Relics:** at 0 RP with a free relic due, the button reads "Pick your free relic".
+- **Relics:** at 0 RP with a free relic due, the button reads "Pick your free relic". The Requisition shop's forged relic button now says the same instead of "Buy (forged: free)", and the relic picker marks those relics "Free".
 - **Umbra Shards:** spelled out in sentences and headings. "US" stays only in stat tiles and costs, with a tooltip.
 - **Unit sheet:** Experience and Traits come before Profile.
 - **Training:**
@@ -138,6 +138,14 @@ Kept as they are:
 - **Dice:** the "Type" caption fix stays.
 
 ## Test by hand
+- **Decisions round:**
+  - Finish & save with one force still to record: the confirm should ask first.
+  - Claim a past battle for a force outside a campaign and press Roll: it never lands on a Nexus-only reward.
+  - A force with no Nexus Wars faction: Unit task is greyed out with a reason.
+  - A faction with no bank room: Expedition warns.
+  - A unit with a free relic waiting: the button reads "Pick your free relic".
+  - The Training top bar at 900–1199 px wide shows words.
+  - Signed in: the "locked in" rows for each faction.
 - **Phone width.** Chrome on a desktop won't go below 500 px, where nothing scrolls sideways. Check 390 px on a real phone: the force page, the unit sheet, the battle start, the campaign tabs and Rules.
 - **Training (long runs, not reached in the browser):** the Victory dialog, the banked block in the run summary, and the "Base −N HP." log line.
 - **Sealed orders (needs sign-in, which was off-limits overnight):**
