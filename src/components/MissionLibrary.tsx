@@ -38,6 +38,50 @@ export default function MissionLibrary() {
     toast('Mission deleted.');
   };
 
+  const custom = missions.filter((m) => state.customMissions?.some((x) => x.id === m.id));
+  // Built-ins in the same groups as the Start a battle list.
+  const groups: [string, MissionDef[]][] = [];
+  for (const x of missions.filter((m) => !custom.includes(m))) {
+    const g = x.source === 'OPR' && x.group ? `OPR · ${x.group}` : x.source;
+    const hit = groups.find(([k]) => k === g);
+    if (hit) hit[1].push(x);
+    else groups.push([g, [x]]);
+  }
+  const row = (m: MissionDef, mine: boolean) => {
+    const editing = openId === m.id && mine;
+    if (editing) return (
+      <div key={m.id} className="panel">
+        <div className="panel-title">
+          <h2>{m.name} <span className="tag">{m.source}</span></h2>
+          <span className="row">
+            <button className="primary" onClick={() => setOpenId(null)}><Icon name="l:check" /> Done</button>
+            <button className="danger" onClick={() => remove(m)}>Delete</button>
+          </span>
+        </div>
+        <MissionForm m={m} onChange={save} />
+      </div>
+    );
+    return (
+      <details key={m.id} className="mission-row">
+        <summary>
+          <span className="grow">
+            <b>{m.name}</b> <span className="tag">{m.source}</span>{m.roles && <span className="tag">Attacker / Defender</span>}
+            <span className="muted small mission-row-sum">{m.summary || 'No summary yet.'}</span>
+          </span>
+          <span className="muted small">{m.rounds} rounds</span>
+        </summary>
+        <div className="mission-row-body">
+          <div className="row">
+            {mine && <button className="primary" onClick={() => setOpenId(m.id)}><Icon name="l:pencil" /> Edit</button>}
+            <button onClick={() => duplicate(m)} data-tip={mine ? undefined : 'Make an editable copy of this mission'}>Duplicate{mine ? '' : ' to edit'}</button>
+            {mine && <button className="danger" onClick={() => remove(m)}>Delete</button>}
+          </div>
+          <MissionSummary m={m} />
+        </div>
+      </details>
+    );
+  };
+
   return (
     <div>
       <div className="page-head">
@@ -48,26 +92,17 @@ export default function MissionLibrary() {
         <div className="row"><button className="primary" onClick={create}>+ New mission</button></div>
       </div>
       <p className="muted small">
-        Built-in missions are read-only (<code>src/rules/missions.ts</code>). Duplicate one to tweak it.
-        Custom missions are shared with every signed-in player. A running battle keeps its starting copy.
+        Tap a mission to read it. Built-in missions can't be changed: duplicate one to make your own version.
+        Your missions are shared with every signed-in player, and a running battle keeps the copy it started with.
       </p>
-      {missions.map((m) => {
-        const custom = !!state.customMissions?.some((x) => x.id === m.id);
-        const open = openId === m.id && custom;
-        return (
-          <div key={m.id} className="panel">
-            <div className="panel-title">
-              <h2>{m.name} <span className="tag">{m.source}</span>{m.group && <span className="tag">{m.group}</span>}</h2>
-              <span className="row">
-                {custom && <button onClick={() => setOpenId(open ? null : m.id)}>{open ? 'Done' : 'Edit'}</button>}
-                <button onClick={() => duplicate(m)}>Duplicate</button>
-                {custom && <button className="danger" onClick={() => remove(m)}>Delete</button>}
-              </span>
-            </div>
-            {open ? <MissionForm m={m} onChange={save} /> : <MissionSummary m={m} />}
-          </div>
-        );
-      })}
+      <h3 className="start-group">Your missions</h3>
+      {custom.length ? custom.map((m) => row(m, true)) : <p className="muted small">None yet. Press + New mission, or duplicate a built-in one below.</p>}
+      {groups.map(([group, list]) => (
+        <div key={group}>
+          <h3 className="start-group">{group}</h3>
+          {list.map((m) => row(m, false))}
+        </div>
+      ))}
     </div>
   );
 }

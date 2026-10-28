@@ -1416,3 +1416,49 @@ table.ledger td:first-child { white-space: nowrap; }
 .training-shop-sub { display: block; font-size: 12px; line-height: 1.3; }
 .training-cards-sub { margin-top: 2px; font-size: 0.85rem; color: var(--muted-2); }
 .training-summary-why { margin-bottom: 4px; font-weight: 600; }
+
+/* === UX pass: battles === */
+/* Start a battle: a force per side, and the Start button pinned to the foot of the screen while the missions scroll. */
+.start-forces { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.6rem; margin-bottom: 1rem; }
+.start-forces .field > span:first-child { color: var(--team); }
+.start-forces select { border-left: 3px solid var(--team); }
+.start-random { margin: 0.5rem 0 0; }
+.start-random summary { cursor: pointer; color: var(--muted-2); }
+.start-group { margin: 0.9rem 0 0.2rem; color: var(--muted-2); font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.start-bar {
+  position: sticky; bottom: 0; z-index: 5; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;
+  margin: 0.8rem -0.25rem 0; padding: 0.6rem 0.75rem; background: var(--panel-2); border: 1px solid var(--gold-dim);
+  box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.5);
+}
+/* The running battle: a hint while sides have no units, and each side's settings folded away once it has them. */
+.battle-hint { margin: 0 0 1rem; padding: 0.55rem 0.75rem; border: 1px solid var(--gold-dim); border-left-width: 3px; background: var(--panel-2); }
+.side-setup { margin: 0.25rem 0 0.5rem; }
+.side-setup > summary { cursor: pointer; padding: 0.25rem 0; }
+.side-setup[open] > summary { margin-bottom: 0.5rem; }
+/* Two sides side by side leave each one too narrow for the units table, so it turns into cards there as on a phone. */
+.side-panel { container-type: inline-size; }
+@container (max-width: 560px) {
+  table.tracker-units, table.tracker-units tbody { display: block; }
+  table.tracker-units thead { display: none; }
+  table.tracker-units tr { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 1.8fr) minmax(0, 0.9fr); gap: 0.35rem 0.75rem; padding: 0.6rem 0.1rem; border-bottom: 1px solid var(--line); }
+  table.tracker-units td { border: 0; padding: 0; min-width: 0; text-align: left; }
+  table.tracker-units td[data-label]::before {
+    content: attr(data-label); display: block; font-size: 0.68rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600;
+  }
+  table.tracker-units .s-2 { grid-column: span 2; }
+  table.tracker-units .s-end { grid-column: 3 / -1; grid-row: 1; justify-self: end; text-align: right; white-space: nowrap; }
+  .table-wrap:has(> table.tracker-units) { overflow-x: visible; }
+}
+.side-panel > h3 { margin-top: 1rem; }
+.result-panel > h3 { margin: 1rem 0 0.25rem; }
+.result-panel > h3:first-of-type { margin-top: 0.25rem; }
+/* Mission library: one line per mission, tapped open to read, edit or duplicate it. */
+.mission-row { border: 1px solid var(--line); background: var(--panel); margin-bottom: 0.4rem; }
+.mission-row[open] { border-color: var(--gold-dim); }
+.mission-row > summary { display: flex; gap: 0.75rem; align-items: baseline; padding: 0.55rem 0.75rem; cursor: pointer; list-style: none; }
+.mission-row > summary::-webkit-details-marker { display: none; }
+.mission-row > summary:hover { background: var(--panel-2); }
+.mission-row-sum { display: block; margin-top: 0.15rem; }
+.mission-row[open] .mission-row-sum { display: none; }
+.mission-row-body { padding: 0 0.75rem 0.75rem; }

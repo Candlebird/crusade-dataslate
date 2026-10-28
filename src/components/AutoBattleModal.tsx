@@ -66,13 +66,19 @@ export default function AutoBattleModal({ b, set, onClose, onApply, applyNote }:
   if (!result) {
     body = (
       <>
+        <p className="small">
+          {crusade.length ? 'Pick how your side fights, check the forecast, then press Fight.' : 'Pick each side\'s force below, then press Fight.'}{' '}
+          <span className="muted">Units start as they are on the tracker.</span>
+        </p>
+        <details className="small">
+          <summary className="muted">How it works</summary>
         <p className="muted small">
           Each unit gets an <b>Attack</b> (expected wounds a round vs a 5-model Defense 4+ unit, shooting / melee) and a <b>Defense</b> (plain hits to lose a wound).
           Both come from its Quality, Defense, weapons, traits, upgrades, relics, scars and level. Hover a unit to see why.
           Teams take turns for {AUTO_BATTLE.rounds} rounds, each unit attacking once a round. A unit at half strength, or beaten in melee,
           takes a Morale (Quality) test. If it fails, it's <b>Shaken</b>: it can't strike back and spends its next turn rallying.
-          Units start as they are on the tracker.
         </p>
+        </details>
         {setup.effects.length > 0 && (
           <div className="small">
             <b>In play</b>

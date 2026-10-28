@@ -160,7 +160,9 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
     toast('Battle recorded.');
   };
 
-  if (applied) return <Applied force={f} outcome={applied} />;
+  // Recording from the battle tracker leads back to it; a claimed past battle back to the Battle page's list.
+  const back = source ? { href: href.tracker(), label: source.past ? 'Back to past battles' : 'Back to the battle' } : undefined;
+  if (applied) return <Applied force={f} outcome={applied} back={back} />;
 
   return (
     <>
@@ -170,7 +172,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
           <h1>Record battle</h1>
         </div>
         <div className="row">
-          <button onClick={() => confirmAction('Discard this battle report?') && go(href.force(f.id))}>Cancel</button>
+          <button onClick={() => confirmAction('Discard this battle report?') && go(back?.href ?? href.force(f.id))}>Cancel</button>
         </div>
       </div>
 
@@ -205,6 +207,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
         {STEPS.map((s, i) => (
           <button key={s} className={i === step ? 'primary' : i < step ? 'done' : ''} onClick={() => setStep(i)}>
             {i + 1}. {s}
+            {i === STEPS.length - 1 && preview.warnings.length > 0 && <span className="tag gold" data-tip="Items to check before you apply">{preview.warnings.length}</span>}
           </button>
         ))}
       </div>
@@ -605,7 +608,7 @@ function SummaryStep({ outcome }: { outcome: BattleOutcome }) {
   );
 }
 
-function Applied({ force, outcome }: { force: Force; outcome: BattleOutcome }) {
+function Applied({ force, outcome, back }: { force: Force; outcome: BattleOutcome; back?: { href: string; label: string } }) {
   const ups = outcome.units.filter((o) => o.levelsGained > 0);
   const todo = outcome.units.filter((o) => o.free.length || o.lostTrait);
   return (
@@ -615,7 +618,10 @@ function Applied({ force, outcome }: { force: Force; outcome: BattleOutcome }) {
           <div className="crumbs"><a href={href.forces()}>Forces</a> / <a href={href.force(force.id)}>{force.name}</a> / Post-battle</div>
           <h1>Battle recorded</h1>
         </div>
-        <div className="row"><a className="btn primary" href={href.force(force.id)}>Back to Order of Battle</a></div>
+        <div className="row">
+          {back && <a className="btn primary" href={back.href}><Icon name="l:arrow-left" /> {back.label}</a>}
+          <a className={`btn${back ? '' : ' primary'}`} href={href.force(force.id)}>{back ? 'Order of Battle' : 'Back to Order of Battle'}</a>
+        </div>
       </div>
       <div className="panel">
         <ul>{outcome.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>

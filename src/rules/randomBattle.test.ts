@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { newForce } from '../model/factory';
-import { formatLabel, randomForces, randomFormat } from './randomBattle';
+import { allMissions } from './missions';
+import { FORMATS, newBattle } from './tracker';
+import { formatLabel, formatSlots, randomForces, randomFormat } from './randomBattle';
 
 const seq = (...xs: number[]) => () => xs.shift() ?? 0;
 
@@ -39,5 +41,13 @@ describe('random battles', () => {
     const picked = randomForces([...ready, newForce('Empty')], 5);
     expect(picked).toHaveLength(3);
     expect(new Set(picked.map((f) => f.name))).toEqual(new Set(['A', 'B', 'C']));
+  });
+
+  it('lists the slots to fill with forces players first, in the order a new battle fills its sides', () => {
+    const f = FORMATS.find((x) => x.label === '2 v AI')!;
+    expect(formatSlots(f)).toEqual([{ team: 'A', ai: false }, { team: 'A', ai: false }, { team: 'B', ai: true }]);
+    const b = newBattle(allMissions()[0], 'b', '', () => 0, f);
+    const open = [...b.sides.filter((x) => !x.ai), ...b.sides.filter((x) => x.ai)];
+    expect(open.map((x) => ({ team: x.team, ai: !!x.ai }))).toEqual(formatSlots(f));
   });
 });

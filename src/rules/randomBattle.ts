@@ -1,5 +1,5 @@
 import type { Force } from '../model/types';
-import { FORMATS } from './tracker';
+import { FORMATS, TEAMS } from './tracker';
 
 // A random battle for the start screen: players split into random teams (or all against the AI),
 // optionally with a random force for each side.
@@ -42,4 +42,12 @@ export function randomFormat(players: number, ai: boolean, rand: Rand = Math.ran
 export function randomForces(forces: Force[], n: number, rand: Rand = Math.random): Force[] {
   const ready = forces.filter((f) => f.units.some((u) => u.status === 'active'));
   return shuffle(rand, ready).slice(0, n);
+}
+
+export interface FormatSlot { team: (typeof TEAMS)[number]; ai: boolean }
+
+/** A format's sides in the order a new battle fills them with forces: every player first, then the AI. */
+export function formatSlots(format: Format): FormatSlot[] {
+  const all = format.teams.flatMap((team, i) => team.map((kind) => ({ team: TEAMS[i], ai: kind === 'ai' })));
+  return [...all.filter((x) => !x.ai), ...all.filter((x) => x.ai)];
 }
