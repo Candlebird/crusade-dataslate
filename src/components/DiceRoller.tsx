@@ -75,7 +75,8 @@ function DiceModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
         </label>
-        <label className="field">
+        {/* A click on the caption itself would press the first button inside (Any): it does nothing instead. */}
+        <label className="field" onClick={(e) => e.target === e.currentTarget && e.preventDefault()}>
           Success on
           {sides === 6 ? (
             // The usual case at the table (a Quality or Defense test): one tap per target.
