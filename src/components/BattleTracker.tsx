@@ -738,7 +738,13 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
       <div className="row">
         <span className="muted small">Finishing closes the battle and shares it under Past battles, where anyone who hasn't recorded it yet can claim their rewards.</span>
         <span className="spacer" />
-        <button className={toRecord.length ? '' : 'primary'} onClick={onFinish}><Icon name="l:check" /> Finish & save result</button>
+        <button
+          className={toRecord.length ? '' : 'primary'}
+          onClick={() => {
+            if (toRecord.length && !confirmAction(`${toRecord.length} force${toRecord.length === 1 ? " hasn't" : "s haven't"} recorded yet (${toRecord.map((s) => s.name).join(', ')}). Finish anyway? ${toRecord.length === 1 ? 'It' : 'They'} can still claim it from Past battles.`)) return;
+            onFinish();
+          }}
+        ><Icon name="l:check" /> Finish & save result</button>
       </div>
     </div>
   );
