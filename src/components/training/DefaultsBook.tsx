@@ -48,7 +48,7 @@ function DefaultRow({ run, d, progress, uses, active, onCraft }: {
   const met = progress.filter(Boolean).length;
   const why = uses ? craftDefaultProblem(run, d.key, uses, uses[0]) : 'Not all its Shards are on the map.';
   return (
-    <div className={`training-recipe${uses ? ' ready' : ''}${active ? ' active' : ''}`} data-tip={d.text}>
+    <div className={`training-recipe${uses ? ' ready' : ''}${active ? ' active' : ''}`}>
       <span className="training-recipe-body">
         <span className="training-recipe-name">{d.name} <span className="muted">· {met}/{d.slots.length}</span></span>
         <span className="training-recipe-slots">
@@ -58,6 +58,7 @@ function DefaultRow({ run, d, progress, uses, active, onCraft }: {
             </span>
           ))}
         </span>
+        <span className="training-recipe-need muted">{d.text}</span>
       </span>
       {uses && active && <span className="training-recipe-crafting">Building…</span>}
       {uses && !active && (

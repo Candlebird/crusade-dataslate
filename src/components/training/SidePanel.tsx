@@ -32,6 +32,8 @@ export interface SidePanelProps {
   peek: boolean;
   onUnpeek: () => void;
   onChange: () => void;
+  /** Base HP each wave played this sitting cost (by wave), to note on its log line. */
+  hpLost?: Record<number, number>;
 }
 
 export function SidePanel(p: SidePanelProps) {
@@ -71,9 +73,17 @@ export function SidePanel(p: SidePanelProps) {
           </div>
         )}
         <div className="training-log muted small" aria-label="Run log, newest first">
-          {run.log.slice(-20).reverse().map((l, i) => <div key={i}>{l}</div>)}
+          {run.log.slice(-20).reverse().map((l, i) => <div key={i}>{l}<HpNote line={l} hpLost={p.hpLost} /></div>)}
         </div>
       </div>
     </div>
   );
+}
+
+/** A cleared wave's log line notes the base HP it cost, when this sitting saw the wave (a resumed run's older waves don't). */
+export function HpNote({ line, hpLost }: { line: string; hpLost?: Record<number, number> }) {
+  const m = /^Wave (\d+) cleared/.exec(line);
+  const lost = m ? hpLost?.[Number(m[1])] : undefined;
+  if (!lost) return null;
+  return <span style={{ color: 'var(--red)' }}> Base {'\u2212'}{lost} HP.</span>;
 }

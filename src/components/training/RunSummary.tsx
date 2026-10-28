@@ -2,8 +2,10 @@ import {
   DRILL_GOALS, drillPreview, endlessDepth, finalBoss, mvp, runWon, runXp, sharedPreview, siegeDmg, siegeScore, towers, unlockText, unitTowers, type TrainingRun,
 } from '../../rules/training';
 import type { Force } from '../../model/types';
+import { OFF_TABLE_XP } from '../../rules/downtimeData';
 import { Icon } from '../Icon';
 import { RunHonoursView } from './RunHonours';
+import type { BankNews } from './useBank';
 
 export interface RunSummaryProps {
   run: TrainingRun;
@@ -11,12 +13,14 @@ export interface RunSummaryProps {
   best?: number;
   /** The force, for each unit's Training record, titles and tales once the run is over (RunHonours). */
   force?: Force;
+  /** What the run's end banked into the force (XP within the off-table limit, Final news, feats), once paid out. */
+  news?: BankNews;
 }
 
 /** How the run went: waves cleared, and each crafted unit's kills, damage, levels and XP (the standout starred), with
  *  the default towers and kept Shards a row each; then records, titles and tales, and what it hands the Sortie side (quirks,
  *  nemesis, bestiary), the Drill Honours earned, and a Weekly Siege's score. */
-export function RunSummary({ run, best, force }: RunSummaryProps) {
+export function RunSummary({ run, best, force, news }: RunSummaryProps) {
   const lead = mvp(run);
   const xp = runXp(run);
   const units = [...unitTowers(run)].sort((a, b) => b.kills - a.kills || b.dealt - a.dealt);
@@ -30,6 +34,7 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
   const drill = banks && force && run.phase === 'over' ? drillPreview(force, run) : [];
   const why = run.phase === 'over' ? endReason(run) : null;
   const total = banks ? Object.values(xp).reduce((a, b) => a + b, 0) : 0;
+  const capped = news?.xp.filter((g) => g.got < g.earned) ?? [];
   return (
     <div className="training-summary small">
       {why && <div className="training-summary-why">{why}</div>}
@@ -97,6 +102,14 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
           ))}
         </ul>
       )}
+      {capped.length > 0 && (
+        <div className="muted">Off-table limit: {capped.map((g) => `${g.name} banked ${g.got} of ${g.earned} XP this sitting`).join(', ')} (each unit banks at most {OFF_TABLE_XP.perRound} off-table XP a round (a week outside a campaign) from Training and free Sorties together).</div>
+      )}
+      {news && (news.finale.length > 0 || news.feats.length > 0) && (
+        <ul className="training-shared">
+          {[...news.finale, ...news.feats].map((l, i) => <li key={i} style={{ color: 'var(--gold)' }}>{l}</li>)}
+        </ul>
+      )}
       {drill.length > 0 && (
         <ul className="training-shared">
           {drill.map((i) => {
@@ -104,6 +117,12 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
             return <li key={i} style={{ color: 'var(--gold)' }}>Drill Honour: {u.name}. {u.text}</li>;
           })}
         </ul>
+      )}
+      {banks && run.phase === 'over' && (
+        <div className="muted training-summary-where">
+          Banked to the force: XP, records, titles and tales show on each unit's sheet (Records and titles); best waves, the
+          Final wave ladder, Drill Honours and feats on the Training start screen.
+        </div>
       )}
     </div>
   );

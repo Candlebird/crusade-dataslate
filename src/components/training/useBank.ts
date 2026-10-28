@@ -18,9 +18,13 @@ import { siegeWinLine } from './useSiegeSettle';
 // Auto (debug) button played (run.auto) banks nothing more.
 
 /** XP a unit earned this session, and what the off-table limit let it bank. */
-interface Gain { name: string; earned: number; got: number }
+export interface Gain { name: string; earned: number; got: number }
 
-export function useBank(force: Force, c?: Campaign) {
+/** What the end of a run banked into the force, for the run summary (the toast fades): each unit's XP, the Final
+ *  ladder's news (a Victory, a deeper Endless, a Final opened) and the feats earned with their rewards. */
+export interface BankNews { xp: Gain[]; finale: string[]; feats: string[] }
+
+export function useBank(force: Force, c?: Campaign, onBanked?: (news: BankNews) => void) {
   const { update, updateForce } = useStore();
   const gains = useRef<Record<string, Gain>>({});
   const done = useRef(false);
@@ -91,10 +95,11 @@ export function useBank(force: Force, c?: Campaign) {
       });
     }
     const got = Object.values(gains.current).filter((g) => g.earned > 0);
+    onBanked?.({ xp: got.map((g) => ({ ...g })), finale: [...finale], feats: [...feats] });
     const led = lead && lead.kills > 0 ? `${lead.name} led the defence with ${lead.kills} kill${lead.kills === 1 ? '' : 's'}. ` : '';
     const xp = got.length ? `XP banked: ${got.map((g) => `${g.name} +${g.got}`).join(', ')}.` : 'No XP this time.';
     toast(`${led}${run.cleared} wave${run.cleared === 1 ? '' : 's'} cleared. ${xp}${feats.length ? ` ${feats.join('. ')}.` : ''}${honours.length ? ` ${honours.join('. ')}.` : ''}${shared.length ? ` ${shared.join('. ')}.` : ''}${drill.length ? ` ${drill.join('. ')}.` : ''}`);
-  }, [force.id, c, update, updateForce, bankXp]);
+  }, [force.id, c, update, updateForce, bankXp, onBanked]);
 
   /** A new run: forget the last one's tally. */
   const reset = useCallback(() => {

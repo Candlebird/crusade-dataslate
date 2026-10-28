@@ -5,6 +5,7 @@ import {
 } from '../../rules/training';
 import { Icon } from '../Icon';
 import { act } from './act';
+import { creditsWhy } from './creditsWhy';
 
 /** A Scout move (to an open spot) or an Ambush swap (with another piece), picked on the map. */
 export type MoveRule = 'scout' | 'ambush';
@@ -28,7 +29,7 @@ export function PieceActions({ run, piece, onChange, onMove }: PieceActionsProps
   if (run.phase === 'over') return null;
   if (piece.kind === 'default') {
     if (piece.upgraded) return <div className="training-info-actions muted"><Icon name="g:upgrade" /> Upgraded: {UPGRADE_FX}</div>;
-    const why = defaultUpgradeProblem(run, piece.id);
+    const why = creditsWhy(defaultUpgradeProblem(run, piece.id), defaultUpgradeCost(piece), run.credits);
     return (
       <div className="training-info-actions">
         <button disabled={!!why} data-tip={why ?? UPGRADE_TEXT} onClick={() => act(() => upgradeDefault(run, piece.id), onChange)}>
@@ -39,7 +40,7 @@ export function PieceActions({ run, piece, onChange, onMove }: PieceActionsProps
     );
   }
   const capped = piece.up >= piece.cap;
-  const why = levelProblem(run, piece.id);
+  const why = creditsWhy(levelProblem(run, piece.id), levelCost(piece), run.credits);
   const moveWhy = run.phase !== 'build' ? 'Units move between waves.' : hasMoved(run, piece.id) ? `${piece.name} has already moved this build phase.` : null;
   const move = (rule: MoveRule, label: string, tip: string) => (
     <button disabled={!!moveWhy || !onMove} data-tip={moveWhy ?? tip} onClick={() => onMove?.(rule)}>{label}</button>
