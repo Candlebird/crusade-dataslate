@@ -53,6 +53,9 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   // A Scout move or Ambush swap waiting for its spot or piece on the map.
   const [moving, setMoving] = useState<{ id: number; rule: MoveRule } | null>(null);
   const best = useRef(force.trainingBest ?? 0);
+  // Base HP lost on each wave played this sitting (by wave), for the log: display only, never saved.
+  const hpLost = useRef<Record<number, number>>({});
+  const hpStart = useRef<number | null>(null);
   // Auto (debug): the bot plays (useAuto); and the side panel's tab on a phone (CSS shows them all on a wide screen).
   const [auto, setAuto] = useState(false);
   const [tab, setTab] = useState<Tab>('draft');
@@ -66,6 +69,8 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   const begin = (r: TrainingRun) => {
     bank.reset();
     best.current = force.trainingBest ?? 0;
+    hpLost.current = {};
+    hpStart.current = null;
     setPick(0);
     setSel(null);
     setCrafting(null);
@@ -98,6 +103,10 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   };
 
   const onPhase = (r: TrainingRun, _was: Phase) => {
+    if (r.phase !== 'wave' && hpStart.current !== null) {
+      hpLost.current[r.wave] = Math.max(0, hpStart.current - r.baseHp);
+      hpStart.current = null;
+    }
     if (r.phase === 'build') {
       bank.bankXp(r);
       saveRun(r);
@@ -120,6 +129,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     setMoving(null);
     setFocus(null);
     setPaused(false);
+    hpStart.current = run.baseHp;
     act(() => startWave(run), () => setTick((n) => n + 1));
     if (!wideSide()) setTab('wave');
   };
@@ -288,6 +298,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
         <SidePanel
           run={run} units={force.units} portraits={portraits} tab={tab} onTab={setTab} pick={pick} onPick={setPick} sel={sel} onFocus={setFocus}
           crafting={craftNow} onCraft={(cr) => { craftMode(cr); if (cr && !wideSide()) setTab('draft'); }} peek={peek} onUnpeek={() => setPeek(false)} onChange={refresh}
+          hpLost={hpLost.current}
         />
         {/* On a phone held upright End run sits at the foot of the page, under the panels, instead of in the HUD. */}
         {run.phase !== 'over' && <button className="training-foot-quit" onClick={quit}>End run</button>}

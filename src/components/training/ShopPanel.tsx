@@ -2,6 +2,7 @@ import { TRAINING } from '../../rules/downtimeData';
 import { buyLuck, buyMend, luckCap, luckCost, luckProblem, mendCost, mendProblem, type TrainingRun } from '../../rules/training';
 import { Icon } from '../Icon';
 import { act } from './act';
+import { creditsWhy } from './creditsWhy';
 
 export interface ShopPanelProps {
   run: TrainingRun;
@@ -16,6 +17,8 @@ export function ShopPanel({ run, onChange }: ShopPanelProps) {
   const nextOdds = TRAINING.shards.odds[run.luck + 1];
   const mend = mendCost(run);
   const build = run.phase === 'build';
+  const luckWhy = creditsWhy(luckProblem(run), luck, run.credits);
+  const mendWhy = creditsWhy(mendProblem(run), mend, run.credits);
   return (
     <div className="training-shop small">
       <div className="training-panel-title">
@@ -29,17 +32,17 @@ export function ShopPanel({ run, onChange }: ShopPanelProps) {
           <span className="muted"> · better Shard grades in each draft</span>
           <span className="training-shop-sub muted">Now: {oddsText(TRAINING.shards.odds[run.luck])}</span>
           {nextOdds && <span className="training-shop-sub muted">Next level: {oddsText(nextOdds)}</span>}
-          <Why why={build ? luckProblem(run) : null} />
+          <Why why={build ? luckWhy : null} />
         </span>
-        <BuyButton cost={luck} why={luckProblem(run)} label="Luck" onBuy={() => act(() => buyLuck(run), onChange)} />
+        <BuyButton cost={luck} why={luckWhy} label="Luck" onBuy={() => act(() => buyLuck(run), onChange)} />
       </div>
       <div className="training-shop-row">
         <Icon name="g:castle" />
         <span className="grow">
           Mend base <span className="muted">· +{TRAINING.mend.hp} HP ({run.baseHp}/{TRAINING.baseHp})</span>
-          <Why why={build ? mendProblem(run) : null} />
+          <Why why={build ? mendWhy : null} />
         </span>
-        <BuyButton cost={mend} why={mendProblem(run)} label="Mend" onBuy={() => act(() => buyMend(run), onChange)} />
+        <BuyButton cost={mend} why={mendWhy} label="Mend" onBuy={() => act(() => buyMend(run), onChange)} />
       </div>
       <div className="muted">Level up a unit, or upgrade a built defence once, from its card: tap it on the map.</div>
     </div>

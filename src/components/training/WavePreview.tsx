@@ -23,7 +23,7 @@ export function WaveStatus({ run }: WavePreviewProps) {
     <div className="training-status">
       <div className="training-status-head">
         <b>{live ? `Wave ${n} under way` : `Next: wave ${n}`}</b>
-        {waveTags(n).map((t) => <span key={t} className="tag">{t}</span>)}
+        {waveTags(n).map((t) => <span key={t} className="tag" data-tip={TAG_TEXT[t]}>{t}</span>)}
         {run.nemesis && isNemesisWave(run, n) && (
           <span className="tag red" data-tip={`Your Sortie nemesis is this wave's Echo Lord. ${nemesisTricks(run.nemesis).map((t) => `${t.name}: ${t.text}`).join(' ')}`}>
             Nemesis: {run.nemesis.name}
@@ -45,9 +45,18 @@ export function WaveStatus({ run }: WavePreviewProps) {
             : <span data-tip="A wave with none through pays bonus credits">none through yet</span>}
         </div>
       ) : <WavePreview run={run} />}
+      {!live && waveTags(n).some((t) => TAG_TEXT[t]) && (
+        <div className="training-status-note muted">{waveTags(n).map((t) => TAG_TEXT[t]).filter(Boolean).join(' ')}</div>
+      )}
     </div>
   );
 }
+
+/** What a wave tag means, said under the wave line before it starts (a tooltip never shows on a phone). */
+export const TAG_TEXT: Record<string, string> = {
+  Flying: 'Flying: they fly straight from pad to pad over the maze, so only pieces in reach of that line hit them.',
+  Boss: `Boss: an Echo Lord leads this wave; it is tough, and costs the base at least ${TRAINING.leak.bossMin} HP if it gets through.`,
+};
 
 /** A tag for a wave one of the campaign's real Echo Lords leads; hover for its trick. */
 function RealLordTag({ run, w }: { run: TrainingRun; w: number }) {
