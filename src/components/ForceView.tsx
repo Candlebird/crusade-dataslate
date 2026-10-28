@@ -11,29 +11,20 @@ import AddUnitModal from './AddUnitModal';
 import RequisitionShop from './RequisitionShop';
 import UmbraShop from './UmbraShop';
 import RoundIncome, { ClaimAll } from './RoundIncome';
-import ExpeditionModal from './ExpeditionModal';
-import PatrolModal from './PatrolModal';
-import UnitTaskModal from './UnitTaskModal';
-import TrainingModal from './TrainingModal';
-import SortieModal from './SortieModal';
+import DowntimePanel from './DowntimePanel';
 import ZoneFight, { useZoneBattles, useZoneSave } from './ZoneFight';
 import { practiceBattle, practiceId } from '../rules/zone/practice';
 import type { TrackedBattle } from '../rules/tracker';
 import { LEDGER_RECENT, LedgerTable } from './Ledger';
 import type { Campaign, Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
-import { SOLO_PATROL } from '../rules/downtimeData';
-import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, currentRound, emptyNexus, factionName, homeOf, ownedSectors, unitsUsed, unlockedTables } from '../rules/nexus';
+import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, currentRound, emptyNexus, factionName, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
 import { factionClaimedRound, factionForces } from '../rules/detachments';
 import { isReinforced, produce, produceCost, produceDiscount, productionSites } from '../rules/production';
 import { hireBlock, hireHero, offerEnds, openOffers } from '../rules/heroes';
 import { nowIso } from '../model/factory';
 import { DetachmentsBox } from './Detachments';
 import { claimableRounds } from '../rules/rounds';
-import { TASK_NAMES, claimGarrisons, freeUnits, garrisonClaims, tasksOf } from '../rules/tasks';
-import { GARRISON, OFF_TABLE_XP, SORTIE, TRAINING } from '../rules/downtimeData';
-import { canTrain, finalWon } from '../rules/training';
-import { canSortie } from '../rules/sortie';
 import { RESULT_LABEL, unitName } from '../rules/battle';
 import { listTotals, newList } from '../rules/lists';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
@@ -186,6 +177,8 @@ export default function ForceView({ forceId }: { forceId: string }) {
               </ul>
             )}
           </div>
+
+          {!theirs && <DowntimePanel f={f} />}
 
           <Panel
             id="force.units"
@@ -565,48 +558,6 @@ export function ForceImage({ image, onChange, readOnly }: { image?: string; onCh
   );
 }
 
-/** Unit tasks this round (Mentoring, Projects, Recon, Garrison), and garrison XP to take. */
-function UnitTasksRow({ f, c, onOpen }: { f: Force; c: Campaign; onOpen: () => void }) {
-  const { update } = useStore();
-  const tasks = tasksOf(f, c);
-  const claims = garrisonClaims(c, f);
-  const claim = () => {
-    let summary = '';
-    update((s) => {
-      const d = s.forces.find((x) => x.id === f.id);
-      if (!d || !s.campaign) return;
-      summary = claimGarrisons(s.campaign, d, localDate(), uid);
-      d.updatedAt = nowIso();
-    });
-    if (summary) toast(summary);
-  };
-  return (
-    <>
-      <div className="span-all row">
-        <span className="grow small">
-          <b>Unit tasks:</b> Mentoring, Project, Recon or Garrison. <span className="muted">The unit is busy all round: it can still fight, Battle-Worn (-1 Quality and -1 Defense).</span>
-        </span>
-        <button disabled={!freeUnits(f, c).length} onClick={onOpen}>Unit task…</button>
-      </div>
-      {Object.keys(tasks).length > 0 && (
-        <div className="span-all small">
-          <span className="muted">Busy this round: </span>
-          {Object.entries(tasks).map(([id, t]) => {
-            const u = f.units.find((x) => x.id === id);
-            return u ? `${unitName(u)} (${TASK_NAMES[t]})` : null;
-          }).filter(Boolean).join(', ')}
-        </div>
-      )}
-      {claims.length > 0 && (
-        <div className="span-all row">
-          <span className="grow small"><b>Garrison XP:</b> Marauders raided {claims.map((x) => x.sector.name).join(', ')}. +{GARRISON.raidXp} XP to each unit on guard.</span>
-          <button className="primary" onClick={claim}>Claim garrison XP</button>
-        </div>
-      )}
-    </>
-  );
-}
-
 function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const { state, updateForce } = useStore();
   const c = state.campaign;
@@ -617,51 +568,14 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const home = c && n ? homeOf(c, n.factionId) : undefined;
   const researchHome = home?.benefit === 'researchStation';
   const [claiming, setClaiming] = useState(false);
-  const [expedition, setExpedition] = useState(false);
-  const [patrol, setPatrol] = useState(false);
-  const [tasking, setTasking] = useState(false);
-  const [training, setTraining] = useState(false);
-  const [sortie, setSortie] = useState(false);
-  // As many Expeditions a round as there are free units: each unit takes part once a round.
-  const expedited = !!c && !f.units.some((u) => u.status === 'active' && !unitsUsed(f, c).includes(u.id));
   const toClaim = c && n && faction ? claimableRounds(c, n, state.forces) : [];
   const claimedThrough = n && factionClaimedRound(state.forces, n.factionId);
-  const patrolRow = (
-    <div className="span-all row">
-      <span className="grow small">
-        <b>Solo patrol:</b> send up to {SOLO_PATROL.points} pts to find a {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts enemy, then fight or turn back.
-      </span>
-      <button disabled={!f.units.some((u) => u.status === 'active')} onClick={() => setPatrol(true)}>Patrol…</button>
-      {patrol && <PatrolModal force={f} onClose={() => setPatrol(false)} />}
-    </div>
-  );
-  const trainingRow = (
-    <div className="span-all row">
-      <span className="grow small">
-        <b>Training sim:</b> draft Shards into a maze, craft your units from them, and hold the base against endless waves; each crafted unit earns {TRAINING.xpPerWave} XP every {TRAINING.xpEvery} waves (up to {TRAINING.xpCap}). <span className="muted">Any time, as often as you like; a unit banks at most {OFF_TABLE_XP.perRound} XP a {c ? 'round' : 'week'} from Training and free Sorties together. Units don't become busy.{f.trainingBest ? ` Best: ${f.trainingBest} waves${f.finale && Object.keys(f.finale.wins).length ? `, Victory at ${finalWon(f)}` : ''}${f.finale?.endless ? `, Endless +${f.finale.endless}` : ''}.` : ''}</span>
-      </span>
-      <button disabled={!f.units.some(canTrain)} onClick={() => setTraining(true)}>Train…</button>
-      {training && <TrainingModal force={f} c={c} onClose={() => setTraining(false)} />}
-    </div>
-  );
-  const sortieRow = (
-    <div className="span-all row">
-      <span className="grow small">
-        <b>Sortie:</b> a party of 3 pushes through Echo fights, camps and shrines to an Echo lord. Free runs earn up to {SORTIE.caps.free.short}–{SORTIE.caps.free.long} XP, within the {OFF_TABLE_XP.perRound} off-table XP limit. A Shard run costs {SORTIE.cost} Umbra Shards, earns up to {SORTIE.caps.shard.long} XP and brings home Supply, RP and up to {SORTIE.haul.maxUs} shards. <span className="muted">{f.sortieBest ? `Furthest: ${f.sortieBest} nodes.` : ''}</span>
-      </span>
-      <button disabled={f.units.filter(canSortie).length < 3} onClick={() => setSortie(true)}>Sortie…</button>
-      {sortie && <SortieModal force={f} c={c} onClose={() => setSortie(false)} />}
-    </div>
-  );
 
   return (
     <Panel id="force.nexus" title="Nexus Wars" h={3} className="nexus-box" extra={<button className="primary" onClick={onShop}>Spend Umbra Shards</button>}>
       {!c ? (
         <>
           <p className="muted small">No campaign loaded. <a href={href.campaign()}>Import or start one</a> to link a faction.</p>
-          {patrolRow}
-          {trainingRow}
-          {sortieRow}
         </>
       ) : (
         <div className="fields">
@@ -685,9 +599,6 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
             </select>}
           </label>
           {n && !faction && <p className="span-all small" style={{ color: 'var(--warn)', margin: 0 }}>This faction isn't in the loaded campaign.</p>}
-          {!(n && faction) && patrolRow}
-          {!(n && faction) && trainingRow}
-          {!(n && faction) && sortieRow}
           {n && faction && (
             <>
               <div className="span-all row wrap">
@@ -700,20 +611,6 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
                 <button disabled={!toClaim.length} onClick={() => setClaiming(true)}>Claim round income…</button>
               </div>
               {claiming && <RoundIncome force={f} c={c} onClose={() => setClaiming(false)} />}
-              <div className="span-all row">
-                <span className="grow small">
-                  {expedited
-                    ? <span className="muted">Every unit has fought this round. They're free again when the GM ends the round.</span>
-                    : <><b>Downtime:</b> send up to 3 units on an Expedition between games.</>}
-                </span>
-                <button disabled={expedited} onClick={() => setExpedition(true)}>Expedition…</button>
-              </div>
-              {expedition && <ExpeditionModal force={f} c={c} onClose={() => setExpedition(false)} />}
-              <UnitTasksRow f={f} c={c} onOpen={() => setTasking(true)} />
-              {tasking && <UnitTaskModal force={f} c={c} onClose={() => setTasking(false)} />}
-              {patrolRow}
-              {trainingRow}
-              {sortieRow}
               <DetachmentsBox f={f} c={c} />
               <div className="span-all small">
                 <div className="muted">Controlled sectors</div>
