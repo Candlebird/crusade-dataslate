@@ -53,6 +53,7 @@ export default function ZoneFight({ id, title, tracked, ctx, modes = ['command',
   if (saved) last.current = saved;
   const save = saved ?? (ended.current ? undefined : last.current);
   const [err, setErr] = useState('');
+  const [rulesOpen, setRulesOpen] = useState(false);
 
   const start = (mode: ZoneMode) => {
     try {
@@ -88,11 +89,19 @@ export default function ZoneFight({ id, title, tracked, ctx, modes = ['command',
   }
   return (
     <Modal title={<><Icon name="g:crossed-swords" /> {title}</>} onClose={onClose}>
-      <p className="small muted">
-        A battle on a board of 12" zones, each split into four 6" squares. Units move a square to Advance and two to Rush or Charge,
-        and shoot in squares (24" is 4). Both sides take turns to deploy and to activate a unit, as at the table.
-        {practice ? ' Practice: nothing is lost and nothing is earned.' : stakes ? ` ${stakes}` : ' Losses carry over as after a table game.'} It's saved after every step, so you can close it and carry on later, on any device.
+      <p className="small" style={{ marginTop: 0 }}>
+        {practice ? 'Practice: nothing is lost and nothing is earned.' : stakes ?? 'Losses carry over as after a table game.'}
+        {' '}It's saved after every step, so you can close it and carry on later, on any device.
+        {' '}<button className="ghost small" aria-expanded={rulesOpen} onClick={() => setRulesOpen(!rulesOpen)}>
+          How the board works <Icon name={rulesOpen ? 'l:chevron-up' : 'l:chevron-down'} />
+        </button>
       </p>
+      {rulesOpen && (
+        <p className="small muted">
+          A battle on a board of 12" zones, each split into four 6" squares. Units move a square to Advance and two to Rush or Charge,
+          and shoot in squares (24" is 4). Both sides take turns to deploy and to activate a unit, as at the table.
+        </p>
+      )}
       {err && <p className="tag red">{err}</p>}
       <div className="zb-modes">
         {modes.map((m) => (
