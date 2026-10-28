@@ -252,7 +252,13 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
 
       <EditModeNotice f={f} />
 
-      {pending > 0 && (
+      {theirs && (
+        <div className="panel notice">
+          <b>{f.owner}</b>'s unit. You can view it, but only they can change it{pending > 0 && ` (it has ${pending} upgrade${pending > 1 ? 's' : ''} to pick)`}.
+        </div>
+      )}
+
+      {pending > 0 && !theirs && (
         <div className="panel notice">
           <div className="panel-title">
             <h3><Icon name="g:upgrade" /> Level {earned} reached — {pending} upgrade{pending > 1 ? 's' : ''} to pick</h3>
@@ -293,7 +299,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           {/* Profile */}
           <Panel id="unit.profile" title="Profile">
             <div className="fields">
-              <label className="field span-2">Crusade name<TextField value={u.name} onCommit={(v) => set((d) => void (d.name = v))} /></label>
+              <label className="field span-2">Crusade name{theirs ? <Fixed>{u.name || '—'}</Fixed> : <TextField value={u.name} onCommit={(v) => set((d) => void (d.name = v))} />}</label>
               {!edit && (
                 <>
                   <label className="field span-2">Datasheet<Fixed>{u.unitType}</Fixed></label>
@@ -520,7 +526,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
         {/* Sidebar */}
         <div>
           <div className="panel">
-            <ForceImage image={u.image} onChange={(img) => set((d) => void (d.image = img))} />
+            <ForceImage image={u.image} readOnly={theirs} onChange={(img) => set((d) => void (d.image = img))} />
             <div className="stats">
               <div className="stat"><b>{battlePoints(u, s)}</b><span>Battle points</span></div>
               <div className="stat"><b>{earned}</b><span>Level</span></div>
@@ -534,9 +540,15 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           <Panel id="unit.validation" title="Validation" h={3}>
             <Issues issues={issues} />
           </Panel>
-          <Panel id="unit.notes" title="Notes" h={3}>
-            <TextArea rows={6} value={u.notes} placeholder="Background, honours, grudges…" onCommit={(v) => set((d) => void (d.notes = v))} />
-          </Panel>
+          {theirs ? u.notes && (
+            <Panel id="unit.notes" title="Notes" h={3}>
+              <p style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{u.notes}</p>
+            </Panel>
+          ) : (
+            <Panel id="unit.notes" title="Notes" h={3}>
+              <TextArea rows={6} value={u.notes} placeholder="Background, honours, grudges…" onCommit={(v) => set((d) => void (d.notes = v))} />
+            </Panel>
+          )}
           {edit && <div className="panel">
             <button
               className="danger"

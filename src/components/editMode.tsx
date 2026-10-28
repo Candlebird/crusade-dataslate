@@ -1,5 +1,6 @@
 import { useSyncExternalStore, type ReactNode } from 'react';
 import { useStore } from '../model/store';
+import { useCloud } from '../cloud/CloudSync';
 import type { Force } from '../model/types';
 import { Icon } from './Icon';
 
@@ -18,23 +19,30 @@ function setEditing(forceId: string, on: boolean) {
   listeners.forEach((l) => l());
 }
 
+/** Whether the force belongs to another signed-in player: this device may view it but not change it (the sync would undo it). */
+export function useTheirs(f: Force | undefined): boolean {
+  const cloud = useCloud();
+  return !!f && !!cloud.email && !!f.owner && f.owner !== cloud.email;
+}
+
 /**
  * Whether the force's manual controls (adding units, RP, shards, XP, traits…) are shown.
  * A force in a Nexus War gets these from the campaign, so they stay hidden until its player turns on edit mode
- * to fix a mistake. Every other force can always be edited.
+ * to fix a mistake. Every other force of the player's own can always be edited; another player's force never.
  */
-export function useEditMode(f: Force | undefined): { nexus: boolean; edit: boolean; toggle: () => void } {
+export function useEditMode(f: Force | undefined): { nexus: boolean; edit: boolean; theirs: boolean; toggle: () => void } {
   const { state } = useStore();
+  const theirs = useTheirs(f);
   const id = f?.id ?? '';
   const on = useSyncExternalStore(subscribe, () => editing.has(id));
   const nexus = !!f?.nexus && !!state.campaign;
-  return { nexus, edit: !nexus || on, toggle: () => setEditing(id, !on) };
+  return { nexus, theirs, edit: !theirs && (!nexus || on), toggle: () => setEditing(id, !on) };
 }
 
 /** The top-right switch on a Nexus Wars force's pages. */
 export function EditModeButton({ f }: { f: Force }) {
-  const { nexus, edit, toggle } = useEditMode(f);
-  if (!nexus) return null;
+  const { nexus, edit, theirs, toggle } = useEditMode(f);
+  if (!nexus || theirs) return null;
   return (
     <button
       className={edit ? 'primary' : ''}
@@ -49,8 +57,8 @@ export function EditModeButton({ f }: { f: Force }) {
 
 /** The reminder shown while edit mode is on. */
 export function EditModeNotice({ f }: { f: Force }) {
-  const { nexus, edit } = useEditMode(f);
-  if (!nexus || !edit) return null;
+  const { nexus, edit, theirs } = useEditMode(f);
+  if (!nexus || !edit || theirs) return null;
   return (
     <div className="panel notice small">
       <b>Edit mode is on.</b> <span className="muted">Changes skip the Nexus Wars rules: nothing is paid for or checked. Fix mistakes, then switch it off.</span>

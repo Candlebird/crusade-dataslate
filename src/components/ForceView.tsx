@@ -336,15 +336,25 @@ export default function ForceView({ forceId }: { forceId: string }) {
         </div>
 
         <div>
-          <Panel id="force.details" title="Force details" h={3} collapsed lead={<ForceImage image={f.image} onChange={(img) => set((d) => void (d.image = img))} />}>
+          <Panel id="force.details" title="Force details" h={3} collapsed lead={<ForceImage image={f.image} readOnly={theirs} onChange={(img) => set((d) => void (d.image = img))} />}>
             <div className="fields" style={{ marginTop: '0.75rem' }}>
-              <label className="field span-all">Name<TextField value={f.name} onCommit={(v) => set((d) => void (d.name = v))} /></label>
-              <label className="field span-all">Faction<TextField value={f.faction} onCommit={(v) => set((d) => void (d.faction = v))} /></label>
-              <label className="field span-all">
-                Army Forge link
-                <TextField value={f.armyLink ?? ''} placeholder={armyUrl ?? 'Paste the army or list link'} onCommit={(v) => set((d) => void (d.armyLink = v.trim() || undefined))} />
-              </label>
-              <label className="field span-all">Player<TextField value={f.player} onCommit={(v) => set((d) => void (d.player = v))} /></label>
+              {theirs ? (
+                <>
+                  <label className="field span-all">Name<Fixed>{f.name}</Fixed></label>
+                  <label className="field span-all">Faction<Fixed>{f.faction || '—'}</Fixed></label>
+                  <label className="field span-all">Player<Fixed>{f.player || '—'}</Fixed></label>
+                </>
+              ) : (
+                <>
+                  <label className="field span-all">Name<TextField value={f.name} onCommit={(v) => set((d) => void (d.name = v))} /></label>
+                  <label className="field span-all">Faction<TextField value={f.faction} onCommit={(v) => set((d) => void (d.faction = v))} /></label>
+                  <label className="field span-all">
+                    Army Forge link
+                    <TextField value={f.armyLink ?? ''} placeholder={armyUrl ?? 'Paste the army or list link'} onCommit={(v) => set((d) => void (d.armyLink = v.trim() || undefined))} />
+                  </label>
+                  <label className="field span-all">Player<TextField value={f.player} onCommit={(v) => set((d) => void (d.player = v))} /></label>
+                </>
+              )}
               {edit ? (
                 <>
                   <label className="field span-all">Starting supply<Stepper value={f.startingSupply} step={50} min={0} onChange={(n) => set((d) => void (d.startingSupply = n))} /></label>
@@ -360,7 +370,9 @@ export default function ForceView({ forceId }: { forceId: string }) {
                   <label className="field span-all">Umbra shards<Fixed>{f.umbraShards}</Fixed></label>
                 </>
               )}
-              <label className="field span-all">Description / lore<TextArea rows={5} value={f.description} onCommit={(v) => set((d) => void (d.description = v))} /></label>
+              {theirs
+                ? f.description && <div className="span-all"><span className="small muted">Description / lore</span><p style={{ whiteSpace: 'pre-wrap', margin: '0.25rem 0 0' }}>{f.description}</p></div>
+                : <label className="field span-all">Description / lore<TextArea rows={5} value={f.description} onCommit={(v) => set((d) => void (d.description = v))} /></label>}
             </div>
           </Panel>
           <RelicVault f={f} readOnly={theirs} />
@@ -524,13 +536,18 @@ function HeroOffers({ f, c }: { f: Force; c: Campaign }) {
   );
 }
 
-export function ForceImage({ image, onChange }: { image?: string; onChange: (img: string | undefined) => void }) {
+/**
+ * A force's or unit's picture with its change/remove buttons. With no picture it is just an "Add picture" button, so an
+ * empty sheet doesn't spend half the column on a placeholder; read-only, it shows the picture if there is one.
+ */
+export function ForceImage({ image, onChange, readOnly }: { image?: string; onChange: (img: string | undefined) => void; readOnly?: boolean }) {
+  if (readOnly) return image ? <img className="portrait" src={image} alt="" /> : null;
   return (
     <div>
-      {image ? <img className="portrait" src={image} alt="" /> : <div className="portrait portrait-empty"><Icon name="g:holy-symbol" /></div>}
-      <div className="row" style={{ marginTop: '0.4rem' }}>
+      {image && <img className="portrait" src={image} alt="" />}
+      <div className="row" style={image ? { marginTop: '0.4rem' } : undefined}>
         <label className="btn" style={{ cursor: 'pointer' }}>
-          {image ? 'Change picture' : 'Add picture'}
+          <Icon name="g:holy-symbol" /> {image ? 'Change picture' : 'Add picture'}
           <input
             type="file"
             accept="image/*"
