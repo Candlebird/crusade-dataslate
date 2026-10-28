@@ -114,8 +114,16 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
 - **Buy a relic with 0 RP** is allowed, because the relic picker offers a free relic. Is that intended?
 - **Unit sheet order.** Should the Profile panel move below Experience and Traits, so what changed comes first? Units also keep no XP history, so the sheet can't show what changed after each battle without a change to the saved data.
 - **Unit tasks.** They only show when the force is linked to a faction in the loaded campaign, the same as before. Is that intended?
+- **Nexus: GM panels fold.** Factions and Sectors fold once they have content. Is that right for you, or should they stay open?
+- **Nexus: End round toast.** The toast is short when the turn report is on screen. Is that enough?
+- **Battle: "Back to past battles"** scrolls to the list. Is that where you expect to land?
+- **Dice: sort with "Any".** Dice only sort against a target once one is picked. Should they sort high to low otherwise?
+- **Training: the "Base −N HP" note** only covers waves played in this sitting. Showing it after a reload would need saved data.
+- **Training HUD labels.** Base, Credits and Luck only have words above 1200 px wide; below that they're icons. Lower it?
+- **Search hits on the Traits page** scroll to the section (for example Trait tables), not to the single trait.
 
 ## Test by hand
+- **Phone width.** Chrome on a desktop won't go below 500 px, where nothing scrolls sideways. Check 390 px on a real phone: the force page, the unit sheet, the battle start, the campaign tabs and Rules.
 - **Training (long runs, not reached in the browser):** the Victory dialog, the banked block in the run summary, and the "Base −N HP." log line.
 - **Sealed orders (needs sign-in, which was off-limits overnight):**
   - Check that the "what it will do" line reads right for hold, move, attack on an AI sector, attack on a faction and a target out of reach, with zone battles both on and off.
