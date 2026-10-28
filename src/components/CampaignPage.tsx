@@ -7,10 +7,10 @@ import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionCol
 import { href } from '../route';
 import { useCloud } from '../cloud/CloudSync';
 import { logFor, type ChronicleEntry } from '../rules/chronicle';
-import { placeGuardians, rerollGuardians } from '../rules/guardians';
 import { reportFor } from '../rules/report';
 import OrdersPanel, { OrdersLockStrip } from './NexusOrders';
-import RoundPanel from './RoundPanel';
+import RoundPanel, { CampaignSettingsPanel } from './RoundPanel';
+import { RoundChecklist, ThisRound } from './RoundTodo';
 import TechTreePanel from './TechTree';
 import WarlordsPanel from './Warlords';
 import DuelsPanel from './Duels';
@@ -49,15 +49,15 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
   const [recordAt, setRecordAt] = useState<{ sectorId: string; n: number }>({ sectorId: '', n: 0 });
   const [pickedView, setViewAs] = useState<string>();
   const [tab, setTab] = useCampaignTab();
-  const [logSeen, setLogSeen] = useState(tab === 'log');
-  if (tab === 'log' && !logSeen) setLogSeen(true);
+  const [logSeen, setLogSeen] = useState(tab === 'chronicle');
+  if (tab === 'chronicle' && !logSeen) setLogSeen(true);
   const [focus, setFocus] = useState<Focus>();
   const showSector = (sectorId: string) => {
     setTab('map');
     setFocus((p) => ({ sectorId, n: (p?.n ?? 0) + 1 }));
   };
   const showGame = (id: string) => {
-    setTab('log');
+    setTab('chronicle');
     setTimeout(() => {
       const el = document.getElementById(`log-${id}`);
       if (!el) return;
@@ -70,10 +70,11 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
   const jump = (e: ChronicleEntry) => (e.eventId ? showGame(e.eventId) : e.sectorId && showSector(e.sectorId));
   // A link to a tab (#/campaign/:tab[/:at]): a game to show on the log, a sector on the map.
   useEffect(() => {
-    if (!TABS.some((x) => x.id === openTab)) return;
+    const t = tabOf(openTab);
+    if (!t) return;
     if (openTab === 'log' && at) showGame(at);
-    else if (openTab === 'map' && at) showSector(at);
-    else setTab(openTab as CampaignTab);
+    else if (t === 'map' && at) showSector(at);
+    else setTab(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTab, at, !!state.campaign]);
   // Signed out, this browser is the GM's own copy.
@@ -117,29 +118,33 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
       d.campaign.updatedAt = nowIso();
     });
 
+  // Rarely needed: folded at the foot of every tab.
   const footer = (
-    <div className="cols-2">
-      <div className="panel">
-        <div className="panel-title"><h3>Update from the GM</h3></div>
-        {importer}
+    <Panel id="campaign.file" title="Campaign file" collapsed>
+      <div className="cols-2">
+        <div>
+          <h3>Update from the GM</h3>
+          {importer}
+        </div>
+        <div>
+          <h3>Remove from this browser</h3>
+          <p className="muted small">Takes the campaign off this browser and unlinks your forces from it. The forces themselves stay.</p>
+          <button
+            className="danger"
+            onClick={() => {
+              if (!confirmAction(`Remove "${c.name}" from this browser? GM: export it first.`)) return;
+              update((d) => {
+                d.campaign = undefined;
+                for (const f of d.forces) f.nexus = undefined;
+              });
+              toast('Campaign removed.');
+            }}
+          >
+            Remove campaign
+          </button>
+        </div>
       </div>
-      <div className="panel">
-        <div className="panel-title"><h3>Danger zone</h3></div>
-        <button
-          className="danger"
-          onClick={() => {
-            if (!confirmAction(`Remove "${c.name}" from this browser? GM: export it first.`)) return;
-            update((d) => {
-              d.campaign = undefined;
-              for (const f of d.forces) f.nexus = undefined;
-            });
-            toast('Campaign removed.');
-          }}
-        >
-          Remove campaign
-        </button>
-      </div>
-    </div>
+    </Panel>
   );
 
   if (gm && !canGm) {
@@ -183,6 +188,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
           {' '}Pick a sector to see what's known and <b>Start a battle here</b>. Full rules: <a href={href.rules('nexus')}>Rules</a>.
         </p>
 
+        {viewAs && viewAs !== '-' && <ThisRound c={c} me={viewAs} />}
         <RoundPanel c={c} gm={false} viewer={fog} />
         <OrdersLockStrip c={c} />
         <CampaignTabs tab={tab} setTab={setTab} />
@@ -203,29 +209,19 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
             <JournalPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />
           </>
         )}
-        {tab === 'chronicle' && <ChroniclePanel c={c} viewer={fog} onJump={jump} />}
+        {tab === 'chronicle' && (
+          <>
+            <ChroniclePanel c={c} viewer={fog} onJump={jump} />
+            <LogPanel c={c} setC={setC} viewer={fog} />
+          </>
+        )}
         {tab === 'night' && <GameNightPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />}
         {tab === 'bounties' && <BountyBoardPanel c={c} setC={setC} gm={false} />}
         {tab === 'stats' && <WarRoomPanel c={c} />}
-        {tab === 'log' && <LogPanel c={c} setC={setC} viewer={fog} />}
         {footer}
       </>
     );
   }
-
-  const guard = () => {
-    let placed: Sector[] = [];
-    setC((d) => void (placed = placeGuardians(d, state.books, state.forces, Math.random, uid)));
-    toast(placed.length
-      ? `Guardians placed: ${placed.map((s) => s.name).join(', ')}.`
-      : "No new guardians: every site has already rolled for one, or Void Echoes isn't imported.");
-  };
-  const reguard = () => {
-    if (!confirmAction('Re-roll every guardian? Each AI-held site loses its guardian (and its relic) and rolls again.')) return;
-    let placed: Sector[] = [];
-    setC((d) => void (placed = rerollGuardians(d, state.books, state.forces, Math.random, uid)));
-    toast(placed.length ? `Guardians re-rolled: ${placed.map((s) => s.name).join(', ')}.` : 'Guardians re-rolled: none this time.');
-  };
 
   return (
     <>
@@ -236,19 +232,17 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         </div>
         <div className="row">
           <a className="btn" href={href.campaign()}><Icon name="l:arrow-left" /> Player view</a>
-          <button onClick={guard} data-tip="Roll for a guardian at each AI-held planet, station, anomaly, void sector and Lost Archive that hasn't rolled yet (round end does this too)">Place guardians</button>
-          <button onClick={reguard} data-tip="Remove every guardian and roll each AI-held site again">Re-roll guardians</button>
           <button className="primary" onClick={() => exportCampaign(c)}>Export campaign.json</button>
         </div>
       </div>
       <p className="muted small">
-        Your campaign.json is the master copy: players import it and report games to you.
-        End the round once the group has played; players then claim sector income on their force pages. Match rewards come with each recorded battle.
-        Pick a sector and <b>Start a battle here</b>; the result goes into the log and the map.
+        Run the round from the checklist below, then <b>End round…</b>. Your campaign.json is the master copy: export it after changes.
         Full rules: <a href={href.rules('nexus')}>Rules</a>.
       </p>
 
+      <RoundChecklist c={c} />
       <RoundPanel c={c} />
+      <CampaignSettingsPanel c={c} />
       <OrdersLockStrip c={c} />
       <CampaignTabs tab={tab} setTab={setTab} />
       {tab === 'map' && (
@@ -257,7 +251,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
           <FactionsPanel c={c} setC={setC} />
           <Suspense fallback={<Loading />}><HexMapPanel c={c} setC={setC} focus={focus} onRecord={(sectorId) => {
             setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
-            setTab('log');
+            setTab('chronicle');
             setTimeout(() => document.getElementById('record-game')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
           }} /></Suspense>
           <OrdersPanel c={c} />
@@ -272,23 +266,23 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
           <JournalPanel c={c} setC={setC} gm />
         </>
       )}
-      {tab === 'chronicle' && <ChroniclePanel c={c} onJump={jump} />}
       {tab === 'night' && <GameNightPanel c={c} setC={setC} gm />}
       {tab === 'bounties' && <BountyBoardPanel c={c} setC={setC} gm />}
       {tab === 'stats' && <WarRoomPanel c={c} />}
       {/* Kept mounted once opened, so a half-filled record survives a look at another tab. */}
       {logSeen && (
-        <div className="cols-2" style={tab === 'log' ? undefined : { display: 'none' }}>
+        <div className="cols-2" style={tab === 'chronicle' ? undefined : { display: 'none' }}>
           <RecordPanel c={c} setC={setC} preset={recordAt} />
           <LogPanel c={c} setC={setC} />
         </div>
       )}
+      {tab === 'chronicle' && <ChroniclePanel c={c} onJump={jump} />}
       {footer}
     </>
   );
 }
 
-type CampaignTab = 'map' | 'warlord' | 'duels' | 'bounties' | 'stats' | 'night' | 'chronicle' | 'log';
+type CampaignTab = 'map' | 'warlord' | 'duels' | 'bounties' | 'stats' | 'night' | 'chronicle';
 const TABS: { id: CampaignTab; label: string }[] = [
   { id: 'map', label: 'Map' },
   { id: 'warlord', label: 'Warlord' },
@@ -296,17 +290,18 @@ const TABS: { id: CampaignTab; label: string }[] = [
   ...(BOUNTY.enabled ? [{ id: 'bounties' as const, label: 'Bounties' }] : []),
   { id: 'stats', label: 'War Room' },
   { id: 'night', label: 'Game night' },
-  { id: 'chronicle', label: 'Chronicle' },
-  { id: 'log', label: 'Log' },
+  { id: 'chronicle', label: 'Chronicle & log' },
 ];
+/** A tab id from a link or an older save: the Log tab is part of the Chronicle's now. */
+const tabOf = (t: string | null | undefined): CampaignTab | undefined =>
+  t === 'log' ? 'chronicle' : TABS.find((x) => x.id === t)?.id;
 const TAB_KEY = 'opr-campaign-tab';
 
 /** The campaign page's open tab, remembered per device. */
 function useCampaignTab(): [CampaignTab, (t: CampaignTab) => void] {
   const [tab, setTab] = useState<CampaignTab>(() => {
     try {
-      const t = localStorage.getItem(TAB_KEY);
-      return TABS.some((x) => x.id === t) ? (t as CampaignTab) : 'map';
+      return tabOf(localStorage.getItem(TAB_KEY)) ?? 'map';
     } catch {
       return 'map';
     }
@@ -386,7 +381,13 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                 return (
                   <tr key={fa.id}>
                     <td className="s-end" data-label="Colour"><input type="color" value={fa.color} onChange={(e) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.color = e.target.value; })} /></td>
-                    <td className="s-2" data-label="Faction"><TextField value={fa.name} onCommit={(v) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.name = v; })} /></td>
+                    <td className="s-2" data-label="Faction"><TextField value={fa.name} onCommit={(v) => setC((d) => {
+                      const x = d.factions.find((y) => y.id === fa.id);
+                      if (!x || !v) return;
+                      // A home still called by the old name follows the faction's new one.
+                      for (const s of d.sectors) if (s.type === 'home' && s.owner === x.id && s.name === `${x.name} Home`) s.name = `${v} Home`;
+                      x.name = v;
+                    })} /></td>
                     <td className="s-full" data-label="Player"><TextField value={fa.player} placeholder="Player" onCommit={(v) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.player = v; })} /></td>
                     <td className="small s-full" data-label="Sectors">
                       {owned.map((s) => <span key={s.id} className={`tag${s.type === 'home' ? ' gold' : ''}`} data-tip={benefitOf(s)?.desc ?? SECTOR_TYPES[s.type].desc}>{s.name}</span>)}

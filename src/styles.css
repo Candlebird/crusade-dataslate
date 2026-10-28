@@ -1369,3 +1369,12 @@ table.ledger td:first-child { white-space: nowrap; }
 .zb-modes button { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; padding: 12px; white-space: normal; height: auto; }
 .zb-modes button span { text-transform: none; letter-spacing: normal; font-weight: 400; line-height: 1.4; }
 .zb-modes button.primary span.muted { color: inherit; opacity: 0.8; }
+
+/* === UX pass: nexus wars === */
+/* "This round" and the GM's round checklist (RoundTodo.tsx). */
+.todo-list li .tag { margin-left: auto; flex: none; }
+.todo-list li.todo-urgent a { font-weight: 600; }
+.round-check td .tag { margin: 0 0.25rem 0.15rem 0; }
+/* The GM's Campaign settings (RoundPanel.tsx): one setting per block, its note under it. */
+.settings-list { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
+.settings-list p { margin: 0.3rem 0 0; }
