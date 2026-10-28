@@ -381,7 +381,13 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                 return (
                   <tr key={fa.id}>
                     <td className="s-end" data-label="Colour"><input type="color" value={fa.color} onChange={(e) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.color = e.target.value; })} /></td>
-                    <td className="s-2" data-label="Faction"><TextField value={fa.name} onCommit={(v) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.name = v; })} /></td>
+                    <td className="s-2" data-label="Faction"><TextField value={fa.name} onCommit={(v) => setC((d) => {
+                      const x = d.factions.find((y) => y.id === fa.id);
+                      if (!x || !v) return;
+                      // A home still called by the old name follows the faction's new one.
+                      for (const s of d.sectors) if (s.type === 'home' && s.owner === x.id && s.name === `${x.name} Home`) s.name = `${v} Home`;
+                      x.name = v;
+                    })} /></td>
                     <td className="s-full" data-label="Player"><TextField value={fa.player} placeholder="Player" onCommit={(v) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.player = v; })} /></td>
                     <td className="small s-full" data-label="Sectors">
                       {owned.map((s) => <span key={s.id} className={`tag${s.type === 'home' ? ' gold' : ''}`} data-tip={benefitOf(s)?.desc ?? SECTOR_TYPES[s.type].desc}>{s.name}</span>)}
