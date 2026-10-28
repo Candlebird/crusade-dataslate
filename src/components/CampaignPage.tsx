@@ -382,7 +382,9 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
       d.sectors.push({ id: uid(), name: `${name} Home`, type: 'home', owner: id, notes: '' });
     });
   return (
-    <Panel id="campaign.factions" title="Factions" extra={<button onClick={add}>+ Add faction</button>}>
+    // Set up once, then rarely touched: folded with a one-line summary once there are factions.
+    <Panel id="campaign.factions" title="Factions" extra={<button onClick={add}>+ Add faction</button>} collapsed={c.factions.length > 0}
+      lead={c.factions.length > 0 && <p className="muted small" style={{ margin: 0 }}>{c.factions.length} faction{c.factions.length === 1 ? '' : 's'}: {c.factions.map((f) => f.name).join(', ')}. Open to rename, recolour, set players or remove one.</p>}>
       {c.factions.length === 0 ? <p className="muted small">No factions yet. Each one gets a home sector.</p> : (
         <div className="table-wrap">
           <table className="compact stack">
@@ -407,8 +409,8 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                     </td>
                     <td className="small s-full" data-label="Linked forces here">{linked.map((f) => <a key={f.id} href={href.force(f.id)}>{f.name} </a>)}</td>
                     <td className="s-tail">
-                      <button className="ghost icon" aria-label="Remove faction" onClick={() => {
-                        if (!confirmAction(`Remove ${fa.name}? Its sectors go unclaimed and its home is deleted.`)) return;
+                      <button className="ghost icon danger" aria-label={`Remove ${fa.name}`} data-tip="Remove faction (asks first)" onClick={() => {
+                        if (!confirmAction(`Remove ${fa.name}? Its sectors go unclaimed and its home is deleted. This can't be undone.`)) return;
                         setC((d) => {
                           d.factions = d.factions.filter((x) => x.id !== fa.id);
                           d.sectors = d.sectors.filter((s) => !(s.type === 'home' && s.owner === fa.id));
@@ -434,7 +436,11 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
   });
   const add = () => setC((d) => void d.sectors.push({ id: uid(), name: `Sector ${d.sectors.length + 1}`, type: 'planet', notes: '' }));
   return (
-    <Panel id="campaign.sectors" title="Sectors" extra={<button onClick={add}>+ Add sector</button>}>
+    // Most sector edits happen on the map (pick a sector, then Edit): this full list is for the rest, folded by default.
+    <Panel id="campaign.sectors" title="Sectors" extra={<button onClick={add}>+ Add sector</button>} collapsed={c.sectors.length > 0}
+      lead={c.sectors.length > 0 && <p className="muted small" style={{ margin: 0 }}>
+        {c.sectors.length} sector{c.sectors.length === 1 ? '' : 's'}{c.map ? ` (${c.sectors.filter((s) => s.q == null).length} off the map)` : ''}. Edit one from the map by picking it; open this for the full list.
+      </p>}>
       {c.sectors.length === 0 ? <p className="muted small">No sectors yet. Generate a map above, paint sectors on it, or add them here.</p> : (
         <div className="table-wrap">
           <table className="compact stack">
@@ -479,7 +485,10 @@ function SectorsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                       {s.type === 'void' && <label className="row" data-tip="One-off reward already taken"><input type="checkbox" checked={!!s.rewardClaimed} onChange={(e) => setS(s.id, (d) => void (d.rewardClaimed = e.target.checked || undefined))} /> Claimed</label>}
                     </td>
                     <td className="s-full" data-label="Lore"><TextField value={s.notes} placeholder="Lore, terrain…" onCommit={(v) => setS(s.id, (d) => void (d.notes = v))} /></td>
-                    <td className="s-end"><button className="ghost icon" aria-label="Remove sector" onClick={() => setC((d) => void (d.sectors = d.sectors.filter((x) => x.id !== s.id)))}><Icon name="l:x" /></button></td>
+                    <td className="s-end"><button className="ghost icon danger" aria-label={`Delete ${s.name}`} data-tip="Delete sector (asks first)" onClick={() => {
+                      if (!confirmAction(`Delete ${s.name}? Its log entries will show "Deleted sector". This can't be undone.`)) return;
+                      setC((d) => void (d.sectors = d.sectors.filter((x) => x.id !== s.id)));
+                    }}><Icon name="l:x" /></button></td>
                   </tr>
                 );
               })}

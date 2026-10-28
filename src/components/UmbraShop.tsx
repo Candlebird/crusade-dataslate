@@ -148,14 +148,15 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
       <div className="cols-2">
         <div>
           {UMBRA_SHOP.map((x) => (
-            <div key={x.key} className={`shop-item${sel === x.key ? ' selected' : ''}${costOf(x) > us ? ' disabled' : ''}`} onClick={() => pick(x.key)}>
+            <div key={x.key} className={`shop-item${sel === x.key ? ' selected' : ''}${costOf(x) > us ? ' disabled' : ''}`} onClick={() => pick(x.key)}
+              data-tip={costOf(x) > us ? `Needs ${costOf(x)} Umbra Shards (this force has ${us})` : undefined}>
               <span className="cost" data-tip={x.key === 'relic' && collector ? 'Relic Collector discount' : undefined}>{costOf(x)}{x.key === 'relic' && x.key !== sel ? '+' : ''} US</span>
               <div className="grow"><b>{x.name}</b><div className="muted small">{x.desc}</div></div>
             </div>
           ))}
         </div>
         <div>
-          {!item && <p className="muted">Choose something to buy.</p>}
+          {!item && <p className="muted">Umbra Shards are this force's campaign currency. Pick an item on the left, make its choices here, then <b>Buy</b>. Greyed items cost more shards than the force has.</p>}
           {item && (
             <div className="fields">
               <h3 className="span-all" style={{ margin: 0 }}>{item.name}</h3>

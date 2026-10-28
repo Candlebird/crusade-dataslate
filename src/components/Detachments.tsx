@@ -65,7 +65,9 @@ export function DetachmentsBox({ f, c }: { f: Force; c: Campaign }) {
               ? `Split off a new detachment: name it, then give it Supply, shards and units, for ${shards(COST)}. Once a round.`
               : `Move Supply, shards and units between them, or split off new detachments, once a round for ${shards(COST)}.`}
         </span>
-        <button disabled={done || total < COST} onClick={() => (needNew ? setNaming(true) : setOpen(true))}>Reorganise…</button>
+        <button disabled={done || total < COST}
+          data-tip={done ? 'Already reorganised this round' : total < COST ? `Needs ${shards(COST)} across your detachments (they have ${total})` : undefined}
+          onClick={() => (needNew ? setNaming(true) : setOpen(true))}>Reorganise…</button>
       </div>
       {naming && <NameModal onNext={start} onClose={() => setNaming(false)} />}
       {open && <ReorganiseModal forces={mine} first={first} make={make} payer={f.id} c={c} onClose={close} />}

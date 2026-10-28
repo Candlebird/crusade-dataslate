@@ -282,7 +282,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
     <>
       <Panel id={gm ? 'campaign.map' : 'campaign.playerMap'} domId="sector-map" title="Sector map" extra={
         <div className="row">
-          {gm && <button onClick={() => setGenOpen(true)}>Generate…</button>}
+          {gm && <button onClick={() => setGenOpen(true)} data-tip="Make a new map: asks before replacing any sectors">Generate…</button>}
           {gm && <SpreadButton c={c} setC={setC} />}
           <button onClick={exportPng} data-tip="Download the whole map as a picture">Export PNG</button>
         </div>
@@ -939,8 +939,8 @@ function SectorEditor({ c, s, setSector, setC, onDone, onDeleted }: {
         <button className="primary" onClick={onDone}>Done</button>
         <span className="spacer" />
         <button className="ghost" onClick={() => setSector((d) => void (d.q = d.r = undefined))} data-tip="Keeps the sector in the list">Take off map</button>
-        <button className="danger" onClick={() => {
-          if (!confirmAction(`Delete ${s.name}? Its log entries will show "Deleted sector".`)) return;
+        <button className="danger" data-tip="Delete the sector (asks first)" onClick={() => {
+          if (!confirmAction(`Delete ${s.name}? Its log entries will show "Deleted sector". This can't be undone.`)) return;
           setC((d) => void (d.sectors = d.sectors.filter((x) => x.id !== s.id)));
           onDeleted();
         }}>Delete</button>

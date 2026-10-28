@@ -70,7 +70,11 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
                     <div key={b.id} className={`tech-card ${st}`}>
                       <div className="tech-name">
                         <span><Glyph g={b.icon} /> {b.name}</span>
-                        {st === 'known' ? <span className="tag green">known</span> : st === 'open' ? <span className="tag gold">{techCost(b)} <Icon name="g:microscope" /></span> : <span className="tag"><Icon name="l:lock" /></span>}
+                        {st === 'known'
+                          ? <span className="tag green" data-tip="Known: build it at a sector from the sector's map panel">known</span>
+                          : st === 'open'
+                            ? <span className="tag gold" data-tip={`Costs ${techCost(b)} Research`}>{techCost(b)} <Icon name="g:microscope" /></span>
+                            : <span className="tag" data-tip="Locked: research the buildings it needs first"><Icon name="l:lock" /></span>}
                       </div>
                       <div className="small">{b.desc}</div>
                       <div className="tech-tags">
