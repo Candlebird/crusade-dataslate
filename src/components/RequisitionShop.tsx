@@ -118,7 +118,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
 
   return (
     <Modal title={`Requisition — ${rp} RP available`} onClose={onClose} wide
-      footer={<><span className="muted small grow">{why ?? warning}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>Buy{sel ? (free ? ' (forged: free)' : ` (${sel.cost} RP)`) : ''}</button></>}>
+      footer={<><span className="muted small grow">{why ?? warning}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>{free ? 'Pick your free relic' : `Buy${sel ? ` (${sel.cost} RP)` : ''}`}</button></>}>
       <div className="cols-2">
         <div>
           {REQUISITIONS.map((r) => (

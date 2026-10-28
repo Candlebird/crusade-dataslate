@@ -93,6 +93,12 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
   const pending = pendingLevels(u);
   const canRelic = (u.category === 'Hero' || !!u.heroicRise) && u.relics.length < relicSlots(u.xp);
   const rp = forceTotals(f, s).rp;
+  // A Sortie or Training-feat relic the force has won and nobody carries yet: this unit can take it without RP.
+  const wonRelics = RELICS.filter((r) => (r.sortie && f.sortie?.relics?.includes(r.sortie)) || (r.training && f.trainingRelics?.includes(r.name)));
+  const freeRelicDue = canRelic && wonRelics.length > 0 && (() => {
+    const held = relicHolders(state.forces, state.campaign);
+    return wonRelics.some((r) => !relicTaken(held, r.name) && relicTierAllowed(r.tier, u.xp));
+  })();
   const normalCount = u.upgrades.filter((x) => !x.unique).length;
   const uniqueCount = u.upgrades.filter((x) => x.unique).length;
 
@@ -147,7 +153,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       label,
       entries: list.map((r) => ({
         name: r.name,
-        desc: [`${relicCost(r.tier)} RP`, r.profile, r.desc, r.note].filter(Boolean).join(' · '),
+        desc: [r.sortie || r.training ? 'Free' : `${relicCost(r.tier)} RP`, r.profile, r.desc, r.note].filter(Boolean).join(' · '),
         disabled: relicTaken(held, r.name) ?? (relicTierAllowed(r.tier, u.xp) ? undefined : `${r.tier} relics need ${RELIC_TIER_MIN_XP[r.tier]}+ XP`),
         meta: r,
       })),
@@ -297,7 +303,9 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             {canRelic && (
               <>
                 <b className="muted small">OR</b>
-                <button onClick={() => setPicker({ kind: 'relic' })}>Buy a relic (from {relicCost('Common')} RP)</button>
+                <button onClick={() => setPicker({ kind: 'relic' })}>
+                  {freeRelicDue && rp < relicCost('Common') ? 'Pick your free relic' : `Buy a relic (from ${relicCost('Common')} RP)`}
+                </button>
                 <span className="muted small">{rp} RP available</span>
               </>
             )}
