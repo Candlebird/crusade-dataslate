@@ -206,12 +206,6 @@ export function drawFx(ctx: CanvasRenderingContext2D, run: TrainingRun, s: numbe
         ctx.fillStyle = f.color;
         ctx.beginPath(); ctx.arc(f.x2 * s, f.y2 * s, Math.max(1.5, s * (0.1 + 0.12 * k)) * (f.kind === 'bolt' ? 1.5 : 1), 0, Math.PI * 2); ctx.fill();
       }
-      if (f.blocked) {
-        // A puff of dust where the cover took the shot.
-        ctx.globalAlpha = Math.min(1, f.t / 0.1);
-        ctx.fillStyle = '#b8a27a';
-        ctx.beginPath(); ctx.arc(f.x2 * s, f.y2 * s, s * 0.14, 0, Math.PI * 2); ctx.fill();
-      }
     }
   }
   ctx.globalAlpha = 1;

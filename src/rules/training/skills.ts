@@ -4,7 +4,7 @@ import { centreOf, dist, towers } from './board';
 import { pick, hitChance, rand } from './rng';
 import { shardValue } from './shards';
 import {
-  addDot, busy, covered, dmgMul, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, partsOf, pulse, rangeCells, reach, toGo, unsaved,
+  addDot, busy, dmgMul, terrainHit, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, partsOf, pulse, rangeCells, reach, toGo, unsaved,
 } from './harm';
 import type { Tower, TowerGun, TowerSkill, TrainingRun, UnitTower } from './types';
 
@@ -84,7 +84,7 @@ export function barrage(run: TrainingRun, t: UnitTower, e: Extract<Effect, { kin
   const target = enemiesNear(run, c.x, c.y, r).sort((a, b) => toGo(run, a) - toGo(run, b))[0];
   if (!target) return false;
   const shot = { melee: false } as TowerGun;
-  const p = hitChance(t.quality, t.boost.hit + (covered(run, shot, target) ? TRAINING.cover.hit * (t.coverMul ?? 1) : 0));
+  const p = hitChance(t.quality, t.boost.hit + terrainHit(run, t, shot, target));
   let landed = 0;
   for (let i = 0; i < e.hits; i++) {
     if (rand(run) >= p) continue;

@@ -13,7 +13,7 @@ import { raidBand, raiderPool } from './raiders';
 import {
   gain, nextTurn, braceFor, omensRead, sigStrength, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicKeysOf, relicsOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, startRound, gunReach, keepsHaul, distOf,
   leaveCombat, leaveEvent, moveMember, nextSlots, onField, partyLine, patchUp, pickBoon, reachable, runXp, skillProblem, skillsOf, squadOf,
-  trinketInfo, weekKey, weekSeed, weeklyScore, reveal, sightOf, veteranTitle,
+  weekKey, weekSeed, weeklyScore, reveal, sightOf, veteranTitle,
   ambushOdds, beastInfo, beastKey, cursesOf, cursed, shopPrice, goalProgress, goalText, lastStanding, rematchTricks, unlockedBoons, markHeat, marked,
   type SortieRun,
 } from './sortie';
@@ -208,10 +208,13 @@ describe('sortie', () => {
     const run = fight(PARTIES.line(), 5);
     const [, mid, back] = partyLine(run.combat!);
     const gun = (s: typeof back) => active(s)[0].guns.find((g) => !g.melee)!;
+    gun(mid).range = 24;
     const before = [gunReach(run, mid, gun(mid)), gunReach(run, back, gun(back))];
-    run.boons.push('spotter');
+    run.boons.push('cells');
     expect(gunReach(run, mid, gun(mid))).toBe(before[0]);
     expect(gunReach(run, back, gun(back))).toBe(Math.min(SORTIE.ranks, before[1] + 1));
+    run.boonTier = { cells: 'Rare' };
+    expect(gunReach(run, mid, gun(mid))).toBe(before[0] + 1);
   });
 
   it('closes ranks when a unit falls', () => {
@@ -737,7 +740,7 @@ describe('sortie quirks and tiers', () => {
   });
 });
 
-describe('sortie stress, trinkets, the weekly challenge and recaps', () => {
+describe('sortie stress, the weekly challenge and recaps', () => {
   it('cracks a unit whose stress is full, for a round, then lets it down', () => {
     const kinds = new Set<string>();
     for (let seed = 1; seed <= 12; seed++) {
@@ -766,45 +769,22 @@ describe('sortie stress, trinkets, the weekly challenge and recaps', () => {
     expect(run.party.every((m) => m.stress === 0)).toBe(true);
   });
 
-  it('gives trinkets their trade-offs, and only to the party', () => {
-    const base = squadOf(UNITS.hero(), 'p').models[0].max;
-    const idol = UNITS.hero();
-    idol.trinket = 'idol';
-    expect(squadOf(idol, 'p').models[0].max).toBe(base + (trinketInfo('idol')!.hp ?? 0));
-    expect(squadOf(idol, 'e', { echo: true }).models[0].max).toBe(base);
-    expect(trinketInfo('nope')).toBeUndefined();
-  });
-
-  it('every trinket has a good side and a bad side', async () => {
-    const { SORTIE_TRINKETS } = await import('./downtimeData');
-    for (const t of Object.values(SORTIE_TRINKETS)) {
-      const parts = [t.init, t.morale, t.melee, t.shoot, t.def, t.hp].filter((x) => x !== undefined) as number[];
-      const good = parts.some((x) => x > 0) || (t.stress ?? 1) < 1;
-      const bad = parts.some((x) => x < 0) || (t.stress ?? 1) > 1;
-      expect(good && bad, t.name).toBe(true);
-    }
-  });
-
-  it('banks trinkets found into the spares, up to a cap, and keeps recaps', () => {
+  it('keeps recaps, up to a cap', () => {
     let n = 0;
     const id = () => `id${n++}`;
     const f = newForce();
     const party = PARTIES.line();
     f.units.push(...party);
-    const run = Object.assign(createRun(party, 2), { over: 'won' as const, bossDown: true, depth: 6, won: 4, trinkets: ['lens', 'idol'] });
+    const run = Object.assign(createRun(party, 2), { over: 'won' as const, bossDown: true, depth: 6, won: 4 });
     applySortie(f, run, '2026-01-01', id, () => 0.99);
-    expect(f.sortie!.trinkets).toEqual(['lens', 'idol']);
     expect(f.sortie!.recaps).toHaveLength(1);
     const r = f.sortie!.recaps![0];
     expect(r).toMatchObject({ over: 'won', depth: 6, won: 4, region: regionName(run), lord: bossOf(run).name });
     expect(r.party).toHaveLength(3);
     expect(r.lines.length).toBeGreaterThan(0);
-    expect(r.gained).toContain('Lens');
-    f.sortie!.trinkets = Array(SORTIE.trinkets.spares - 1).fill('charm');
     for (let i = 0; i < SORTIE.recaps + 2; i++) {
-      applySortie(f, Object.assign(createRun(party, 3), { over: 'quit' as const, trinkets: ['plate', 'mask'] }), '2026-01-02', id, () => 0.99);
+      applySortie(f, Object.assign(createRun(party, 3), { over: 'quit' as const }), '2026-01-02', id, () => 0.99);
     }
-    expect(f.sortie!.trinkets).toHaveLength(SORTIE.trinkets.spares);
     expect(f.sortie!.recaps).toHaveLength(SORTIE.recaps);
     expect(f.sortie!.recaps![0].date).toBe('2026-01-02');
   });
@@ -877,7 +857,7 @@ describe('sortie hidden nodes and veterans', () => {
     reveal(plain);
     expect(plain.map[1].every((n) => !n.hidden)).toBe(true);
     expect(plain.map[2].some((n) => n.hidden)).toBe(true);
-    Object.assign(plain, { screen: 'reward', offer: { boons: ['lantern'] } });
+    Object.assign(plain, { screen: 'reward', offer: { boons: [{ id: 'lantern', tier: 'Rare' }] } });
     pickBoon(plain, 0);
     expect(plain.map.flat().some((n) => n.hidden)).toBe(false);
   });
@@ -1057,7 +1037,7 @@ describe('sortie rematches, boon unlocks and last stands', () => {
       startCombat(run, book, i % 2 ? 'elite' : 'fight');
       run.combat!.over = 'won';
       leaveCombat(run);
-      for (const id of run.offer?.boons ?? []) expect(SORTIE.boonsAtStart.includes(id) || SORTIE_BOONS[id].curse).toBe(true);
+      for (const { id } of run.offer?.boons ?? []) expect(SORTIE.boonsAtStart.includes(id) || SORTIE_BOONS[id].curse).toBe(true);
       run.offer = undefined;
       run.screen = 'map';
     }

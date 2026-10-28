@@ -2,14 +2,14 @@ import { SHARD_TYPES, TRAINING } from '../downtimeData';
 import { affixHit } from './affixes';
 import { centreOf, dist, towers } from './board';
 import {
-  afflict, canAim, covered, dmgMul, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, levelDmg, reach, targetFor,
-  towerById, unsaved,
+  afflict, canAim, cardMul, dmgMul, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, levelDmg, reach, targetFor,
+  terrainHit, towerById, unsaved,
 } from './harm';
 import { lordHit } from './lords';
 import { hitChance, rand } from './rng';
 import type { Enemy, Tower, TowerGun, TowerSkill, TrainingRun } from './types';
 
-// Towers at work: volleys and OPR rolls, cover, statuses, dots, and taking the dead off. Holds are in holds.ts, timed
+// Towers at work: volleys and OPR rolls, statuses, dots, and taking the dead off. Holds are in holds.ts, timed
 // skills and auras in skills.ts; this module is the one the rest of the run imports.
 
 export { afflict, FX_COLOR, FX_TIME, hurt, levelDmg, partsOf, rangeCells, reach, targetFor, type Harm } from './harm';
@@ -23,10 +23,11 @@ function carried(s: TowerSkill, g: TowerGun): boolean {
   return !only || (only === 'melee') === g.melee;
 }
 
-/** How fast a tower attacks: level-ups, a frenzy, rate auras, a banner relic's rally, and a unit's initiative and
- *  Jumpy habit. */
+/** How fast a tower attacks: level-ups, a frenzy, rate auras, a banner relic's rally, a Kill chain, and a unit's
+ *  initiative and Jumpy habit. */
 export function rateOf(run: TrainingRun, t: Tower): number {
-  const base = (1 + t.boost.rate) * (1 + (t.rush && t.rush.left > 0 ? t.rush.mul : 0));
+  const chain = t.chain && t.chain.left > 0 ? t.chain.per * t.chain.stacks : 0;
+  const base = (1 + t.boost.rate) * (1 + (t.rush && t.rush.left > 0 ? t.rush.mul : 0)) * (1 + chain);
   if (!isUnit(t)) return base;
   const H = TRAINING.habits;
   const habit = Math.max(0.5, 1 + H.rate * t.init) * (t.jumpy && run.t < H.jumpySecs ? H.jumpyMul : 1);
@@ -34,21 +35,21 @@ export function rateOf(run: TrainingRun, t: Tower): number {
 }
 
 /**
- * One attack from one gun at the enemy it's aimed at: false if there's none in reach. Quality to hit (−1 for a shot at
- * an enemy in cover), a save on the enemy's Defense + AP, then damage: Deadly(X), levels and sixes, less armour.
+ * One attack from one gun at the enemy it's aimed at: false if there's none in reach. Quality to hit (a region quirk
+ * on a shot at an enemy in dangerous terrain), a save on the enemy's Defense + AP, then damage: Deadly(X), levels and sixes, less armour.
  * Rending (or a rend skill) makes a 6 to hit AP 4 and armour-piercing. `extra`: an attack a 6 gave.
  */
 export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): boolean {
   const target = targetFor(run, t, g);
   if (!target) return false;
   const c = centreOf(t);
-  // Region quirks change the cover penalty on a unit's shots (habits.ts coverMul).
-  const cover = covered(run, g, target) ? TRAINING.cover.hit * (isUnit(t) ? t.coverMul ?? 1 : 1) : 0;
+  // A region quirk changes a unit's shots at an Echo in dangerous terrain (habits.ts).
+  const ground = terrainHit(run, t, g, target);
   const d = dist(c.x, c.y, target.x, target.y);
   const far = !g.melee && isUnit(t) && t.myopic && d > reach(t, g) * TRAINING.habits.myopicFrom ? -1 : 0;
   // The Nexus: Shrouded, Ion Storm and a lord's Mirror Veil (affixes.ts, lords.ts).
   const nexus = affixHit(run, g, d, reach(t, g)) + lordHit(run, g, target);
-  const p = g.reliable ? hitChance(2, cover + nexus) : hitChance(t.quality, g.hitMod + (g.melee ? t.hitMelee : t.hitShoot) + t.boost.hit + cover + far + nexus);
+  const p = g.reliable ? hitChance(2, ground + nexus) : hitChance(t.quality, g.hitMod + (g.melee ? t.hitMelee : t.hitShoot) + t.boost.hit + ground + far + nexus);
   const r = rand(run);
   const miss = r >= p;
   // Where a shot lands is only for show, so it doesn't touch the run's dice.
@@ -58,7 +59,7 @@ export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): bo
     x1: c.x + (Math.random() - 0.5) * 0.7, y1: c.y + (Math.random() - 0.5) * 0.7,
     x2: target.x + Math.cos(a) * off, y2: target.y + Math.sin(a) * off,
     t: g.melee ? FX_TIME.melee : FX_TIME.shot, color: g.relic ? FX_COLOR.relic : g.melee ? FX_COLOR.melee : FX_COLOR.shot,
-    melee: g.melee, miss, blocked: miss && cover < 0,
+    melee: g.melee, miss,
   });
   if (miss) return true;
   const six = r < 1 / 6;
@@ -68,7 +69,7 @@ export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): bo
   const ap = rend ? Math.max(g.ap, 4) : g.ap;
   const how = g.melee ? 'melee' : 'shot';
   const raw = Math.max(1, g.deadly) + levelDmg(t, g) + (six && isUnit(t) && t.category === 'Elite' ? 1 : 0) + sixes.reduce((n, e) => n + (e.dmg ?? 0), 0);
-  const dmgTo = (e: Enemy) => Math.max(0.5, raw - (rend ? 0 : enemyDef(e).armor)) * dmgMul(t) * (e.flies ? g.air ?? 1 : 1);
+  const dmgTo = (e: Enemy) => Math.max(0.5, raw - (rend ? 0 : enemyDef(e).armor)) * dmgMul(t) * cardMul(run, t, e) * (e.flies ? g.air ?? 1 : 1);
   // Blast(X): the hit spills onto up to X−1 others close by, each saving on its own.
   const splash = g.blast > 1 ? enemiesNear(run, target.x, target.y, TRAINING.blastRadius).filter((o) => o !== target && canAim(g, o)).slice(0, g.blast - 1) : [];
   if (unsaved(run, target, ap)) {

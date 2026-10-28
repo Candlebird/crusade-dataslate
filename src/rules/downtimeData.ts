@@ -524,8 +524,8 @@ export const TRAINING = {
   /** A Hero's aura gives +1 to hit to every tower within this many cells of it, itself included. */
   auraRadius: 6,
   /** Every enemy has this many times its listed wounds (tuned with the balance bot, bot.balance.test.ts: a fresh sample force
-   *  reaches about wave 20-25). */
-  enemyHp: 0.16,
+   *  reaches about wave 18-23, as hard as the old waves with a fifth more wounds, since the players maze well). */
+  enemyHp: 0.2,
   /**
    * Holds: a crafted unit with Tough above 1 (not an Aircraft) grabs one walker in melee reach and holds it `perTough`
    * seconds per Tough, up to `max`; a boss or a monster is held `bigMul` as long. Let go, an enemy can't be grabbed
@@ -592,7 +592,7 @@ export const TRAINING = {
     overRate: 0.25,
     growth: 1.15,
     curve: 0.7,
-    crowd: 4,
+    crowd: 4.2,
     maxCount: 96,
     hpFrom: 4,
     hpTo: 20,
@@ -627,6 +627,9 @@ export const TRAINING = {
     eliteFrom: 6,
     eliteEvery: 6,
     eliteHp: 2,
+    /** A wide force's waves (waves.ts wideMul), from wave `fromWave`: `per` more budget for each unit that can train
+     *  past `from`, up to `max`. */
+    wide: { from: 3, per: 0.04, max: 8, fromWave: 4 },
   },
   /**
    * Default towers (emplacements.ts): generic emplacements any force can build from Shards of exactly these types and
@@ -667,15 +670,23 @@ export const TRAINING = {
    * more to flyers; a Firepower gun shoots only flyers and a Blast one only walkers (SHARD_TYPES `only`). `width` cells either side of a leg are drawn as the lane.
    */
   flightLane: { width: 1.5 },
-  /** Cover: `patches` (a range) of `size`×`size` patches laid out each run, `onRoute` of them centred on cells of the
-   * empty map's route. Cover never blocks building or walking; an enemy standing in it is at `hit` to be hit by shooting. */
-  cover: { patches: [6, 8] as [number, number], size: 3, onRoute: 0.7, hit: -1 },
+  /** Dangerous terrain: `patches` (a range) of `size`×`size` patches laid out each run, `onRoute` of them centred on
+   * cells of the empty map's route. It never blocks building or walking; an Echo walking through it is `slow` slower
+   * (an Echo Lord only `bossSlow`), and flyers pass over it. */
+  terrain: { patches: [6, 8] as [number, number], size: 3, onRoute: 0.7, slow: 0.25, bossSlow: 0.1 },
   /**
-   * Boon cards: when a boss dies, pick one of `offer` drawn, each one's rarity drawn with these odds (Legendary first).
-   * Numbers for the cards that need them: base HP a mend card adds, a bounty's share more credits, a hold card's longer
-   * holds (×) and longer re-grab (+ seconds), cover patches a sandbag card lays. (`every` is only for the rules text.)
+   * Boon cards (training/cards.ts): when a boss dies, pick one of `offer` drawn (never more), each one's rarity drawn with these odds (Legendary first). A card's rarity is its strength. (`every` is only
+   * for the rules text.)
    */
-  cards: { every: 5, offer: 3, odds: { Legendary: 0.1, Rare: 0.3 }, walls: 20, ramparts: 40, bounty: 0.25, holdMul: 1.5, regrabAdd: 1, patches: 2 },
+  cards: {
+    every: 5, offer: 3, odds: { Legendary: 0.1, Rare: 0.3 },
+    /** Pack tactics counts the other crafted units this near (centre to centre, so a diagonal neighbour counts). */
+    pack: { radius: 3 },
+    /** Kill chain: a kill's speed-up lasts this long, and stacks this many times. */
+    chain: { secs: 3, max: 5 },
+    /** Ace: its bonus counts once for every this many kills this run. */
+    ace: { per: 10 },
+  },
   /** Seconds in an ability round: an ability that comes back every 2 rounds comes back every 12 seconds. */
   abilityRound: 6,
   /** Seconds each status lasts once a hit leaves it. */
@@ -699,18 +710,15 @@ export const TRAINING = {
   /** A field's slow or daze lingers this many seconds after an enemy leaves it. */
   fieldLinger: 0.5,
   /**
-   * Sortie quirks and trinkets count here too (habits.ts): each point of initiative attacks `rate` faster; Jumpy attacks
+   * Sortie quirks count here too (habits.ts): each point of initiative attacks `rate` faster; Jumpy attacks
    * at `jumpyMul` for the first `jumpySecs` of a wave; Short-sighted is -1 to hit past `myopicFrom` of a gun's reach.
    * Morale becomes hold time: Steady holds `steady` longer, Shaky `shaky`; wounds become Tough: Hardy `hardy`, Frail
-   * `frail` (never below 1). A region quirk is about cover: `native` times the cover penalty on its shots (none),
-   * `haunted` times (twice). A trinket's Defense holds `def` longer a point, its morale `morale` a point, its stress
-   * `stress` longer for each share of stress it takes off (shorter for each it adds), and its wounds are Tough at `hp`
-   * a wound, rounded away from nothing.
+   * `frail` (never below 1). A region quirk is about dangerous terrain: shots at an Echo in it are at `native` to hit
+   * (it knows the ground), or `haunted`.
    */
   habits: {
     rate: 0.1, jumpySecs: 5, jumpyMul: 0.6, myopicFrom: 2 / 3,
-    steady: 0.1, shaky: -0.1, hardy: 1, frail: -1, native: 0, haunted: 2,
-    trinket: { def: 0.15, morale: 0.05, stress: 0.2, hp: 0.5 },
+    steady: 0.1, shaky: -0.1, hardy: 1, frail: -1, native: 1, haunted: -1,
   },
   /**
    * Shards. Each build phase `draw` are drawn, each of a random type and grade, the grade by the odds for the luck level
@@ -823,12 +831,11 @@ export const TRAINING = {
     bleed: { mul: 2 },
   },
   /**
-   * The Sortie layer shared with Training (quirks.ts, bestiary.ts, trinkets.ts, nemesis.ts). Quirks: a run reaching
+   * The Sortie layer shared with Training (quirks.ts, bestiary.ts, nemesis.ts). Quirks: a run reaching
    * wave `goodFrom` gives its MVP a good quirk `good` of the time, picked by what it did most (`goods`: shots, blows or
    * holds, a hold counting as `holdDmg` damage; the first it hasn't got); a crafted unit a boss walked past in its
    * reach without taking a hit from it picks up a bad one (`bads`, the same way) `bad` of the time. Bestiary: each
-   * Training kind counts as this Echo of the Sortie bestiary. Trinkets: a boss kill offers a trinket as a 4th card
-   * (of `trinkets.rarity`) `trinkets.odds` of the time, until one is offered (one a run). Nemesis: see `nemesis`.
+   * Training kind counts as this Echo of the Sortie bestiary. Nemesis: see `nemesis`.
    */
   shared: {
     quirks: {
@@ -840,7 +847,6 @@ export const TRAINING = {
       swarm: 'Fang Swarms', drone: 'Scourges', spitter: 'Spectres', outrider: 'Shadow Hounds', carapace: 'Reapers',
       mirror: 'Phantoms', stalker: 'Fiends', brute: 'Butchers', lord: 'Terror Beast',
     } as Record<TrainingEnemyKind, string>,
-    trinkets: { odds: 0.35, rarity: 'Rare' as 'Common' | 'Rare' | 'Legendary' },
     /**
      * A force's Sortie nemesis (the lord with the biggest grudge) is the boss of wave `wave`: `hp` more wounds per grudge
      * level, and its tricks. Rage: walks `rage.per` faster a second it lives, up to `rage.max`. Dive: every `dive.every`
@@ -971,19 +977,19 @@ export const TRAINING = {
    * `luckAtStart` and draws boss cards only from `cardsAtStart`; each goal reached (in any order)
    * unlocks a luck level, a card group, or a level of a small run perk. Perks, a level each: `purse` more starting
    * credits, `mend` more HP a base mend, `reroll` card offers re-drawn a run, `thrift` off the price of luck (a share),
-   * `offer` more cards on offer (a draft is always TRAINING.shards.draw: no perk changes it); thrift never takes more than `thriftMax` off. Goals count
+   * (a draft is always TRAINING.shards.draw and a card offer always TRAINING.cards.offer: no perk changes them); thrift never takes more than `thriftMax` off. Goals count
    * over every run (drill.ts goalText).
    */
   drill: {
     luckAtStart: 5,
-    cardsAtStart: ['aim', 'whet', 'grip', 'walls', 'supply', 'rapid', 'promote', 'ramparts', 'heroes'],
+    cardsAtStart: ['whet', 'aim', 'barrels', 'grip', 'promote', 'rapid', 'bounty', 'heroes'],
     groups: {
-      fieldcraft: { name: 'Fieldcraft cards', cards: ['sandbags', 'spotter', 'bounty'] },
-      hold: { name: 'Hold-fast cards', cards: ['nets', 'thirst', 'chains', 'line'] },
-      support: { name: 'Support cards', cards: ['medic', 'drill', 'banner'] },
-      fury: { name: 'Fury cards', cards: ['trance', 'uplink'] },
+      fieldcraft: { name: 'Fieldcraft cards', cards: ['spotter', 'ap', 'blast'] },
+      hold: { name: 'Hold-fast cards', cards: ['nets', 'thirst', 'snare', 'crossfire'] },
+      support: { name: 'Support cards', cards: ['medic', 'drill', 'banner', 'pack'] },
+      fury: { name: 'Fury cards', cards: ['trance', 'uplink', 'deadly', 'chain', 'ace'] },
     } as Record<string, { name: string; cards: string[] }>,
-    perks: { purse: 10, mend: 8, reroll: 1, thrift: 0.1, offer: 1 },
+    perks: { purse: 10, mend: 8, reroll: 1, thrift: 0.1 },
     thriftMax: 0.9,
     goals: [
       { goal: 'runs', n: 1, unlock: { cards: 'fieldcraft' } },
@@ -1002,12 +1008,12 @@ export const TRAINING = {
       { goal: 'titles', n: 2, unlock: { perk: 'reroll' } },
       { goal: 'runs', n: 10, unlock: { perk: 'purse' } },
       { goal: 'sieges', n: 3, unlock: { perk: 'thrift' } },
-      { goal: 'lore', n: 6, unlock: { perk: 'offer' } },
+      { goal: 'lore', n: 6, unlock: { perk: 'reroll' } },
       { goal: 'clean', n: 12, unlock: { perk: 'mend' } },
       { goal: 'kills', n: 16000, unlock: { perk: 'purse' } },
       { goal: 'lords', n: 4, unlock: { perk: 'thrift' } },
       { goal: 'bosses', n: 25, unlock: { luck: 9 } },
-      { goal: 'final', n: 25, unlock: { perk: 'offer' } },
+      { goal: 'final', n: 25, unlock: { perk: 'reroll' } },
       { goal: 'final', n: 30, unlock: { luck: 10 } },
       { goal: 'final', n: 35, unlock: { perk: 'purse' } },
       { goal: 'final', n: 50, unlock: { perk: 'reroll' } },
@@ -1041,6 +1047,7 @@ export const TRAINING = {
    * `bossHp[N]` times the wounds a boss of its wave has; a ward or mending that goes by its wounds (Shield, Regeneration) is
    * `trick` as much, or the Crisis lord would be a wall. A Weekly Siege's Final is `from`: a lone Echo Lord of
    * `siegeHp` wounds and no escorts, the attempt over when it reaches the base; its score is the damage dealt to it.
+   * It walks `siegeSpeed` as fast as a lord, and dangerous terrain never slows it.
    */
   finale: {
     from: 25,
@@ -1061,6 +1068,7 @@ export const TRAINING = {
     bossHp: { 25: 0.5, 30: 0.8, 35: 1.4, 40: 4, 45: 3, 50: 3 } as Record<number, number>,
     trick: 0.3,
     siegeHp: 9_999_999,
+    siegeSpeed: 1.25,
   },
   /** A force's power (squadPower, which Sorties scale by too): its points, with each veteran level adding this share. */
   levelPower: 0.05,
@@ -1074,7 +1082,7 @@ export const TRAINING = {
 /** What a Drill Honour counts (training/drill.ts drillProgress). */
 export type DrillGoal = 'runs' | 'best' | 'kills' | 'bosses' | 'lords' | 'clean' | 'crafted' | 'titles' | 'lore' | 'sieges' | 'final';
 /** A small run option a Drill Honour unlocks a level of (TRAINING.drill.perks). */
-export type DrillPerk = 'purse' | 'mend' | 'reroll' | 'thrift' | 'offer';
+export type DrillPerk = 'purse' | 'mend' | 'reroll' | 'thrift';
 /** What a Drill Honour unlocks: a luck level, a card group (TRAINING.drill.groups) or a perk level. */
 export type DrillUnlock = { luck: number } | { cards: string } | { perk: DrillPerk };
 
@@ -1214,34 +1222,6 @@ export const SORTIE_QUIRKS: Record<string, { name: string; text: string; good: b
   frail: { name: 'Frail', text: '-2 wounds on each model.', good: false, foe: 'hardy' },
 };
 
-/** Sortie trinkets: each with a gain and a cost, one to a unit; they count on a Sortie and in Training. `init`, `morale`,
- * `melee`, `shoot` and `def` add to initiative, morale tests, hitting and Defense; `hp` to each model's wounds; `stress`
- * multiplies the stress the unit takes. */
-export interface SortieTrinket {
-  name: string;
-  text: string;
-  init?: number;
-  morale?: number;
-  melee?: number;
-  shoot?: number;
-  def?: number;
-  hp?: number;
-  stress?: number;
-}
-
-export const SORTIE_TRINKETS: Record<string, SortieTrinket> = {
-  spurs: { name: 'Rusted Spurs', text: '+1 initiative, -1 to morale tests.', init: 1, morale: -1 },
-  charm: { name: 'Bone Charm', text: '+1 to morale tests, -1 initiative.', morale: 1, init: -1 },
-  lens: { name: 'Cracked Lens', text: '+1 to hit when shooting, -1 in melee.', shoot: 1, melee: -1 },
-  knuckles: { name: 'Spiked Knuckles', text: '+1 to hit in melee, -1 when shooting.', melee: 1, shoot: -1 },
-  plate: { name: 'Salvaged Plate', text: '+1 Defense, -1 initiative.', def: 1, init: -1 },
-  flask: { name: 'Calming Flask', text: 'Half the stress, but -1 wound on each model.', stress: 0.5, hp: -1 },
-  idol: { name: 'Hungry Idol', text: '+2 wounds on each model, but half again the stress.', hp: 2, stress: 1.5 },
-  mask: { name: 'Mourning Mask', text: 'Half the stress, but -1 to hit when shooting.', stress: 0.5, shoot: -1 },
-  shroud: { name: 'Echo Shroud', text: '+1 Defense, but half again the stress.', def: 1, stress: 1.5 },
-  totem: { name: 'War Totem', text: '+1 to hit in melee and +1 initiative, but -2 wounds on each model.', melee: 1, init: 1, hp: -2 },
-};
-
 export const SORTIE = {
   /** Rows of the map before the boss (the last of them all camps); each row holds up to `width` nodes. */
   rows: { short: 5, long: 8 },
@@ -1273,8 +1253,8 @@ export const SORTIE = {
   ranges: [[12, 1], [24, 2], [36, 3], [999, 4]] as [number, number][],
   /** How likely an Echo shot is to pick each slot, Front to Back. */
   aim: [3, 2, 1],
-  /** The chance each boon offered is a rare one (an elite always offers one). */
-  rareChance: 0.2,
+  /** Each boon offered draws its rarity with these odds (Legendary first, the rest Common); an elite always offers a Rare or better. */
+  boonOdds: { Legendary: 0.1, Rare: 0.3 },
   ranks: 3,
   /** Initiative is a d6 a model, +`fast` for Fast or Flying, −`slow` for Slow (or slowed). */
   fast: 2,
@@ -1317,8 +1297,8 @@ export const SORTIE = {
   /** Node kinds by chance, rows 1 on (row 0 is all fights, the last row all camps). Elites only from 40% of the way in.
    * A camp, encounter, cache or shop never leads to another one. */
   odds: { fight: 0.42, elite: 0.15, camp: 0.11, shrine: 0.21, cache: 0.05, shop: 0.06 },
-  /** Supply prices at a shop (for a common or rare boon, and a heal of `healShare`), on any run. */
-  shop: { boon: 10, rare: 18, heal: 8, healShare: 0.4, boons: 3 },
+  /** Supply prices at a shop (for a boon by its rarity, and a heal of `healShare`), on any run. */
+  shop: { price: { Common: 10, Rare: 18, Legendary: 28 }, heal: 8, healShare: 0.4, boons: 3 },
   /** How a pick of the next encounter weighs a thread's next step, a region's own encounter and a common one. */
   storyWeight: { next: 12, region: 3, common: 1 },
   /** At most this share of the Echo lord's wounds can be taken by story choices before the fight. */
@@ -1362,8 +1342,6 @@ export const SORTIE = {
    * fights wild at -1 to hit, and comes back down to `after`.
    */
   stress: { max: 10, after: 5, wounds: 6, shaken: 1, lost: 3, fail: 2, hurt: 1, won: 1, camp: 6, patch: 3, refuse: 0.5 },
-  /** Trinkets drop from an elite won (`elite`), a cache (`cache`) and a choice that pays off (`event`). */
-  trinkets: { elite: 0.5, cache: 0.25, event: 0.15, spares: 12 },
   /** The weekly challenge: one seed a week, the same region, lord and map for every force, at this tier and length.
    * Its score is `depth` per node, `won` per fight won, `boss` for the lord and `alive` per unit still standing. */
   weekly: { tier: 1, length: 'long' as const, depth: 10, won: 5, boss: 50, alive: 10, weeks: 4 },
@@ -1423,7 +1401,7 @@ export const SORTIE = {
   },
   /** Boons a force's parties are offered from the start; the rest unlock one by one as its runs reach `unlocks` goals.
    * Curses are always on offer, and the weekly challenge offers every boon. */
-  boonsAtStart: ['scope', 'blades', 'bayonets', 'medic', 'drill', 'trophy', 'stims', 'wall', 'relay', 'spotter', 'dressing', 'grit'] as string[],
+  boonsAtStart: ['scope', 'blades', 'bayonets', 'medic', 'drill', 'trophy', 'stims', 'wall', 'relay', 'dressing', 'grit', 'veteran', 'holdline'] as string[],
   unlocks: {
     rally: { goal: 'runs', n: 2 },
     salvo: { goal: 'wins', n: 1 },
@@ -1437,6 +1415,12 @@ export const SORTIE = {
     scavenge: { goal: 'deepest', n: 7 },
     packs: { goal: 'deep', n: 1 },
     rounds: { goal: 'relics', n: 2 },
+    signature: { goal: 'wins', n: 3 },
+    bodyguard: { goal: 'runs', n: 2 },
+    hunter: { goal: 'lords', n: 2 },
+    rotation: { goal: 'runs', n: 4 },
+    momentum: { goal: 'flawless', n: 1 },
+    pinning: { goal: 'beasts', n: 8 },
   } as Record<string, { goal: SortieGoal; n: number }>,
   /** Ascension, past the top tier: each level adds the next curse in order, and pays `pay` more. */
   ascension: {
@@ -1470,48 +1454,74 @@ export type SortieMode = 'free' | 'shard';
 export type SortieLength = 'short' | 'long';
 
 export type SortieBoonId = 'scope' | 'blades' | 'ward' | 'medic' | 'drill' | 'cells' | 'packs' | 'hide' | 'trophy' | 'banner' | 'bayonets' | 'stims'
-  | 'wall' | 'relay' | 'spotter' | 'dressing' | 'salvo' | 'grit' | 'rally' | 'rounds' | 'scavenge'
-  | 'pact' | 'fury' | 'adrenal' | 'hymn' | 'respite' | 'lantern';
+  | 'wall' | 'relay' | 'dressing' | 'salvo' | 'grit' | 'rally' | 'rounds' | 'scavenge'
+  | 'pact' | 'fury' | 'adrenal' | 'hymn' | 'respite' | 'lantern'
+  | 'veteran' | 'signature' | 'bodyguard' | 'hunter' | 'holdline' | 'rotation' | 'momentum' | 'pinning';
 
+export type SortieBoonTier = 'Common' | 'Rare' | 'Legendary';
+export const BOON_TIERS: SortieBoonTier[] = ['Common', 'Rare', 'Legendary'];
+
+/**
+ * Sortie boons. Each comes at one or more rarities, each stronger than the last, in OPR's own steps: whole-number stats
+ * go up by 1 a rarity, to-hit and Defense go re-roll 1s (Common), +1 (Rare), +1 and re-roll 1s (Legendary), and the rest
+ * reach further (one unit, a slot, the party). A party holds a boon once; it can turn up again only at a higher rarity,
+ * and taking it then upgrades it. A curse has the one strength.
+ */
 export const SORTIE_BOONS: Record<SortieBoonId, {
   name: string;
-  text: string;
+  /** What it does at each rarity it comes at. */
+  tiers: Partial<Record<SortieBoonTier, string>>;
   ranged?: boolean;
   melee?: boolean;
   shard?: boolean;
-  /** Turns up less often; an elite always offers one. */
-  rare?: boolean;
+  /** Goes to one unit of the party (picked at random among those it suits), and stays with it for the run. */
+  unit?: boolean;
   /** Strong with a cost, and only ever from a shrine. */
   curse?: boolean;
 }> = {
-  scope: { name: 'Targeting Scope', text: '+1 to hit when shooting at Far range.', ranged: true },
-  cells: { rare: true, name: 'Overcharged Cells', text: 'Every ranged weapon reaches one step further.', ranged: true },
-  blades: { name: 'Honed Blades', text: 'Melee weapons get +1 AP.', melee: true },
-  bayonets: { name: 'Bayonets', text: 'Every model makes 1 more melee attack.' },
-  packs: { rare: true, name: 'Jump Packs', text: 'Charge reaches Far range.', melee: true },
-  ward: { rare: true, name: 'Echo-Ward', text: '+1 Defense in the first round of every fight.' },
-  medic: { name: 'Field Medic', text: 'After each fight, one fallen model gets back up with a little health (or the most hurt mends some).' },
-  drill: { name: 'Battle Drill', text: '+1 initiative for every model.' },
-  hide: { rare: true, name: 'Thick Hide', text: 'Every model gets +1 Tough.' },
-  trophy: { name: 'Echo Trophy', text: 'Every Echo a unit kills mends 1 wound on that unit.' },
-  banner: { rare: true, name: 'Tattered Banner', text: 'Every unit starts each fight with a shield of 1 wound per model standing.' },
-  stims: { name: 'Combat Stims', text: '+1 to every morale test.' },
-  wall: { name: 'Shield Wall', text: 'The Front unit gets +1 Defense.' },
-  relay: { name: 'Vox Relay', text: 'The Middle unit gets +1 to hit.' },
-  spotter: { name: 'Spotter Drone', text: "The Back unit's guns reach one step further.", ranged: true },
-  dressing: { name: 'Field Dressing', text: "When the line turns, the unit falling back from the Front mends a sixth of each model's wounds." },
-  salvo: { rare: true, name: 'Opening Salvo', text: '+1 to hit in the first round of every fight.' },
-  grit: { name: 'Grit', text: 'Models down to half their wounds or less get +1 Defense.' },
-  rally: { name: 'Rally Cry', text: 'At the start of every round, shaken models steady.' },
-  rounds: { rare: true, name: 'Rending Rounds', text: 'Ranged weapons get Rending (a 6 to hit gets AP(4)).', ranged: true },
-  pact: { curse: true, name: 'Void Pact', text: '+1 to hit with everything, but every fight opens with each model losing a sixth of its wounds (never the last).' },
-  fury: { curse: true, name: 'Berserk Rite', text: 'Melee weapons get +2 AP, but every unit has -1 Defense.', melee: true },
-  adrenal: { curse: true, name: 'Adrenal Surge', text: '+2 initiative for every model, but -1 to every morale test.' },
-  hymn: { name: 'Battle Hymn', text: 'The party takes half the stress.' },
-  respite: { name: 'Brief Respite', text: 'Every fight won takes 2 more stress off each unit.' },
-  lantern: { name: 'Pathfinder’s Lantern', text: 'Shows every hidden node on the map, and the party sees a step further ahead.' },
-  scavenge: { name: 'Scavenger', text: 'Every fight won adds half again to the haul.', shard: true },
+  scope: { name: 'Targeting Scope', ranged: true, tiers: { Common: 'Re-roll 1s to hit when shooting at Far range.', Rare: '+1 to hit when shooting at Far range.', Legendary: '+1 to hit and re-roll 1s when shooting at Far range.' } },
+  cells: { name: 'Overcharged Cells', ranged: true, tiers: { Common: "The Back unit's guns reach one step further.", Rare: "The Back and Middle units' guns reach one step further.", Legendary: 'Every ranged weapon reaches one step further.' } },
+  rounds: { name: 'Rending Rounds', ranged: true, tiers: { Common: "The Back unit's guns get Rending (a 6 to hit gets AP(4)).", Rare: 'Ranged weapons get Rending (a 6 to hit gets AP(4)).', Legendary: 'Ranged weapons get Rending on a 5 or 6 to hit.' } },
+  salvo: { name: 'Opening Salvo', tiers: { Common: 'Re-roll 1s to hit in the first round of every fight.', Rare: '+1 to hit in the first round of every fight.', Legendary: '+1 to hit in the first two rounds of every fight.' } },
+  relay: { name: 'Vox Relay', tiers: { Common: 'The Middle unit re-rolls 1s to hit.', Rare: 'The Middle unit gets +1 to hit.', Legendary: 'The Middle and Back units get +1 to hit.' } },
+  blades: { name: 'Honed Blades', melee: true, tiers: { Common: 'Melee weapons get +1 AP.', Rare: 'Melee weapons get +2 AP.', Legendary: 'Melee weapons get +3 AP.' } },
+  bayonets: { name: 'Bayonets', tiers: { Common: 'Every model makes 1 more melee attack.', Rare: 'Every model makes 1 more melee attack, and re-rolls 1s to hit in melee.', Legendary: 'Every model makes 2 more melee attacks.' } },
+  packs: { name: 'Jump Packs', melee: true, tiers: { Common: 'Charge reaches Far range.', Rare: 'Charge reaches Far range, and a unit gets +1 to hit in the round it charges.', Legendary: 'Charge reaches Far range, and a unit gets +1 to hit and re-rolls 1s in the round it charges.' } },
+  ward: { name: 'Echo-Ward', tiers: { Common: 'Re-roll saves of 1 in the first round of every fight.', Rare: '+1 Defense in the first round of every fight.', Legendary: '+1 Defense in the first two rounds of every fight.' } },
+  wall: { name: 'Shield Wall', tiers: { Common: 'The Front unit re-rolls saves of 1.', Rare: 'The Front unit gets +1 Defense.', Legendary: 'The Front and Middle units get +1 Defense.' } },
+  grit: { name: 'Grit', tiers: { Common: 'Models down to half their wounds or less re-roll saves of 1.', Rare: 'Models down to half their wounds or less get +1 Defense.', Legendary: 'Models down to half their wounds or less get +2 Defense.' } },
+  hide: { name: 'Thick Hide', tiers: { Common: 'Every model gets +1 Tough.', Rare: 'Every model gets +2 Tough.', Legendary: 'Every model gets +3 Tough.' } },
+  banner: { name: 'Tattered Banner', tiers: { Common: 'Every unit starts each fight with a shield of 1 wound per model standing.', Rare: 'Every unit starts each fight with a shield of 2 wounds per model standing.', Legendary: 'Every unit starts each fight with a shield of 3 wounds per model standing.' } },
+  drill: { name: 'Battle Drill', tiers: { Common: '+1 initiative for every model.', Rare: '+2 initiative for every model.', Legendary: '+3 initiative for every model.' } },
+  stims: { name: 'Combat Stims', tiers: { Common: '+1 to every morale test.', Rare: '+2 to every morale test.', Legendary: 'The party never fails a morale test.' } },
+  rally: { name: 'Rally Cry', tiers: { Common: "At the start of every round, the Front unit's shaken models steady.", Rare: 'At the start of every round, shaken models steady.', Legendary: 'At the start of every round, shaken models steady, and a unit that steadies gets +1 to hit that round.' } },
+  medic: { name: 'Field Medic', tiers: { Common: 'After each fight, one fallen model gets back up with a little health (or the most hurt mends some).', Rare: 'After each fight, two fallen models get back up with a little health (or the most hurt mend some).', Legendary: 'After each fight, two fallen models get back up, and every model standing mends a sixth of its wounds.' } },
+  trophy: { name: 'Echo Trophy', tiers: { Common: 'Every Echo a unit kills mends 1 wound on that unit.', Rare: 'Every Echo a unit kills mends 2 wounds on that unit.', Legendary: 'Every Echo a unit kills mends 3 wounds on that unit.' } },
+  dressing: { name: 'Field Dressing', tiers: { Common: "When the line turns, the unit falling back from the Front mends a sixth of each model's wounds.", Rare: "When the line turns, the unit falling back from the Front mends a quarter of each model's wounds.", Legendary: "When the line turns, the unit falling back from the Front mends a third of each model's wounds." } },
+  hymn: { name: 'Battle Hymn', tiers: { Common: 'The party takes a quarter less stress.', Rare: 'The party takes half the stress.', Legendary: 'The party takes a quarter of the stress.' } },
+  respite: { name: 'Brief Respite', tiers: { Common: 'Every fight won takes 2 more stress off each unit.', Rare: 'Every fight won takes 3 more stress off each unit.', Legendary: 'Every fight won takes 4 more stress off each unit.' } },
+  lantern: { name: 'Pathfinder’s Lantern', tiers: { Rare: 'Shows every hidden node on the map, and the party sees a step further ahead.' } },
+  scavenge: { name: 'Scavenger', shard: true, tiers: { Common: 'Every fight won adds a quarter to the haul.', Rare: 'Every fight won adds half again to the haul.', Legendary: 'Every fight won doubles the haul.' } },
+  veteran: { name: 'Veteran’s Mark', unit: true, tiers: { Common: 're-rolls 1s to hit.', Rare: 'gets +1 to hit.', Legendary: 'gets +1 to hit and re-rolls 1s.' } },
+  signature: { name: 'Signature Weapon', unit: true, tiers: { Common: 'its best weapon gets +1 AP.', Rare: 'its best weapon gets +1 AP and +1 attack.', Legendary: 'its best weapon gets +2 AP and +1 attack.' } },
+  bodyguard: { name: 'Bodyguard', unit: true, tiers: { Common: 'gets +1 Tough while at the Front.', Rare: 'gets +2 Tough and re-rolls saves of 1 while at the Front.', Legendary: 'gets +2 Tough and +1 Defense while at the Front.' } },
+  hunter: { name: 'Lord-Hunter', unit: true, tiers: { Common: '+1 AP against elites and lords.', Rare: '+1 to hit and +1 AP against elites and lords.', Legendary: '+1 to hit and +2 AP against elites and lords.' } },
+  holdline: { name: 'Hold the Line', tiers: { Common: 'When an Echo charges the Front unit, the Front unit strikes first.', Rare: 'When an Echo charges the Front unit, the Front unit strikes first, at +1 to hit.', Legendary: 'When an Echo charges the Front unit, the Front unit strikes first at +1 to hit, and re-rolls saves of 1 against the charge.' } },
+  rotation: { name: 'Rotation Drill', tiers: { Common: 'A unit that steps up to the Front re-rolls 1s to hit that round.', Rare: 'A unit that steps up to the Front gets +1 to hit that round.', Legendary: 'A unit that steps up to the Front gets +1 to hit and +1 Defense that round.' } },
+  momentum: { name: 'Momentum', tiers: { Common: 'Every fight won in a row with no model lost gives +1 initiative, up to +2.', Rare: 'Every fight won in a row with no model lost gives +1 initiative, up to +3.', Legendary: 'Every fight won in a row with no model lost gives +1 initiative, up to +4.' } },
+  pinning: { name: 'Pinning Fire', ranged: true, tiers: { Common: 'A shot that wounds on a 6 to hit leaves its target slowed for a round.', Rare: 'Any shot that wounds leaves its target slowed for a round.', Legendary: 'Any shot that wounds leaves its target slowed for two rounds.' } },
+  pact: { curse: true, name: 'Void Pact', tiers: { Common: '+1 to hit with everything, but every fight opens with each model losing a sixth of its wounds (never the last).' } },
+  fury: { curse: true, name: 'Berserk Rite', melee: true, tiers: { Common: 'Melee weapons get +2 AP, but every unit has -1 Defense.' } },
+  adrenal: { curse: true, name: 'Adrenal Surge', tiers: { Common: '+3 initiative for every model, but -1 to every morale test.' } },
 };
+
+/** What a boon does at a rarity (its lowest, if it doesn't come at that one); a unit boon's text names the unit. */
+export function boonText(id: SortieBoonId, tier?: SortieBoonTier, unit?: string): string {
+  const b = SORTIE_BOONS[id];
+  if (!b) return '';
+  const t = (tier && b.tiers[tier]) || Object.values(b.tiers)[0] || '';
+  return b.unit ? `${unit ?? 'One unit'}: ${t}` : t;
+}
 
 /** What a shrine choice does. A chance rolls once; `fail` happens instead when it misses. */
 export interface SortieOutcome {

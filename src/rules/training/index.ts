@@ -18,7 +18,6 @@ export * from './tally';
 export * from './nemesis';
 export * from './quirks';
 export * from './bestiary';
-export * from './trinkets';
 export * from './shared';
 export * from './nexus';
 export * from './lordPick';

@@ -201,7 +201,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   /** Auto on marks the run for good (it banks nothing from then on); off hands it back between moves. */
   const toggleAuto = () => {
     if (!auto && !run.auto) {
-      if (!confirmAction('Auto (debug): the bot plays this run for you. A run that used Auto banks nothing from here on: no XP, records, titles, quirks, trinkets, honours, bestiary or siege score. Turn it on?')) return;
+      if (!confirmAction('Auto (debug): the bot plays this run for you. A run that used Auto banks nothing from here on: no XP, records, titles, quirks, honours, bestiary or siege score. Turn it on?')) return;
       run.auto = true;
       refresh();
     }

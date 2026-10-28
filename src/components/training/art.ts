@@ -26,7 +26,7 @@ export const shardColor = (type: ShardType): string => SHARD_HUE[type] ?? SHARD_
 
 export const RUBBLE_ICON: IconName = 'g:stone-pile';
 export const BASE_ICON: IconName = 'g:castle';
-/** Cover patches alternate between brush and ruins (by where they lie, so a patch keeps its look). */
+/** Dangerous terrain alternates between thorn brush and ruins (by where it lies, so a patch keeps its look). */
 export const COVER_ICONS: IconName[] = ['g:berry-bush', 'g:ancient-ruins'];
 
 /** Mix a hex colour toward grey for low grades: grade 1 is mostly grey, grade 5 the full colour, a little lighter. */

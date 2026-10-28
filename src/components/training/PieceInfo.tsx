@@ -30,7 +30,7 @@ function gunLine(t: Tower, g: TowerGun): string {
   return `${g.name}: ${r1(g.attacks)} attack${g.attacks === 1 ? '' : 's'}, ${g.melee ? 'melee' : `${r1(reach(t, g))} cells`}, ${dmg} dmg${rules ? ` · ${rules}` : ''}${air}${only}`;
 }
 
-/** What the selected piece is: a crafted unit's weapons, skills, record, Sortie quirks and trinket, relics and tally, a
+/** What the selected piece is: a crafted unit's weapons, skills, record, Sortie quirks, relics and tally, a
  *  default tower's Shards, or a Shard's type and grade. */
 export function PieceInfo({ run, piece, record, onClose, onChange, onMove }: PieceInfoProps) {
   if (piece.kind === 'rubble') return null;

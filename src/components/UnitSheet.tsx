@@ -40,7 +40,7 @@ import {
 } from '../rules/engine';
 import { nexusAccess } from '../rules/nexus';
 import { unitName } from '../rules/battle';
-import { quirkInfo, trinketInfo } from '../rules/sortie';
+import { quirkInfo } from '../rules/sortie';
 import { pickTitle } from '../rules/training/titles';
 import { UnitRecord } from './training/UnitRecord';
 import { unitBookUrl } from '../armyforge/book';
@@ -83,23 +83,6 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
   if (!f || !u) return <div className="panel empty">Unit not found. <a href={href.forces()}>Back to forces</a></div>;
 
   const set = (fn: (d: Unit) => void) => updateUnit(f.id, u.id, fn);
-  /** Equip a spare trinket (or '-' to take it off): the one it had goes back to the spares. */
-  const equipTrinket = (id: string) => {
-    if (!id) return;
-    updateForce(f.id, (fd) => {
-      const d = fd.units.find((x) => x.id === u.id);
-      if (!d) return;
-      const spares = [...(fd.sortie?.trinkets ?? [])];
-      if (id !== '-') {
-        const i = spares.indexOf(id);
-        if (i < 0) return;
-        spares.splice(i, 1);
-      }
-      if (d.trinket) spares.push(d.trinket);
-      d.trinket = id === '-' ? undefined : id;
-      (fd.sortie ??= {}).trinkets = spares;
-    });
-  };
   const s = state.settings;
   const bookUrl = unitBookUrl(u, state.books);
   const issues = validateUnit(u);
@@ -529,28 +512,6 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                     </div>
                   ) : null;
                 })}
-              </Panel>
-            ) : null}
-            {u.trinket || f.sortie?.trinkets?.length ? (
-              <Panel id="unit.trinket" title="Sortie trinket" h={3}>
-                <p className="muted small" style={{ marginTop: 0 }}>1 per unit, found on Sorties. Each has a trade-off. It applies on Sorties and in Training, except its morale or stress effects.</p>
-                {u.trinket && trinketInfo(u.trinket) && (
-                  <div className="list-item">
-                    <div className="grow">
-                      <b>{trinketInfo(u.trinket)!.name}</b>
-                      <div className="muted small">{trinketInfo(u.trinket)!.text}</div>
-                    </div>
-                  </div>
-                )}
-                {edit && (
-                  <select value="" onChange={(e) => equipTrinket(e.target.value)}>
-                    <option value="">{u.trinket ? 'Swap or take off…' : 'Equip a spare…'}</option>
-                    {u.trinket && <option value="-">Take it off</option>}
-                    {[...new Set(f.sortie?.trinkets ?? [])].map((t) => (
-                      <option key={t} value={t}>{trinketInfo(t)?.name ?? t}: {trinketInfo(t)?.text}</option>
-                    ))}
-                  </select>
-                )}
               </Panel>
             ) : null}
           </div>

@@ -9,15 +9,16 @@ import { unitName } from '../rules/battle';
 import { levelForXp } from '../rules/engine';
 import { echoesBook } from '../rules/echoForce';
 import { raiderPool } from '../rules/raiders';
+import { TIER_TAG } from './training/CardOffer';
 import { applySortie, offTableKey, offTableLeft, postWeekly, weekBoard } from '../rules/downtime';
 import { partyProblem, sortieProblem, sortieScout, startSortie } from '../rules/tasks';
-import { SORTIE, SORTIE_BOONS, type SortieLength, type SortieMarkId, type SortieMode } from '../rules/downtimeData';
+import { SORTIE, SORTIE_BOONS, BOON_TIERS, boonText, type SortieBoonTier, type SortieLength, type SortieMarkId, type SortieMode } from '../rules/downtimeData';
 import {
   active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, startRound, nextTurn, braceFor, omensRead, sigWeaker,
   isFort, keepsHaul, leaveCombat, leaveEvent, memberName, memberUp, nextSlots, onField, patchUp, pickBoon, quitRun, distOf, DISTANCES, reachText, reachable, runXp, skillProblem,
-  skillTargets, skillsOf, slotOf, SLOTS, trinketInfo, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
-  ambushOdds, beastInfo, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons,
-  type SortieFx, type SortieIntentKind, type SortieModel, type SortieNode, type SortieNodeKind, type SortieRun, type SortieSkill, type SortieSkillKind, type SortieSquad,
+  skillTargets, skillsOf, slotOf, SLOTS, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
+  ambushOdds, beastInfo, boonDrawText, boonLabel, heldBoon, isUpgrade, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons,
+  type SortieBoonDraw, type SortieFx, type SortieIntentKind, type SortieModel, type SortieNode, type SortieNodeKind, type SortieRun, type SortieSkill, type SortieSkillKind, type SortieSquad,
 } from '../rules/sortie';
 import { SORTIE_BOSSES, SORTIE_REGIONS, type SortieSignature } from '../rules/sortieStory';
 import { Modal, confirmAction, toast } from './ui';
@@ -479,12 +480,6 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
           {force.sortieBest ? <p className="muted small" style={{ margin: '6px 0 0' }}>Furthest so far: {force.sortieBest} nodes.</p> : null}
           {topTier === 0 && <p className="muted small" style={{ margin: '6px 0 0' }}>Win a run to unlock {SORTIE.tiers[1].name}: harder runs that pay more.</p>}
           {c && mode === 'shard' && <p className="muted small" style={{ margin: '6px 0 0' }}>A won Shard run scouts the nearest unseen sector on the way home.</p>}
-          {story?.trinkets?.length ? (
-            <p className="small" style={{ margin: '6px 0 0' }}>
-              <b>Spare trinkets:</b> {story.trinkets.map((t) => trinketInfo(t)?.name ?? t).join(', ')}
-              <span className="muted"> — equip them from a unit’s sheet. Sorties only.</span>
-            </p>
-          ) : null}
         </div>
         {story?.recaps?.length ? (
           <div className="sortie-choice">
@@ -538,10 +533,12 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                 return (
                   <div key={id} className={`sortie-beast${open ? ' lord' : ''}`}>
                     <div>
-                      <b>{SORTIE_BOONS[id].name}</b>{SORTIE_BOONS[id].rare && <span className="sortie-rare"> · Rare</span>}
+                      <b>{SORTIE_BOONS[id].name}</b>{SORTIE_BOONS[id].unit && <span className="muted small"> · one unit</span>}
                       <span className="muted small"> · {open ? 'unlocked' : `${goalText(u.goal, u.n)} (${Math.min(have, u.n)}/${u.n})`}</span>
                     </div>
-                    <div className="small">{open ? SORTIE_BOONS[id].text : <span className="muted">{SORTIE_BOONS[id].text}</span>}</div>
+                    {BOON_TIERS.filter((t) => SORTIE_BOONS[id].tiers[t]).map((t) => (
+                      <div key={t} className={`small${open ? '' : ' muted'}`}><BoonTier tier={t} /> {boonText(id, t)}</div>
+                    ))}
                   </div>
                 );
               })}
@@ -624,10 +621,10 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               {run.scene && <p className="small sortie-scene">{run.scene}</p>}
               <p className="muted small">Take a boon for the rest of the run{run.offer.patch ? ', or patch the party up instead' : ''}.</p>
               <div className="sortie-boons">
-                {run.offer.boons.map((id, i) => (
-                  <button key={id} className={`sortie-boon${SORTIE_BOONS[id].rare ? ' rare' : ''}`} onClick={() => doit(() => pickBoon(run, i))}>
-                    <b>{SORTIE_BOONS[id].name}{SORTIE_BOONS[id].rare && <span className="sortie-rare"> · Rare</span>}</b>
-                    <span className="small">{SORTIE_BOONS[id].text}</span>
+                {run.offer.boons.map((d, i) => (
+                  <button key={d.id} className={`sortie-boon ${d.tier.toLowerCase()}`} onClick={() => doit(() => pickBoon(run, i))}>
+                    <BoonHead run={run} d={d} />
+                    <span className="small">{boonDrawText(run, d)}</span>
                   </button>
                 ))}
                 {run.offer.patch && (
@@ -661,9 +658,9 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               </p>
               <div className="sortie-boons">
                 {run.shop.boons.map((b, i) => (
-                  <button key={b.id} className={`sortie-boon${SORTIE_BOONS[b.id].rare ? ' rare' : ''}`} disabled={b.sold || run.haul.supply < b.price} onClick={() => doit(() => shopBuy(run, i))}>
-                    <b>{SORTIE_BOONS[b.id].name}{SORTIE_BOONS[b.id].rare && <span className="sortie-rare"> · Rare</span>} <span className="sortie-price">{b.sold ? 'Sold' : `${b.price} Supply`}</span></b>
-                    <span className="small">{SORTIE_BOONS[b.id].text}</span>
+                  <button key={b.id} className={`sortie-boon ${b.tier.toLowerCase()}`} disabled={b.sold || run.haul.supply < b.price} onClick={() => doit(() => shopBuy(run, i))}>
+                    <BoonHead run={run} d={b} price={b.sold ? 'Sold' : `${b.price} Supply`} />
+                    <span className="small">{boonDrawText(run, b)}</span>
                   </button>
                 ))}
                 <button className="sortie-boon heal" disabled={run.shop.healed || run.haul.supply < shopPrice(run, SORTIE.shop.heal)} onClick={() => doit(() => shopHeal(run))}>
@@ -735,8 +732,8 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
         {!run.boons.length && <p className="muted" style={{ margin: 0 }}>None yet. Win a fight to pick one.</p>}
         {run.boons.map((b) => (
           <div key={b} className="sortie-side-boon">
-            <b className={SORTIE_BOONS[b].curse ? 'sortie-cursed' : undefined}>{SORTIE_BOONS[b].name}{SORTIE_BOONS[b].curse ? ' (cursed)' : SORTIE_BOONS[b].rare ? ' (rare)' : ''}</b>
-            <span className="muted">{SORTIE_BOONS[b].text}</span>
+            <b className={SORTIE_BOONS[b].curse ? 'sortie-cursed' : undefined}>{SORTIE_BOONS[b].name}{SORTIE_BOONS[b].curse ? ' (cursed)' : <> <BoonTier tier={heldBoon(run, b).tier} /></>}</b>
+            <span className="muted">{boonDrawText(run, heldBoon(run, b))}</span>
           </div>
         ))}
       </div>
@@ -757,7 +754,6 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
           </div>
           <div className="row" style={{ gap: 6 }}>
             <span className="muted">Stress</span> <Stress v={m.stress} />
-            {m.unit.trinket && trinketInfo(m.unit.trinket) && <span className="muted" data-tip={trinketInfo(m.unit.trinket)!.text}>· {trinketInfo(m.unit.trinket)!.name}</span>}
           </div>
           {m.scars?.length ? (
             <div className="row small" style={{ gap: 4, flexWrap: 'wrap' }}>
@@ -776,11 +772,10 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
         </div>
       ) : null}
       {run.weekly && <div>Weekly score: <b>{weeklyScore(run)}</b></div>}
-      {run.trinkets?.length ? <div>Trinkets found: {run.trinkets.map((t) => trinketInfo(t)?.name ?? t).join(', ')}</div> : null}
       {run.boons.length > 0 && (
         <div>
           <div className="muted">Boons</div>
-          {run.boons.map((b) => <div key={b} data-tip={SORTIE_BOONS[b].text}>• {SORTIE_BOONS[b].name}</div>)}
+          {run.boons.map((b) => <div key={b} data-tip={boonDrawText(run, heldBoon(run, b))}>• {boonLabel(run, heldBoon(run, b))}</div>)}
         </div>
       )}
       <div className="sortie-journal">
@@ -1145,3 +1140,20 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
   );
 }
 
+/** A boon's rarity, as a tag coloured like the Training cards'. */
+function BoonTier({ tier }: { tier: SortieBoonTier }) {
+  return <span className={`tag ${TIER_TAG[tier]}`}>{tier}</span>;
+}
+
+/** A boon on offer: its name, rarity (none on a curse), the unit it goes to, whether it upgrades one held, and a price. */
+function BoonHead({ run, d, price }: { run: SortieRun; d: SortieBoonDraw; price?: string }) {
+  const b = SORTIE_BOONS[d.id];
+  return (
+    <b>
+      {b.name} {!b.curse && <BoonTier tier={d.tier} />}
+      {isUpgrade(run, d) && <span className="sortie-rare"> · upgrade</span>}
+      {d.unit !== undefined && run.party[d.unit] && <span className="sortie-rare"> · for {memberName(run.party[d.unit])}</span>}
+      {price && <> <span className="sortie-price">{price}</span></>}
+    </b>
+  );
+}

@@ -11,7 +11,7 @@ import type { TrainingRun } from './types';
 // The end of a run handed to the Sortie side, and a slain nemesis met hurt on the next Sortie.
 
 function force(): Force {
-  return { id: 'f', name: 'F', ledger: [], units: [newUnit({ id: 'a', name: 'Alpha', quirks: ['eagle'] }), newUnit({ id: 'b', name: 'Bravo', trinket: 'charm' })] } as unknown as Force;
+  return { id: 'f', name: 'F', ledger: [], units: [newUnit({ id: 'a', name: 'Alpha', quirks: ['eagle'] }), newUnit({ id: 'b', name: 'Bravo' })] } as unknown as Force;
 }
 
 function ended(o: Partial<TrainingRun> = {}): TrainingRun {
@@ -22,29 +22,22 @@ function ended(o: Partial<TrainingRun> = {}): TrainingRun {
 }
 
 describe('shared bank', () => {
-  it('puts quirks on, equips or spares the trinket, feeds the bestiary and bleeds the nemesis, once', () => {
+  it('puts quirks on, feeds the bestiary and bleeds the nemesis, once', () => {
     const f = force();
     const run = ended({
       gains: [{ unitId: 'a', name: 'Alpha', quirk: 'brute', good: true }, { unitId: 'b', name: 'Bravo', quirk: 'frail', good: false }],
-      trinket: { offered: true, id: 'lens', unitId: 'a' },
       beasts: { swarm: { met: 1, slain: 4 } },
       nemesis: { id: 'butcher', name: 'Gorrhul', grudge: 1, rematch: 0, sig: 'rage', sigName: 'Mounting Rage', slain: true },
     });
-    expect(sharedPreview(run).length).toBe(5);
+    expect(sharedPreview(run).length).toBe(4);
     const lines = bankShared(f, run);
     expect(f.units[0].quirks).toEqual(['eagle', 'brute']);
     expect(f.units[1].quirks).toEqual(['frail']);
-    expect(f.units[0].trinket).toBe('lens');
     expect(f.sortie?.bestiary?.['Fang Swarms']).toEqual({ met: 1, slain: 4 });
     expect(f.sortie?.bled).toEqual({ butcher: 1 });
     expect(lines.length).toBeGreaterThan(3);
     expect(bankShared(f, run)).toEqual([]);
     expect(f.sortie?.bled).toEqual({ butcher: 1 });
-
-    const g = force();
-    bankShared(g, ended({ trinket: { offered: true, id: 'lens', unitId: 'b' } }));
-    expect(g.units[1].trinket).toBe('charm');
-    expect(g.sortie?.trinkets).toEqual(['lens']);
   });
 
   it('a nemesis slain in Training meets the next Sortie hurt and a trick short; the meeting spends it', () => {
@@ -77,11 +70,4 @@ describe('shared bank', () => {
     expect(f.sortie?.bled).toBeUndefined();
   });
 
-  it('says so when the spares are full', () => {
-    const f = force();
-    f.sortie = { trinkets: Array(SORTIE.trinkets.spares).fill('charm') };
-    const lines = bankShared(f, ended({ trinket: { offered: true, id: 'lens', unitId: 'b' } }));
-    expect(f.sortie.trinkets?.length).toBe(SORTIE.trinkets.spares);
-    expect(lines.some((l) => /spares are full/.test(l))).toBe(true);
-  });
 });

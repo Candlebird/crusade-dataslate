@@ -15,6 +15,7 @@ const { abilities, afflict, auras, fire, fireAll, holds, holdTime, hurt, reach, 
 const { dmgMul, toGo } = await import('./harm');
 const { payKill } = await import('./economy');
 const { offerCards } = await import('./cards');
+const { speedOf } = await import('./waves');
 
 const gun = (o: Partial<TowerGun> = {}): TowerGun => ({
   name: 'Rifle', melee: false, range: 12, attacks: 1, ap: 0, hitMod: 0, blast: 0, deadly: 0, rending: false, reliable: false, bane: false,
@@ -88,21 +89,37 @@ describe('fire: OPR rolls', () => {
     fire(run, t, t.guns[0]);
     expect(e.hp).toBe(9);
   });
-  it('a shot at an enemy in cover is at -1, and the miss shows as blocked; melee ignores cover', () => {
+  it('dangerous terrain leaves shooting alone, bar a region quirk: +1 to hit if native, -1 if haunted', () => {
     const t = unit();
     const e = enemy();
     run.pieces = [t];
     run.enemies = [e];
     run.cover = [{ x: 22, y: 30 }];
+    rolls.push(0.4, 0.5);
+    fire(run, t, t.guns[0]);
+    expect(e.hp).toBe(9);
+    t.terrainHit = -1;
     rolls.push(0.4);
     fire(run, t, t.guns[0]);
-    expect(e.hp).toBe(10);
-    expect(run.fx[run.fx.length - 1]?.blocked).toBe(true);
-    const m = unit({ guns: [gun({ melee: true, range: 0 })] });
-    e.x = 22.5;
-    rolls.push(0.4, 0.5);
-    fire(run, m, m.guns[0]);
     expect(e.hp).toBe(9);
+    t.terrainHit = 1;
+    rolls.push(0.6, 0.5);
+    fire(run, t, t.guns[0]);
+    expect(e.hp).toBe(8);
+  });
+  it('dangerous terrain slows walkers by a quarter, an Echo Lord by a tenth, and never a flyer', () => {
+    const e = enemy();
+    const lord = enemy({}, 'lord');
+    const flyer = enemy({ flies: true });
+    const before = [e, lord, flyer].map((x) => speedOf(run, x));
+    run.cover = [{ x: 22, y: 30 }];
+    const after = [e, lord, flyer].map((x) => speedOf(run, x));
+    expect(after[0]).toBeCloseTo(before[0] * (1 - TRAINING.terrain.slow));
+    expect(after[1]).toBeCloseTo(before[1] * (1 - TRAINING.terrain.bossSlow));
+    expect(after[2]).toBeCloseTo(before[2]);
+    // A Weekly Siege's colossus strides over it, siegeSpeed as fast.
+    const colossus = { ...lord, final: true as const };
+    expect(speedOf({ ...run, siege: '2026-W43' }, colossus)).toBeCloseTo(before[1] * TRAINING.finale.siegeSpeed);
   });
   it('Deadly sets the damage; armour takes off; marks add', () => {
     const t = unit({ guns: [gun({ deadly: 3 })] });

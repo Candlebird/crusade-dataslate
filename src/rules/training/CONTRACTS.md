@@ -23,20 +23,19 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | UnitTower.brace (spent on a grab) | holds.ts |
 | UnitTower.xp | run.ts (XP at wave end) |
 | credits, luck, mends | economy.ts |
-| baseHp | waves.ts (leaks), economy.ts (mends), cards.ts (base cards) |
+| baseHp | waves.ts (leaks), economy.ts (mends) |
 | leaked, queue, enemies (add, move, leg, jumped, face) | waves.ts |
 | clean (waves cleared in a row from the first with nothing through; set at each wave cleared) | run.ts |
 | enemies (hp, status, dots, heldBy, regrab; removal of the dead) | combat.ts |
-| cover | run.ts at create (via waves.layCover), cards.ts (cover card) |
+| cover | run.ts at create (via waves.layCover) |
 | offer, cards, mods | cards.ts |
 | fx | combat.ts pushes (relics.ts too, recoloured gold); run.step decays |
-| UnitTower.quirks, UnitTower.trinket, UnitTower.coverMul; grit / tough / init / hit from habits | recipes.unitTower (via habits.habitsOf); habits.applyTrinket for a trinket card taken mid-run |
+| UnitTower.quirks, UnitTower.coverMul; grit / tough / init / hit from habits | recipes.unitTower (via habits.habitsOf) |
 | UnitTower.tally, run.beasts, run.watch[].hit | tally.ts (from harm.hurt, holds.holds, waves.spawnOne) |
 | run.watch[].passed | quirks.watchBosses |
 | run.gains | quirks.rollGains (once, from endRun) |
 | run.nemesis (set at create; slain by tally) | run.ts via nemesis.pickNemesis; tally.ts marks slain |
 | Enemy.nem (speed, hard, free, next, regen, armed), boss SpawnPlan.nemesis / hp | nemesis.ts (nemesisPlan, nemesisTick); waves.spawnOne seeds it |
-| run.trinket, CardDraw.trinket | trinkets.ts |
 | run.shared | shared.bankShared (the force's Sortie layer banked once) |
 | run.nexus (threat, affixes, event, lords; set at create, a JSON copy) | run.ts via nexus.nexusOf(campaign) (the UI passes it; bots pass none) |
 | run.nexus.lords[].slain, .by; run.nemesis.by (the crafted unit that landed the killing blow) | tally.ts (a real lord's or the nemesis's kill) |
@@ -56,7 +55,7 @@ Done already (foundation): `map.ts`, `rng.ts`, `board.ts`, `types.ts`, `economy.
 | Campaign.siegeBoard (each force's best a week, last TRAINING.siege.weeks weeks), Campaign.siegeWins (settled weeks, last TRAINING.siege.keep) | siegeBoard.postSiege (useBank.finish), siegeBoard.settleSieges (useBank.finish, useSiegeSettle on Training open and the RoundPanel assets row) |
 | run.finale (final, lord at create; dealt / slain / by from tally; through from waves.walk; victory from run.ts; banked from veterancy.bankFinale) | run.ts via finale.newFinale (createRun opts.final: freshRun passes veterancy.finaleOpen(force)) |
 | Force.finale (vet, open, wins by Final, endless) | veterancy.noteVeterancy (the store, on every change), veterancy.bankFinale (useBank.finish) |
-| Force.sortie.bestiary (incl. SortieBeast.drill), Unit.quirks / trinket, sortie.trinkets, sortie.bled | shared.ts (bankShared, bestiary.bankBeasts) on finish; sortie.ts / downtime.applySortie as before; applySortie clears bled[lord] once a Sortie meets it |
+| Force.sortie.bestiary (incl. SortieBeast.drill), Unit.quirks, sortie.bled | shared.ts (bankShared, bestiary.bankBeasts) on finish; sortie.ts / downtime.applySortie as before; applySortie clears bled[lord] once a Sortie meets it |
 
 ## run.step(dt) call order
 
@@ -109,7 +108,7 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 
 ### recipes.ts
 - `canTrain(u: Unit): boolean` (done) — any active unit.
-- `habitsOf(u: Unit): { shoot; melee; init; jumpy; myopic }` — Sortie quirks/trinket (port old habitsOf, minus def/wounds).
+- `habitsOf(u: Unit): { shoot; melee; init; jumpy; myopic }` — Sortie quirks (port old habitsOf, minus def/wounds).
 - `habitNames(u: Unit): string[]`
 - `typeScores(u: Unit, force: Unit[]): Record<ShardType, number>` — rank-based fit of each Shard type.
 - `recipesFor(units: Unit[]): Recipe[]` — one unique recipe per trainable unit; deterministic.
@@ -190,10 +189,9 @@ else if (!run.queue.length && !run.enemies.length) → wave cleared (run.ts, pri
 - A pulse on a siege's Final boss counts from min(maxHp, pulse.siegeBase) wounds, not its millions. A sunder marks one enemy in reach (a boss first): `Enemy.sunder` (secs left, owned by relics.ts) adds relics.sunder.ap to the AP of every hit in harm.unsaved.
 - New fields: `UnitTower.relics?: RelicSocket[]`, `UnitTower.grit?` (hold-time share), `UnitTower.brace?` (next hold ×), `Tower.rush?: {mul, left}` (rateOf × (1 + mul)), `TowerGun.relic?` (fires gold).
 
-### habits.ts (Sortie quirks and trinkets in Training)
-- `interface Habits { shoot; melee; init; jumpy; myopic; hold; tough; cover }`; `quirkHabit(id)`, `trinketHabit(k)` — every SORTIE_QUIRKS id (region ones by prefix) and SORTIE_TRINKETS entry, numbers in TRAINING.habits.
+### habits.ts (Sortie quirks in Training)
+- `interface Habits { shoot; melee; init; jumpy; myopic; hold; tough; cover }`; `quirkHabit(id)` — every SORTIE_QUIRKS id (region ones by prefix), numbers in TRAINING.habits.
 - `habitsOf(u)`, `coverMulOf(h)` (cover hit × this, floor 0), `habitText(h)`, `habitBadges(u): HabitBadge[]` ({name, kind, good, text}), `habitNames(u)`.
-- `applyTrinket(t, id)` — a trinket taken mid-run straight onto the tower.
 
 ### tally.ts
 - `tallyHarm(run, by, e, dealt, how, killed)` — UnitTower.tally shot/melee, watch[boss].hit, beasts slain, nemesis / real lord slain (with `by` = the killing unit). `tallyHold(t)`.
@@ -269,12 +267,8 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `nextRound(run, plans): NextRound | undefined` from `previewWave(run)`: wave run.wave + 1, its one kind (a siege's lone colossus: `lord`), flies, elite, the boss's name and if it flies, and `lines` (one each): `TRAINING_ENEMY_BLURBS[kind]`, `TRAINING_WAVE_BLURBS` (flies, elite, final, siege, endless), the boss and its tricks (nemesis, campaign or Final lord: TRICK_NAMES/trickText), every campaign affix (affixInfo).
 - UI: training/NextRound.tsx in HudBar while building: the kind as drawn on the map (drawLive `enemyShape`, `flyerWings`, `bossGlow`) and the boss beside it; tap toggles the popover, a mouse hover shows it.
 
-### trinkets.ts
-- `TRINKET_CARD`, `isTrinketCard(d)`, `trinketDice(run)` (its own dice from seed and wave: never moves run.rng).
-- `trinketOffer(run)` — each boss kill at trinkets.odds until one is offered (then never again); to the crafted unit with most kills and none, else spares. `trinketCardText`, `takeTrinket`.
-
 ### shared.ts
-- `bankShared(f, run): string[]` — once (run.shared): gains via addQuirk, the trinket (equipped, else spares within SORTIE.trinkets.spares), the bestiary, a slain nemesis → sortie.bled[id]++. Called inside useBank's updateForce.
+- `bankShared(f, run): string[]` — once (run.shared): gains via addQuirk, the bestiary, a slain nemesis → sortie.bled[id]++. Called inside useBank's updateForce.
 - `sharedPreview(run)` — {text, good} lines for RunSummary.
 - Sortie side: sortie.createRun opts.bled → `bleed(run, n)`: weaken += n × nemesis.bled (capped), tricks dropped, the rest as known omens (need − 1 max), a journal note.
 
@@ -317,11 +311,11 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `spawnOne(run, plan): Enemy` — one spawn (spawnDue and the nemesis's brood); a nemesis plan gets `nem`; noteMet. speedOf × nem.speed × the lord's Surge × affixes.affixPace; a real lord's plan gets `lord`, an Armoured one `hard`.
 
 ### cards.ts
-- `interface TrainingCard { id; name; rarity; text; unit?(t); useful?(run); apply(run, t?) }`, `CARDS: TrainingCard[]`
-- `cardUseful(run, c: TrainingCard): boolean` — drill.cardOpen, and a unit card with a crafted unit `unit` fits, a whole-run card whose `useful` holds (no mending a full base, no Heroes with every unit at its cap, no longer holds with no grounded unit to hold).
-- `drawCards(run): CardDraw[]` (only cardUseful cards; offer + the Wider choice perk), `cardById(id)`
-- `rerollsLeft(run)`, `rerollProblem(run)`, `rerollCards(run)` — the Second thoughts perk: re-draw the offer (a trinket card stays), run.rerolls++.
-- `offerCards(run): void` — sets run.offer unless one is on offer; trinkets.trinketOffer may add a 4th (trinket) card. cardText / pickCard branch on isTrinketCard.
+- `type CardTower = UnitTower | DefaultTower`; `interface TrainingCard { id; name; tiers: {Common?, Rare?, Legendary?: strength}; text(n); fits?(t: CardTower); useful?(run); apply(run, n, t?) }`, `CARDS: TrainingCard[]`. A draw's rarity is its strength; no base-mend cards.
+- `cardUseful(run, c: TrainingCard): boolean` — drill.cardOpen, and a tower card with a unit or default emplacement on the field `fits`, a whole-run card whose `useful` holds (no Heroes with every unit at its cap, no longer holds with no grounded unit to hold).
+- `drawCards(run, n = offer): CardDraw[]` (only cardUseful cards, never more than TRAINING.cards.offer; a tower card gets `unitId` for a unit, `pieceId` for an emplacement), `cardById(id)`, `cardTower(run, d)`
+- `rerollsLeft(run)`, `rerollProblem(run)`, `rerollCards(run)` — the Second thoughts perk: re-draw the offer, run.rerolls++.
+- `offerCards(run): void` — sets run.offer unless one is on offer; always 3.
 - `cardText(run, d: CardDraw): { name; text }`
 - `pickCard(run, i: number): void` — apply, push to run.cards, clear offer, log.
 - `autoCardIndex(run): number`
@@ -336,7 +330,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `saveKey(forceId): string` (done) — `trainingRun:<forceId>`.
 - `serialize(run): string`, `deserialize(s: string): TrainingRun | null` — JSON; null on bad/old version. fx may be dropped.
 - `saveRun(run): void`, `loadRun(forceId): SavedRun | null` (null for a run already 'over'), `clearSave(forceId): void` — localStorage wrapped in try/catch.
-- `SAVE_VERSION` (9: the Final wave and Endless (run.finale); 8: crowded waves, fast guns and the base at 80 HP; 7: the playtest pass, default towers and one-kind waves; 6: Drill Honours and the Weekly Siege; 5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
+- `SAVE_VERSION` (10: the boss card rebuild, no trinkets, dangerous terrain; 9: the Final wave and Endless (run.finale); 8: crowded waves, fast guns and the base at 80 HP; 7: the playtest pass, default towers and one-kind waves; 6: Drill Honours and the Weekly Siege; 5: names, records and titles; 4: the Nexus; 3 was the Sortie layer; 2 living recipes and relics); run.v and SavedRun.v must match it. `staleSave(forceId): boolean` — drops an older version's save and says so (true) until `ackStale(forceId)`, which TrainingModal calls once the start screen has shown its note (a StrictMode double render still sees true).
 
 ### run.ts
 - `createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus, opts: { drill?: RunDrill; siege?: string; final?: number } = {}): TrainingRun` — run.finale = finale.newFinale(opts.final ?? finale.from, siege); — run.drill = a copy of opts.drill (unset: everything open), credits + drill.purseOf; run.siege = opts.siege (the UI then passes no story, nexus or drill, and seed = sortie.weekSeed(week)); run.nemesis = nemesis.pickNemesis(story) (no story, no nemesis: bots); run.nexus = a copy of `nexus` with nexusStart's credits, base and cover; power = Σ points of trainable units; recipes; cover; credits.start; drawDraft; phase 'build'.
@@ -369,7 +363,7 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `guardian(name, tier, rules?)`, `campaign(threat, guardians?, o?)` — a round-2 campaign for the Nexus tests.
 
 ### index.ts
-Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, trinkets, shared, nexus, lordPick, lords, affixes, titles, records, tales, drill, drillBank, siege, siegeBoard, dps, clock, emplacements, waveKinds, flightLane (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).
+Re-exports types, map, board, rng, recipes, shards, economy, combat, waves, cards, save, veterans, relics, habits, tally, run, nemesis, quirks, bestiary, shared, nexus, lordPick, lords, affixes, titles, records, tales, drill, drillBank, siege, siegeBoard, dps, clock, emplacements, waveKinds, flightLane (keeps `squadPower`, `canTrain` for sortie.ts / ForceView).
 
 ### probe.ts (test-only)
 - `probeRun(units, seed, {maxWaves?, nexus?}): Probe` — a bot run with bot.playRun's `watch` hook: cleared, fell, fellFlying, leaks by wave, each boss's death pad (LEGS if through). `prober()` is the same probe as a `{watch, done}` pair. Also `flies(w)`, `mean`, `median`. Never imported by the app.

@@ -38,7 +38,7 @@ describe('training run', () => {
     expect(run.phase).toBe('build');
     expect(run.recipes).toHaveLength(FORCE.length);
     expect(run.power).toBe(FORCE.reduce((n, u) => n + u.points, 0));
-    expect(run.cover.length).toBeGreaterThanOrEqual(TRAINING.cover.patches[0]);
+    expect(run.cover.length).toBeGreaterThanOrEqual(TRAINING.terrain.patches[0]);
     expect(run.credits).toBe(TRAINING.credits.start);
     expect(run.draft.hand).toHaveLength(TRAINING.shards.draw);
     expect(startProblem(run)).toMatch(/draft/);

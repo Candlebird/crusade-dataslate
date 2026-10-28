@@ -76,8 +76,6 @@ export interface Unit {
   scars: Scar[];
   /** Habits picked up on Sorties, good and bad (rules/sortie.ts quirkInfo); they count on a Sortie and in Training. */
   quirks?: string[];
-  /** The Sortie trinket it carries (SORTIE_TRINKETS, downtimeData.ts); it counts on a Sortie and in Training. */
-  trinket?: string;
   /** Its Sortie record: runs it came back from standing, and Echo lords slain (rules/training/titles.ts). */
   sortieRecord?: { runs: number; lords: number };
   /** Its Training record (rules/training/records.ts): best wave, kills, real lords and nemeses it slew, runs, MVPs. */
@@ -231,8 +229,6 @@ export interface ForceSortie {
   relics?: string[];
   /** The hardest difficulty tier unlocked (0 = none yet): winning a run at it unlocks the next. */
   tier?: number;
-  /** Trinkets brought home and not carried by a unit (SORTIE_TRINKETS ids). */
-  trinkets?: string[];
   /** The last few runs, newest first. */
   recaps?: SortieRecap[];
   /** The highest Ascension level unlocked past the top tier (0 = none yet). */
@@ -296,7 +292,7 @@ export interface SortieRecap {
   party: string[];
   /** The run's journal, oldest first. */
   lines: string[];
-  /** What came home (XP, haul, quirks, trinkets, unlocks). */
+  /** What came home (XP, haul, quirks, unlocks). */
   gained: string;
   /** The weekly challenge it was (an ISO week like '2026-W43'), and its score. */
   weekly?: string;

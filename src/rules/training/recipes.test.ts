@@ -136,12 +136,11 @@ describe('training unit towers', () => {
   });
 
   it('brings Sortie habits that do something here', () => {
-    const u = newUnit({ quirks: ['eagle', 'clumsy', 'quick', 'hardy', 'myopic'], trinket: 'knuckles', weapons: [gun('Rifles', 24, 1, 5)] });
-    expect(habitsOf(u)).toEqual({ shoot: 0, melee: 0, init: 1, jumpy: false, myopic: true, hold: 0, tough: 1, cover: 0 });
-    expect(habitNames(u)).toEqual(['Eagle-eyed', 'Clumsy', 'Quick', 'Hardy', 'Short-sighted', 'Spiked Knuckles']);
+    const u = newUnit({ quirks: ['eagle', 'clumsy', 'quick', 'hardy', 'myopic'], weapons: [gun('Rifles', 24, 1, 5)] });
+    expect(habitsOf(u)).toEqual({ shoot: 1, melee: -1, init: 1, jumpy: false, myopic: true, hold: 0, tough: 1, terrain: 0 });
+    expect(habitNames(u)).toEqual(['Eagle-eyed', 'Clumsy', 'Quick', 'Hardy', 'Short-sighted']);
     const t = unitTower(u, 1, { x: 0, y: 0 }, 0);
     expect(t.init).toBe(1);
     expect(t.myopic).toBe(true);
-    expect(habitNames(newUnit({ trinket: 'flask' }))).toEqual(['Calming Flask']);
   });
 });

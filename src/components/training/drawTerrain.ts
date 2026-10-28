@@ -3,7 +3,7 @@ import { BASE, N, WAYPOINTS, centreOf, isFlyBossWave, isFlyWave, laneCells, type
 import { BASE_ICON, COVER_ICONS, bar, drawIcon, label, roundRect } from './art';
 import { walkPath } from './routePath';
 
-// Canvas drawing for the Training map's ground: the grid, the no-build corner, the route, cover, the pads and the base.
+// Canvas drawing for the Training map's ground: the grid, the no-build corner, the route, dangerous terrain, the pads and the base.
 // Same frame as draw.ts: `s` pixels a cell, the canvas translated to the map's corner.
 
 /** The ground, a faint grid and the hatched no-build corner where the enemy comes in. */
@@ -42,20 +42,20 @@ export function drawGround(ctx: CanvasRenderingContext2D, s: number) {
   ctx.strokeRect(0.5, 0.5, w - 1, w - 1);
 }
 
-/** Cover: earthy patches with brush or ruins on them (ranged hits on an enemy in one are at −1). */
+/** Dangerous terrain: rust-red hazard patches with thorns or ruins on them (Echoes walk slower through one). */
 export function drawCover(ctx: CanvasRenderingContext2D, run: TrainingRun, s: number) {
-  const n = TRAINING.cover.size;
+  const n = TRAINING.terrain.size;
   for (const c of run.cover) {
     roundRect(ctx, c.x * s + 1, c.y * s + 1, n * s - 2, n * s - 2, s * 0.6);
-    ctx.fillStyle = 'rgba(128,108,66,0.2)';
+    ctx.fillStyle = 'rgba(150,72,48,0.2)';
     ctx.fill();
-    ctx.strokeStyle = 'rgba(176,152,98,0.4)';
+    ctx.strokeStyle = 'rgba(204,104,72,0.45)';
     ctx.lineWidth = 1;
     ctx.setLineDash([Math.max(2, s * 0.3), Math.max(2, s * 0.25)]);
     ctx.stroke();
     ctx.setLineDash([]);
     const icon = COVER_ICONS[(c.x + c.y) % COVER_ICONS.length];
-    drawIcon(ctx, icon, (c.x + n / 2) * s, (c.y + n / 2) * s, n * s * 0.62, 'rgba(184,160,106,0.5)');
+    drawIcon(ctx, icon, (c.x + n / 2) * s, (c.y + n / 2) * s, n * s * 0.62, 'rgba(208,120,88,0.5)');
   }
 }
 
@@ -121,7 +121,7 @@ export function drawRoute(ctx: CanvasRenderingContext2D, run: TrainingRun, s: nu
   }
 }
 
-/** The spawn (S), the numbered pads, and the base keep with its HP. Drawn over cover, so a patch never hides one. */
+/** The spawn (S), the numbered pads, and the base keep with its HP. Drawn over the terrain, so a patch never hides one. */
 export function drawPads(ctx: CanvasRenderingContext2D, run: TrainingRun, s: number) {
   const inset = Math.max(1, s * 0.1);
   const tile = (x: number, y: number) => roundRect(ctx, x * s + inset, y * s + inset, 2 * s - 2 * inset, 2 * s - 2 * inset, s * 0.35);

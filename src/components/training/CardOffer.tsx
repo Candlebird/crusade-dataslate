@@ -1,14 +1,14 @@
 import type { EmblemLayer } from '../../model/types';
 import {
-  autoCardIndex, cardText, isTrinketCard, rerollProblem, rerollsLeft, rerollsOf, unitTowers, type CardDraw, type TrainingRun,
+  autoCardIndex, cardText, cardTower, rerollProblem, rerollsLeft, rerollsOf, type CardDraw, type TrainingRun,
 } from '../../rules/training';
 import { TRAINING } from '../../rules/downtimeData';
 import { EmblemBadge } from '../Emblem';
 
 export const TIER_TAG: Record<CardDraw['rarity'], string> = { Common: '', Rare: 'red', Legendary: 'gold' };
 
-/** A card's tag colour: by rarity, gold for a trinket. */
-export const cardTag = (d: CardDraw) => (isTrinketCard(d) ? 'gold' : TIER_TAG[d.rarity]);
+/** A card's tag colour, by rarity. */
+export const cardTag = (d: CardDraw) => TIER_TAG[d.rarity];
 
 export interface CardOfferProps {
   run: TrainingRun;
@@ -25,12 +25,11 @@ export interface CardOfferProps {
   onReroll?: () => void;
 }
 
-/** The cards on offer after a boss falls: they rise up one after another, and glow by rarity. A trinket card (a Sortie
- *  trinket the unit keeps) is tagged as one. */
+/** The three cards on offer after a boss falls: they rise up one after another, and glow by rarity. A card names the
+ *  tower it goes to (a unit with its emblem, or an emplacement). */
 export function CardOffer({ run, offer, portraits, auto, autoPick, onPick, onPeek, onReroll }: CardOfferProps) {
   const best = autoPick ?? autoCardIndex(run);
   const top = offer.some((d) => d.rarity === 'Legendary') ? 'legendary' : offer.some((d) => d.rarity === 'Rare') ? 'rare' : 'common';
-  const units = unitTowers(run);
   return (
     <div className={`training-cards ${top}`} role="dialog" aria-label="Choose a card">
       <div className="training-cards-title">
@@ -40,8 +39,8 @@ export function CardOffer({ run, offer, portraits, auto, autoPick, onPick, onPee
       <div className="training-cards-row">
         {offer.map((d, i) => {
           const c = cardText(run, d);
-          const unit = units.find((t) => t.unitId === d.unitId);
-          const face = unit && portraits?.[unit.unitId];
+          const to = cardTower(run, d);
+          const face = to?.kind === 'unit' ? portraits?.[to.unitId] : undefined;
           return (
             <button
               key={`${run.rerolls ?? 0}:${i}`}
@@ -51,9 +50,9 @@ export function CardOffer({ run, offer, portraits, auto, autoPick, onPick, onPee
               onClick={() => onPick(i)}
             >
               <span className="training-card-shine" aria-hidden />
-              <span className={`tag ${cardTag(d)}`}>{isTrinketCard(d) ? 'Trinket' : d.rarity}</span>
+              <span className={`tag ${cardTag(d)}`}>{d.rarity}</span>
               <span className="training-card-name">{c.name}</span>
-              {unit && <span className="training-card-unit">{face ? <EmblemBadge emblem={face} size={18} /> : null} {unit.name}</span>}
+              {to && <span className="training-card-unit">{face ? <EmblemBadge emblem={face} size={18} /> : null} {to.name}</span>}
               <span className="training-card-text">{c.text}</span>
             </button>
           );

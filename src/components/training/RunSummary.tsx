@@ -14,7 +14,7 @@ export interface RunSummaryProps {
 }
 
 /** How the run went: waves cleared, and each crafted unit's kills, damage, levels and XP (the standout starred), with
- *  the default towers and kept Shards a row each; then records, titles and tales, and what it hands the Sortie side (quirks, trinket,
+ *  the default towers and kept Shards a row each; then records, titles and tales, and what it hands the Sortie side (quirks,
  *  nemesis, bestiary), the Drill Honours earned, and a Weekly Siege's score. */
 export function RunSummary({ run, best, force }: RunSummaryProps) {
   const lead = mvp(run);

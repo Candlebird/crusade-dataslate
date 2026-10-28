@@ -70,7 +70,7 @@ export function useBank(force: Force, c?: Campaign) {
       const round = f.nexus?.factionId && c ? c.round ?? 1 : undefined;
       honours = bankHonours(f, run, localDate(), uid, round);
       if (run.cleared > (f.trainingBest ?? 0)) f.trainingBest = run.cleared;
-      // Quirks, the trinket, the bestiary and a slain nemesis go to the Sortie side with the XP.
+      // Quirks, the bestiary and a slain nemesis go to the Sortie side with the XP.
       shared = bankShared(f, run);
       // The Victory, Endless depth and the Final it opens, before the Drill's news (Win at N goals read it).
       if (!run.siege) finale = bankFinale(f, run, localDate());

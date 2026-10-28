@@ -6,7 +6,7 @@ import { applyScar, levelForXp } from './engine';
 import { awardFeats, type FeatId } from './feats';
 import { currentRound } from './nexus';
 import { earnTitles, heldTitles, sortieTitles, titleInfo } from './training/titles';
-import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicsOf, runXp, threadDone, tierOf, trinketInfo, unlockedBoons, markHeat, weekKey, weeklyScore, type SortieRun } from './sortie';
+import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicsOf, runXp, threadDone, tierOf, unlockedBoons, markHeat, weekKey, weeklyScore, type SortieRun } from './sortie';
 
 type Rand = () => number;
 
@@ -382,12 +382,6 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
   // Boons unlocked by what the force has done, this run and before.
   const boonsNew = unlockedBoons(story).filter((id) => !boonsBefore.includes(id));
   if (boonsNew.length) bits.push(`unlocked the boon${boonsNew.length === 1 ? '' : 's'} ${boonsNew.map((id) => SORTIE_BOONS[id].name).join(', ')}`);
-  // Trinkets found come home whatever happened, into the force's spares (up to SORTIE.trinkets.spares).
-  const found = (run.trinkets ?? []).slice(0, Math.max(0, SORTIE.trinkets.spares - (story.trinkets?.length ?? 0)));
-  if (found.length) {
-    story.trinkets = [...(story.trinkets ?? []), ...found];
-    bits.push(`found ${found.map((t) => trinketInfo(t)?.name ?? t).join(', ')}`);
-  }
   // Feats: the hardest runs pay a real reward, once per force.
   const won = run.over === 'won';
   const top = won && tierOf(run) === SORTIE.tiers.length - 1;

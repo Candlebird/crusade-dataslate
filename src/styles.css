@@ -1198,7 +1198,8 @@ button.sortie-echo:disabled { cursor: default; opacity: 1; }
 .sortie-boon { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; width: 200px; padding: 10px; }
 .sortie-boon b { color: var(--gold); }
 .sortie-boon.heal b { color: var(--green); }
-.sortie-boon.rare { border-color: var(--gold); }
+.sortie-boon.rare { border-color: var(--red); }
+.sortie-boon.legendary { border-color: var(--gold); box-shadow: 0 0 10px rgba(201, 162, 74, 0.2); }
 .sortie-rare { font-weight: normal; font-size: 0.85em; }
 .sortie-cursed { color: var(--red); }
 .sortie-stress { display: inline-block; width: 56px; height: 5px; background: var(--line); border-radius: 2px; overflow: hidden; vertical-align: middle; }

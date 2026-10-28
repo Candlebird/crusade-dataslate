@@ -4,8 +4,8 @@ import type { SavedRun, TrainingRun } from './types';
 
 export const saveKey = (forceId: string) => `trainingRun:${forceId}`;
 
-/** The save format this version reads (9: the Final wave, its Victory and Endless, the run's finale; 8: towers fire 4× as fast at waves 4× as thick, the base 4× the HP; 7: the playtest pass, default towers and one-kind waves); older saves are dropped (staleSave). */
-export const SAVE_VERSION = 9;
+/** The save format this version reads (10: the boss card rebuild, no trinkets, dangerous terrain; 9: the Final wave, its Victory and Endless, the run's finale; 8: towers fire 4× as fast at waves 4× as thick, the base 4× the HP; 7: the playtest pass, default towers and one-kind waves); older saves are dropped (staleSave). */
+export const SAVE_VERSION = 10;
 
 /** The run as JSON; shots and blows on screen are left behind. */
 export function serialize(run: TrainingRun): string {

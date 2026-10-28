@@ -108,7 +108,9 @@ describe('planWave', () => {
     expect(p.filter((s) => s.elite)).toHaveLength(Math.floor(p.length / W.eliteEvery));
     const w = W.hpFrom + 6;
     const plain = planWave({ ...blankRun(), power: BIG }, w).find((s) => !s.elite && TRAINING_ENEMIES[s.kind].spawn === 'main')!;
-    const { hpMul } = countFor(plain.kind, waveBudget(2000, w), W.maxCount);
+    // A boss wave's escorts take `escorts` of the budget, and leave the boss a place.
+    const boss = isBossWave(w);
+    const { hpMul } = countFor(plain.kind, waveBudget(2000, w) * (boss ? W.escorts : 1), W.maxCount - (boss ? 1 : 0));
     expect(plain.hp).toBeCloseTo(TRAINING_ENEMIES[plain.kind].hp * TRAINING.enemyHp * hpMul * lateHp(w) * groundHpAt(w) * minionHpAt(w));
   });
 
@@ -178,16 +180,16 @@ describe('cover', () => {
     const path = route(mapFor([]));
     const cover = layCover(r, 8, path);
     expect(cover).toHaveLength(8);
-    const s = TRAINING.cover.size;
+    const s = TRAINING.terrain.size;
     for (const c of cover) {
       expect(WAYPOINTS.some((t) => c.x <= t.x + 1 && t.x <= c.x + s - 1 && c.y <= t.y + 1 && t.y <= c.y + s - 1)).toBe(false);
       expect(cover.filter((d) => Math.abs(d.x - c.x) < s && Math.abs(d.y - c.y) < s)).toHaveLength(1);
     }
     const onPath = cover.filter((c) => path.some((p) => p.x >= c.x && p.x < c.x + s && p.y >= c.y && p.y < c.y + s));
-    expect(onPath.length).toBeGreaterThanOrEqual(Math.round(8 * TRAINING.cover.onRoute));
+    expect(onPath.length).toBeGreaterThanOrEqual(Math.round(8 * TRAINING.terrain.onRoute));
     const n = runCover({ rng: 9 }).length;
-    expect(n).toBeGreaterThanOrEqual(TRAINING.cover.patches[0]);
-    expect(n).toBeLessThanOrEqual(TRAINING.cover.patches[1]);
+    expect(n).toBeGreaterThanOrEqual(TRAINING.terrain.patches[0]);
+    expect(n).toBeLessThanOrEqual(TRAINING.terrain.patches[1]);
   });
 });
 

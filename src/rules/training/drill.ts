@@ -76,8 +76,8 @@ export const drillOf = (f: Force): RunDrill => drillFrom(drillEarned(f));
 /** The highest luck level the run may buy. */
 export const luckCap = (run: TrainingRun): number => run.drill?.luck ?? TRAINING.shards.luckCost.length;
 
-/** May boss card `id` be drawn this run? */
-export const cardOpen = (run: TrainingRun, id: string): boolean => !run.drill || run.drill.cards.includes(id);
+/** May boss card `id` be drawn this run? The starting cards always may (a run saved before they changed). */
+export const cardOpen = (run: TrainingRun, id: string): boolean => !run.drill || run.drill.cards.includes(id) || D.cardsAtStart.includes(id);
 
 /** Levels of a perk the run has. */
 export const perkOf = (run: TrainingRun, p: DrillPerk): number => run.drill?.perks[p] ?? 0;
@@ -125,8 +125,7 @@ export function unlockText(u: DrillUnlock): { name: string; text: string } {
     mend: `Each base mend restores ${P.mend} more HP.`,
     reroll: `Re-draw a card offer ${P.reroll} more time a run.`,
     thrift: `Luck costs ${Math.round(P.thrift * 100)}% less.`,
-    offer: `${P.offer} more card on offer after a boss.`,
   };
-  const names: Record<DrillPerk, string> = { purse: 'Purse', mend: 'Field mending', reroll: 'Second thoughts', thrift: 'Thrift', offer: 'Wider choice' };
+  const names: Record<DrillPerk, string> = { purse: 'Purse', mend: 'Field mending', reroll: 'Second thoughts', thrift: 'Thrift' };
   return { name: names[u.perk], text: text[u.perk] };
 }

@@ -3,7 +3,7 @@ import { TRAINING } from '../downtimeData';
 import type { TrainingRun } from './types';
 
 // The Weekly Siege (F5): a run on the week's seed (sortie.ts weekSeed, the Sortie weekly's), so every force gets the same
-// cover, the same drafts and the same waves (still scaled by its own points), however it plays. Its Final is wave
+// terrain, the same drafts and the same waves (still scaled by its own points), however it plays. Its Final is wave
 // TRAINING.finale.from: a lone colossus of finale.siegeHp wounds (finale.ts), the attempt over when it reaches the base.
 // Its score is the damage dealt to it (siegeDmg); a force that fell before it, the wave reached. A siege run has no Drill Honours limits or perks, no nemesis and no Nexus (TrainingModal makes it).
 

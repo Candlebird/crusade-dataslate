@@ -69,6 +69,11 @@ export interface Armed {
   dmgBoost: { mul: number; left: number };
   /** A banner relic's rally on it (relics.ts): a share faster and seconds left. */
   rush?: { mul: number; left: number };
+  /** The Crossfire card: a share more damage to an enemy being held. */
+  crossfire?: number;
+  /** The Kill chain card: a share faster per stack, the stacks (one a kill, TRAINING.cards.chain.max at most) and
+   *  seconds left before they drop. */
+  chain?: { per: number; stacks: number; left: number };
   kills: number;
   dealt: number;
 }
@@ -113,6 +118,10 @@ export interface UnitTower extends PieceBase, Armed {
   size: number;
   impact: number;
   skills: TowerSkill[];
+  /** The Pack tactics card: a share more damage per other crafted unit near it. */
+  pack?: number;
+  /** The Ace card: a share more damage per TRAINING.cards.ace.per kills this run. */
+  ace?: number;
   /** Level-ups bought this run, and the most it may have (by its points). */
   up: number;
   cap: number;
@@ -136,11 +145,10 @@ export interface UnitTower extends PieceBase, Armed {
   brace?: number;
   /** Its relics, each going off by itself on its own clock during waves (relics.ts). */
   relics?: RelicSocket[];
-  /** Its Sortie quirks and trinket as crafted (habits.ts), and a trinket taken this run (trinkets.ts). */
+  /** Its Sortie quirks as crafted (habits.ts). */
   quirks?: string[];
-  trinket?: string;
-  /** Times the cover penalty on its shots (region quirks; 1 if unset). */
-  coverMul?: number;
+  /** To hit on its shots at an Echo in dangerous terrain (region quirks; 0 if unset). */
+  terrainHit?: number;
   /** Datasheet Scout / Ambush: once a build phase it may move to any open spot / swap places with another piece (moves.ts). */
   scout?: boolean;
   ambush?: boolean;
@@ -235,20 +243,18 @@ export interface Fx {
   color: string;
   melee?: boolean;
   miss?: boolean;
-  /** A miss that cover stopped. */
-  blocked?: boolean;
   /** heal: a line (bleed-field / boost link); bolt: a barrage shot; pulse: a ring of `r` cells; hold: a grab line. */
   kind?: 'heal' | 'bolt' | 'pulse' | 'hold';
   r?: number;
 }
 
-/** A card as drawn: which card (cards.ts CARDS), and the unit it would go to. */
+/** A card as drawn: which card (cards.ts CARDS), its rarity (its strength), and the tower it would go to: a crafted
+ *  unit, or a default emplacement by its piece id. */
 export interface CardDraw {
   id: string;
   rarity: RelicTier;
   unitId?: string;
-  /** A trinket card (trinkets.ts, id 'trinket'): the Sortie trinket it gives. */
-  trinket?: string;
+  pieceId?: number;
 }
 
 /** Run-wide modifiers cards give. */
@@ -286,7 +292,7 @@ export interface RunDrill {
 
 export interface TrainingRun {
   /** Save format version (save.ts SAVE_VERSION). */
-  v: 9;
+  v: 10;
   forceId: string;
   seed: number;
   /** mulberry32 state: the same seed and the same moves play out the same. */
@@ -317,7 +323,7 @@ export interface TrainingRun {
   moved?: number[];
   enemies: Enemy[];
   queue: SpawnPlan[];
-  /** Cover patches, each by its top-left cell (TRAINING.cover.size square). */
+  /** Patches of dangerous terrain, each by its top-left cell (TRAINING.terrain.size square). */
   cover: Tile[];
   /** Cards on offer (after a boss kill), to pick one before the next wave; and those picked, oldest first. */
   offer?: CardDraw[];
@@ -328,12 +334,10 @@ export interface TrainingRun {
   fx: Fx[];
   log: string[];
   /** The Sortie layer (F2): the nemesis waiting at its wave; Echoes met and slain for the bestiary; the units each boss
-   *  walked past in reach and those that hit it (by enemy id); the trinket card offered (and to whom, if taken); and
-   *  the quirks the run gives, rolled once at its end. */
+   *  walked past in reach and those that hit it (by enemy id); and the quirks the run gives, rolled once at its end. */
   nemesis?: RunNemesis;
   beasts?: Record<string, RunBeast>;
   watch?: Record<string, { passed: string[]; hit: string[] }>;
-  trinket?: { offered: boolean; id?: string; unitId?: string };
   gains?: QuirkGain[];
   /** The Sortie layer has been banked into the force (shared.ts bankShared). */
   shared?: boolean;
@@ -359,7 +363,7 @@ export interface TrainingRun {
 
 /** What a saved run looks like on disk (save.ts). */
 export interface SavedRun {
-  v: 9;
+  v: 10;
   savedAt: string;
   run: TrainingRun;
 }

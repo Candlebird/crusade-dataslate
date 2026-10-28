@@ -166,10 +166,11 @@ function go(run: TrainingRun, t: UnitTower, s: RelicSocket): boolean {
   }
 }
 
-/** Wear rally boosts down, then run every relic's clock; whatever a relic draws is gold. */
+/** Wear rally boosts and Kill chains down, then run every relic's clock; whatever a relic draws is gold. */
 export function relics(run: TrainingRun, dt: number): void {
   for (const e of run.enemies) if (e.sunder !== undefined && (e.sunder -= dt) <= 0) e.sunder = undefined;
   for (const t of towers(run)) {
+    if (t.chain && t.chain.left > 0 && (t.chain.left -= dt) <= 0) t.chain = { ...t.chain, stacks: 0, left: 0 };
     if (!t.rush) continue;
     t.rush.left -= dt;
     if (t.rush.left <= 0) t.rush = undefined;

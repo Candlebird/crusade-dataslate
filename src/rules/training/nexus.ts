@@ -51,7 +51,7 @@ export function budgetMul(run: Pick<TrainingRun, 'nexus'>): number {
   return fierce * ev;
 }
 
-/** What a new run starts with, the Nexus counted: credits (Supply Convoys), base HP (Bleed), extra cover patches
+/** What a new run starts with, the Nexus counted: credits (Supply Convoys), base HP (Bleed), extra patches of dangerous terrain
  *  (Derelict Fleet), extra draft luck (Shard Rush: grades roll as if luck were higher) and XP cap (Glory Seekers). */
 export function nexusStart(run: Pick<TrainingRun, 'nexus'>) {
   const E = X.events;
@@ -98,7 +98,7 @@ export function eventEffect(id: string): string {
     case 'echoSurge': return `Waves are ${pc(E.echoSurge.budget - 1)} bigger.`;
     case 'voidLull': return `Waves are ${pc(1 - E.voidLull.budget)} smaller.`;
     case 'risingDark': return `+${E.risingDark.threat} threat (counted above).`;
-    case 'derelicts': return `+${E.derelicts.cover} cover patches.`;
+    case 'derelicts': return `+${E.derelicts.cover} patches of dangerous terrain (Echoes walk slower through them).`;
     case 'glory': return `Each unit can earn +${E.glory.xp} XP this run.`;
     default: return '';
   }

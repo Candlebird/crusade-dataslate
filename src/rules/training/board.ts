@@ -2,7 +2,7 @@ import { TRAINING } from '../downtimeData';
 import { centre, mapFor, noBuild, open, overlaps, route, within, type MapState, type Tile } from './map';
 import type { Piece, ShardPiece, Tower, TrainingRun, UnitTower } from './types';
 
-// The board as a run stands: which pieces are where, the maze they make, and cover. Read-only helpers every module uses.
+// The board as a run stands: which pieces are where, the maze they make, and dangerous terrain. Read-only helpers every module uses.
 
 export const dist = (ax: number, ay: number, bx: number, by: number) => Math.hypot(ax - bx, ay - by);
 
@@ -60,10 +60,16 @@ export function placeProblem(run: TrainingRun, x: number, y: number): string | n
   return null;
 }
 
-/** Is cell (x, y) in a cover patch? */
-export function inCover(run: TrainingRun, x: number, y: number): boolean {
-  const s = TRAINING.cover.size;
+/** Is cell (x, y) in a patch of dangerous terrain? */
+export function inTerrain(run: TrainingRun, x: number, y: number): boolean {
+  const s = TRAINING.terrain.size;
   const cx = Math.floor(x);
   const cy = Math.floor(y);
   return run.cover.some((c) => cx >= c.x && cx < c.x + s && cy >= c.y && cy < c.y + s);
 }
+
+/** The other crafted units within Pack tactics' reach of unit `t`. */
+export const packMates = (run: TrainingRun, t: UnitTower): number => {
+  const c = centreOf(t);
+  return unitTowers(run).filter((o) => o !== t && dist(c.x, c.y, centreOf(o).x, centreOf(o).y) <= TRAINING.cards.pack.radius).length;
+};

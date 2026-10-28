@@ -54,16 +54,15 @@ export function RelicList({ relics }: { relics: RelicSocket[] }) {
   );
 }
 
-/** A unit's Sortie quirks and trinket on the tower card: each as a tag (green good, red bad, gold a trinket) with what
- *  it does here. */
-export function HabitBadges({ unit }: { unit: Pick<Unit, 'quirks' | 'trinket'> }) {
+/** A unit's Sortie quirks on the tower card: each as a tag (green good, red bad) with what it does here. */
+export function HabitBadges({ unit }: { unit: Pick<Unit, 'quirks'> }) {
   const badges = habitBadges(unit);
   if (!badges.length) return null;
   return (
     <div className="training-record">
       {badges.map((b, i) => (
         <div key={i} className="training-record-row">
-          <span className={`tag ${b.kind === 'trinket' ? 'gold' : b.good ? 'green' : 'red'}`} data-tip={b.kind === 'trinket' ? 'Sortie trinket' : 'Sortie quirk'}>{b.name}</span>
+          <span className={`tag ${b.good ? 'green' : 'red'}`} data-tip="Sortie quirk">{b.name}</span>
           <span className="muted">{b.text}</span>
         </div>
       ))}

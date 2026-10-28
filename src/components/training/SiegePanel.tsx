@@ -18,7 +18,7 @@ export function SiegePanel({ force, c, week }: { force: Force; c?: Campaign; wee
     <div className="small training-nexus">
       <div><b>Weekly Siege</b> <span className="muted">· {week}</span></div>
       <p className="muted" style={{ margin: '2px 0 4px' }}>
-        The same map, cover, drafts and waves for every force this week, the waves scaled by each force's points. Every luck
+        The same map, terrain, drafts and waves for every force this week, the waves scaled by each force's points. Every luck
         level and boss card is open, with no Drill perks, nemesis or Nexus. Wave {TRAINING.finale.from} is the Final: {SIEGE_BOSS}
         alone, {TRAINING.finale.siegeHp.toLocaleString()} wounds, and the attempt ends when it reaches the base. Score: the damage
         dealt to it; a force that falls before it ranks below every damage score, by the wave reached. Try as often as you

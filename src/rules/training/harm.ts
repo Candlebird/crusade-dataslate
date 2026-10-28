@@ -1,6 +1,6 @@
 import type { Effect, Status } from '../abilities';
 import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
-import { centreOf, dist, inCover, mapOf, pieceById } from './board';
+import { centreOf, dist, inTerrain, mapOf, packMates, pieceById } from './board';
 import { onEchoDeath } from './affixes';
 import { offerCards } from './cards';
 import { payKill } from './economy';
@@ -80,8 +80,9 @@ export function targetFor(run: TrainingRun, t: Tower, g: TowerGun): Enemy | unde
 /** Is any of a tower's guns aimed at something right now? */
 export const busy = (run: TrainingRun, t: Tower) => t.guns.some((g) => targetFor(run, t, g));
 
-/** Is the enemy at -1 to be hit by this weapon: a shot at one standing in cover. */
-export const covered = (run: TrainingRun, g: TowerGun, e: Enemy) => !g.melee && inCover(run, e.x, e.y);
+/** A unit's region quirk on a shot at an enemy in dangerous terrain (habits.ts): + if native, − if haunted. */
+export const terrainHit = (run: TrainingRun, t: Tower, g: TowerGun, e: Enemy): number =>
+  !g.melee && isUnit(t) && t.terrainHit && inTerrain(run, e.x, e.y) ? t.terrainHit : 0;
 
 /** Did a hit get through the enemy's save (Defense + AP; a Hardened nemesis and an Armoured Echo save better, a
  *  sundered one worse)? */
@@ -106,6 +107,16 @@ export function dmgMul(t: Tower): number {
   return t.atkBonus * (1 + (t.dmgBoost.left > 0 ? t.dmgBoost.mul : 0)) * last * up;
 }
 
+/** What a tower's cards add against this enemy: Crossfire on a held one, Pack tactics for units near it, Ace for its
+ *  kills. */
+export function cardMul(run: TrainingRun, t: Tower, e: Enemy): number {
+  let m = t.crossfire && e.heldBy !== undefined ? 1 + t.crossfire : 1;
+  if (!isUnit(t)) return m;
+  if (t.pack) m *= 1 + t.pack * packMates(run, t);
+  if (t.ace) m *= 1 + t.ace * Math.floor(t.kills / TRAINING.cards.ace.per);
+  return m;
+}
+
 /**
  * Damage to an enemy from tower `by` (undefined: no one). A shot or blow on a marked enemy deals more; some enemies take
  * less from shots or more from blows. A kill credits `by`, pays out, sets off death-blasts, and a boss kill offers cards.
@@ -124,7 +135,10 @@ export function hurt(run: TrainingRun, by: Tower | undefined, e: Enemy, dmg: num
   if (by) by.dealt += dealt;
   tallyHarm(run, by, e, dealt, how, e.hp <= 0);
   if (e.hp > 0) return;
-  if (by) by.kills += 1;
+  if (by) {
+    by.kills += 1;
+    if (by.chain) by.chain = { ...by.chain, stacks: Math.min(TRAINING.cards.chain.max, by.chain.stacks + 1), left: TRAINING.cards.chain.secs };
+  }
   payKill(run, e);
   onEchoDeath(run, e);
   if (chain) deathBlasts(run, e);

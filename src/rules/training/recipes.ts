@@ -6,7 +6,7 @@ import { hasRule, levelForXp, ruleRating } from '../engine';
 import { SHARD_TYPES, TRAINING, type ShardType } from '../downtimeData';
 import { shardsOnMap } from './board';
 import { levelCap, trainPoints } from './economy';
-import { coverMulOf, habitsOf } from './habits';
+import { habitsOf } from './habits';
 import { socketRuns, socketsOf } from './relics';
 import { adjustSlots, gritOf, rangeBonus, recordBudget } from './veterans';
 import type { Grade, Recipe, RecipeSlot, ShardPiece, Tile, TowerSkill, TrainingRun, UnitTower } from './types';
@@ -208,8 +208,8 @@ export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): Uni
     up: 0, cap: levelCap(trainPoints(u)), holdLeft: 0, frenzy: 0, frenzyMul: 1, craftedAt, xp: 0,
     init: h.init + g.init, jumpy: h.jumpy, myopic: h.myopic,
     ...(grit !== 1 ? { grit } : {}), ...(relics.length ? { relics } : {}),
-    ...(u.quirks?.length ? { quirks: [...u.quirks] } : {}), ...(u.trinket ? { trinket: u.trinket } : {}),
-    ...(coverMulOf(h) !== 1 ? { coverMul: coverMulOf(h) } : {}),
+    ...(u.quirks?.length ? { quirks: [...u.quirks] } : {}),
+    ...(h.terrain ? { terrainHit: h.terrain } : {}),
     ...(hasRule(u.rules, 'Scout') ? { scout: true } : {}), ...(hasRule(u.rules, 'Ambush') ? { ambush: true } : {}),
   };
 }

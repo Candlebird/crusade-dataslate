@@ -1,6 +1,6 @@
 import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyKind } from '../downtimeData';
 import { affixPace, affixPlan } from './affixes';
-import { BASE, dist, mapOf } from './board';
+import { BASE, dist, inTerrain, mapOf } from './board';
 import { LEGS, N, WAYPOINTS, centre, heading, mapFor, route, type MapState } from './map';
 import { budgetMul } from './nexus';
 import { pick, rand, randInt, type Rng } from './rng';
@@ -125,8 +125,16 @@ function spawnPlan(r: Rng, kind: TrainingEnemyKind, at: number, hpMul: number, f
   return { kind, at, leg, x, y, hp, flies, ...(elite ? { elite } : {}) };
 }
 
-/** Wave `w`'s spawns, sorted by time, rolling `r`: the Nexus's budget and affixes on them (nexus.ts, affixes.ts). */
-const nexusWave = (r: Rng, run: TrainingRun, w: number) => affixPlan(r, run, planFor(r, wavePoints(run.power) * budgetMul(run), w, finalOf(run)));
+/** How many times thicker a force's waves come for its width from wave `wide.fromWave` (the first waves are a Shard's
+ *  to hold): `wide.per` more for each unit that can train past `wide.from`, up to `wide.max` of them (many cheap recipes
+ *  fill sooner than a few dear ones). */
+export const wideMul = (run: Pick<TrainingRun, 'recipes'>, w: number) =>
+  w < W.wide.fromWave ? 1 : 1 + W.wide.per * Math.min(W.wide.max, Math.max(0, run.recipes.length - W.wide.from));
+
+/** Wave `w`'s spawns, sorted by time, rolling `r`: the force's width, the Nexus's budget and affixes on them (nexus.ts,
+ *  affixes.ts). */
+const nexusWave = (r: Rng, run: TrainingRun, w: number) =>
+  affixPlan(r, run, planFor(r, wavePoints(run.power) * wideMul(run, w) * budgetMul(run), w, finalOf(run)));
 
 /** Wave `w`'s spawns, sorted by time (rolls the run's dice; a siege's own for the wave). */
 export const planWave = (run: TrainingRun, w: number): SpawnPlan[] => nexusWave(waveDice(run, w, run), run, w);
@@ -163,11 +171,11 @@ export const mainKind = (plans: SpawnPlan[]): TrainingEnemyKind | undefined =>
 /** Does the size×size patch at `a` share a cell with the 2×2 area at `t`? */
 const touches = (a: Tile, s: number, t: Tile) => a.x <= t.x + 1 && t.x <= a.x + s - 1 && a.y <= t.y + 1 && t.y <= a.y + s - 1;
 
-/** Cover patches for a run: `n` of them, TRAINING.cover.onRoute of them on `route` cells (the empty map's route). */
+/** Dangerous terrain for a run: `n` patches, TRAINING.terrain.onRoute of them on `route` cells (the empty map's route). */
 export function layCover(r: Rng, n: number, route: Tile[], taken: Tile[] = []): Tile[] {
-  const s = TRAINING.cover.size;
+  const s = TRAINING.terrain.size;
   const half = Math.floor(s / 2);
-  const onRoute = Math.round(n * TRAINING.cover.onRoute);
+  const onRoute = Math.round(n * TRAINING.terrain.onRoute);
   const out: Tile[] = [];
   const ok = (a: Tile) =>
     a.x >= 0 && a.y >= 0 && a.x + s <= N && a.y + s <= N
@@ -181,9 +189,9 @@ export function layCover(r: Rng, n: number, route: Tile[], taken: Tile[] = []): 
   return out;
 }
 
-/** A new run's cover: TRAINING.cover.patches patches (and `extra` more: the Derelict Fleet), biased to the empty map's route. */
+/** A new run's dangerous terrain: TRAINING.terrain.patches patches (and `extra` more: the Derelict Fleet), biased to the empty map's route. */
 export const runCover = (r: Rng, extra = 0): Tile[] =>
-  layCover(r, randInt(r, TRAINING.cover.patches[0], TRAINING.cover.patches[1]) + extra, route(mapFor([])));
+  layCover(r, randInt(r, TRAINING.terrain.patches[0], TRAINING.terrain.patches[1]) + extra, route(mapFor([])));
 
 /** An enemy on the field from a spawn plan (id run.nextId++), met for the bestiary. A nemesis plan gets its tricks
  *  through `nem` (nemesis.ts sets them up), a real lord's through `lord` (lords.ts); an Armoured one its `hard`; the
@@ -207,13 +215,18 @@ export function spawnDue(run: TrainingRun): void {
   while (run.queue.length && run.queue[0].at <= run.t) spawnOne(run, run.queue.shift()!);
 }
 
-/** An enemy's speed now, in cells a second (earlyPace on the first waves; slow, daze; a nemesis's rage and Vengeful; a real lord's Surge; the
- *  Nexus's Swift, Warp Currents and Vengeful rushes). */
+/** An enemy's speed now, in cells a second (earlyPace on the first waves; slow, daze; dangerous terrain underfoot; a nemesis's rage and
+ *  Vengeful; a real lord's Surge; the Nexus's Swift, Warp Currents and Vengeful rushes). */
 export function speedOf(run: TrainingRun, e: Enemy): number {
   const slow = (e.status.slow ?? 0) > 0 ? TRAINING.slowMul : 1;
   const daze = (e.status.daze ?? 0) > 0 ? TRAINING.dazeMul : 1;
   const surge = (e.lord?.burst ?? 0) > 0 ? TRAINING.nexus.tricks.burst.mul : 1;
-  return TRAINING_ENEMIES[e.kind].speed * TRAINING.walkMul * (W.earlyPace[run.wave - 1] ?? 1) * slow * daze * (e.nem?.speed ?? 1) * surge * affixPace(run, e);
+  // A Weekly Siege's colossus strides over dangerous terrain, siegeSpeed as fast.
+  const colossus = !!run.siege && !!e.final;
+  const T = TRAINING.terrain;
+  const ground = !e.flies && !colossus && inTerrain(run, e.x, e.y) ? 1 - (TRAINING_ENEMIES[e.kind].spawn === 'boss' ? T.bossSlow : T.slow) : 1;
+  return TRAINING_ENEMIES[e.kind].speed * TRAINING.walkMul * (W.earlyPace[run.wave - 1] ?? 1) * slow * daze * ground * (e.nem?.speed ?? 1) * surge
+    * affixPace(run, e) * (colossus ? TRAINING.finale.siegeSpeed : 1);
 }
 
 /** Base HP an enemy costs if it gets through: its own leak, or leak.elite for an elite; a boss its leak × the share

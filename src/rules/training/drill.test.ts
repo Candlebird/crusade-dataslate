@@ -8,7 +8,6 @@ import {
   unlockText,
 } from './drill';
 import { buyLuck, buyMend, luckCost, luckProblem } from './economy';
-import { TRINKET_CARD } from './trinkets';
 import { blankRun, testUnit } from './testRun';
 import type { RunDrill, TrainingRun } from './types';
 
@@ -46,7 +45,7 @@ describe('drill honours', () => {
     const d = all();
     expect(d.luck).toBe(TRAINING.shards.luckCost.length);
     expect([...d.cards].sort()).toEqual(CARDS.map((c) => c.id).sort());
-    expect(d.perks).toEqual({ purse: 5, mend: 3, reroll: 3, thrift: 3, offer: 2 });
+    expect(d.perks).toEqual({ purse: 5, mend: 3, reroll: 5, thrift: 3 });
   });
 
   it('counts goals from the force, and an old force starts from its units\' records', () => {
@@ -90,27 +89,26 @@ describe('drill honours', () => {
     for (let i = 0; i < 40; i++) for (const d of drawCards(run)) expect(D.cardsAtStart).toContain(d.id);
   });
 
-  it('perks: thrift, purse, mend, offer', () => {
+  it('perks: thrift, purse, mend; no perk widens the card offer', () => {
     const base = TRAINING.shards.luckCost[0];
     expect(luckCost(drilled({ luck: 4, cards: [], perks: { thrift: 2 } }))).toBe(Math.round(base * (1 - 2 * D.perks.thrift)));
     const hurt = drilled({ luck: 4, cards: [], perks: { mend: 1 } }, { credits: 9999, baseHp: 1 });
     buyMend(hurt);
     expect(hurt.baseHp).toBe(1 + TRAINING.mend.hp + D.perks.mend);
-    const wide = drilled({ ...all(), perks: { offer: 1 } });
+    const wide = drilled({ ...all(), perks: { reroll: 9 } });
     wide.pieces.push(testUnit());
-    expect(drawCards(wide)).toHaveLength(TRAINING.cards.offer + D.perks.offer);
+    expect(drawCards(wide)).toHaveLength(TRAINING.cards.offer);
+    expect(drawCards(wide, 9)).toHaveLength(TRAINING.cards.offer);
   });
 
   it('re-draws a card offer with the reroll perk, as many times as it has levels', () => {
     const none = drilled({ ...all(), perks: {} }, { offer: [{ id: 'aim', rarity: 'Common' }] });
     expect(rerollProblem(none)).toMatch(/Drill Honour/);
-    const trinket = { id: TRINKET_CARD, rarity: 'Rare', trinket: 'lucky-coin' } as NonNullable<TrainingRun['offer']>[number];
-    const run = drilled({ ...all(), perks: { reroll: 1 } }, { offer: [{ id: 'aim', rarity: 'Common' }, trinket] });
+    const run = drilled({ ...all(), perks: { reroll: 1 } }, { offer: [{ id: 'aim', rarity: 'Common' }] });
     expect(rerollsLeft(run)).toBe(1);
-    run.baseHp -= 5; // so the mending cards are useful too (cardUseful): enough to fill the offer with no unit crafted
+    run.pieces.push(testUnit());
     rerollCards(run);
-    expect(run.offer).toContainEqual(trinket);
-    expect(run.offer!.length).toBe(TRAINING.cards.offer + 1);
+    expect(run.offer!.length).toBe(TRAINING.cards.offer);
     expect(rerollsLeft(run)).toBe(0);
     expect(rerollProblem(run)).toMatch(/left/);
     expect(() => rerollCards(run)).toThrow();

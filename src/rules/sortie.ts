@@ -11,7 +11,7 @@ import { squadPower } from './training/economy';
 import { shownTitle } from './training/titles';
 import { unitName } from './battle';
 import {
-  SORTIE, SORTIE_BOONS, SORTIE_EVENTS, SORTIE_QUIRKS, SORTIE_TRINKETS, TRAINING, type SortieGoal,
+  SORTIE, SORTIE_BOONS, BOON_TIERS, boonText, type SortieBoonTier, SORTIE_EVENTS, SORTIE_QUIRKS, TRAINING, type SortieGoal,
   type SortieAffix, type SortieBoonId, type SortieChoice, type SortieEvent, type SortieLength, type SortieMode, type SortieOutcome,
   type SortieCurseId, type SortieMarkId, type SortieScarId,
 } from './downtimeData';
@@ -101,6 +101,9 @@ export interface SortieSquad {
   member?: number;
   /** The round a party unit made its last stand (SORTIE.lastStand); only one a fight. */
   stand?: number;
+  /** The last round a party unit charged, and the last round Rally Cry steadied it. */
+  chargedAt?: number;
+  rallied?: number;
 }
 
 export type SortieTone = 'good' | 'bad' | 'info';
@@ -190,6 +193,12 @@ export interface SortieCombat {
   /** The latest blows, for the view's trails and damage numbers (newest last). */
   fx?: SortieFx[];
   fxSeq?: number;
+  /** A party model fell this fight (Momentum). */
+  lostModel?: boolean;
+  /** The party unit that stepped up to the Front this round (Rotation Drill). */
+  upFront?: string;
+  /** The Front unit holding the line against a charge (Hold the Line), and the boon's level. */
+  holding?: { key: string; lv: number };
 }
 
 /** A tell: a signature that goes off next round, the party unit it means (if one), and how to answer it. */
@@ -222,6 +231,9 @@ export interface SortieHaul {
   rp: number;
   us: number;
 }
+
+/** A boon on offer: which, at what rarity, and the party unit (by index) a unit boon goes to. */
+export interface SortieBoonDraw { id: SortieBoonId; tier: SortieBoonTier; unit?: number }
 
 /** One unit of the party and the wounds its models carry. */
 export interface SortieMember {
@@ -263,6 +275,11 @@ export interface SortieRun {
   /** Extra wounds per model from boons and shrines. */
   tough: number;
   boons: SortieBoonId[];
+  /** Each boon's rarity (none: its lowest), and the party unit a unit boon went to. */
+  boonTier?: Partial<Record<SortieBoonId, SortieBoonTier>>;
+  boonUnit?: Partial<Record<SortieBoonId, number>>;
+  /** Fights won in a row with no model lost (Momentum). */
+  streak?: number;
   won: number;
   /** XP earned so far, before the cap. */
   xp: number;
@@ -274,7 +291,7 @@ export interface SortieRun {
   screen: SortieScreen;
   combat?: SortieCombat;
   /** Boons to pick from; `patch` offers patching up instead. */
-  offer?: { boons: SortieBoonId[]; patch?: boolean };
+  offer?: { boons: SortieBoonDraw[]; patch?: boolean };
   event?: { id: string; result?: string; then?: 'fight' };
   /** fell: wiped out. broke: the last models routed. home: headed home from a camp. */
   over?: 'fell' | 'broke' | 'won' | 'quit' | 'home';
@@ -288,7 +305,7 @@ export interface SortieRun {
   /** The scene at the node the party is at. */
   scene?: string;
   /** A shop's wares, bought with the run's Supply. */
-  shop?: { boons: { id: SortieBoonId; price: number; sold?: boolean }[]; healed?: boolean };
+  shop?: { boons: (SortieBoonDraw & { price: number; sold?: boolean })[]; healed?: boolean };
   /** How much of the Echo lord's wounds story choices have taken. */
   weaken: number;
   /** The region's deep version (bigger fights, a bigger haul). */
@@ -301,8 +318,6 @@ export interface SortieRun {
   tier?: number;
   /** From tier 3: the lord's second signature ability, borrowed from another lord. */
   sig2?: string;
-  /** Trinkets found on the way, brought home whatever happens. */
-  trinkets?: string[];
   /** The weekly challenge this run is (an ISO week like '2026-W43'). */
   weekly?: string;
   /** Pact marks taken on for this run (SORTIE.marks). */
@@ -367,7 +382,7 @@ export function squadOf(u: Unit, key: string, opts: { n?: number; extraTough?: n
   // fighter() counts extra Tough as Defense; here it is wounds on each model instead.
   const defBonus = extra ? f.defBonus / ((f.size * f.tough + extra) / (f.size * f.tough)) : f.defBonus;
   const n = clamp(opts.n ?? f.size, 1, f.size);
-  const knack = opts.echo ? 0 : (u.quirks?.includes('hardy') ? 2 : 0) - (u.quirks?.includes('frail') ? 2 : 0) + (SORTIE_TRINKETS[u.trinket ?? '']?.hp ?? 0);
+  const knack = opts.echo ? 0 : (u.quirks?.includes('hardy') ? 2 : 0) - (u.quirks?.includes('frail') ? 2 : 0);
   const tough = Math.max(1, (f.tough + extra) * SORTIE.hpMul + (opts.extraTough ?? 0) + knack);
   const s: SortieSquad = {
     key, name: f.name, unit: u, echo: !!opts.echo, models: modelsOf(u, f, n, tough),
@@ -589,27 +604,14 @@ const quirk = (s: SortieSquad, id: string) => !s.echo && !!s.unit.quirks?.includ
 /** A region quirk for where the run is. */
 const quirkHere = (run: SortieRun, s: SortieSquad, kind: 'native' | 'haunted') => quirk(s, `${kind}:${run.region}`);
 
-// --- Trinkets and stress ---------------------------------------------------------------------------------------------
+// --- Stress --------------------------------------------------------------------------------------------------------
 
-/** The trinket a party squad carries (Echoes carry none). */
-const trinketOf = (s: SortieSquad) => (s.echo ? undefined : SORTIE_TRINKETS[s.unit.trinket ?? '']);
-export const trinketInfo = (id?: string) => (id ? SORTIE_TRINKETS[id] : undefined);
-
-/** Maybe find a trinket. */
-function findTrinket(run: SortieRun, chance: number) {
-  if (rand(run) >= chance) return;
-  const ids = Object.keys(SORTIE_TRINKETS);
-  const id = ids[Math.floor(rand(run) * ids.length)];
-  (run.trinkets ??= []).push(id);
-  note(run, `Found a trinket: ${SORTIE_TRINKETS[id].name} (${SORTIE_TRINKETS[id].text})`, 'good');
-}
-
-/** Stress on a party unit, bent by its quirks, trinket and boons (a unit wiped out takes no more); a negative takes it off. */
+/** Stress on a party unit, bent by its quirks and boons (a unit wiped out takes no more); a negative takes it off. */
 function stress(run: SortieRun, m: SortieMember, n: number) {
   if (n > 0) {
     if (!memberUp(m)) return;
     const q = m.unit.quirks ?? [];
-    n *= (q.includes('steady') ? 0.75 : 1) * (q.includes('shaky') ? 1.25 : 1) * (SORTIE_TRINKETS[m.unit.trinket ?? '']?.stress ?? 1) * (has(run, 'hymn') ? 0.5 : 1);
+    n *= (q.includes('steady') ? 0.75 : 1) * (q.includes('shaky') ? 1.25 : 1) * [1, 0.75, 0.5, 0.25][lv(run, 'hymn')];
   }
   m.stress = clamp((m.stress ?? 0) + n, 0, SORTIE.stress.max);
 }
@@ -838,8 +840,7 @@ export function enterNode(run: SortieRun, book: CatalogBook, node: SortieNode) {
     gain(run, SORTIE.haul.cache);
     run.offer = { boons: boonOffer(run, 3) };
     run.screen = 'reward';
-    note(run, `${run.scene} A cache of old supplies (+${SORTIE.haul.cache.supply} Supply).`, 'info');
-    return findTrinket(run, SORTIE.trinkets.cache);
+    return note(run, `${run.scene} A cache of old supplies (+${SORTIE.haul.cache.supply} Supply).`, 'info');
   }
   const ev = pickEvent(run);
   run.seen.push(ev.id);
@@ -894,34 +895,80 @@ export function gain(run: SortieRun, h: Partial<SortieHaul>) {
 
 // --- Rewards, camps and shrines ----------------------------------------------------------------------------------
 
-/** Some boons the party could still take: commons mostly, a rare now and then (always one with 'rare'), or curses. */
-function boonOffer(run: SortieRun, n: number, kind: 'any' | 'rare' | 'curse' = 'any'): SortieBoonId[] {
+const TIER_LV: Record<SortieBoonTier, number> = { Common: 1, Rare: 2, Legendary: 3 };
+/** The rarity a party holds a boon at (its lowest, if the run never said). */
+export const boonTier = (run: SortieRun, b: SortieBoonId): SortieBoonTier =>
+  run.boonTier?.[b] ?? BOON_TIERS.find((t) => SORTIE_BOONS[b]?.tiers[t] !== undefined) ?? 'Common';
+/** How strong a boon the party holds is: 0 not held, 1 Common, 2 Rare, 3 Legendary. */
+export const boonLevel = (run: SortieRun, b: SortieBoonId) => (run.boons.includes(b) ? TIER_LV[boonTier(run, b)] : 0);
+const lv = boonLevel;
+/** A unit boon's level on this squad: only the unit it went to has it. */
+const ulv = (run: SortieRun, s: SortieSquad, b: SortieBoonId) => (!s.echo && s.member !== undefined && run.boonUnit?.[b] === s.member ? lv(run, b) : 0);
+
+/** The party units (by index) a unit boon could go to: any still in the fight; a Fortification never holds the Front. */
+function boonUnits(run: SortieRun, id: SortieBoonId): number[] {
+  return run.party.flatMap((m, i) => (memberUp(m) && (id !== 'bodyguard' || !isFort(m.unit)) ? [i] : []));
+}
+
+/** A boon the party holds, as a draw: its rarity, and its unit. */
+export const heldBoon = (run: SortieRun, id: SortieBoonId): SortieBoonDraw => ({ id, tier: boonTier(run, id), unit: run.boonUnit?.[id] });
+/** "Bayonets (Rare)", "Veteran’s Mark (Common), for Wardens", "Void Pact". */
+export function boonLabel(run: SortieRun, d: SortieBoonDraw): string {
+  const b = SORTIE_BOONS[d.id];
+  const unit = d.unit !== undefined && run.party[d.unit] ? memberName(run.party[d.unit]) : undefined;
+  return `${b.name}${b.curse ? '' : ` (${d.tier})`}${unit ? `, for ${unit}` : ''}`;
+}
+/** What a drawn (or held) boon does, its unit named. */
+export const boonDrawText = (run: SortieRun, d: SortieBoonDraw) =>
+  boonText(d.id, d.tier, d.unit !== undefined && run.party[d.unit] ? memberName(run.party[d.unit]) : undefined);
+/** Taking this draw upgrades a boon the party already holds. */
+export const isUpgrade = (run: SortieRun, d: SortieBoonDraw) => run.boons.includes(d.id);
+
+/**
+ * Some boons the party could still take, each at a rarity drawn by SORTIE.boonOdds: one it doesn't hold, or one it holds
+ * at a higher rarity (taking that upgrades it). With 'rare' the first is Rare or better; 'curse' draws curses.
+ */
+function boonOffer(run: SortieRun, n: number, kind: 'any' | 'rare' | 'curse' = 'any'): SortieBoonDraw[] {
+  const open = (id: SortieBoonId, t: SortieBoonTier) => SORTIE_BOONS[id].tiers[t] !== undefined && TIER_LV[t] > lv(run, id);
   const pool = (Object.keys(SORTIE_BOONS) as SortieBoonId[]).filter((id) => {
     const b = SORTIE_BOONS[id];
-    return !run.boons.includes(id) && (b.curse || !run.unlocked || run.unlocked.includes(id)) && (run.ranged || !b.ranged) && (run.melee || !b.melee) && (run.mode === 'shard' || !b.shard) && !b.curse === (kind !== 'curse');
+    return (b.curse || !run.unlocked || run.unlocked.includes(id)) && (run.ranged || !b.ranged) && (run.melee || !b.melee) && (run.mode === 'shard' || !b.shard)
+      && !b.curse === (kind !== 'curse') && (!b.unit || run.boonUnit?.[id] !== undefined || boonUnits(run, id).length > 0) && BOON_TIERS.some((t) => open(id, t));
   });
-  const take = (ids: SortieBoonId[]) => {
+  const out: SortieBoonDraw[] = [];
+  const { Legendary, Rare } = SORTIE.boonOdds;
+  while (out.length < n && pool.length) {
+    const min = kind === 'rare' && !out.length ? 2 : 1;
+    const r = rand(run);
+    const want = Math.max(min, r < Legendary ? 3 : r < Legendary + Rare ? 2 : 1);
+    // The rarity drawn if any boon left comes at it, else the nearest below it (down to the least allowed), else above.
+    const order = [...BOON_TIERS].sort((x, y) => {
+      const dx = TIER_LV[x] - want, dy = TIER_LV[y] - want;
+      return (dx > 0 ? 10 + dx : -dx) - (dy > 0 ? 10 + dy : -dy);
+    }).filter((t) => TIER_LV[t] >= min);
+    const tier = order.find((t) => pool.some((id) => open(id, t)));
+    if (!tier) break;
+    const ids = pool.filter((id) => open(id, tier));
     const id = ids[Math.floor(rand(run) * ids.length)];
     pool.splice(pool.indexOf(id), 1);
-    return id;
-  };
-  const out: SortieBoonId[] = [];
-  if (kind === 'rare' && pool.some((id) => SORTIE_BOONS[id].rare)) out.push(take(pool.filter((id) => SORTIE_BOONS[id].rare)));
-  while (out.length < n && pool.length) {
-    const rare = pool.filter((id) => SORTIE_BOONS[id].rare);
-    const common = pool.filter((id) => !SORTIE_BOONS[id].rare);
-    out.push(take(rare.length && (!common.length || rand(run) < SORTIE.rareChance) ? rare : common));
+    const units = SORTIE_BOONS[id].unit ? boonUnits(run, id) : [];
+    const unit = SORTIE_BOONS[id].unit ? run.boonUnit?.[id] ?? units[Math.floor(rand(run) * units.length)] : undefined;
+    out.push(unit === undefined ? { id, tier } : { id, tier, unit });
   }
   return out;
 }
 
-function addBoon(run: SortieRun, id: SortieBoonId) {
-  run.boons.push(id);
-  if (id === 'hide') toughen(run, SORTIE.hpMul);
-  if (id === 'lantern') {
+/** Take a boon, or upgrade one the party holds to the draw's rarity. */
+function addBoon(run: SortieRun, d: SortieBoonDraw) {
+  const was = lv(run, d.id);
+  if (!was) run.boons.push(d.id);
+  (run.boonTier ??= {})[d.id] = d.tier;
+  if (d.unit !== undefined && run.boonUnit?.[d.id] === undefined) (run.boonUnit ??= {})[d.id] = d.unit;
+  if (d.id === 'hide') toughen(run, (lv(run, 'hide') - was) * SORTIE.hpMul);
+  if (d.id === 'lantern') {
     for (const n of run.map.flat()) n.hidden = false;
   }
-  note(run, `Boon: ${SORTIE_BOONS[id].name}.`, 'good');
+  note(run, `${was ? 'Boon upgraded' : 'Boon'}: ${boonLabel(run, heldBoon(run, d.id))}.`, 'good');
 }
 
 /** Extra wounds on every model of the party. */
@@ -957,8 +1004,8 @@ function revive(run: SortieRun, n: number, members = run.party): number {
 /** Take an offered boon (or skip them with null). */
 export function pickBoon(run: SortieRun, i: number | null) {
   if (run.screen !== 'reward' || !run.offer) return;
-  const id = i === null ? undefined : run.offer.boons[i];
-  if (id) addBoon(run, id);
+  const d = i === null ? undefined : run.offer.boons[i];
+  if (d) addBoon(run, d);
   onward(run);
 }
 
@@ -996,8 +1043,7 @@ export function campHome(run: SortieRun) {
 
 /** A shop: a few boons for Supply, and patching up. */
 function openShop(run: SortieRun) {
-  const { boon, rare, boons } = SORTIE.shop;
-  run.shop = { boons: boonOffer(run, boons).map((id) => ({ id, price: shopPrice(run, SORTIE_BOONS[id].rare ? rare : boon) })) };
+  run.shop = { boons: boonOffer(run, SORTIE.shop.boons).map((d) => ({ ...d, price: shopPrice(run, SORTIE.shop.price[d.tier]) })) };
   run.screen = 'shop';
   note(run, run.scene ?? 'A shop.', 'info');
 }
@@ -1007,7 +1053,7 @@ export function shopBuy(run: SortieRun, i: number) {
   if (run.screen !== 'shop' || !item || item.sold || run.haul.supply < item.price) return;
   run.haul.supply -= item.price;
   item.sold = true;
-  addBoon(run, item.id);
+  addBoon(run, item);
 }
 
 export function shopHeal(run: SortieRun) {
@@ -1048,7 +1094,6 @@ export function eventChoose(run: SortieRun, i: number) {
   if (ev.id === regionOf(run).finale && !threadDone(run)) run.flags.push(`${run.region}-done`);
   note(run, `${ev.name}: ${run.event!.result}`, o === c.fail ? 'bad' : 'info');
   if (o === c.fail) stressAll(run, SORTIE.stress.fail);
-  else if (!o.fight && !o.hurt) findTrinket(run, SORTIE.trinkets.event);
   if (o.fight) run.event!.then = 'fight';
 }
 
@@ -1062,8 +1107,8 @@ export function leaveEvent(run: SortieRun, book: CatalogBook) {
 function outcome(run: SortieRun, o: SortieOutcome): string {
   const bits = [o.text];
   if (o.boon || o.rare) {
-    const id = boonOffer(run, 1, o.rare ? 'rare' : 'any')[0];
-    if (id) { addBoon(run, id); bits.push(`Boon: ${SORTIE_BOONS[id].name}.`); }
+    const d = boonOffer(run, 1, o.rare ? 'rare' : 'any')[0];
+    if (d) { addBoon(run, d); bits.push(`Boon: ${boonLabel(run, d)}.`); }
   }
   if (o.flag && !run.flags.includes(o.flag)) run.flags.push(o.flag);
   if (o.weaken) {
@@ -1071,8 +1116,8 @@ function outcome(run: SortieRun, o: SortieOutcome): string {
     bits.push(`${bossOf(run).name} will start the fight ${Math.round(run.weaken * 100)}% down.`);
   }
   if (o.curse) {
-    const id = boonOffer(run, 1, 'curse')[0];
-    if (id) { addBoon(run, id); bits.push(`${SORTIE_BOONS[id].name}: ${SORTIE_BOONS[id].text}`); }
+    const d = boonOffer(run, 1, 'curse')[0];
+    if (d) { addBoon(run, d); bits.push(`${SORTIE_BOONS[d.id].name}: ${boonText(d.id)}`); }
     else bits.push('Nothing more it can give you.');
     stressAll(run, SORTIE.stress.hurt);
   }
@@ -1244,9 +1289,27 @@ export function gunReach(run: SortieRun, s: SortieSquad, g: Gun): number {
   const band = SORTIE.ranges.find(([r]) => g.range <= r)?.[1] ?? SORTIE.ranks;
   if (s.echo) return band;
   // Any gun reaches Close from the Middle, so a 12" one isn't dead weight there.
-  return clamp(Math.max(slotOf(s) === 1 ? 1 : 0, band + (has(run, 'cells') ? 1 : 0) + (has(run, 'spotter') && slotOf(s) === 2 ? 1 : 0) - slotOf(s)), 0, SORTIE.ranks);
+  return clamp(Math.max(slotOf(s) === 1 ? 1 : 0, band + (lv(run, 'cells') && slotOf(s) >= 3 - lv(run, 'cells') ? 1 : 0) - slotOf(s)), 0, SORTIE.ranks);
 }
 export const chargeReach = (run: SortieRun, s: SortieSquad) => SORTIE.chargeReach + (!s.echo && has(run, 'packs') ? 1 : 0);
+
+/** A squad's best weapon (not its fists), for Signature Weapon. */
+function bestGun(s: SortieSquad): Gun | undefined {
+  const score = (g: Gun) => g.attacks * (1 + g.ap) * Math.max(1, g.blast) * Math.max(1, g.deadly);
+  return s.models.flatMap((m) => m.guns).filter((g) => g.name !== FISTS.name).sort((a, b) => score(b) - score(a) || a.name.localeCompare(b.name))[0];
+}
+const signed = (run: SortieRun, s: SortieSquad, g: Gun) => ulv(run, s, 'signature') > 0 && g.name === bestGun(s)?.name;
+/** A party unit with Lord-Hunter, against an elite fight's Echoes or the lord. */
+const hunting = (run: SortieRun, att: SortieSquad, def: SortieSquad) => ulv(run, att, 'hunter') > 0 && (run.combat?.kind === 'elite' || def.key === run.combat?.lord);
+
+/** A weapon's AP on a target, boons and Fortified counted. */
+function apOf(run: SortieRun, att: SortieSquad, def: SortieSquad, g: Gun, melee: boolean): number {
+  const mine = !att.echo;
+  return g.ap + (melee && mine ? lv(run, 'blades') + (has(run, 'fury') ? 2 : 0) : 0)
+    + (mine && signed(run, att, g) ? (ulv(run, att, 'signature') >= 3 ? 2 : 1) : 0)
+    + (mine && hunting(run, att, def) ? (ulv(run, att, 'hunter') >= 3 ? 2 : 1) : 0)
+    - (def.fortified ? 1 : 0);
+}
 
 const healOf = (s: SortieSquad) => SORTIE.hpMul * Math.max(1, effects(s.abilities, 'heal').reduce((n, e) => n + e.n, 0)) * 2;
 const shieldOf = (s: SortieSquad) => SORTIE.hpMul * Math.max(1, effects(s.abilities, 'shield').reduce((n, e) => n + e.n, 0)) + active(s).length;
@@ -1272,11 +1335,13 @@ function rotate(run: SortieRun, c: SortieCombat) {
   const back = line.shift()!;
   line.push(back);
   if (has(run, 'dressing')) {
-    const n = mend(back, active(back).reduce((x, m) => x + Math.ceil(m.max / 6), 0));
+    const div = [6, 6, 4, 3][lv(run, 'dressing')];
+    const n = mend(back, active(back).reduce((x, m) => x + Math.ceil(m.max / div), 0));
     if (n) log(c, `${back.name} dress their wounds: mended ${n}.`, 'good');
   }
   line.forEach((p, i) => (p.slot = i));
   closeRanks(c);
+  c.upFront = partyLine(c)[0]?.key;
   log(c, `The line turns: ${partyLine(c).map((p, i) => `${p.name} ${SLOTS[i].toLowerCase()}`).join(', ')}.`, 'info');
 }
 
@@ -1388,7 +1453,7 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
     log(c, `Ambush! The ${band.length ? 'Marauders' : 'Echoes'} were waiting, and strike first this round.`, 'bad');
     note(run, `Ambushed by ${listText([...new Set(enemies.map((e) => e.name))])}.`, 'bad');
   }
-  if (has(run, 'banner')) for (const p of partyLine(c)) p.shield = active(p).length;
+  if (has(run, 'banner')) for (const p of partyLine(c)) p.shield = active(p).length * lv(run, 'banner');
   if (has(run, 'pact')) {
     for (const m of partyLine(c).flatMap(active)) m.hp = Math.max(1, m.hp - Math.ceil(m.max / 6));
     log(c, 'The Void Pact takes its due.', 'bad');
@@ -1485,11 +1550,24 @@ function newRound(run: SortieRun) {
   c.tells = [];
   c.acting = undefined;
   log(c, `— Round ${c.round} —`, 'info');
+  c.upFront = undefined;
   if (c.round > 1) {
     for (const p of c.party) if ((p.shieldUntil ?? 0) < c.round) { p.shield = 0; p.shieldUntil = undefined; }
     rotate(run, c);
   }
-  if (has(run, 'rally')) for (const p of partyLine(c)) for (const m of p.models) m.shaken = false;
+  // Bodyguard: extra wounds on every model while the unit holds the Front, gone once it falls back.
+  const guard = frontOf(c);
+  const bg = guard ? ulv(run, guard, 'bodyguard') : 0;
+  if (guard && bg) {
+    guard.shield += (bg >= 2 ? 2 : 1) * SORTIE.hpMul * active(guard).length;
+    guard.shieldUntil = Math.max(guard.shieldUntil ?? 0, c.round);
+  }
+  const rally = lv(run, 'rally');
+  if (rally) for (const p of rally >= 2 ? partyLine(c) : partyLine(c).slice(0, 1)) {
+    if (!p.models.some((m) => m.shaken)) continue;
+    for (const m of p.models) m.shaken = false;
+    p.rallied = c.round;
+  }
   for (const e of c.enemies) if (e.arrives && e.arrives <= c.round && standing(e)) {
     e.arrives = undefined;
     e.dist = 1;
@@ -1524,7 +1602,7 @@ function newRound(run: SortieRun) {
   const turns: SortieTurn[] = [];
   for (const s of [...partyLine(c), ...onField(c)]) {
     if (refusing(c, s)) continue;
-    const mod = (trinketOf(s)?.init ?? 0) + (s.fast ? SORTIE.fast : 0) - (s.slow || statusOn(c, s, 'slow') ? SORTIE.slow : 0) + (!s.echo && has(run, 'drill') ? 1 : 0) + (!s.echo && has(run, 'adrenal') ? 2 : 0)
+    const mod = (s.fast ? SORTIE.fast : 0) - (s.slow || statusOn(c, s, 'slow') ? SORTIE.slow : 0) + (s.echo ? 0 : lv(run, 'drill') + (has(run, 'adrenal') ? 3 : 0) + (has(run, 'momentum') ? Math.min(run.streak ?? 0, lv(run, 'momentum') + 1) : 0))
       + (quirk(s, 'quick') ? 1 : 0) - (quirk(s, 'jumpy') && c.round === 1 ? 2 : 0) + (s.echo && c.ambush && c.round === 1 ? SORTIE.ambush.init : 0);
     if (standing(s)) turns.push({ key: s.key, init: d6(run) + mod + rand(run) * 0.1 });
   }
@@ -1684,10 +1762,11 @@ function pickHurt(s: SortieSquad) {
 function fell(run: SortieRun, s: SortieSquad, front: boolean, by?: SortieSquad) {
   const c = run.combat;
   if (!c) return;
+  if (!s.echo) c.lostModel = true;
   if (s.echo) {
     c.kills++;
     if (by && !by.echo) {
-      const leech = effects(by.abilities, 'leech').reduce((n, e) => n + e.n, 0) + (has(run, 'trophy') ? 1 : 0);
+      const leech = effects(by.abilities, 'leech').reduce((n, e) => n + e.n, 0) + lv(run, 'trophy');
       if (leech) mend(by, leech);
     }
   }
@@ -1765,18 +1844,54 @@ function hitMod(run: SortieRun, att: SortieSquad, def: SortieSquad, g: Gun, a: S
   if (statusOn(c, att, 'daze')) mod -= 1;
   if (lastStanding(c, att)) mod += 1;
   mod -= def.evasive + (a.melee ? (def.meleeEvasion ? 1 : 0) : def.stealth && a.dist >= 2 ? 1 : 0);
-  if (!a.melee && !att.echo && has(run, 'scope') && a.dist >= 3) mod += 1;
-  if (!att.echo && has(run, 'relay') && slotOf(att) === 1) mod += 1;
-  if (!att.echo && has(run, 'salvo') && c.round === 1) mod += 1;
-  if (!att.echo && has(run, 'pact')) mod += 1;
+  if (!att.echo) {
+    if (!a.melee && lv(run, 'scope') >= 2 && a.dist >= 3) mod += 1;
+    if (lv(run, 'relay') >= 2 && (slotOf(att) === 1 || (lv(run, 'relay') >= 3 && slotOf(att) === 2))) mod += 1;
+    if (lv(run, 'salvo') >= 2 && c.round <= lv(run, 'salvo') - 1) mod += 1;
+    if (has(run, 'pact')) mod += 1;
+    if (ulv(run, att, 'veteran') >= 2) mod += 1;
+    if (ulv(run, att, 'hunter') >= 2 && hunting(run, att, def)) mod += 1;
+    if (lv(run, 'rotation') >= 2 && c.upFront === att.key) mod += 1;
+    if (lv(run, 'packs') >= 2 && att.chargedAt === c.round) mod += 1;
+    if (lv(run, 'rally') >= 3 && att.rallied === c.round) mod += 1;
+    if (c.holding && c.holding.key === att.key && c.holding.lv >= 2) mod += 1;
+  }
   if (a.melee) mod += (quirk(att, 'brute') ? 1 : 0) - (quirk(att, 'clumsy') ? 1 : 0);
   else mod += (quirk(att, 'eagle') ? 1 : 0) - (quirk(att, 'myopic') && a.dist >= 3 ? 1 : 0);
   if (quirkHere(run, att, 'haunted')) mod -= 1;
-  mod += (a.melee ? trinketOf(att)?.melee : trinketOf(att)?.shoot) ?? 0;
   if (att.crack?.round === c.round && att.crack.kind === 'wild') mod -= 1;
   // Fresh from melee, guns are hard to bring to bear.
   if (!a.melee && att.engaged >= c.round - 1) mod -= 1;
   return mod;
+}
+
+/** A party unit re-rolls its 1s to hit: the Common (and Legendary) steps of its to-hit boons. */
+function rerollHit(run: SortieRun, att: SortieSquad, a: Strike): boolean {
+  const c = run.combat!;
+  if (att.echo) return false;
+  const odd = (n: number) => n === 1 || n === 3;
+  return (!a.melee && a.dist >= 3 && odd(lv(run, 'scope'))) || (lv(run, 'salvo') === 1 && c.round === 1) || (lv(run, 'relay') === 1 && slotOf(att) === 1)
+    || (a.melee && lv(run, 'bayonets') === 2) || odd(ulv(run, att, 'veteran')) || (lv(run, 'rotation') === 1 && c.upFront === att.key)
+    || (lv(run, 'packs') >= 3 && att.chargedAt === c.round);
+}
+
+/** The Defense a party unit's boons add to one model's save (Berserk Rite takes one off). */
+function boonCover(run: SortieRun, def: SortieSquad, target: SortieModel): number {
+  const c = run.combat!;
+  const half = target.hp * 2 <= target.max;
+  return (lv(run, 'ward') >= 2 && c.round <= lv(run, 'ward') - 1 ? 1 : 0)
+    + (lv(run, 'wall') >= 2 && (slotOf(def) === 0 || (lv(run, 'wall') >= 3 && slotOf(def) === 1)) ? 1 : 0)
+    + (half && lv(run, 'grit') >= 2 ? lv(run, 'grit') - 1 : 0)
+    + (ulv(run, def, 'bodyguard') >= 3 && slotOf(def) === 0 ? 1 : 0)
+    + (lv(run, 'rotation') >= 3 && c.upFront === def.key ? 1 : 0)
+    - (has(run, 'fury') ? 1 : 0);
+}
+
+/** A party model re-rolls a save of 1: the Common steps of its Defense boons, a Bodyguard at Rare, and Hold the Line at Legendary. */
+function rerollSave(run: SortieRun, def: SortieSquad, target: SortieModel): boolean {
+  const c = run.combat!;
+  return (lv(run, 'ward') === 1 && c.round === 1) || (lv(run, 'wall') === 1 && slotOf(def) === 0) || (lv(run, 'grit') === 1 && target.hp * 2 <= target.max)
+    || (ulv(run, def, 'bodyguard') === 2 && slotOf(def) === 0) || (!!c.holding && c.holding.key === def.key && c.holding.lv >= 3);
 }
 
 /** One model's attack on a squad, dice by dice. Returns wounds dealt. */
@@ -1791,28 +1906,36 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
   const mul = att.atkBonus * fury(c, att);
   const sixes = effects(att.abilities, 'sixes');
   for (const g of a.guns) {
-    let n = stoch(run, g.attacks * mul + (a.melee && mine && has(run, 'bayonets') ? 1 : 0));
+    const bayonets = a.melee && mine ? lv(run, 'bayonets') : 0;
+    let n = stoch(run, g.attacks * mul + (bayonets >= 3 ? 2 : bayonets ? 1 : 0) + (mine && ulv(run, att, 'signature') >= 2 && signed(run, att, g) ? 1 : 0));
     const mod = hitMod(run, att, def, g, a);
+    const again = rerollHit(run, att, a);
+    const rounds = mine && !a.melee ? lv(run, 'rounds') : 0;
+    const pin = mine && !a.melee && def.echo ? lv(run, 'pinning') : 0;
     for (let i = 0; i < n; i++) {
       if (!standing(def)) break;
       const need = g.reliable ? 2 : clamp(att.quality - mod, 2, 6);
-      const r = hitRoll(run);
+      let r = hitRoll(run);
+      if (r === 1 && again) r = hitRoll(run);
       if (r < need) continue;
       const six = r === 6;
       const six6 = six ? sixes.filter((e) => appliesTo(e, g)) : [];
       if (six6.some((e) => e.again)) n++;
-      const rend = six && (g.rending || six6.some((e) => e.rend) || (mine && !a.melee && has(run, 'rounds')));
+      const rend = (six && (g.rending || six6.some((e) => e.rend))) || (!!rounds && (rounds >= 2 || slotOf(att) === 2) && r >= (rounds >= 3 ? 5 : 6));
       const extra = six6.reduce((x, e) => x + (e.dmg ?? 0), 0);
       const blast = blastOn(g, def);
       for (let b = 0; b < blast; b++) {
         const target = pickHurt(def);
         if (!target) break;
         hits++;
-        const ap = g.ap + (a.melee && mine ? (has(run, 'blades') ? 1 : 0) + (has(run, 'fury') ? 2 : 0) : 0) + (rend ? 4 : 0) - (def.fortified ? 1 : 0);
-        const cover = -(target.shaken ? 1 : 0) + (def.echo ? 0 : (has(run, 'ward') && c.round === 1 ? 1 : 0)
-          + (has(run, 'wall') && slotOf(def) === 0 ? 1 : 0) + (has(run, 'grit') && target.hp * 2 <= target.max ? 1 : 0) - (has(run, 'fury') ? 1 : 0) + (quirkHere(run, def, 'native') ? 1 : 0) + (trinketOf(def)?.def ?? 0));
+        const ap = apOf(run, att, def, g, a.melee) + (rend ? 4 : 0);
+        const cover = -(target.shaken ? 1 : 0) + (def.echo ? 0 : boonCover(run, def, target) + (quirkHere(run, def, 'native') ? 1 : 0));
         const save = clamp(def.defense + Math.max(0, ap) - def.defMod - cover, 2, 7);
-        if (save < 7 && d6(run) >= save) continue;
+        if (save < 7) {
+          let roll = d6(run);
+          if (roll === 1 && !def.echo && rerollSave(run, def, target)) roll = d6(run);
+          if (roll >= save) continue;
+        }
         const ignore = g.bane ? Math.min(def.ignore, 1 / 6) : def.ignore;
         // Deadly: all its wounds onto one model, none carried over.
         let w = 0;
@@ -1823,6 +1946,7 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
         const lost = Math.min(target.hp, w - soak);
         target.hp -= lost;
         dealt += lost;
+        if (pin && lost && (pin >= 2 || six)) def.status.slow = Math.max(def.status.slow ?? 0, c.round + (pin >= 3 ? 2 : 1));
         if (target.hp <= 0) fell(run, def, front, att);
       }
     }
@@ -1856,9 +1980,9 @@ const atHalf = (s: SortieSquad) => (s.models.length > 1 ? active(s).length * 2 <
  */
 function morale(run: SortieRun, s: SortieSquad, why: string) {
   const c = run.combat!;
-  if (!standing(s) || lastStanding(c, s)) return;
-  const bonus = (s.hero ? SORTIE.heroMorale : 0) + (!s.echo && has(run, 'stims') ? SORTIE.heroMorale : 0) - (!s.echo && has(run, 'adrenal') ? 1 : 0)
-    + (quirk(s, 'steady') ? 1 : 0) - (quirk(s, 'shaky') ? 1 : 0) + (trinketOf(s)?.morale ?? 0) + (scarred(run, s, 'blooded') ? 1 : 0);
+  if (!standing(s) || lastStanding(c, s) || (!s.echo && lv(run, 'stims') >= 3)) return;
+  const bonus = (s.hero ? SORTIE.heroMorale : 0) + (s.echo ? 0 : lv(run, 'stims') * SORTIE.heroMorale - (has(run, 'adrenal') ? 1 : 0))
+    + (quirk(s, 'steady') ? 1 : 0) - (quirk(s, 'shaky') ? 1 : 0) + (scarred(run, s, 'blooded') ? 1 : 0);
   const need = clamp(s.quality - bonus, 2, 6);
   const r = d6(run);
   if (r !== 1 && (r === 6 || r >= need)) return;
@@ -1909,6 +2033,7 @@ function charge(run: SortieRun, att: SortieSquad, def: SortieSquad) {
   const c = run.combat!;
   if (!att.echo) {
     def.dist = 1;
+    att.chargedAt = c.round;
     log(c, `${att.name} charge ${def.name}!`, 'info');
   } else {
     att.dist = 1;
@@ -2182,7 +2307,7 @@ function expect(run: SortieRun, att: SortieSquad, guns: Gun[], def: SortieSquad,
     const a: Strike = { melee, guns: [g], dist, loose };
     const once = g.reliable ? 5 / 6 : clamp((7 - att.quality + hitMod(run, att, def, g, a)) / 6, 1 / 6, 5 / 6);
     const hit = SORTIE.hitTwice ? 1 - (1 - once) ** 2 : once;
-    const ap = g.ap + (melee && !att.echo ? (has(run, 'blades') ? 1 : 0) + (has(run, 'fury') ? 2 : 0) : 0) - (def.fortified ? 1 : 0);
+    const ap = apOf(run, att, def, g, melee);
     const fail = 1 - clamp((7 - def.defense - Math.max(0, ap) + def.defMod) / 6, 0, 5 / 6);
     const per = Math.min(g.deadly, def.models[0]?.max ?? 1);
     n += g.attacks * att.atkBonus * hit * blastOn(g, def) * fail * per * (1 - def.ignore);
@@ -2275,8 +2400,17 @@ function echoTurn(run: SortieRun, e: SortieSquad, ms: SortieModel[]) {
   }
   const front = line[0];
   if (canCharge(run, e)) {
-    charge(run, e, front);
-    if (standing(e) && standing(front)) strike(run, e, front, { melee: true, dist: 1, guns: ms.filter((m) => m.hp > 0 && !m.routed).flatMap((m) => m.guns.filter((g) => g.melee)) });
+    // Hold the Line: the Front unit meets the charge with its own blades first.
+    const hold = lv(run, 'holdline');
+    if (hold) {
+      c.holding = { key: front.key, lv: hold };
+      strike(run, front, e, { melee: true, dist: 1, guns: active(front).flatMap((m) => m.guns.filter((g) => g.melee)), label: 'holds the line' });
+    }
+    if (standing(e) && standing(front)) {
+      charge(run, e, front);
+      if (standing(e) && standing(front)) strike(run, e, front, { melee: true, dist: 1, guns: ms.filter((m) => m.hp > 0 && !m.routed).flatMap((m) => m.guns.filter((g) => g.melee)) });
+    }
+    c.holding = undefined;
     return;
   }
   echoAttack(run, e, ms);
@@ -2355,19 +2489,26 @@ function finish(run: SortieRun, how: 'won' | 'lost' | 'broke') {
     return note(run, `Broke and fled from ${fightTitle[c.kind].toLowerCase()} at depth ${run.depth + 1}.`, 'bad');
   }
   run.won++;
-  stressAll(run, -(SORTIE.stress.won + (has(run, 'respite') ? 2 : 0)));
+  stressAll(run, -(SORTIE.stress.won + [0, 2, 3, 4][lv(run, 'respite')]));
+  run.streak = c.lostModel ? 0 : (run.streak ?? 0) + 1;
   run.xp += c.kind === 'boss' ? SORTIE.xp.boss[run.length] : SORTIE.xp[c.kind];
   const loot: Partial<SortieHaul> = SORTIE.haul[c.kind];
-  const more = (has(run, 'scavenge') ? 1.5 : 1) * (run.deep ? SORTIE.deep.haul : 1) * tierPay(run);
+  const more = [1, 1.25, 1.5, 2][lv(run, 'scavenge')] * (run.deep ? SORTIE.deep.haul : 1) * tierPay(run);
   gain(run, { supply: Math.round((loot.supply ?? 0) * more), rp: Math.round((loot.rp ?? 0) * more), us: loot.us });
   if (c.kind === 'boss' && run.length === 'long' && rand(run) < SORTIE.haul.longShard) gain(run, { us: 1 });
   log(c, `Victory! ${c.kills} Echo${c.kills === 1 ? '' : 'es'} destroyed.`, 'good');
   const lost = c.party.filter((p) => !alive(p).length).map((p) => p.name);
   note(run, `Beat ${fightTitle[c.kind].toLowerCase()}: ${c.kills} kill${c.kills === 1 ? '' : 's'}.${lost.length ? ` ${listText(lost)} fell.` : ''}`, lost.length ? 'bad' : 'good');
   earnScars(run, c);
-  if (has(run, 'medic') && !revive(run, 1)) {
-    const m = run.party.filter(memberUp).flatMap((x) => x.models).filter((x) => x.hp > 0 && x.hp < x.max).sort((a, b) => a.hp - b.hp)[0];
-    if (m) m.hp = Math.min(m.max, m.hp + 2 * SORTIE.hpMul);
+  const medic = lv(run, 'medic');
+  if (medic) {
+    const want = medic >= 2 ? 2 : 1;
+    // Each one it can't bring back, the most hurt model standing mends some instead.
+    for (let k = revive(run, want); k < want; k++) {
+      const m = run.party.filter(memberUp).flatMap((x) => x.models).filter((x) => x.hp > 0 && x.hp < x.max).sort((a, b) => a.hp - b.hp)[0];
+      if (m) m.hp = Math.min(m.max, m.hp + 2 * SORTIE.hpMul);
+    }
+    if (medic >= 3) heal(run, 1 / 6);
   }
   if (c.kind === 'boss') {
     run.bossDown = true;
@@ -2414,7 +2555,6 @@ export function leaveCombat(run: SortieRun) {
   const lean = cursed(run, 'lean') ? 1 : 0;
   run.offer = c.kind === 'elite' ? { boons: boonOffer(run, 3 - lean, 'rare') } : { boons: boonOffer(run, 2 - lean), patch: true };
   run.screen = 'reward';
-  if (c.kind === 'elite') findTrinket(run, SORTIE.trinkets.elite);
 }
 
 /** The bestiary key of an Echo squad: its datasheet, or the lord's id. */
