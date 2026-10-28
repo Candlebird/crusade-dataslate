@@ -37,6 +37,11 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
   - Unit task no longer has the second confirm pop-up.
   - Sortie folds its fight rules away and adds a map key; "Road" is now "Map", and the two Autos are named "Auto-play" and "Auto pick".
   - Zone battles: the side panel no longer repeats the bar over the board, and there's a key for the terrain letters and objectives. The result shows VP and says nothing is recorded until you take it.
+- **Downtime modes, round 2** (6 commits):
+  - Sortie setup no longer repeats the line tags, and the region intro shows once.
+  - The zone battle start leads with the stakes, with the board rules folded.
+  - Expedition, Unit task, Sortie and Zone battle result screens now all say "Recorded on <force>" and list what was recorded. Sortie gets one line per item. Practice says nothing is recorded. A tracked zone battle explains that you then record it from the tracker.
+  - Unit tasks with no worlds held, or no Recon targets, say so.
 - **Forces and units, round 1** (10 commits):
   - Another player's force, lists and ledger are read-only on your device; this matches firestore.rules.
   - A new "Between games" panel on the force page launches Expedition, Unit task, Garrison XP, Patrol, Training and Sortie, each with a reason when greyed out and the best run so far.
@@ -89,6 +94,8 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
 - **Battle result: Finish & save** turns gold once every force has recorded, but it can still be pressed before that, as it could before. Should it be blocked?
 - **Battle: Prev round** is hidden once a battle ends too (Resume brings both back). OK?
 - **Battle rewards for non-campaign forces.** They can roll Nexus-only reward results, which must be re-rolled or changed by hand. The wizard now flags them as a To do. Should the roll skip them instead? That would be a rules change.
+- **Expedition Materials with no bank.** With no bank they seem to be lost ("no bank had room"). Warn before setting out?
+- **"US" for Umbra Shards** is used everywhere. Spell it out for new players?
 - **Unit tasks.** They only show when the force is linked to a faction in the loaded campaign, the same as before. Is that intended?
 
 ## Test by hand
