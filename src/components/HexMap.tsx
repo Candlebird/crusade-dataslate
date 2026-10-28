@@ -469,6 +469,13 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
           <span><Icon name="g:warlord-helmet" /> Guardian</span>
           <span><Icon name="g:hood" /> Marauders</span>
           <span data-tip="Where a band goes next round. Any detachment on its road stops it."><i className="swatch band-road-swatch" /> Marauder road</span>
+          <span data-tip={MARK_TIP}><Icon name="g:hazard-sign" /> Echo mark</span>
+          <span><Icon name="g:crowned-skull" /> Nexus Crisis</span>
+          <span><Icon name="g:tornado" /> Can't be attacked this round</span>
+          <span data-tip="Detachments posted there: hover or tap one to see whose"><Icon name="g:barbute" /> Detachment</span>
+          <span data-tip="The red number under a sector: the Supply of its AI garrison, what you fight to take it"><b className="hex-diff-key">500</b> AI garrison (Supply)</span>
+          {front && <span data-tip="A detachment of yours can reach these this round"><i className="swatch map-reach-swatch" /> In reach this round</span>}
+          {viewAs && <span data-tip="Seen before: you don't know who holds it now"><i className="swatch map-seen-swatch" /> Seen before</span>}
           {sidesOf(c).map((f) => <span key={f.id}><i className="swatch" style={{ background: f.color }} /> {f.name}</span>)}
         </div>
 
