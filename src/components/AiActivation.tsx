@@ -34,7 +34,7 @@ export default function AiActivation({ side, unitId, onPick, setUnit }: {
       <div className="ai-activation">
         <div className="row">
           <button className="primary" disabled={!ready.length} onClick={roll}><Icon name="g:perspective-dice-six-faces-six" /> Activate a random unit</button>
-          <span className="muted small">{ready.length ? `${ready.length} unit${ready.length > 1 ? 's' : ''} still to activate this round` : 'Every unit has activated this round.'}</span>
+          <span className="muted small">{ready.length ? `${ready.length} unit${ready.length > 1 ? 's' : ''} still to activate this round. Roll to let the AI pick which goes next, or press Decide on a unit below.` : 'Every unit has activated this round. Press Next round once every side is done.'}</span>
         </div>
       </div>
     );
