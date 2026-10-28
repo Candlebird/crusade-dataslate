@@ -1406,3 +1406,12 @@ table.ledger td:first-child { white-space: nowrap; }
 .side-panel > h3 { margin-top: 1rem; }
 .result-panel > h3 { margin: 1rem 0 0.25rem; }
 .result-panel > h3:first-of-type { margin-top: 0.25rem; }
+/* Mission library: one line per mission, tapped open to read, edit or duplicate it. */
+.mission-row { border: 1px solid var(--line); background: var(--panel); margin-bottom: 0.4rem; }
+.mission-row[open] { border-color: var(--gold-dim); }
+.mission-row > summary { display: flex; gap: 0.75rem; align-items: baseline; padding: 0.55rem 0.75rem; cursor: pointer; list-style: none; }
+.mission-row > summary::-webkit-details-marker { display: none; }
+.mission-row > summary:hover { background: var(--panel-2); }
+.mission-row-sum { display: block; margin-top: 0.15rem; }
+.mission-row[open] .mission-row-sum { display: none; }
+.mission-row-body { padding: 0 0.75rem 0.75rem; }
