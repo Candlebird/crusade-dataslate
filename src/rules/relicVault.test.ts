@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
 import type { Force } from '../model/types';
 import { relicHolders } from './engine';
-import { carryProblem, equipRelic, grantRelic, stowRelic, vaultOf } from './relicVault';
+import { carryProblem, equipRelic, grantRelic, sendRelic, stowRelic, vaultOf } from './relicVault';
 
 function force(): Force {
   const f: Force = { ...newForce('Alpha Host'), id: 'f' };
@@ -46,5 +46,18 @@ describe('relic vault', () => {
     const f = force();
     f.relicVault = [relic('a')];
     expect(relicHolders([f]).get('Relic a')?.[0]).toMatchObject({ forceId: 'f', unitId: '', unit: 'Relic vault' });
+  });
+
+  it("a stored relic can be sent to another force's vault, noted in both ledgers", () => {
+    const f = force();
+    const g: Force = { ...newForce('Beta Host'), id: 'g' };
+    f.relicVault = [relic('a'), relic('b')];
+    expect(sendRelic(f, g, 'a', '2026-10-28')).toBe(true);
+    expect(vaultOf(f).map((r) => r.id)).toEqual(['b']);
+    expect(vaultOf(g).map((r) => r.id)).toEqual(['a']);
+    expect(f.ledger[f.ledger.length - 1]).toMatchObject({ label: 'Relic sent to Beta Host: Relic a', rp: 0, supply: 0 });
+    expect(g.ledger[g.ledger.length - 1]).toMatchObject({ label: 'Relic received from Alpha Host: Relic a', rp: 0, supply: 0 });
+    expect(sendRelic(f, g, 'a', '2026-10-28')).toBe(false); // no longer there
+    expect(sendRelic(f, f, 'b', '2026-10-28')).toBe(false); // same force
   });
 });

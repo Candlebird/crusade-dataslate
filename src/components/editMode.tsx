@@ -22,8 +22,11 @@ function setEditing(forceId: string, on: boolean) {
 /** Whether the force belongs to another signed-in player: this device may view it but not change it (the sync would undo it). */
 export function useTheirs(f: Force | undefined): boolean {
   const cloud = useCloud();
-  return !!f && !!cloud.email && !!f.owner && f.owner !== cloud.email;
+  return isTheirs(f, cloud.email);
 }
+
+/** useTheirs outside a hook: whether the force belongs to another signed-in player. */
+export const isTheirs = (f: Force | undefined, email: string | null | undefined): boolean => !!f && !!email && !!f.owner && f.owner !== email;
 
 /**
  * Whether the force's manual controls (adding units, RP, shards, XP, traits…) are shown.

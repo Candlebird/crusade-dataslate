@@ -4,7 +4,7 @@ import { useCloud } from '../cloud/CloudSync';
 import { exportForce, readImageAsDataUrl } from '../model/io';
 import { uid } from '../model/factory';
 import { battlePoints, forceTotals, levelForXp, pendingLevels, relicBearer, validateUnit } from '../rules/engine';
-import { carryProblem, equipRelic, vaultOf } from '../rules/relicVault';
+import { carryProblem, equipRelic, sendRelic, vaultOf } from '../rules/relicVault';
 import { forceArmyUrl } from '../armyforge/book';
 import { go, href } from '../route';
 import AddUnitModal from './AddUnitModal';
@@ -30,7 +30,7 @@ import { listTotals, newList } from '../rules/lists';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
 import { Panel, Stepper, TextArea, TextField, XpBar, confirmAction, toast, umbraShards } from './ui';
-import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
+import { EditModeButton, EditModeNotice, Fixed, isTheirs, useEditMode } from './editMode';
 import { localDate } from '../model/date';
 import { EmblemButton } from './Emblem';
 import { defaultEmblem, emblemLayers } from '../model/emblem';
@@ -425,28 +425,47 @@ export default function ForceView({ forceId }: { forceId: string }) {
 /** Producing new units at one of the faction's planets, paid from its bank (Nexus Wars). */
 /** Relics none of the force's units carry: give one to any unit with room, or stow one from a unit's sheet. */
 function RelicVault({ f, readOnly }: { f: Force; readOnly: boolean }) {
-  const { updateForce } = useStore();
+  const { state, update, updateForce } = useStore();
+  const cloud = useCloud();
   const vault = vaultOf(f);
+  // The player's other forces: a stored relic can move to their vaults (another player's force can't be changed from here).
+  const mine = state.forces.filter((x) => x.id !== f.id && !isTheirs(x, cloud.email));
+  const send = (relicId: string, toId: string) =>
+    update((d) => {
+      const from = d.forces.find((x) => x.id === f.id);
+      const to = d.forces.find((x) => x.id === toId);
+      if (!from || !to || !sendRelic(from, to, relicId, localDate())) return;
+      from.updatedAt = to.updatedAt = nowIso();
+    });
   const carried = f.units.filter((u) => u.status !== 'removed' && u.relics.length);
   if (!vault.length && !carried.length) return null;
   const bearers = f.units.filter((u) => u.status !== 'removed' && relicBearer(u));
   return (
     <Panel id="force.vault" title="Relic vault" h={3} extra={<span className="muted small">{vault.length} stored</span>}>
-      {vault.length === 0 && <p className="muted small">Empty. Use "To vault" on a unit's relic to store it here and hand it to another unit.</p>}
+      {vault.length === 0 && <p className="muted small">Empty. Use "To vault" on a unit's relic to store it here and hand it to another unit or send it to another of your forces.</p>}
       {vault.map((r) => (
-        <div key={r.id} className="list-item">
+        <div key={r.id} className="list-item vault-item">
           <div className="grow">
             <b>{r.name}</b> <span className="tag gold">{r.tier}</span>
             {r.profile && <div className="muted small">{r.profile}</div>}
           </div>
           {!readOnly && (
-            <select value="" aria-label={`Give ${r.name} to`} onChange={(e) => e.target.value && updateForce(f.id, (d) => void equipRelic(d, e.target.value, r.id))}>
-              <option value="">Give to…</option>
-              {bearers.map((u) => {
-                const why = carryProblem(u, r);
-                return <option key={u.id} value={u.id} disabled={!!why} title={why}>{unitName(u)}{why ? ` - ${why}` : ''}</option>;
-              })}
-            </select>
+            <div className="vault-moves">
+              <select value="" aria-label={`Give ${r.name} to`} onChange={(e) => e.target.value && updateForce(f.id, (d) => void equipRelic(d, e.target.value, r.id))}>
+                <option value="">Give to…</option>
+                {bearers.map((u) => {
+                  const why = carryProblem(u, r);
+                  return <option key={u.id} value={u.id} disabled={!!why} title={why}>{unitName(u)}{why ? ` - ${why}` : ''}</option>;
+                })}
+              </select>
+              {mine.length > 0 && (
+                <select value="" aria-label={`Send ${r.name} to another force`} title="Moves it to that force's relic vault"
+                  onChange={(e) => e.target.value && send(r.id, e.target.value)}>
+                  <option value="">Send to force…</option>
+                  {mine.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                </select>
+              )}
+            </div>
           )}
         </div>
       ))}

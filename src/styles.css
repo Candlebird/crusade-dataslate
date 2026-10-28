@@ -1547,3 +1547,8 @@ table.ledger td:first-child { white-space: nowrap; }
 .lock-rows li:first-child { border-top: none; }
 /* "US" in stat tiles and cost labels: the full name is on hover. */
 abbr.us-abbr { text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }
+
+/* === Relic vault: give to a unit or send to another force === */
+.list-item.vault-item { flex-wrap: wrap; }
+.vault-item .vault-moves { display: flex; flex-wrap: wrap; gap: 6px; width: 100%; }
+.vault-item .vault-moves select { flex: 1 1 140px; min-width: 0; }

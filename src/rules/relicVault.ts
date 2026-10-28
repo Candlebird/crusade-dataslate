@@ -2,6 +2,7 @@
 // unit with room for them; a relic won by a unit that can't take it (no free slot, not a relic bearer, or short of
 // the tier's XP) goes to the vault instead of over the unit's limit.
 import type { Force, Relic, Unit } from '../model/types';
+import { uid } from '../model/factory';
 import { RELIC_TIER_MIN_XP } from './data';
 import { relicBearer, relicSlots, relicTierAllowed } from './engine';
 
@@ -32,6 +33,17 @@ export function equipRelic(f: Force, unitId: string, relicId: string): boolean {
   if (!u || !r || carryProblem(u, r)) return false;
   f.relicVault = vaultOf(f).filter((x) => x !== r);
   u.relics.push(r);
+  return true;
+}
+
+/** Move a relic from one force's vault to another force's vault, noting it in both ledgers. False when it isn't there. */
+export function sendRelic(from: Force, to: Force, relicId: string, date: string): boolean {
+  const r = vaultOf(from).find((x) => x.id === relicId);
+  if (!r || from.id === to.id) return false;
+  from.relicVault = vaultOf(from).filter((x) => x !== r);
+  to.relicVault = [...vaultOf(to), r];
+  from.ledger.push({ id: uid(), date, label: `Relic sent to ${to.name}: ${r.name}`, rp: 0, supply: 0 });
+  to.ledger.push({ id: uid(), date, label: `Relic received from ${from.name}: ${r.name}`, rp: 0, supply: 0 });
   return true;
 }
 

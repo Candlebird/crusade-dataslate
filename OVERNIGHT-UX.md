@@ -126,6 +126,8 @@ Done on overnight-ux (tsc, 944 tests and the build pass):
   - The HUD shows words down to 900 px wide.
   - The Flying tag says who flies: the boss flies and its escorts walk.
 
+- **Relic vault (asked 2026-10-28):** a stored relic can be sent to the vault of another of your forces with "Send to force…", which is next to "Give to…". Both ledgers note it, as "Relic sent to X" and "Relic received from Y". Only your own forces are listed, because another player's force can't be changed from your device. Only stored relics move, so a carried relic goes "To vault" first.
+
 Kept as they are:
 - **Nexus:** the merged tab keeps the GM's Record form and game log first, and the End round toast stays short.
 - **Battles:** Nexus effects stay hidden outside a campaign, and Prev round stays hidden once a battle ends.
