@@ -117,29 +117,33 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
       d.campaign.updatedAt = nowIso();
     });
 
+  // Rarely needed: folded at the foot of every tab.
   const footer = (
-    <div className="cols-2">
-      <div className="panel">
-        <div className="panel-title"><h3>Update from the GM</h3></div>
-        {importer}
+    <Panel id="campaign.file" title="Campaign file" collapsed>
+      <div className="cols-2">
+        <div>
+          <h3>Update from the GM</h3>
+          {importer}
+        </div>
+        <div>
+          <h3>Remove from this browser</h3>
+          <p className="muted small">Takes the campaign off this browser and unlinks your forces from it. The forces themselves stay.</p>
+          <button
+            className="danger"
+            onClick={() => {
+              if (!confirmAction(`Remove "${c.name}" from this browser? GM: export it first.`)) return;
+              update((d) => {
+                d.campaign = undefined;
+                for (const f of d.forces) f.nexus = undefined;
+              });
+              toast('Campaign removed.');
+            }}
+          >
+            Remove campaign
+          </button>
+        </div>
       </div>
-      <div className="panel">
-        <div className="panel-title"><h3>Danger zone</h3></div>
-        <button
-          className="danger"
-          onClick={() => {
-            if (!confirmAction(`Remove "${c.name}" from this browser? GM: export it first.`)) return;
-            update((d) => {
-              d.campaign = undefined;
-              for (const f of d.forces) f.nexus = undefined;
-            });
-            toast('Campaign removed.');
-          }}
-        >
-          Remove campaign
-        </button>
-      </div>
-    </div>
+    </Panel>
   );
 
   if (gm && !canGm) {
@@ -227,9 +231,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         </div>
       </div>
       <p className="muted small">
-        Your campaign.json is the master copy: players import it and report games to you.
-        End the round once the group has played; players then claim sector income on their force pages. Match rewards come with each recorded battle.
-        Pick a sector and <b>Start a battle here</b>; the result goes into the log and the map.
+        Run the round from the checklist below, then <b>End round…</b>. Your campaign.json is the master copy: export it after changes.
         Full rules: <a href={href.rules('nexus')}>Rules</a>.
       </p>
 
