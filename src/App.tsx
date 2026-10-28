@@ -1,4 +1,4 @@
-import { Suspense } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { href, useRoute } from './route';
 import ForceList from './components/ForceList';
 import ForceView from './components/ForceView';
@@ -23,39 +23,79 @@ const MissionLibrary = lazyPage(() => import('./components/MissionLibrary'));
 const GuidePage = lazyPage(() => import('./components/GuidePage'));
 const RulesPage = lazyPage(() => import('./components/RulesPage'));
 
+const FORCE_PAGES = ['forces', 'force', 'unit', 'battle', 'list', 'ledger'];
+const BATTLE_PAGES = ['tracker', 'sideSheet', 'missions'];
+// On a phone these three fold into one "More" menu so the top bar stays on one line of links.
+const MORE = [
+  { page: 'settings', label: 'Settings', href: () => href.settings() },
+  { page: 'rules', label: 'Rules', href: () => href.rules() },
+  { page: 'guide', label: 'Guide', href: () => href.guide() },
+];
+
+function MoreMenu({ page }: { page: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => setOpen(false), [page]);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', esc);
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', esc); };
+  }, [open]);
+  const here = MORE.find((m) => m.page === page);
+  return (
+    <div className="nav-more" ref={ref}>
+      <a href="#" className={here || open ? 'active' : ''} aria-expanded={open} onClick={(e) => { e.preventDefault(); setOpen(!open); }}>
+        {here ? here.label : 'More'} ▾
+      </a>
+      {open && (
+        <div className="nav-more-menu">
+          {MORE.map((m) => (
+            <a key={m.page} className={m.page === page ? 'active' : ''} href={m.href()} onClick={() => setOpen(false)}>
+              {m.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const route = useRoute();
+  const on = (pages: string[]) => pages.includes(route.page);
   return (
     <div className="app">
       <header className="topbar">
         <a className="brand" href={href.forces()}>
           <span className="brand-sigil"><Icon name="g:holy-symbol" /></span>
-          <span>
+          <span className="brand-name">
             Crusade <em>Dataslate</em>
           </span>
         </a>
         <nav>
-          <a className={route.page === 'forces' || route.page === 'force' || route.page === 'unit' || route.page === 'battle' || route.page === 'list' || route.page === 'ledger' ? 'active' : ''} href={href.forces()}>
+          <a className={on(FORCE_PAGES) ? 'active' : ''} href={href.forces()}>
             Forces
           </a>
-          <a className={route.page === 'tracker' || route.page === 'sideSheet' || route.page === 'missions' ? 'active' : ''} href={href.tracker()}>
+          <a className={on(BATTLE_PAGES) ? 'active' : ''} href={href.tracker()}>
             Battle
           </a>
-          <a className={route.page === 'campaign' ? 'active' : ''} href={href.campaign()}>
+          <a className={on(['campaign']) ? 'active' : ''} href={href.campaign()}>
             Nexus Wars
           </a>
-          <a className={route.page === 'books' ? 'active' : ''} href={href.books()}>
-            Army Books
+          <a className={on(['books']) ? 'active' : ''} href={href.books()}>
+            <span className="nav-long">Army </span>Books
           </a>
-          <a className={route.page === 'settings' ? 'active' : ''} href={href.settings()}>
-            Settings
-          </a>
-          <a className={route.page === 'rules' ? 'active' : ''} href={href.rules()}>
-            Rules
-          </a>
-          <a className={route.page === 'guide' ? 'active' : ''} href={href.guide()}>
-            Guide
-          </a>
+          {MORE.map((m) => (
+            <a key={m.page} className={`nav-wide ${on([m.page]) ? 'active' : ''}`} href={m.href()}>
+              {m.label}
+            </a>
+          ))}
+          <MoreMenu page={route.page} />
+        </nav>
+        <nav className="nav-tools">
           <DiceRoller />
           <AccountButton />
         </nav>
