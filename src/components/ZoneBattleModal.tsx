@@ -38,10 +38,13 @@ const ORDER_NAME: Record<Action, string> = { hold: 'Hold', advance: 'Advance', r
 
 const isPhone = () => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 700px)').matches;
 
-/** Plays a battle on screen. `onSave` gets every step; `onDone` the ended battle, once the player takes the result. */
-export default function ZoneBattleModal({ battle, mode: mode0, effects = [], title, canQuick = true, onSave, onDone, onClose }: {
+/**
+ * Plays a battle on screen. `onSave` gets every step; `onDone` the ended battle, once the player takes the result.
+ * `after` says what taking the result does, on the result screen.
+ */
+export default function ZoneBattleModal({ battle, mode: mode0, effects = [], title, canQuick = true, after, onSave, onDone, onClose }: {
   battle: ZBattle; mode: ZoneMode; effects?: string[]; title: string; canQuick?: boolean;
-  onSave: (z: ZBattle, mode: ZoneMode) => void; onDone: (z: ZBattle, mode: ZoneMode) => void; onClose: () => void;
+  after?: string; onSave: (z: ZBattle, mode: ZoneMode) => void; onDone: (z: ZBattle, mode: ZoneMode) => void; onClose: () => void;
 }) {
   const [z, setZ] = useState<ZBattle>(() => structuredClone(battle));
   const [mode, setMode] = useState<ZoneMode>(mode0);
@@ -400,12 +403,14 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     orders = (
       <div className="zb-panel">
         <h3>{r.winner === 'draw' ? 'A draw' : `${sideName(r.winner)} wins`}</h3>
-        <p className="small">{r.why}.</p>
+        <p className="small">{r.why.charAt(0).toUpperCase() + r.why.slice(1)}.</p>
         <p className="small">
           <span className="muted">Victory points:</span> {sideName(0)} {vp[0]}, {sideName(1)} {vp[1]}
           <br /><span className="muted">Points lost:</span> {sideName(0)} {r.lost[0]}, {sideName(1)} {r.lost[1]}
         </p>
-        {!z.practice && <p className="small muted">Nothing is recorded until you take the result.</p>}
+        {z.practice
+          ? <p className="small muted">Practice: nothing is recorded.</p>
+          : <p className="small muted">Nothing is recorded until you take the result.{after ? ` ${after}` : ''}</p>}
         <button className="primary" onClick={() => onDone(z, mode)}>{z.practice ? 'Close' : 'Take the result'}</button>
       </div>
     );

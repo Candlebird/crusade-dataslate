@@ -32,6 +32,8 @@ const MODE_TEXT: Record<ZoneMode, { label: string; text: string }> = {
   command: { label: 'Command', text: 'You give every order for your side; the AI plays the other.' },
   quick: { label: 'Quick', text: 'The AI plays both sides while you watch.' },
 };
+/** What taking the result of a tracked battle does. */
+const TRACKER_AFTER = 'Taking it fills in the battle tracker: losses, kill XP, objectives and the winner. Then record the battle for each force from there, as after a table game.';
 const rewardText = (m: ZoneMode) => `${Math.round(ZONE_REWARDS[m].xp * 100)}% XP${ZONE_REWARDS[m].rolls ? ' and reward rolls' : ', no reward rolls'}; no match bonus or Strategic Asset`;
 
 /**
@@ -83,7 +85,7 @@ export default function ZoneFight({ id, title, tracked, ctx, modes = ['command',
     return (
       <Suspense fallback={<Modal title={title} onClose={onClose}><p className="muted">Loading the battle…</p></Modal>}>
         <ZoneBattleModal key={save.id} battle={save.battle} mode={save.mode} effects={save.effects} title={save.title}
-          canQuick={modes.includes('quick')} onSave={store} onDone={done} onClose={onClose} />
+          canQuick={modes.includes('quick')} after={practice ? undefined : stakes ?? (ctx.kind === 'tracker' ? TRACKER_AFTER : undefined)} onSave={store} onDone={done} onClose={onClose} />
       </Suspense>
     );
   }
