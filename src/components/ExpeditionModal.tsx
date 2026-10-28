@@ -74,8 +74,11 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
     const s = expeditionSite(site)!;
     body = (
       <>
+        <p className="small" style={{ marginTop: 0 }}>
+          Up to {EXPEDITION.squadMax} units face {EXPEDITION.encounters} encounters in the Nexus. After each, head home with the haul or press on.
+        </p>
         <p className="muted small">
-          Up to {EXPEDITION.squadMax} units face {EXPEDITION.encounters} encounters in the Nexus. After each, head home with the haul or press on. Deeper pays more, but each failed roll raises the ambush danger.
+          Deeper pays more, but each failed roll raises the ambush danger.
           {' '}Checks roll 1–4 dice. Every roll gets +1 per unit after the first and +1 per {EXPEDITION.levelsPerBonus} squad levels (max +{EXPEDITION.bonusCap}).
         </p>
         <div className="fields">
@@ -89,14 +92,24 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
           <div className="span-all small">
             <div className="muted">Squad ({squad.length}/{EXPEDITION.squadMax}){squad.length > 0 && <> · <b>+{bonus}</b> to every roll</>}</div>
             {units.length === 0 && <span className="muted">No active units.</span>}
-            {used.length > 0 && <div className="muted">Each unit gets 1 Solo patrol or Expedition a round. Games at the table don't count.</div>}
-            {units.map((u) => (
-              <label key={u.id} className="row">
-                <input type="checkbox" checked={squad.includes(u.id)} disabled={used.includes(u.id) || (!squad.includes(u.id) && squad.length >= EXPEDITION.squadMax)} onChange={() => toggle(u.id)} />
-                <span className="grow">{unitName(u)}</span>
-                {used.includes(u.id) && <span className="tag gold">Already fought this round</span>}
-              </label>
-            ))}
+            {used.length > 0 && <div className="muted">Units that already went on a Solo patrol, Expedition or task this round stay home. Games at the table don't count.</div>}
+            <div className="mission-pick">
+              {units.map((u) => {
+                const on = squad.includes(u.id);
+                const out = used.includes(u.id);
+                const full = !on && squad.length >= EXPEDITION.squadMax;
+                const why = out ? 'Already went out this round' : full ? `The squad is full (${EXPEDITION.squadMax} units)` : undefined;
+                return (
+                  <label key={u.id} className={`shop-item${on ? ' selected' : ''}${why ? ' disabled' : ''}`} data-tip={why}>
+                    <input type="checkbox" checked={on} disabled={!!why} onChange={() => toggle(u.id)} />
+                    <div className="grow">
+                      <b>{unitName(u)}</b> <span className="muted small">{u.points} pts</span>
+                      {out && <> <span className="tag gold">Out this round</span></>}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
           </div>
         </div>
       </>
@@ -104,7 +117,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
     footer = (
       <>
         <button onClick={onClose}>Cancel</button>
-        <button className="primary" disabled={!squad.length} onClick={() => setE(startExpedition(site, squad))}>Set out</button>
+        <button className="primary" disabled={!squad.length} data-tip={squad.length ? undefined : 'Pick at least one unit'} onClick={() => setE(startExpedition(site, squad))}>Set out</button>
       </>
     );
   } else {
@@ -150,7 +163,8 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
             {' '}Rewards deeper in are worth more.
           </p>
         )}
-        {e.phase === 'done' && done && <p className="small"><b>Recorded:</b> {done}</p>}
+        {e.phase === 'done' && done && <p className="small panel"><b>Recorded:</b> {done}</p>}
+        {!done && <p className="muted small">Closing this window heads home with the haul so far.</p>}
       </>
     );
     footer = e.phase === 'crossroads' ? (
