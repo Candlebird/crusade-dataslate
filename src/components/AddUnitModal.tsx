@@ -23,7 +23,13 @@ export default function AddUnitModal({ onAdd, onClose, budget }: { onAdd: (units
         <button className={tab === 'catalog' ? 'primary' : ''} onClick={() => setTab('catalog')}>From army book</button>
         <button className={tab === 'text' ? 'primary' : ''} onClick={() => setTab('text')}>Paste list text</button>
         <button className={tab === 'blank' ? 'primary' : ''} onClick={() => setTab('blank')}>Blank sheet</button>
+        {budget !== undefined && <span className={`small ${budget < 0 ? 'tag red' : 'muted'}`} style={{ marginLeft: 'auto' }}>{budget} pts left under the Supply Limit</span>}
       </div>
+      {!state.books.length && (
+        <p className="muted small" style={{ marginTop: 0 }}>
+          No army books yet. <a href={href.books()}>Import your faction's book</a> to fill in stats, points and upgrades from a datasheet.
+        </p>
+      )}
       {tab === 'catalog' && <CatalogTab onAdd={onAdd} budget={budget} />}
       {tab === 'text' && <TextTab onAdd={onAdd} />}
       {tab === 'blank' && <BlankTab onAdd={onAdd} />}

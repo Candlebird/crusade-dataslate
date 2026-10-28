@@ -146,7 +146,12 @@ export default function BooksPage() {
                 {busy === b.uid ? 'Refreshing…' : 'Refresh'}
               </button>
             )}
-            <button onClick={() => setOpenId(openId === b.uid ? null : b.uid)}>{openId === b.uid ? 'Hide' : 'Browse'}</button>
+            <button onClick={() => {
+              const opening = openId !== b.uid;
+              setOpenId(opening ? b.uid : null);
+              // The book opens below the list: bring it into view, or a long list hides that anything happened.
+              if (opening) setTimeout(() => document.getElementById('book-browser')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+            }}>{openId === b.uid ? 'Hide' : 'Browse'}</button>
             {b.uid !== ECHOES_BOOK && <button
               className="ghost icon"
               aria-label={`Remove ${b.name}`}
@@ -194,6 +199,7 @@ function BookBrowser({ uid }: { uid: string }) {
   return (
     <Panel
       id={`books.book.${book.uid}`}
+      domId="book-browser"
       title={book.name}
       extra={
         <div className="row">

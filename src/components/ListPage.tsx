@@ -10,12 +10,15 @@ import { TagFilter, UnitTags } from './Tags';
 import { MARKS, traitMark } from './marks';
 import { Issues, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 import { Icon } from './Icon';
+import { useTheirs } from './editMode';
 
 export default function ListPage({ forceId, listId }: { forceId: string; listId: string }) {
   const { state, updateForce } = useStore();
   const f = state.forces.find((x) => x.id === forceId);
   const l = f?.lists?.find((x) => x.id === listId);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
+  // Another player's list can be viewed and printed here, not changed: the sync would undo it.
+  const theirs = useTheirs(f);
 
   // The browser uses the page title as the default PDF file name.
   useEffect(() => {
@@ -37,7 +40,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
   const t = listTotals(f, l, s);
   const selected = new Set(l.unitIds);
 
-  const toggle = (u: Unit) =>
+  const toggle = (u: Unit) => !theirs &&
     setList((d) => {
       const ids = new Set(d.unitIds);
       if (ids.has(u.id)) {
@@ -74,11 +77,17 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
             <h1>{l.name}</h1>
           </div>
           <div className="row">
-            <button onClick={duplicate}>Duplicate</button>
-            <button className="danger" onClick={remove}>Delete</button>
+            {!theirs && <button onClick={duplicate}>Duplicate</button>}
+            {!theirs && <button className="danger" onClick={remove}>Delete</button>}
             <button className="primary" onClick={() => window.print()} disabled={!t.units}><Icon name="l:printer" /> Print</button>
           </div>
         </div>
+
+        {theirs && (
+          <div className="panel notice">
+            <b>{f.owner}</b>'s list. You can view and print it, but only they can change it.
+          </div>
+        )}
 
         <div className="cols-main">
           <Panel id="list.units" title="Units" extra={<span className="muted small">{t.units} selected</span>}>
@@ -97,7 +106,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
                     {units.map((u) => {
                       const on = selected.has(u.id);
                       return (
-                        <tr key={u.id} className={`clickable${on ? '' : ' unpicked'}`} onClick={() => toggle(u)}>
+                        <tr key={u.id} className={`${theirs ? '' : 'clickable'}${on ? '' : ' unpicked'}`} onClick={() => toggle(u)}>
                           <td className="s-end"><input type="checkbox" checked={on} readOnly aria-label={`Include ${label(u)}`} /></td>
                           <td className="s-2">
                             <b>{label(u)}</b>
@@ -112,7 +121,10 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
                           <td className="num" data-label="Pts">{u.points}</td>
                           <td className="num" data-label="BP">{battlePoints(u, s)}</td>
                           <td className="s-full" onClick={(e) => e.stopPropagation()}>
-                            {on && isHero(u) && (
+                            {on && isHero(u) && theirs && l.joins[u.id] && (
+                              <span className="small">Joins {label(f.units.find((x) => x.id === l.joins[u.id]) ?? u)}</span>
+                            )}
+                            {on && isHero(u) && !theirs && (
                               <select
                                 value={l.joins[u.id] ?? ''}
                                 onChange={(e) => setList((d) => {
@@ -145,7 +157,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
               </div>
               <div style={{ marginTop: '0.75rem' }}><Issues issues={listIssues(f, l, s)} /></div>
             </div>
-            <Panel id="list.settings" title="List settings" h={3}>
+            {!theirs && <Panel id="list.settings" title="List settings" h={3}>
               <div className="fields">
                 <label className="field span-all">Name<TextField value={l.name} onCommit={(v) => setList((d) => void (d.name = v || 'Battle list'))} /></label>
                 <label className="field span-all">Game size (pts)<Stepper value={l.pointsLimit} step={50} min={0} onChange={(n) => setList((d) => void (d.pointsLimit = n))} /></label>
@@ -164,7 +176,7 @@ export default function ListPage({ forceId, listId }: { forceId: string; listId:
                   Import core rules on the <a href={href.books()}>Army Books</a> page to print descriptions for rules like Hero and Fearless.
                 </p>
               )}
-            </Panel>
+            </Panel>}
           </div>
         </div>
 

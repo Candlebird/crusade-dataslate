@@ -1,4 +1,5 @@
 import { useStore } from '../model/store';
+import type { Force } from '../model/types';
 import { newForce } from '../model/factory';
 import { exportBackup } from '../model/io';
 import { forceTotals, pendingLevels } from '../rules/engine';
@@ -18,6 +19,11 @@ export default function ForceList() {
   const local = cloud.email ? state.forces.filter((f) => !f.owner) : [];
   const claim = (ids: string[]) =>
     update((d) => d.forces.forEach((f) => ids.includes(f.id) && (f.owner = cloud.email ?? undefined)));
+
+  // Signed in, the player's own forces (and ones only on this device) come first; other players' follow, view only.
+  const isTheirs = (f: Force) => !!cloud.email && !!f.owner && f.owner !== cloud.email;
+  const mine = state.forces.filter((f) => !isTheirs(f));
+  const theirs = state.forces.filter(isTheirs);
 
   const create = () => {
     const f = newForce();
@@ -58,36 +64,14 @@ export default function ForceList() {
 
       {state.forces.length === 0 && <div className="panel empty">No forces yet. Create one or drop a force file below. New here? See the <a href={href.guide()}>getting started guide</a>.</div>}
 
-      <div className="grid grid-cards">
-        {state.forces.map((f) => {
-          const t = forceTotals(f, state.settings);
-          const levelling = f.units.filter((u) => pendingLevels(u) > 0).length;
-          return (
-            <a key={f.id} className="card" href={href.force(f.id)}>
-              {f.image && <img src={f.image} alt="" style={{ width: '100%', height: 110, objectFit: 'cover', marginBottom: 8 }} />}
-              <h3 className="with-emblem"><EmblemBadge emblem={forceEmblem(f)} size={28} />{f.name}</h3>
-              {cloud.email && f.owner && f.owner !== cloud.email && <div className="tag">{f.owner.split('@')[0]}'s force</div>}
-              {levelling > 0 && (!cloud.email || !f.owner || f.owner === cloud.email) && (
-                <div className="tag gold"><Icon name="g:upgrade" /> {levelling} unit{levelling > 1 ? 's' : ''} to level up</div>
-              )}
-              <div className="sub">
-                {f.faction || 'Unknown faction'}
-                {f.player && <> · {f.player}</>}
-              </div>
-              <div className="stats">
-                <div className={`stat${t.pointsUsed > t.supplyLimit ? ' over' : ''}`}>
-                  <b>{t.pointsUsed}</b>
-                  <span>/ {t.supplyLimit} pts</span>
-                </div>
-                <div className="stat"><b>{t.activeUnits}</b><span>Units</span></div>
-                <div className="stat"><b>{t.rp}</b><span>RP</span></div>
-                <div className="stat"><b>{t.bp}</b><span>BP</span></div>
-                <div className="stat"><b>{f.wins}/{f.battles}</b><span>W / Battles</span></div>
-              </div>
-            </a>
-          );
-        })}
-      </div>
+      {theirs.length > 0 && mine.length > 0 && <h2 className="force-group">Your forces</h2>}
+      {mine.length > 0 && <div className="grid grid-cards">{mine.map((f) => <ForceCard key={f.id} f={f} />)}</div>}
+      {theirs.length > 0 && (
+        <>
+          <h2 className="force-group">Other players' forces <span className="muted small">view only</span></h2>
+          <div className="grid grid-cards">{theirs.map((f) => <ForceCard key={f.id} f={f} owner={f.owner} />)}</div>
+        </>
+      )}
 
       <div className="panel" style={{ marginTop: '1.5rem' }}>
         <div className="panel-title"><h3>Import</h3></div>
@@ -96,5 +80,35 @@ export default function ForceList() {
         </Dropzone>
       </div>
     </>
+  );
+}
+
+function ForceCard({ f, owner }: { f: Force; owner?: string }) {
+  const { state } = useStore();
+  const t = forceTotals(f, state.settings);
+  const levelling = f.units.filter((u) => pendingLevels(u) > 0).length;
+  return (
+    <a className="card" href={href.force(f.id)}>
+      {f.image && <img src={f.image} alt="" style={{ width: '100%', height: 110, objectFit: 'cover', marginBottom: 8 }} />}
+      <h3 className="with-emblem"><EmblemBadge emblem={forceEmblem(f)} size={28} />{f.name}</h3>
+      {owner && <div className="tag">{owner.split('@')[0]}'s force</div>}
+      {levelling > 0 && !owner && (
+        <div className="tag gold"><Icon name="g:upgrade" /> {levelling} unit{levelling > 1 ? 's' : ''} to level up</div>
+      )}
+      <div className="sub">
+        {f.faction || 'Unknown faction'}
+        {f.player && <> · {f.player}</>}
+      </div>
+      <div className="stats">
+        <div className={`stat${t.pointsUsed > t.supplyLimit ? ' over' : ''}`}>
+          <b>{t.pointsUsed}</b>
+          <span>/ {t.supplyLimit} pts</span>
+        </div>
+        <div className="stat"><b>{t.activeUnits}</b><span>Units</span></div>
+        <div className="stat"><b>{t.rp}</b><span>RP</span></div>
+        <div className="stat"><b>{t.bp}</b><span>BP</span></div>
+        <div className="stat"><b>{f.wins}/{f.battles}</b><span>W / Battles</span></div>
+      </div>
+    </a>
   );
 }
