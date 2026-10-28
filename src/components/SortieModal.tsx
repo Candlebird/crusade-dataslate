@@ -692,7 +692,12 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                 {run.won} fight{run.won === 1 ? '' : 's'} won, {run.depth} node{run.depth === 1 ? '' : 's'} cleared. <b>+{runXp(run)} XP</b> per unit (cap {cap}){run.party.some((m) => !memberUp(m)) && <>, half for a unit wiped out</>}.
                 {run.mode === 'shard' && (keepsHaul(run) ? ` The haul comes home: ${haulText(run)}.` : ' The haul was lost.')}
               </p>
-              {summary && <p className="muted small">{summary}</p>}
+              {summary && (
+                <div className="small panel sortie-recorded">
+                  <b>Recorded on {force.name}:</b>
+                  <ul>{summary.split('; ').map((x, i) => <li key={i}>{x.charAt(0).toUpperCase() + x.slice(1)}</li>)}</ul>
+                </div>
+              )}
               {run.weekly && <p className="small">Weekly challenge {run.weekly}: <b>{weeklyScore(run)} pts</b>{c ? ' (posted to the campaign board)' : ''}.</p>}
               {story?.recaps?.[0] && (
                 <>
