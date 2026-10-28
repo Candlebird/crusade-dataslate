@@ -51,8 +51,7 @@ export function DraftPanel({ run, pick, sel, onPick, onFocus, onChange, onTab }:
   if (run.phase === 'wave') {
     return (
       <div className="training-draft small">
-        <div className="training-panel-title"><b>Wave {run.wave} under way</b></div>
-        <div className="muted">The next {drawSize(run)} Shards come once it is over. Craft and spend between waves.</div>
+        <div className="muted training-panel-title">The next {drawSize(run)} Shards come once this wave is over; craft, spend and level up between waves.</div>
       </div>
     );
   }

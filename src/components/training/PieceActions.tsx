@@ -34,6 +34,7 @@ export function PieceActions({ run, piece, onChange, onMove }: PieceActionsProps
         <button disabled={!!why} data-tip={why ?? UPGRADE_TEXT} onClick={() => act(() => upgradeDefault(run, piece.id), onChange)}>
           <Icon name="g:upgrade" /> Upgrade · <Icon name="g:two-coins" /> {defaultUpgradeCost(piece)}
         </button>
+        <span className="training-info-fx muted">{why ?? UPGRADE_TEXT}</span>
       </div>
     );
   }
@@ -52,6 +53,7 @@ export function PieceActions({ run, piece, onChange, onMove }: PieceActionsProps
       )}
       {piece.scout && move('scout', 'Scout move', 'Scout: move it to any open spot, once a build phase. The route must stay open.')}
       {piece.ambush && move('ambush', 'Ambush swap', 'Ambush: swap places with another defence, Shard or rubble, once a build phase. The route must stay open.')}
+      {!capped && <span className="training-info-fx muted">{why ?? LEVEL_TEXT}</span>}
     </div>
   );
 }
