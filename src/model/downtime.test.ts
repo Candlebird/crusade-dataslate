@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Campaign } from './types';
 import { newForce, newUnit } from './factory';
 import { markUnitsUsed } from '../rules/nexus';
-import { downtimeBlocks } from './downtime';
+import { NO_FACTION, downtimeBlocks } from './downtime';
 
 const campaign = () => ({ id: 'c', name: 'C', updatedAt: '', round: 2, threat: 0, factions: [], sectors: [], log: [] }) as unknown as Campaign;
 
@@ -10,7 +10,7 @@ describe('downtimeBlocks', () => {
   it('lets a force of three active units do everything', () => {
     const f = newForce('Spears');
     f.units = ['a', 'b', 'c'].map((id) => newUnit({ id }));
-    expect(downtimeBlocks(f, undefined)).toEqual({});
+    expect(downtimeBlocks(f, undefined)).toEqual({ task: NO_FACTION });
     f.nexus = { factionId: 'A', permanentTables: [], tempTables: [], traitTokens: 0, pending: [] };
     expect(downtimeBlocks(f, campaign())).toEqual({});
   });
