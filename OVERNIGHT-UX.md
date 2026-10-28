@@ -41,6 +41,20 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
   - Players don't see a greyed-out "Reset to defaults".
   - Browse on Army Books scrolls to the book.
   - The Guide covers the new panels.
+- **Training, round 1** (3 commits):
+  - The build phase shows three steps (Place 5 / Keep 1 / Start wave N). After the keep, links point to Recipes (ready count) and the Shop (credits to spend).
+  - The keep table names each Shard's type. The HUD labels Base, Credits and Luck on wide screens and no longer jumps when a wave starts.
+  - Each piece's Level up or Upgrade says what it does or why it can't be bought.
+  - The Shop explains luck and shows the Shard grade odds.
+  - A live count shows enemies left and how many got through.
+  - The run summary opens with how the run ended and the total XP. The boss card offer says the card lasts the run.
+- **Battles, round 1** (6 commits):
+  - Starting a battle goes Players → Forces → Mission. A force taken by one side is greyed out for the others, and the randomizer folds away. Start battle sits in a bar at the bottom.
+  - The tracker shows each side's units first, with side settings folded. A note names sides with no units, and End battle only turns gold on the last round.
+  - On phones, units show as compact cards.
+  - The result panel reads "1. Record it for each force · N to go" then "2. Finish". The record wizard leads back to the battle.
+  - The Mission library shows one tappable line per mission, with "Duplicate to edit" on built-ins.
+  - Auto-battle folds its explanation away.
 
 ## Open questions
 - **Nexus: other factions' readiness.** Should players see the GM checklist, such as whose orders are locked in?
@@ -49,6 +63,9 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
 - **Patrol vs Expedition.** A patrol takes units that already went out (Battle-Worn), while an Expedition refuses them. Is that intended? Only the wording changed to match.
 - **Ledger.** "Increase supply (−1 RP)" repeats the one inside Requisition…. Keep it as a shortcut?
 - **Between games.** Should the panel start folded? Right now it starts open and remembers a fold.
+- **Training: smaller merges.** Should Combine offer smaller merges, such as 2 of a set of 4 alike? That would be a rules change.
+- **Battle tracker: Nexus effects** are now hidden outside a campaign unless one was already added. Is that OK?
+- **Battle result: Finish & save** turns gold once every force has recorded, but it can still be pressed before that, as it could before. Should it be blocked?
 - **Unit tasks.** They only show when the force is linked to a faction in the loaded campaign, the same as before. Is that intended?
 
 ## Test by hand
