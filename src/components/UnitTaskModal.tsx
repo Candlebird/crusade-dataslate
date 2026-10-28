@@ -11,7 +11,7 @@ import {
   TASK_NAMES, activeProject, freeUnits, garrison, garrisonNow, garrisonPoints, mentor, mentorProblem, mentorXp, projectById, projectProblem,
   projectRewardText, reconArea, reconTargets, scout, workProject, worldsOf,
 } from '../rules/tasks';
-import { Modal, confirmAction, toast } from './ui';
+import { Modal, toast } from './ui';
 
 const TASK_DESC: Record<Exclude<UnitTaskKind, 'sortie'>, string> = {
   mentor: `A veteran teaches a lower-level unit of its category. The pupil gains +${MENTORING.xpPerLevel} XP per mentor level. Both units are busy.`,
@@ -59,8 +59,9 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
   const busyNames = unit ? [unit, ...(task === 'mentor' && pupil ? [pupil] : [])].map(unitName).join(' and ') : '';
   const warning = busyNames && `${busyNames} can't go on an Expedition for the rest of round ${currentRound(c)}, and fight${unit && task === 'mentor' && pupil ? '' : 's'} Battle-Worn (-1 Quality and -1 Defense).`;
 
+  // The "Busy all round" warning is on screen next to the button, so there's no second confirm.
   const apply = () => {
-    if (problem || !confirmAction(`${warning}\n\nSet ${TASK_NAMES[task]}?`)) return;
+    if (problem) return;
     let summary = '';
     try {
       update((s) => {
@@ -99,7 +100,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
     <Modal
       title="Unit task"
       onClose={onClose}
-      footer={<><button onClick={onClose}>Cancel</button><button className="primary" disabled={!!problem} onClick={apply}>Set task</button></>}
+      footer={<><button onClick={onClose}>Cancel</button><button className="primary" disabled={!!problem} data-tip={problem ?? undefined} onClick={apply}>Set task</button></>}
     >
       <div className="fields">
         <div className="span-all row" role="radiogroup" aria-label="Task">
@@ -109,6 +110,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
         </div>
         <p className="span-all muted small" style={{ margin: 0 }}>{TASK_DESC[task]}</p>
 
+        {!free.length && <p className="span-all small" style={{ margin: 0, color: 'var(--warn)' }}>Every active unit is busy or already fought this round. Tasks open again next round.</p>}
         <label className="field span-all">
           {task === 'mentor' ? 'Mentor' : 'Unit'}
           <select value={unitId} onChange={(e) => { setUnitId(e.target.value); setPupilId(''); }}>
