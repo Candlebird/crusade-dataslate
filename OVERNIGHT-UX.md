@@ -60,6 +60,14 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
   - The result panel reads "1. Record it for each force · N to go" then "2. Finish". The record wizard leads back to the battle.
   - The Mission library shows one tappable line per mission, with "Duplicate to edit" on built-ins.
   - Auto-battle folds its explanation away.
+- **Battles, round 2** (3 commits):
+  - Each step of the record wizard opens with one line on what it decides and what applying changes. Apply names the force.
+  - A reward that needs fixing shows a To do under its table.
+  - "Battle recorded" lists what changed and which forces still have to record.
+  - An ended battle shows "Battle over" instead of the round buttons.
+  - The Battle page flags past battles still waiting for one of your forces to claim, and their rows get a gold edge.
+  - The dice roller has one-tap "Success on" buttons and sorts dice against a target.
+  - The AI activation hint counts the units left and explains Roll vs Decide.
 
 ## Open questions
 - **Nexus: other factions' readiness.** Should players see the GM checklist, such as whose orders are locked in?
@@ -71,6 +79,8 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
 - **Training: smaller merges.** Should Combine offer smaller merges, such as 2 of a set of 4 alike? That would be a rules change.
 - **Battle tracker: Nexus effects** are now hidden outside a campaign unless one was already added. Is that OK?
 - **Battle result: Finish & save** turns gold once every force has recorded, but it can still be pressed before that, as it could before. Should it be blocked?
+- **Battle: Prev round** is hidden once a battle ends too (Resume brings both back). OK?
+- **Battle rewards for non-campaign forces.** They can roll Nexus-only reward results, which must be re-rolled or changed by hand. The wizard now flags them as a To do. Should the roll skip them instead? That would be a rules change.
 - **Unit tasks.** They only show when the force is linked to a faction in the loaded campaign, the same as before. Is that intended?
 
 ## Test by hand
