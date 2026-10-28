@@ -86,6 +86,10 @@ export function depositNearest(c: Campaign, factionId: string, n: number, from?:
   return out;
 }
 
+/** Free room across the faction's banks: 0 means a Materials reward would be lost ("no bank had room"). */
+export const bankRoom = (c: Campaign, factionId: string) =>
+  productionSites(c, factionId).reduce((t, s) => t + Math.max(0, bankCap(s, c) - (s.bank ?? 0)), 0);
+
 export const deposited = (d: Deposit) => d.reduce((t, x) => t + x.n, 0);
 
 /** "+150 Materials to Kharon (100) and Vesta (50)", or why none were banked. */

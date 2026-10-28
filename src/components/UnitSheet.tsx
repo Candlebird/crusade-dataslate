@@ -93,6 +93,12 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
   const pending = pendingLevels(u);
   const canRelic = (u.category === 'Hero' || !!u.heroicRise) && u.relics.length < relicSlots(u.xp);
   const rp = forceTotals(f, s).rp;
+  // A Sortie or Training-feat relic the force has won and nobody carries yet: this unit can take it without RP.
+  const wonRelics = RELICS.filter((r) => (r.sortie && f.sortie?.relics?.includes(r.sortie)) || (r.training && f.trainingRelics?.includes(r.name)));
+  const freeRelicDue = canRelic && wonRelics.length > 0 && (() => {
+    const held = relicHolders(state.forces, state.campaign);
+    return wonRelics.some((r) => !relicTaken(held, r.name) && relicTierAllowed(r.tier, u.xp));
+  })();
   const normalCount = u.upgrades.filter((x) => !x.unique).length;
   const uniqueCount = u.upgrades.filter((x) => x.unique).length;
 
@@ -147,7 +153,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       label,
       entries: list.map((r) => ({
         name: r.name,
-        desc: [`${relicCost(r.tier)} RP`, r.profile, r.desc, r.note].filter(Boolean).join(' · '),
+        desc: [r.sortie || r.training ? 'Free' : `${relicCost(r.tier)} RP`, r.profile, r.desc, r.note].filter(Boolean).join(' · '),
         disabled: relicTaken(held, r.name) ?? (relicTierAllowed(r.tier, u.xp) ? undefined : `${r.tier} relics need ${RELIC_TIER_MIN_XP[r.tier]}+ XP`),
         meta: r,
       })),
@@ -297,7 +303,9 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             {canRelic && (
               <>
                 <b className="muted small">OR</b>
-                <button onClick={() => setPicker({ kind: 'relic' })}>Buy a relic (from {relicCost('Common')} RP)</button>
+                <button onClick={() => setPicker({ kind: 'relic' })}>
+                  {freeRelicDue && rp < relicCost('Common') ? 'Pick your free relic' : `Buy a relic (from ${relicCost('Common')} RP)`}
+                </button>
                 <span className="muted small">{rp} RP available</span>
               </>
             )}
@@ -307,6 +315,73 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
 
       <div className="cols-main">
         <div>
+          {/* XP */}
+          <Panel
+            id="unit.xp"
+            title="Experience"
+            extra={
+              <span className="row">
+                <span className="muted small" data-tip="Each level buys one trait, weapon trait or relic">{used} of {earned} upgrade{earned === 1 ? '' : 's'} used</span>
+                {pending > 0 && <span className="tag gold">{pending} to pick</span>}
+              </span>
+            }
+          >
+            <XpBar xp={u.xp} />
+            <p className="small muted" style={{ marginBottom: 0 }}>
+              {xpNextText(u.xp)}
+              {!edit && <> {u.battles} battle{u.battles === 1 ? '' : 's'} · {u.kills} kill{u.kills === 1 ? '' : 's'}.</>}
+            </p>
+            {edit && <div className="row" style={{ marginTop: '0.75rem' }}>
+              <Stepper value={u.xp} min={0} onChange={(n) => set((d) => void (d.xp = n))} />
+              {[1, 2, 3, 5].map((n) => (
+                <button key={n} onClick={() => set((d) => void (d.xp += n))}>+{n}</button>
+              ))}
+              <span className="spacer" />
+              <label className="field">Battles<Stepper value={u.battles} min={0} onChange={(n) => set((d) => void (d.battles = n))} /></label>
+              <label className="field">Kills<Stepper value={u.kills} min={0} onChange={(n) => set((d) => void (d.kills = n))} /></label>
+            </div>}
+          </Panel>
+
+          {/* Traits */}
+          <Panel
+            id="unit.traits"
+            title="Traits"
+            extra={
+              <div className="row">
+                <span className="muted small">{normalCount}/{MAX_NORMAL_TRAITS} normal · {uniqueCount}/{MAX_UNIQUE_TRAITS} unique</span>
+                {edit && <button className="primary" onClick={() => setPicker({ kind: 'trait' })}>+ Trait</button>}
+              </div>
+            }
+          >
+            {u.upgrades.length === 0 && <p className="muted small">No traits yet.</p>}
+            {u.upgrades.map((up, i) => !edit ? (
+              <div key={up.id} className="list-item">
+                <div className="grow">
+                  <b>{traitMark(up)} {up.name}</b>
+                  {traitDesc(up.name) && <div className="muted small">{traitDesc(up.name)}</div>}
+                </div>
+                {up.nexus && <span className="tag cyan">Nexus</span>}
+                {up.unique && !up.nexus && <span className="tag gold">Unique</span>}
+                {up.free && <span className="tag">Free</span>}
+              </div>
+            ) : (
+              <div key={up.id} className="list-item">
+                <div className="grow">
+                  <TextField className="wide" value={up.name} onCommit={(v) => set((d) => void (d.upgrades[i].name = v))} />
+                  {traitDesc(up.name) && <div className="muted small" style={{ marginTop: 2 }}>{traitDesc(up.name)}</div>}
+                </div>
+                {up.nexus && <span className="tag cyan">Nexus</span>}
+                <label className="row small" data-tip="Unique traits are worth more BP and have their own limit">
+                  <input type="checkbox" checked={up.unique} onChange={(e) => set((d) => void (d.upgrades[i].unique = e.target.checked))} />Unique
+                </label>
+                <label className="row small" data-tip="Free traits don't use a level">
+                  <input type="checkbox" checked={!!up.free} onChange={(e) => set((d) => void (d.upgrades[i].free = e.target.checked || undefined))} />Free
+                </label>
+                <button className="ghost icon" aria-label="Remove trait" onClick={() => set((d) => void d.upgrades.splice(i, 1))}><Icon name="l:x" /></button>
+              </div>
+            ))}
+          </Panel>
+
           {/* Profile */}
           <Panel id="unit.profile" title="Profile">
             <div className="fields">
@@ -376,73 +451,6 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
                 <button type="submit">Add</button>
               </form>}
             </div>
-          </Panel>
-
-          {/* XP */}
-          <Panel
-            id="unit.xp"
-            title="Experience"
-            extra={
-              <span className="row">
-                <span className="muted small" data-tip="Each level buys one trait, weapon trait or relic">{used} of {earned} upgrade{earned === 1 ? '' : 's'} used</span>
-                {pending > 0 && <span className="tag gold">{pending} to pick</span>}
-              </span>
-            }
-          >
-            <XpBar xp={u.xp} />
-            <p className="small muted" style={{ marginBottom: 0 }}>
-              {xpNextText(u.xp)}
-              {!edit && <> {u.battles} battle{u.battles === 1 ? '' : 's'} · {u.kills} kill{u.kills === 1 ? '' : 's'}.</>}
-            </p>
-            {edit && <div className="row" style={{ marginTop: '0.75rem' }}>
-              <Stepper value={u.xp} min={0} onChange={(n) => set((d) => void (d.xp = n))} />
-              {[1, 2, 3, 5].map((n) => (
-                <button key={n} onClick={() => set((d) => void (d.xp += n))}>+{n}</button>
-              ))}
-              <span className="spacer" />
-              <label className="field">Battles<Stepper value={u.battles} min={0} onChange={(n) => set((d) => void (d.battles = n))} /></label>
-              <label className="field">Kills<Stepper value={u.kills} min={0} onChange={(n) => set((d) => void (d.kills = n))} /></label>
-            </div>}
-          </Panel>
-
-          {/* Traits */}
-          <Panel
-            id="unit.traits"
-            title="Traits"
-            extra={
-              <div className="row">
-                <span className="muted small">{normalCount}/{MAX_NORMAL_TRAITS} normal · {uniqueCount}/{MAX_UNIQUE_TRAITS} unique</span>
-                {edit && <button className="primary" onClick={() => setPicker({ kind: 'trait' })}>+ Trait</button>}
-              </div>
-            }
-          >
-            {u.upgrades.length === 0 && <p className="muted small">No traits yet.</p>}
-            {u.upgrades.map((up, i) => !edit ? (
-              <div key={up.id} className="list-item">
-                <div className="grow">
-                  <b>{traitMark(up)} {up.name}</b>
-                  {traitDesc(up.name) && <div className="muted small">{traitDesc(up.name)}</div>}
-                </div>
-                {up.nexus && <span className="tag cyan">Nexus</span>}
-                {up.unique && !up.nexus && <span className="tag gold">Unique</span>}
-                {up.free && <span className="tag">Free</span>}
-              </div>
-            ) : (
-              <div key={up.id} className="list-item">
-                <div className="grow">
-                  <TextField className="wide" value={up.name} onCommit={(v) => set((d) => void (d.upgrades[i].name = v))} />
-                  {traitDesc(up.name) && <div className="muted small" style={{ marginTop: 2 }}>{traitDesc(up.name)}</div>}
-                </div>
-                {up.nexus && <span className="tag cyan">Nexus</span>}
-                <label className="row small" data-tip="Unique traits are worth more BP and have their own limit">
-                  <input type="checkbox" checked={up.unique} onChange={(e) => set((d) => void (d.upgrades[i].unique = e.target.checked))} />Unique
-                </label>
-                <label className="row small" data-tip="Free traits don't use a level">
-                  <input type="checkbox" checked={!!up.free} onChange={(e) => set((d) => void (d.upgrades[i].free = e.target.checked || undefined))} />Free
-                </label>
-                <button className="ghost icon" aria-label="Remove trait" onClick={() => set((d) => void d.upgrades.splice(i, 1))}><Icon name="l:x" /></button>
-              </div>
-            ))}
           </Panel>
 
           {/* Weapons */}

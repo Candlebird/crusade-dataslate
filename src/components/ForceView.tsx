@@ -296,13 +296,6 @@ export default function ForceView({ forceId }: { forceId: string }) {
               <div className="row">
                 <button className="primary" onClick={() => setShopping(true)}>Requisition…</button>
                 {edit && <button onClick={() => addLedger('Battle reward', 1, 0)}>+1 RP</button>}
-                <button
-                  disabled={t.rp < 1}
-                  onClick={() => addLedger('Increase Supply', -1, s.supplyPerRp)}
-                  data-tip={`Spend 1 RP for +${s.supplyPerRp} Supply`}
-                >
-                  Increase supply (−1 RP)
-                </button>
                 {edit && <button onClick={() => addLedger('Adjustment', 0, 0)}>+ Entry</button>}
               </div>
             )}

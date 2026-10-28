@@ -6,10 +6,13 @@ import { canSortie } from '../rules/sortie';
 
 export type DowntimeMode = 'expedition' | 'task' | 'patrol' | 'training' | 'sortie';
 
+/** Why a unit task can't start for a force that isn't in a faction of the loaded campaign. */
+export const NO_FACTION = 'Link this force to a Nexus Wars faction first.';
+
 /**
  * Why each between-games mode can't start for the force now, or undefined when it can. The force page shows the reason
  * next to the greyed-out button so a player isn't left guessing. Expeditions and unit tasks need a faction in the
- * loaded campaign (`c`); without one they aren't offered at all.
+ * loaded campaign (`c`): without one, Expeditions aren't offered and unit tasks are listed but greyed out.
  */
 export function downtimeBlocks(f: Force, c: Campaign | undefined): Partial<Record<DowntimeMode, string>> {
   const active = f.units.filter((u) => u.status === 'active').length;
@@ -24,7 +27,7 @@ export function downtimeBlocks(f: Force, c: Campaign | undefined): Partial<Recor
       out.expedition = none ?? 'Every unit has fought or been busy this round. They are free again when the GM ends the round.';
     }
     if (!freeUnits(f, c).length) out.task = out.expedition;
-  }
+  } else out.task = NO_FACTION;
   for (const k of Object.keys(out) as DowntimeMode[]) if (!out[k]) delete out[k];
   return out;
 }

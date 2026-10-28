@@ -40,8 +40,8 @@ function Mode({ icon, name, status, blocked, button, onOpen, children }: {
 }
 
 /**
- * Everything a force can do between table games, in one place: Expeditions and unit tasks (Nexus Wars only), Solo
- * patrols, the Training sim and Sorties. Each says what it costs the force, how it's going, and why it can't start.
+ * Everything a force can do between table games, in one place: Expeditions and unit tasks (Nexus Wars only; a task is
+ * still listed, greyed out, outside it), Solo patrols, the Training sim and Sorties. Each says what it costs the force, how it's going, and why it can't start.
  */
 export default function DowntimePanel({ f }: { f: Force }) {
   const { state, update } = useStore();
@@ -76,15 +76,18 @@ export default function DowntimePanel({ f }: { f: Force }) {
   return (
     <Panel id="force.downtime" title="Between games" h={3} className="downtime">
       {nexus && (
+        <Mode icon="g:telescope" name="Expedition" button="Expedition…" blocked={blocks.expedition} onOpen={() => setOpen('expedition')}>
+          Send up to 3 units on an Expedition. Each unit takes part in one a round.
+        </Mode>
+      )}
+      {/* Always listed, so a player outside Nexus Wars sees it exists and what it needs. */}
+      <Mode icon="g:gears" name="Unit task" button="Unit task…" blocked={blocks.task} onOpen={() => setOpen('task')}
+        status={busy.length > 0 && `${busy.length} busy`}>
+        Mentoring, Project, Recon or Garrison. The unit is busy all round; it can still fight, Battle-Worn (-1 Quality and -1 Defense).
+        {busy.length > 0 && <span className="downtime-what muted">Busy this round: {busy.join(', ')}</span>}
+      </Mode>
+      {nexus && (
         <>
-          <Mode icon="g:telescope" name="Expedition" button="Expedition…" blocked={blocks.expedition} onOpen={() => setOpen('expedition')}>
-            Send up to 3 units on an Expedition. Each unit takes part in one a round.
-          </Mode>
-          <Mode icon="g:gears" name="Unit task" button="Unit task…" blocked={blocks.task} onOpen={() => setOpen('task')}
-            status={busy.length > 0 && `${busy.length} busy`}>
-            Mentoring, Project, Recon or Garrison. The unit is busy all round; it can still fight, Battle-Worn (-1 Quality and -1 Defense).
-            {busy.length > 0 && <span className="downtime-what muted">Busy this round: {busy.join(', ')}</span>}
-          </Mode>
           {claims.length > 0 && (
             <div className="list-item">
               <span className="downtime-icon"><Icon name="g:white-tower" /></span>

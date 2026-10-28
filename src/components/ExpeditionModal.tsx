@@ -9,7 +9,7 @@ import {
   applyExpedition, checkOdds, checkText, chooseOption, currentEncounter, expeditionSite, headHome, pressOn, rewardText, scaledReward, squadBonus, startExpedition,
   type Expedition,
 } from '../rules/downtime';
-import { depositNearest, depositText, rewardOrigin } from '../rules/production';
+import { bankRoom, depositNearest, depositText, rewardOrigin } from '../rules/production';
 import { Modal, toast } from './ui';
 import { localDate } from '../model/date';
 
@@ -89,6 +89,10 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
             </select>
           </label>
           <p className="span-all small" style={{ margin: 0 }}>{s.desc} <span className="muted">Make it all the way: {rewardText(s.finish.reward)}.</span></p>
+          {/* Same test as depositNearest: Materials only bank where there's room, so with none they're lost. */}
+          {(!force.nexus || bankRoom(c, force.nexus.factionId) <= 0) && (
+            <p className="span-all small" style={{ margin: 0, color: 'var(--warn)' }}>No bank: any Materials found are lost.</p>
+          )}
           <div className="span-all small">
             <div className="muted">Squad ({squad.length}/{EXPEDITION.squadMax}){squad.length > 0 && <> · <b>+{bonus}</b> to every roll</>}</div>
             {units.length === 0 && <span className="muted">No active units.</span>}
