@@ -122,6 +122,23 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
     const x0 = Math.min(...pts.map((p) => p.x)) - pad, y0 = Math.min(...pts.map((p) => p.y)) - pad;
     return { x0, y0, w: Math.max(...pts.map((p) => p.x)) + pad - x0, h: Math.max(...pts.map((p) => p.y)) + pad - y0 };
   }, [all]);
+  // Seen as a faction, the map starts on the sectors it knows of, not the whole galaxy (mostly fog early on).
+  const known = useMemo(() => {
+    if (!viewAs) return undefined;
+    const pts = c.sectors.filter((s) => isPlaced(s) && sight(s) !== 'hidden').map((s) => toPixel(s as Hex, SIZE));
+    if (!pts.length) return undefined;
+    const pad = SIZE * 2;
+    const x0 = Math.min(...pts.map((p) => p.x)) - pad, x1 = Math.max(...pts.map((p) => p.x)) + pad;
+    const y0 = Math.min(...pts.map((p) => p.y)) - pad, y1 = Math.max(...pts.map((p) => p.y)) + pad;
+    const zoom = Math.min(3, Math.max(1, Math.min(bounds.w / (x1 - x0), bounds.h / (y1 - y0))));
+    return { zoom, pan: { x: (x0 + x1) / 2 - (bounds.x0 + bounds.w / 2), y: (y0 + y1) / 2 - (bounds.y0 + bounds.h / 2) } };
+  }, [c.sectors, sight, viewAs, bounds]);
+  const resetView = () => {
+    setZoom(known?.zoom ?? 1);
+    setPan(known && known.zoom > 1 ? known.pan : { x: 0, y: 0 });
+  };
+  // Once per faction looked through (not on every change to the campaign, which would yank the view about).
+  useEffect(resetView, [viewAs, map.cols, map.rows]);
   const stars = useMemo(() => {
     const rand = rng(map.seed);
     const n = Math.round((bounds.w * bounds.h) / 900);
@@ -429,7 +446,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
             <div className="map-zoom">
               <button className="icon" aria-label="Zoom in" onClick={() => setZoom((z) => Math.min(4, z * 1.25))}>+</button>
               <button className="icon" aria-label="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))}>−</button>
-              <button className="icon" aria-label="Reset view" data-tip="Reset view" onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}><Icon name="l:rotate-ccw" /></button>
+              <button className="icon" aria-label="Reset view" data-tip={known && known.zoom > 1 ? 'Back to the sectors you know' : 'Reset view'} onClick={resetView}><Icon name="l:rotate-ccw" /></button>
             </div>
           </div>
 
@@ -466,7 +483,7 @@ function SideIntro({ c, unplaced }: { c: Campaign; unplaced: Sector[] }) {
   return (
     <>
       <h3>{c.name}</h3>
-      <p className="muted small">Click a hex to see its sector. Drag to pan; scroll or use the buttons to zoom.</p>
+      <p className="muted small">Click or tap a hex to see its sector. Drag to pan; scroll or use + and − to zoom.</p>
       {!c.factions.length && <p className="muted small">No factions on the map yet.</p>}
       {sidesOf(c).map((f) => {
         const n = c.sectors.filter((s) => s.owner === f.id).length;
