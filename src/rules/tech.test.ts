@@ -7,7 +7,7 @@ import { randomLoadout } from './echoForce';
 import { ECHOES, emptyNexus, incomeItems, nexusEntry, recordSectorGame, removeSectorGame, rollGuardianLoot } from './nexus';
 import { BUILDINGS, GUARDIAN_LOOT, NEXUS_TECH, PRODUCTION, TECH_BRANCHES } from './nexusData';
 import {
-  bankCap, buildBlock, buildingSlots, depositNearest, depositText, rewardOrigin, coreBlock, exchange, exchangeBlock, installCore, produceCost, productionRate, tradeBonus,
+  bankCap, bankRoom, buildBlock, buildingSlots, depositNearest, depositText, rewardOrigin, coreBlock, exchange, exchangeBlock, installCore, produceCost, productionRate, tradeBonus,
 } from './production';
 import { repels } from './marauders';
 import { accrueResearch, knows, research, researchBlock, researchRate, techStatus } from './tech';
@@ -249,7 +249,9 @@ describe('Materials rewards', () => {
 
   it('say so when no bank has room', () => {
     const c = campaign();
+    expect(bankRoom(c, 'A')).toBeGreaterThan(0);
     for (const s of c.sectors) if (s.owner === 'A') s.bank = bankCap(s, c);
+    expect(bankRoom(c, 'A')).toBe(0);
     expect(depositText(100, depositNearest(c, 'A', 100))).toBe("+100 Materials, but no bank had room");
   });
 
