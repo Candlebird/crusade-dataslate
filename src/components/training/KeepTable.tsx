@@ -54,7 +54,7 @@ export function KeepTable({ run, sel, onFocus, onChange }: KeepTableProps) {
       <div className="muted">Keep one Shard; the rest turn to rubble. Combine alike ones a grade up, or keep one a grade down for a recipe that wants exactly that.</div>
       <div className="training-keep-table" role="table" aria-label="Keep one">
         <div className="training-keep-head" role="row">
-          <span role="columnheader">#</span><span role="columnheader">Keep</span><span role="columnheader">Combine</span><span role="columnheader">Downgrade</span>
+          <span role="columnheader">Shard</span><span role="columnheader">Keep</span><span role="columnheader">Combine</span><span role="columnheader">Downgrade</span>
         </div>
         {rows.map((p) => {
           const mine = opts.filter((o) => o.pieceId === p.id);
@@ -66,8 +66,14 @@ export function KeepTable({ run, sel, onFocus, onChange }: KeepTableProps) {
           );
           return (
             <div key={p.id} className={`training-keep-tr${sel === p.id ? ' lit' : ''}`} role="row">
-              <span className="training-keep-num" role="rowheader" aria-label={`Shard ${num(p.id)}: ${gradeName(p.grade)} ${SHARD_TYPES[p.type].name}`}>
+              <span
+                className="training-keep-num"
+                role="rowheader"
+                aria-label={`Shard ${num(p.id)}: ${gradeName(p.grade)} ${SHARD_TYPES[p.type].name}`}
+                data-tip={`#${num(p.id)} on the map: ${gradeName(p.grade)} ${SHARD_TYPES[p.type].name}. ${SHARD_TYPES[p.type].text}`}
+              >
                 {num(p.id)} <ShardBadge type={p.type} grade={p.grade} size={20} />
+                <span className="training-keep-type">{SHARD_TYPES[p.type].name}</span>
               </span>
               {cell(plain, 'Keep', '')}
               {cell(merge, 'Combine', 'Needs an alike Shard (same type and grade) in this draft.')}

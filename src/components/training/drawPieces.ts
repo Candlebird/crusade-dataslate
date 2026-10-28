@@ -83,6 +83,13 @@ export function drawShard(ctx: CanvasRenderingContext2D, p: ShardPiece, s: numbe
       const r = Math.max(5, s * 0.36);
       ctx.beginPath(); ctx.arc(p.x * s + r + 1, p.y * s + r + 1, r, 0, Math.PI * 2); ctx.fill();
       label(ctx, String(num), p.x * s + r + 1, p.y * s + r + 1.5, r * 1.5, '#15181d');
+    } else if (num) {
+      // A small map: the number sits on the middle of the piece, so the keep table's rows still match the map.
+      const r = Math.max(5.5, s * 0.85);
+      const cx = (p.x + 1) * s, cy = (p.y + 1) * s;
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#15181d'; ctx.lineWidth = 1; ctx.stroke();
+      label(ctx, String(num), cx, cy + 0.5, r * 1.5, '#15181d');
     } else {
       ctx.beginPath(); ctx.moveTo(p.x * s + 1, p.y * s + 1); ctx.lineTo(p.x * s + 1 + t, p.y * s + 1); ctx.lineTo(p.x * s + 1, p.y * s + 1 + t); ctx.closePath();
       ctx.fill();

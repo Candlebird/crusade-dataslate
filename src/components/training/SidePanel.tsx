@@ -51,7 +51,7 @@ export function SidePanel(p: SidePanelProps) {
       <div className={sec('draft')}>
         {build && run.offer && p.peek && <button className="primary" onClick={p.onUnpeek}>Pick a card</button>}
         {run.phase === 'wave' && run.offer && <div className="muted">The Echo Lord fell: pick a card after this wave.</div>}
-        <DraftPanel run={run} pick={p.pick} sel={p.sel} onPick={p.onPick} onFocus={p.onFocus} onChange={p.onChange} />
+        <DraftPanel run={run} pick={p.pick} sel={p.sel} onPick={p.onPick} onFocus={p.onFocus} onChange={p.onChange} onTab={p.onTab} />
       </div>
       <div className={sec('units')}>
         {!over && <RecipeBook run={run} units={p.units} portraits={p.portraits} crafting={p.crafting} onCraft={p.onCraft} />}
