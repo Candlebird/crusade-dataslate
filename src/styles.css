@@ -1404,3 +1404,5 @@ table.ledger td:first-child { white-space: nowrap; }
   .table-wrap:has(> table.tracker-units) { overflow-x: visible; }
 }
 .side-panel > h3 { margin-top: 1rem; }
+.result-panel > h3 { margin: 1rem 0 0.25rem; }
+.result-panel > h3:first-of-type { margin-top: 0.25rem; }

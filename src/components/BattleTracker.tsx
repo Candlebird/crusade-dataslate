@@ -671,6 +671,7 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
   const sc = score(b);
   const teams = teamsOf(b);
   const title = resultTitle(b);
+  const toRecord = b.sides.filter((s) => s.forceId && !b.recorded.includes(s.id) && state.forces.some((f) => f.id === s.forceId));
   return (
     <div className="panel result-panel">
       <div className="panel-title">
@@ -678,7 +679,8 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
         <button className="ghost" onClick={() => set((d) => { d.ended = false; delete d.auto; delete d.zoneMode; })}
           data-tip={b.auto ? 'Back to the tracker. Drops the battle result, but its losses and kill XP stay on the units.' : undefined}>Resume</button>
       </div>
-      <p className="muted small">Record the result in each crusade force's log. The wizard is pre-filled from this battle: check it, then apply.</p>
+      <h3>1. Record it for each force{toRecord.length > 0 && <span className="muted small"> · {toRecord.length} to go</span>}</h3>
+      <p className="muted small">Each crusade force records the battle in its own log: the wizard is filled in from this battle, so check it, add rewards, then apply. A player can also do it later from Past battles.</p>
       <div className="row">
         {b.sides.map((s) => {
           if (!s.forceId) return <span key={s.id} className="muted small">{s.name}: no force loaded.</span>;
@@ -708,10 +710,11 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
               : `A loss leaves the Lord standing: it can be fought again until the end of round ${crisisUntil(c.crisis!)}. Still standing then, the ${ECHOES.name} take a sector from each faction.`}
         </p>
       )}
-      <div className="row" style={{ marginTop: '0.75rem' }}>
-        <span className="muted small">Finishing shares the battle under Past battles. Anyone who hasn't recorded it can claim their rewards there.</span>
+      <h3>2. Finish</h3>
+      <div className="row">
+        <span className="muted small">Finishing closes the battle and shares it under Past battles, where anyone who hasn't recorded it yet can claim their rewards.</span>
         <span className="spacer" />
-        <button className="primary" onClick={onFinish}><Icon name="l:check" /> Finish & save result</button>
+        <button className={toRecord.length ? '' : 'primary'} onClick={onFinish}><Icon name="l:check" /> Finish & save result</button>
       </div>
     </div>
   );
