@@ -27,6 +27,11 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
   - GM settings (difficulty, rescale, zone battles for everyone, guardians) are in a folded "Campaign settings" panel. "Update from the GM" and "Remove campaign" are in a folded "Campaign file" panel.
   - Chronicle and Log are one tab, so there are six tabs instead of seven; old links still work.
   - Renaming a faction renames its default home sector, and a blank name keeps the old one.
+- **Nexus Wars, round 2** (5 commits):
+  - A map seen as a faction opens zoomed on the sectors it knows. The legend now covers Echo marks, Crisis, the no-attack icon, detachments, the AI garrison number, the reach outline and seen-before sectors.
+  - Sealed orders say in words what each pick will do and show "Locked in".
+  - Warlords show the next perk. Disabled buttons say why. Duels end with a "Next:" line, and the Journal puts its actions first with the rules folded.
+  - Ending a round scrolls to and flashes the new turn report. "Since you last looked" counts your dispatches and links straight to the report.
 - **Downtime modes, round 1** (5 commits): Patrol, Expedition and Unit task each say why a button or unit is greyed out.
   - Expedition picks its squad from the same cards as a Patrol.
   - Unit task no longer has the second confirm pop-up.
@@ -69,3 +74,6 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
 - **Unit tasks.** They only show when the force is linked to a faction in the loaded campaign, the same as before. Is that intended?
 
 ## Test by hand
+- **Sealed orders (needs sign-in, which was off-limits overnight):**
+  - Check that the "what it will do" line reads right for hold, move, attack on an AI sector, attack on a faction and a target out of reach, with zone battles both on and off.
+  - Check that "Locked in" shows after saving.
