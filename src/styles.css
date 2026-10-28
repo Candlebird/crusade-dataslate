@@ -1413,3 +1413,14 @@ table.ledger td:first-child { white-space: nowrap; }
   .first-step .grow { flex: 1 1 0; min-width: 0; }
   .first-step-act { flex-basis: 100%; padding-left: 2.75rem; }
 }
+/* Rules page search. */
+.rules-search { margin-bottom: 1rem; }
+.rules-search input { width: 100%; margin-bottom: 0.3rem; }
+.rules-hit { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.55rem 0; border-top: 1px solid var(--line); color: var(--text); }
+.rules-hit:first-of-type { border-top: none; }
+.rules-hit:hover b { color: var(--gold); }
+.rules-hit mark { background: rgba(201, 162, 74, 0.3); color: inherit; padding: 0 1px; }
+@media (max-width: 640px) {
+  .rules-tabs { flex-wrap: wrap; }
+  .rules-tabs button { flex: 1 1 auto; }
+}

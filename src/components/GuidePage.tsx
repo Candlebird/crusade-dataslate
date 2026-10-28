@@ -39,6 +39,9 @@ export default function GuidePage() {
           <a href="#guide-edit" onClick={jump}>3 · Edit your force</a>
           <a href="#guide-claim" onClick={jump}>4 · Claim battle rewards</a>
         </nav>
+        <p className="muted small" style={{ marginBottom: 0 }}>
+          Looking up a trait, relic, scar or requisition? The <a href={href.rules()}>Rules</a> page has every table, with a search box at the top.
+        </p>
       </div>
 
       <Panel id="guide.books" domId="guide-books" title="1 · Import an army book">
