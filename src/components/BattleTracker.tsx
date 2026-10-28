@@ -200,10 +200,10 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
         <div className="score-round">
           <div className="small muted">Round</div>
           <div className="score-vp">{b.round}<span className="muted small"> / {b.mission.rounds}</span></div>
-          <div className="row" style={{ justifyContent: 'center' }}>
+          {b.ended ? <div className="small muted">Battle over</div> : <div className="row" style={{ justifyContent: 'center' }}>
             <button disabled={b.round <= 1} onClick={() => set(prevRound)} aria-label="Previous round"><Icon name="l:chevron-left" /></button>
             <button className={last ? '' : 'primary'} onClick={() => set(nextRound)}>{last ? 'Extra round' : <>Next round <Icon name="l:chevron-right" /></>}</button>
-          </div>
+          </div>}
         </div>
       </div>
 
@@ -419,6 +419,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
         <div><h1>Battle</h1></div>
         <div className="row"><a className="btn" href={href.missions()}>Mission library</a></div>
       </div>
+      <WaitingNotice />
       {resumable.length > 0 && (
         <Panel id="battle.zones" title="Zone battles in progress">
           {resumable.map((z) => (
@@ -548,7 +549,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
         </div>
       </Panel>
       {!sector && !crisis && <SoloPatrol mission={m} />}
-      <PastBattles />
+      <div id="battle-past"><PastBattles /></div>
     </div>
   );
 }
@@ -581,18 +582,41 @@ function SoloPatrol({ mission }: { mission?: MissionDef }) {
   );
 }
 
-function PastBattles() {
-  const { state, update } = useStore();
+/** Past battles one of this player's forces fought in without claiming its side yet, and those forces. */
+function useWaiting() {
+  const { state } = useStore();
   const cloud = useCloud();
-  const [onlyMine, setOnlyMine] = useState(false);
   const all = state.battleHistory ?? [];
   // Forces this player can record into: their own, or ones kept only on this device.
   const mine = state.forces.filter((f) => !f.owner || f.owner === cloud.email);
-  // Battles one of my forces fought in without claiming its side yet.
   const waiting = all.filter((x) => {
     const done = claims(x, state.forces);
     return x.sides.some((side) => !side.ai && !(side.id in done) && mine.some((f) => f.id === side.forceId));
   });
+  return { all, mine, waiting };
+}
+
+/** Top-of-page nudge: rewards from a finished battle (maybe finished on another device) are waiting to be claimed. */
+function WaitingNotice() {
+  const { state } = useStore();
+  const { waiting, mine } = useWaiting();
+  if (!waiting.length) return null;
+  const names = [...new Set(waiting.flatMap((x) => {
+    const done = claims(x, state.forces);
+    return x.sides.filter((s) => !(s.id in done) && mine.some((f) => f.id === s.forceId)).map((s) => s.name);
+  }))];
+  return (
+    <p className="battle-hint small">
+      <b>{waiting.length} past battle{waiting.length === 1 ? ' is' : 's are'} waiting for you</b> to claim the rewards ({names.join(', ')}).{' '}
+      <button className="primary small" onClick={() => document.getElementById('battle-past')?.scrollIntoView({ behavior: 'smooth' })}>Show {waiting.length === 1 ? 'it' : 'them'}</button>
+    </p>
+  );
+}
+
+function PastBattles() {
+  const { state, update } = useStore();
+  const [onlyMine, setOnlyMine] = useState(false);
+  const { all, mine, waiting } = useWaiting();
   const past = onlyMine ? waiting : all;
   const remove = (x: FinishedBattle) =>
     confirmAction(`Delete ${x.mission.name} (${localDate(x.finishedAt)}) for the whole group? Claimed rewards stay in each force's log.`) &&
@@ -619,7 +643,7 @@ function PastBattles() {
         const sc = score(x);
         const done = claims(x, state.forces);
         return (
-          <div key={x.id} className="list-item past-battle">
+          <div key={x.id} className={`list-item past-battle${waiting.includes(x) ? ' waiting' : ''}`}>
             <div className="grow">
               <div>
                 <b>{x.mission.name}</b>{' '}

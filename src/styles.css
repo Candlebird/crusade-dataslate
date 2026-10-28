@@ -1418,3 +1418,5 @@ table.ledger td:first-child { white-space: nowrap; }
 /* Record-battle wizard: one line under the step buttons on what the step decides and changes. */
 .wizard-lead { margin: 0 0 0.75rem; padding-left: 0.6rem; border-left: 2px solid var(--gold-dim); }
 .reward-todo { margin: -0.25rem 0 0.6rem; }
+/* Past battles: a battle one of your forces still has to claim stands out. */
+.past-battle.waiting { border-left: 3px solid var(--gold); padding-left: 0.6rem; }
