@@ -32,6 +32,12 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
   - Sealed orders say in words what each pick will do and show "Locked in".
   - Warlords show the next perk. Disabled buttons say why. Duels end with a "Next:" line, and the Journal puts its actions first with the rules folded.
   - Ending a round scrolls to and flashes the new turn report. "Since you last looked" counts your dispatches and links straight to the report.
+- **Nexus Wars, round 3** (3 commits):
+  - The End round confirm is "End round N?" plus one bullet per fact, with nothing dropped. The toast is short when the turn report is on screen.
+  - Game night, Research, the Umbra Shards shop, Detachments and the Nexus box each say what to do and why something is greyed out.
+  - The GM's Factions and Sectors panels fold once they have content, each with a summary.
+  - Remove and delete buttons are red.
+  - Deleting a sector from the list now asks first, as the map's Delete already did.
 - **Downtime modes, round 1** (5 commits): Patrol, Expedition and Unit task each say why a button or unit is greyed out.
   - Expedition picks its squad from the same cards as a Patrol.
   - Unit task no longer has the second confirm pop-up.
