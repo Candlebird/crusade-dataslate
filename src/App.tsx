@@ -110,7 +110,7 @@ export default function App() {
           {route.page === 'battle' && <BattleWizard key={`${route.forceId}/${route.battleId}/${route.sideId}`} forceId={route.forceId} battleId={route.battleId} sideId={route.sideId} />}
           {route.page === 'list' && <ListPage forceId={route.forceId} listId={route.listId} />}
           {route.page === 'ledger' && <LedgerPage forceId={route.forceId} />}
-          {route.page === 'tracker' && <BattleTracker key={`${route.sectorId}/${route.attacker}/${route.forceId}/${route.crisis}`} crisis={route.crisis} sectorId={route.sectorId} attacker={route.attacker} forceId={route.forceId} />}
+          {route.page === 'tracker' && <BattleTracker key={`${route.sectorId}/${route.attacker}/${route.forceId}/${route.crisis}/${route.past}`} crisis={route.crisis} past={route.past} sectorId={route.sectorId} attacker={route.attacker} forceId={route.forceId} />}
           {route.page === 'sideSheet' && <SideSheet sideId={route.sideId} />}
           {route.page === 'missions' && <MissionLibrary />}
           {route.page === 'campaign' && <CampaignPage gm={!!route.gm} tab={route.tab} at={route.at} />}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/force/:id/ledger , #/battle[/sector/:sectorId[/:attacker[/:forceId]]] , #/battle/crisis , #/battle/sheet/:sideId , #/missions , #/campaign[/gm] , #/campaign/:tab[/:at] , #/books , #/settings , #/rules[/nexus|traits|relics] , #/guide */
+/** Hash routes: #/ , #/force/:id , #/force/:id/unit/:uid , #/force/:id/battle[/:battleId/:sideId] , #/force/:id/list/:lid , #/force/:id/ledger , #/battle[/sector/:sectorId[/:attacker[/:forceId]]] , #/battle/crisis , #/battle/past , #/battle/sheet/:sideId , #/missions , #/campaign[/gm] , #/campaign/:tab[/:at] , #/books , #/settings , #/rules[/nexus|traits|relics] , #/guide */
 export type Route =
   | { page: 'forces' }
   | { page: 'force'; forceId: string }
@@ -8,7 +8,7 @@ export type Route =
   | { page: 'battle'; forceId: string; battleId?: string; sideId?: string }
   | { page: 'list'; forceId: string; listId: string }
   | { page: 'ledger'; forceId: string }
-  | { page: 'tracker'; sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean }
+  | { page: 'tracker'; sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean; past?: boolean }
   | { page: 'sideSheet'; sideId: string }
   | { page: 'missions' }
   | { page: 'campaign'; gm?: boolean; tab?: string; at?: string }
@@ -32,6 +32,7 @@ export function parseRoute(hash: string): Route {
   }
   if (parts[0] === 'battle' && parts[1] === 'sheet' && parts[2]) return { page: 'sideSheet', sideId: parts[2] };
   if (parts[0] === 'battle' && parts[1] === 'crisis') return { page: 'tracker', crisis: true };
+  if (parts[0] === 'battle' && parts[1] === 'past') return { page: 'tracker', past: true };
   if (parts[0] === 'battle') return parts[1] === 'sector' ? { page: 'tracker', sectorId: parts[2], attacker: parts[3], forceId: parts[4] } : { page: 'tracker' };
   if (parts[0] === 'missions') return { page: 'missions' };
   if (parts[0] === 'campaign') return parts[1] === 'gm' ? { page: 'campaign', gm: true } : { page: 'campaign', tab: parts[1], at: parts[2] };
@@ -54,6 +55,8 @@ export const href = {
   /** The battle tracker; with a sector, a new battle is set up to be fought over it (by this attacking faction and detachment). */
   tracker: (sectorId?: string, attacker?: string, forceId?: string) =>
     (sectorId ? `#/battle/sector/${sectorId}${attacker ? `/${attacker}${forceId ? `/${forceId}` : ''}` : ''}` : '#/battle'),
+  /** The Battle page scrolled to its Past battles list. */
+  pastBattles: () => '#/battle/past',
   /** The battle tracker, setting a new battle up as this round's Nexus Crisis. */
   crisis: () => '#/battle/crisis',
   /** The printable army sheet of a generated side in the current battle. */

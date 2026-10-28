@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
+import { href, parseRoute } from '../route';
 import { REWARD_TABLES } from './data';
 import { emptyUnitBattle, materialsLine, nexusOnlyReward, participationXp, resolveBattle, restartInput, rewardRows, rollReward, type BattleInput } from './battle';
 import { emptyNexus } from './nexus';
@@ -137,5 +138,12 @@ describe('rolling a reward table', () => {
   it('never lands on a Nexus-only result outside Nexus Wars', () => {
     for (const k of Object.keys(REWARD_TABLES) as (keyof typeof REWARD_TABLES)[])
       for (let i = 0; i < 200; i++) expect(nexusOnlyReward(REWARD_TABLES[k].entries[rollReward(k, false) - 1])).toBe(false);
+  });
+});
+
+describe('back to past battles', () => {
+  it('opens the Battle page at its Past battles list', () => {
+    expect(parseRoute(href.pastBattles())).toEqual({ page: 'tracker', past: true });
+    expect(parseRoute(href.tracker())).toEqual({ page: 'tracker' });
   });
 });

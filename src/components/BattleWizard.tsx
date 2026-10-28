@@ -162,7 +162,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
   };
 
   // Recording from the battle tracker leads back to it; a claimed past battle back to the Battle page's list.
-  const back = source ? { href: href.tracker(), label: source.past ? 'Back to past battles' : 'Back to the battle' } : undefined;
+  const back = source ? { href: source.past ? href.pastBattles() : href.tracker(), label: source.past ? 'Back to past battles' : 'Back to the battle' } : undefined;
   // Forces from the same tracker battle that still have to record it.
   const waiting = source && !source.past
     ? source.battle.sides.filter((x) => x.forceId && x.id !== source.side && !state.battle?.recorded.includes(x.id) && state.forces.some((g) => g.id === x.forceId)).map((x) => x.name)
@@ -183,7 +183,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
 
       {source && (
         <p className="panel notice small">
-          Filled in from {source.past ? 'past battle' : 'the battle tracker'} <a href={href.tracker()}>{source.battle.mission.name}</a>
+          Filled in from {source.past ? 'past battle' : 'the battle tracker'} <a href={source.past ? href.pastBattles() : href.tracker()}>{source.battle.mission.name}</a>
           {source.past && ` (${localDate(source.past)}, as ${source.battle.sides.find((x) => x.id === source.side)?.name})`}. Check it, then add XP and rewards.
           {' '}<button className="ghost small" onClick={() => setInput(restartInput(initialInput(f, forceTotals(f, state.settings).bp), input, []))}>Start blank instead</button>
         </p>
