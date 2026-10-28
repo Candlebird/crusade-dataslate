@@ -162,7 +162,11 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
 
   // Recording from the battle tracker leads back to it; a claimed past battle back to the Battle page's list.
   const back = source ? { href: href.tracker(), label: source.past ? 'Back to past battles' : 'Back to the battle' } : undefined;
-  if (applied) return <Applied force={f} outcome={applied} back={back} />;
+  // Forces from the same tracker battle that still have to record it.
+  const waiting = source && !source.past
+    ? source.battle.sides.filter((x) => x.forceId && x.id !== source.side && !state.battle?.recorded.includes(x.id) && state.forces.some((g) => g.id === x.forceId)).map((x) => x.name)
+    : undefined;
+  if (applied) return <Applied force={f} outcome={applied} back={back} waiting={waiting} />;
 
   return (
     <>
@@ -212,10 +216,12 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
         ))}
       </div>
 
+      <p className="wizard-lead small">{stepLead(step, f.name, input)}</p>
+
       {step === 0 && <SetupStep input={input} set={set} campaign={linked ? campaign : undefined} />}
       {step === 1 && <UnitsStep units={units} input={input} setUnit={setUnit} worn={worn} />}
       {step === 2 && <DeathsStep units={units} input={input} setUnit={setUnit} />}
-      {step === 3 && <RewardsStep units={units} input={full} set={set} setPick={setPick} />}
+      {step === 3 && <RewardsStep units={units} input={full} set={set} setPick={setPick} warnings={preview.warnings} />}
       {step === 3 && linked && <NexusRewards units={units} input={input} nexus={nexus} setPick={setNexusPick} />}
       {step === 4 && <SummaryStep outcome={preview} />}
 
@@ -223,10 +229,24 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
         {step > 0 && <button onClick={() => setStep(step - 1)}><Icon name="l:arrow-left" /> Back</button>}
         <span className="spacer" />
         {step < STEPS.length - 1 && <button className="primary" onClick={() => setStep(step + 1)}>Next: {STEPS[step + 1]} <Icon name="l:arrow-right" /></button>}
-        {step === STEPS.length - 1 && <button className="primary" onClick={apply}>Apply to force</button>}
+        {step === STEPS.length - 1 && <button className="primary" onClick={apply}><Icon name="l:check" /> Apply to {f.name}</button>}
       </div>
     </>
   );
+}
+
+/** One plain line per step: what it decides, and what it will change on the force once applied. */
+function stepLead(step: number, name: string, input: BattleInput): string {
+  const nothingYet = `Nothing changes on ${name} until you apply on the Summary step.`;
+  switch (step) {
+    case 0: return `Decides the result${input.patrol ? '' : ', the agendas and which reward table you roll on'}. ${nothingYet}`;
+    case 1: return `Decides who fought and how much XP each unit earns. Applying adds that XP to each unit, and a unit that reaches a new level rolls an upgrade on its sheet.`;
+    case 2: return `Decides what the battle cost each destroyed unit. Applying adds any battle scar to that unit (a lost trait drops its XP to the level before), and a +1 XP result to its XP.`;
+    case 3: return input.patrol
+      ? 'A Solo patrol rolls no rewards. Go on to the Summary.'
+      : `Roll each table and pick who gets the result. Applying adds the RP, Supply and XP to ${name}; free upgrades are left as reminders for the unit sheet.`;
+    default: return `Everything below is what applying will change on ${name}. Go back to any step to fix it first.`;
+  }
 }
 
 // ---- Step 1: setup ----
@@ -432,11 +452,12 @@ function DeathsStep({ units, input, setUnit }: { units: Unit[]; input: BattleInp
 
 // ---- Step 4: rewards ----
 
-function RewardsStep({ units, input, set, setPick }: {
+function RewardsStep({ units, input, set, setPick, warnings }: {
   units: Unit[];
   input: BattleInput;
   set: (p: Partial<BattleInput>) => void;
   setPick: (key: string, p: Partial<RewardPick>) => void;
+  warnings: string[];
 }) {
   const rows = rewardRows(input);
   return (
@@ -445,10 +466,17 @@ function RewardsStep({ units, input, set, setPick }: {
         <h2>Rewards</h2>
         {!input.patrol && <label className="row small">Agenda RP <Stepper value={input.agendaRp} min={0} onChange={(n) => set({ agendaRp: n })} /></label>}
       </div>
-      <p className="muted small">{input.patrol ? 'Solo patrol: participation and kill XP only, no RP or reward rolls.' : 'Every battle earns 1 RP. Roll on each table below and assign the result.'}</p>
-      {rows.map((row) => (
-        <RewardBox key={row.key} row={row} units={units} input={input} pick={input.rewards[row.key] ?? emptyPick()} setPick={(p) => setPick(row.key, p)} />
-      ))}
+      <p className="muted small">{input.patrol ? 'Solo patrol: participation and kill XP only, no RP or reward rolls.' : 'Every battle earns 1 RP, plus any Agenda RP you set above.'}</p>
+      {rows.map((row) => {
+        // What still needs doing on this table (a result this force can't take, a unit to pick), shown where it's fixed.
+        const todo = warnings.filter((w) => w.startsWith(`${row.source}: `) && !w.endsWith('not rolled yet.')).map((w) => w.slice(row.source.length + 2));
+        return (
+          <div key={row.key}>
+            <RewardBox row={row} units={units} input={input} pick={input.rewards[row.key] ?? emptyPick()} setPick={(p) => setPick(row.key, p)} />
+            {todo.map((w) => <p key={w} className="small reward-todo"><span className="tag gold">To do</span> {w[0].toUpperCase() + w.slice(1)}</p>)}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -599,7 +627,7 @@ function SummaryStep({ outcome }: { outcome: BattleOutcome }) {
         </div>
         {outcome.warnings.length > 0 && (
           <div className="panel">
-            <div className="panel-title"><h3>Unresolved</h3></div>
+            <div className="panel-title"><h3>Check before you apply</h3></div>
             <ul className="issues">{outcome.warnings.map((w, i) => <li key={i} className="warn">{w}</li>)}</ul>
           </div>
         )}
@@ -608,7 +636,7 @@ function SummaryStep({ outcome }: { outcome: BattleOutcome }) {
   );
 }
 
-function Applied({ force, outcome, back }: { force: Force; outcome: BattleOutcome; back?: { href: string; label: string } }) {
+function Applied({ force, outcome, back, waiting }: { force: Force; outcome: BattleOutcome; back?: { href: string; label: string }; waiting?: string[] }) {
   const ups = outcome.units.filter((o) => o.levelsGained > 0);
   const todo = outcome.units.filter((o) => o.free.length || o.lostTrait);
   return (
@@ -623,7 +651,15 @@ function Applied({ force, outcome, back }: { force: Force; outcome: BattleOutcom
           <a className={`btn${back ? '' : ' primary'}`} href={href.force(force.id)}>{back ? 'Order of Battle' : 'Back to Order of Battle'}</a>
         </div>
       </div>
+      {waiting && (
+        <p className="wizard-lead small">
+          {waiting.length
+            ? `${waiting.join(' and ')} still ${waiting.length === 1 ? 'has' : 'have'} to record this battle. Go back to the battle to record it, then Finish.`
+            : 'Every force has recorded it. Go back to the battle and press Finish to close it.'}
+        </p>
+      )}
       <div className="panel">
+        <div className="panel-title"><h2>What changed on {force.name}</h2></div>
         <ul>{outcome.summary.map((s, i) => <li key={i}>{s}</li>)}</ul>
       </div>
       {(ups.length > 0 || todo.length > 0) && (

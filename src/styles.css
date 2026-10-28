@@ -1415,3 +1415,6 @@ table.ledger td:first-child { white-space: nowrap; }
 .mission-row-sum { display: block; margin-top: 0.15rem; }
 .mission-row[open] .mission-row-sum { display: none; }
 .mission-row-body { padding: 0 0.75rem 0.75rem; }
+/* Record-battle wizard: one line under the step buttons on what the step decides and changes. */
+.wizard-lead { margin: 0 0 0.75rem; padding-left: 0.6rem; border-left: 2px solid var(--gold-dim); }
+.reward-todo { margin: -0.25rem 0 0.6rem; }
