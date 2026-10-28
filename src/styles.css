@@ -1465,7 +1465,7 @@ table.ledger td:first-child { white-space: nowrap; }
 /* Every HUD stat as tall as the next-wave icon, so the map doesn't jump when a wave starts or ends. */
 .training-hud .training-hud-stat { min-height: 30px; }
 .training-hud-lbl { color: var(--muted-2); }
-@media (max-width: 1199px) { .training-hud-lbl { display: none; } }
+@media (max-width: 899px) { .training-hud-lbl { display: none; } }
 /* What a level or upgrade does (or why it can't), under the button, since a tooltip never shows on a phone. */
 .training-info-fx { flex: 1 1 100%; font-size: 12px; line-height: 1.3; }
 .training-shop-sub { display: block; font-size: 12px; line-height: 1.3; }
