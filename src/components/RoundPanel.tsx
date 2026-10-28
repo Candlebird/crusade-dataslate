@@ -32,7 +32,18 @@ export function useEndRound() {
       d.campaign.updatedAt = nowIso();
       out = { r, c: d.campaign };
     });
-    if (out) toast(roundEndText(out.c, out.r));
+    if (out) {
+      toast(roundEndText(out.c, out.r));
+      // The new turn report is what everyone reads next: bring it into view where it's on the page (the Map tab).
+      setTimeout(() => {
+        const el = document.getElementById('turn-report');
+        if (!el) return;
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        el.classList.remove('flash');
+        void el.offsetWidth;
+        el.classList.add('flash');
+      }, 50);
+    }
     return out?.r;
   };
 }

@@ -15,6 +15,7 @@ import { currentRound, factionName } from '../rules/nexus';
 import { Panel, TextArea, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
+import { href } from '../route';
 
 type SetC = (fn: (c: Campaign) => void) => void;
 const today = () => localDate();
@@ -61,13 +62,6 @@ export default function JournalPanel({ c, setC, me, gm }: { c: Campaign; setC: S
         {waiting.length > 0 ? `${waiting.length} journal${waiting.length === 1 ? '' : 's'} in progress.` : 'A new journal is ready to deal.'}
       </span>
     )}>
-      <p className="muted small">
-        Once a round your Warlord comes to a crossroads off the battlefield. Pick an approach, answer the complication
-        and roll the checks: each is a D6 against the Warlord's Quality (Defense for Endurance), easier with fitting special rules.
-        Re-roll a failed check once for {JOURNAL.rerollCost} Umbra Shards. More passes mean better endings, but at least one
-        ending always gives nothing or costs you. Sometimes a twist adds a check, a rival Warlord appears, or an earlier
-        journal's story thread returns.
-      </p>
       {dealable.map((f) => (
         <div key={f.id} className="row">
           <span>{f.name}'s Warlord, {f.warlord!.name}, has no journal yet this round.</span>
@@ -77,9 +71,20 @@ export default function JournalPanel({ c, setC, me, gm }: { c: Campaign; setC: S
       {current.map((j) => <JournalCard key={j.id} c={c} setC={setC} j={j} gm={gm} own={own} />)}
       {factions.map((f) => <Marks key={f.id} c={c} setC={setC} factionId={f.id} canDrop={gm || me === f.id} />)}
       {!factions.length && <p className="muted small">Link a force to a faction to play its Warlord's journal.</p>}
+      {!current.length && !dealable.length && <p className="muted small" style={{ margin: 0 }}>Once a round your Warlord comes to a crossroads off the battlefield: a short story with dice checks and a reward to pick.</p>}
       {factions.length > 0 && !current.length && !dealable.length && (
-        <p className="muted small">{factions.map((f) => `${f.name}: ${journalBlock(c, f.id)}`).join('. ')}.</p>
+        <p className="muted small">
+          {factions.map((f) => f.warlord ? `${f.name}: ${journalBlock(c, f.id)}. ` : <span key={f.id}>{f.name} has no Warlord yet: name one on the <a href={href.campaign('warlord')}>Warlord</a> tab first. </span>)}
+        </p>
       )}
+      <details className="muted small">
+        <summary>How a journal works</summary>
+        Once a round your Warlord comes to a crossroads off the battlefield. Pick an approach, answer the complication
+        and roll the checks: each is a D6 against the Warlord's Quality (Defense for Endurance), easier with fitting special rules.
+        Re-roll a failed check once for {JOURNAL.rerollCost} Umbra Shards. More passes mean better endings, but at least one
+        ending always gives nothing or costs you. Sometimes a twist adds a check, a rival Warlord appears, or an earlier
+        journal's story thread returns.
+      </details>
       {past.length > 0 && (
         <>
           <h3>Earlier journals</h3>
@@ -142,7 +147,8 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
   };
   const Reroll = ({ which, r }: { which: JournalCheck; r: JournalRoll }) =>
     canPlay && !r.pass && canReroll(j, which)
-      ? <button className="small" disabled={!force || force.umbraShards < JOURNAL.rerollCost} onClick={() => reroll(which)}>Re-roll ({JOURNAL.rerollCost} US)</button>
+      ? <button className="small" disabled={!force || force.umbraShards < JOURNAL.rerollCost} onClick={() => reroll(which)}
+        data-tip={!force ? "The force isn't on this device" : force.umbraShards < JOURNAL.rerollCost ? `${force.name} has ${force.umbraShards} Umbra Shards` : 'Roll this check again, once'}>Re-roll ({JOURNAL.rerollCost} US)</button>
       : null;
 
   const tally = async () => {

@@ -67,13 +67,26 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
       el.classList.add('flash');
     }, 50);
   };
+  // The turn report (a link from Since you last looked): its panel on the Map tab, opened and flashed.
+  const showReport = () => setTimeout(() => {
+    const el = document.getElementById('turn-report');
+    if (!el) return;
+    if (el.classList.contains('collapsed')) el.querySelector<HTMLButtonElement>('.fold')?.click();
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    el.classList.remove('flash');
+    void el.offsetWidth;
+    el.classList.add('flash');
+  }, 50);
   const jump = (e: ChronicleEntry) => (e.eventId ? showGame(e.eventId) : e.sectorId && showSector(e.sectorId));
   // A link to a tab (#/campaign/:tab[/:at]): a game to show on the log, a sector on the map.
   useEffect(() => {
     const t = tabOf(openTab);
     if (!t) return;
     if (openTab === 'log' && at) showGame(at);
-    else if (t === 'map' && at) showSector(at);
+    else if (t === 'map' && at === 'report') {
+      setTab('map');
+      showReport();
+    } else if (t === 'map' && at) showSector(at);
     else setTab(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTab, at, !!state.campaign]);
@@ -194,7 +207,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         <CampaignTabs tab={tab} setTab={setTab} />
         {tab === 'map' && (
           <>
-            <ReportPanel c={c} viewer={fog} />
+            <ReportPanel key={c.reports?.[c.reports.length - 1]?.round} c={c} viewer={fog} />
             <Suspense fallback={<Loading />}><HexMapPanel c={c} setC={setC} gm={false} fog={viewAs} focus={focus} /></Suspense>
             <OrdersPanel c={c} />
             {viewAs !== '-' && <TechTreePanel c={c} setC={setC} faction={viewAs || undefined} />}
@@ -247,7 +260,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
       <CampaignTabs tab={tab} setTab={setTab} />
       {tab === 'map' && (
         <>
-          <ReportPanel c={c} />
+          <ReportPanel key={c.reports?.[c.reports.length - 1]?.round} c={c} />
           <FactionsPanel c={c} setC={setC} />
           <Suspense fallback={<Loading />}><HexMapPanel c={c} setC={setC} focus={focus} onRecord={(sectorId) => {
             setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
@@ -337,7 +350,7 @@ function ReportPanel({ c, viewer }: { c: Campaign; viewer?: string }) {
   const lines = viewer === '-' ? [] : reportFor(report, viewer);
   const sectorName = (id?: string) => (id ? c.sectors.find((s) => s.id === id)?.name : undefined);
   return (
-    <Panel id="campaign.report" title={`Turn report: round ${report.round}`} extra={reports.length > 1 && (
+    <Panel id="campaign.report" domId="turn-report" title={`Turn report: round ${report.round}`} extra={reports.length > 1 && (
       <select value={report.round} onChange={(e) => setPick(Number(e.target.value))} aria-label="Round">
         {[...reports].reverse().map((r) => <option key={r.round} value={r.round}>Round {r.round}</option>)}
       </select>

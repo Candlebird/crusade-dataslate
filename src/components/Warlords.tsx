@@ -37,9 +37,9 @@ export default function WarlordsPanel({ c, setC, faction, gm }: { c: Campaign; s
       </div>
     }>
       <p className="muted small">
-        Each faction names one Hero from its forces its Warlord and picks a Path for it. The Path's perks unlock as the Warlord
-        reaches levels {WARLORDS.levels.join(', ')}. The Path can be changed, but the Warlord starts back at level 1. If the Warlord
-        falls for good or its force leaves the faction, the perks go, and a new Warlord can be named {WARLORDS.replaceAfter} round{WARLORDS.replaceAfter === 1 ? '' : 's'} later (on the same Path).
+        Each faction names one Hero from its forces as its Warlord and picks a Path: the Path's perks unlock at Warlord
+        levels {WARLORDS.levels.join(', ')}. Changing Path puts the Warlord back to level 1. If the Warlord falls for good or its
+        force leaves the faction, the perks go, and a new Warlord can be named {WARLORDS.replaceAfter} round{WARLORDS.replaceAfter === 1 ? '' : 's'} later (on the same Path).
       </p>
       {shown.map((f) => <FactionWarlord key={f.id} c={c} setC={setC} f={f} gm={gm} />)}
     </Panel>
@@ -52,35 +52,39 @@ function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: Campai
   const [pathPick, setPathPick] = useState<WarlordPathId | ''>('');
   const [newPath, setNewPath] = useState<WarlordPathId | ''>('');
   const path = pathById(f.path);
+  // "Wolves'" rather than "Wolves's".
+  const whose = f.name.endsWith('s') ? `${f.name}'` : `${f.name}'s`;
   const unlocked = perksOf(f);
   const block = warlordBlock(c, f.id);
   const candidates = warlordCandidates(c, state.forces, f.id);
   const key = (forceId: string, unitId: string) => `${forceId}:${unitId}`;
   const chosen = candidates.find((x) => key(x.force.id, x.unit.id) === pick);
+  // The next perk the Warlord is working towards.
+  const nextAt = path && f.warlord ? WARLORDS.levels.findIndex((l, i) => l > f.warlord!.level && !unlocked.includes(path.perks[i]?.id)) : -1;
 
   const name = () => {
     if (!chosen) return;
     const p = f.path ? undefined : pathPick || undefined;
     if (!f.path && !p) return toast('Pick a Path for the Warlord.');
-    if (!f.path && !confirmAction(`Make ${chosen.unit.name} ${f.name}'s Warlord on the Path of the ${pathById(p)!.name}? Changing Path later resets the Warlord to level 1.`)) return;
+    if (!f.path && !confirmAction(`Make ${chosen.unit.name} ${whose} Warlord on the Path of the ${pathById(p)!.name}? Changing Path later resets the Warlord to level 1.`)) return;
     let ok = false;
     setC((d) => {
       // The store's copies of the force and unit, so chooseWarlord can check them.
       const force = state.forces.find((x) => x.id === chosen.force.id)!;
       ok = chooseWarlord(d, f.id, force, force.units.find((u) => u.id === chosen.unit.id)!, p);
     });
-    toast(ok ? `${chosen.unit.name} is ${f.name}'s Warlord.` : warlordBlock(c, f.id) ?? 'Not named.');
+    toast(ok ? `${chosen.unit.name} is ${whose} Warlord.` : warlordBlock(c, f.id) ?? 'Not named.');
     setPick('');
   };
 
   const stepDown = () => {
-    if (!f.warlord || !confirmAction(`${f.warlord.name} stops being ${f.name}'s Warlord? Its perks go; a new one can be named in ${WARLORDS.replaceAfter} round${WARLORDS.replaceAfter === 1 ? '' : 's'}.`)) return;
+    if (!f.warlord || !confirmAction(`${f.warlord.name} stops being ${whose} Warlord? Its perks go; a new one can be named in ${WARLORDS.replaceAfter} round${WARLORDS.replaceAfter === 1 ? '' : 's'}.`)) return;
     setC((d) => loseWarlord(d, f.id));
   };
 
   const switchPath = () => {
     const p = pathById(newPath);
-    if (!f.warlord || !p || !confirmAction(`Change ${f.name}'s Path to the ${p.name}? ${f.warlord.name} restarts at Warlord level 1 (its own XP and level stay) and levels up with XP gained from now on.`)) return;
+    if (!f.warlord || !p || !confirmAction(`Change ${whose} Path to the ${p.name}? ${f.warlord.name} restarts at Warlord level 1 (its own XP and level stay) and levels up with XP gained from now on.`)) return;
     let ok = false;
     setC((d) => void (ok = changePath(d, f.id, p.id, state.forces)));
     toast(ok ? `${f.name} follows the Path of the ${p.name}.` : `Can't change Path: ${f.warlord.name}'s force isn't on this device.`);
@@ -89,10 +93,10 @@ function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: Campai
 
   const revive = () => {
     const who = f.fallenWarlord?.name;
-    if (!confirmAction(who ? `Bring back ${who} as ${f.name}'s Warlord? (If it can't, the wait for a new one is lifted.)` : `Lift the wait so ${f.name} can name a Warlord now?`)) return;
+    if (!confirmAction(who ? `Bring back ${who} as ${whose} Warlord? (If it can't, the wait for a new one is lifted.)` : `Lift the wait so ${f.name} can name a Warlord now?`)) return;
     let name: string | undefined;
     setC((d) => void (name = reviveWarlord(d, f.id, state.forces)));
-    toast(name ? `${name} is ${f.name}'s Warlord again.` : `${f.name} can name a Warlord now.`);
+    toast(name ? `${name} is ${whose} Warlord again.` : `${f.name} can name a Warlord now.`);
   };
 
   return (
@@ -102,19 +106,20 @@ function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: Campai
         <p>
           <b>{f.warlord.name}</b>, level {f.warlord.level}
           <span className="muted">{state.forces.find((x) => x.id === f.warlord!.forceId)?.name ? ` (${state.forces.find((x) => x.id === f.warlord!.forceId)!.name})` : ''}, Warlord since round {f.warlord.since}.</span>{' '}
+          {nextAt >= 0 && path!.perks[nextAt] && <span className="muted small">Next perk: <b>{path!.perks[nextAt].name}</b> at level {WARLORDS.levels[nextAt]}.</span>}{' '}
           <button className="small" onClick={stepDown}>Step down</button>
           <span className="row">
             <select value={newPath} onChange={(e) => setNewPath(e.target.value as WarlordPathId)} aria-label="New Path">
               <option value="">Change Path…</option>
               {WARLORDS.paths.filter((p) => p.id !== f.path).map((p) => <option key={p.id} value={p.id}>{p.icon} {p.name}</option>)}
             </select>
-            <button className="small" disabled={!newPath} onClick={switchPath} data-tip="The Warlord starts back at level 1">Change Path</button>
+            <button className="small" disabled={!newPath} onClick={switchPath} data-tip={newPath ? 'The Warlord starts back at level 1' : 'Pick the new Path first'}>Change Path</button>
           </span>
         </p>
       ) : (
         <div className="row">
           {block ? <span className="muted">{block}</span> : candidates.length === 0 ? (
-            <span className="muted">No Hero in {f.name}'s forces here: a Warlord must be a Hero.</span>
+            <span className="muted">No Hero in {whose} forces here: a Warlord must be a Hero.</span>
           ) : (
             <>
               <select value={pick} onChange={(e) => setPick(e.target.value)} aria-label="Warlord">
@@ -131,7 +136,8 @@ function FactionWarlord({ c, setC, f, gm }: { c: Campaign; setC: SetC; f: Campai
                   {WARLORDS.paths.map((p) => <option key={p.id} value={p.id}>{p.icon} {p.name}</option>)}
                 </select>
               )}
-              <button className="primary" disabled={!chosen || (!f.path && !pathPick)} onClick={name}>Name Warlord</button>
+              <button className="primary" disabled={!chosen || (!f.path && !pathPick)} onClick={name}
+                data-tip={!chosen ? 'Pick a Hero first' : !f.path && !pathPick ? 'Pick a Path first: its perks are listed below' : undefined}>Name Warlord</button>
             </>
           )}
           {gm && canRevive(f) && (

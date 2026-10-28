@@ -124,7 +124,8 @@ function Challenge({ c, setC, me, gm, own }: { c: Campaign; setC: SetC; me?: str
           {theirsToPick.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
         </select>
       )}
-      <button className="primary" disabled={!fromFaction || !to || !a} onClick={send}><Icon name="g:crossed-swords" /> Request a duel</button>
+      <button className="primary" disabled={!fromFaction || !to || !a} onClick={send}
+        data-tip={!fromFaction ? 'Pick the challenger first' : !a ? `${factionName(c, fromFaction)} has no force linked here` : !to ? 'Pick who to challenge' : undefined}><Icon name="g:crossed-swords" /> Request a duel</button>
     </div>
   );
 }
@@ -137,6 +138,15 @@ function DuelCard({ c, setC, d, me, gm }: { c: Campaign; setC: SetC; d: NexusDue
   const ready = duelReady(d);
   const forceName = (s: DuelSide) => !s.forceId ? 'force not picked yet' : state.forces.find((f) => f.id === s.forceId)?.name ?? 'a missing force';
   const sideName = (s: DuelSide) => factionName(c, s.factionId);
+  // What this duel waits on, from the viewer's side.
+  const myside = mine ? d[mine] : undefined;
+  const other = mine ? d[mine === 'challenger' ? 'challenged' : 'challenger'] : undefined;
+  const nextStep = ready
+    ? <>both sides agreed. Play it on <a href={href.tracker()}>Battle</a>, then record who won here.</>
+    : myside && !myside.forceId ? <>pick your force and stakes in <b>Change wagers</b>, then agree.</>
+    : myside && !myside.agreed ? <>check what both sides put up; <b>Agree</b>, or change the wagers.</>
+    : other ? <>waiting for {sideName(other)} to agree to the wagers.</>
+    : <>both sides must agree to the wagers before the result is recorded.</>;
 
   const agree = (s: DuelSide, yes: boolean) => setC((x) => void agreeDuel(x.duels!.find((y) => y.id === d.id)!, s.factionId, yes));
   const callOff = () => {
@@ -187,7 +197,7 @@ function DuelCard({ c, setC, d, me, gm }: { c: Campaign; setC: SetC; d: NexusDue
           <button className="danger" onClick={callOff}>{mine === 'challenged' ? 'Decline' : 'Call off'}</button>
         </div>
       )}
-      {!ready && involved && <p className="muted small">Both sides must agree before you record the result.</p>}
+      {involved && <p className="muted small" style={{ marginBottom: 0 }}><b>Next:</b> {nextStep}</p>}
       {editing && <WagerModal c={c} setC={setC} d={d} me={me} onClose={() => setEditing(false)} />}
     </div>
   );
