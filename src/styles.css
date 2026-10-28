@@ -1535,3 +1535,8 @@ table.ledger td:first-child { white-space: nowrap; }
 /* Dice roller: Success-on buttons for D6 stay on one line where they fit. */
 .dice-targets { gap: 0.25rem; }
 .dice-targets button { min-width: 2.6rem; padding-left: 0.4rem; padding-right: 0.4rem; }
+
+/* === UX pass: battle decisions === */
+/* Rules search: the entry a hit opened (a paragraph, a table row, a relic card) flashes gold for a moment. */
+.rule-flash { animation: rule-flash 2s ease-out; scroll-margin: 5rem; }
+@keyframes rule-flash { 0%, 35% { background-color: rgba(201, 162, 74, 0.35); box-shadow: inset 0 0 0 2px var(--gold); } 100% { background-color: transparent; box-shadow: inset 0 0 0 2px transparent; } }

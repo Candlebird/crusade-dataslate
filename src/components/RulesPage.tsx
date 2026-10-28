@@ -1,4 +1,4 @@
-import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { href, type RulesSub } from '../route';
 import { useStore } from '../model/store';
 import {
@@ -16,7 +16,7 @@ import { relicSource } from '../rules/sortie';
 import { featInfo } from '../rules/feats';
 import { relicHolderText, relicHolders } from '../rules/engine';
 import { Panel } from './ui';
-import { searchRules, type RuleHit } from '../model/rulesSearch';
+import { entryId, searchRules, type RuleHit } from '../model/rulesSearch';
 import { IconText } from './Icon';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
@@ -26,27 +26,40 @@ function jump(e: MouseEvent<HTMLAnchorElement>) {
   document.querySelector(e.currentTarget.getAttribute('href')!)?.scrollIntoView({ behavior: 'smooth' });
 }
 
+/** The section an entry sits in ('' = outside any), for its element id (entryId), so a search hit can scroll to it. */
+const SectionAnchor = createContext('');
+/** The element id of an entry in the current section. */
+const useEntryId = () => {
+  const anchor = useContext(SectionAnchor);
+  return (key: string) => entryId(anchor, key);
+};
+
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <Panel id={`rules.${id}`} domId={id} title={title}>
-      {children}
+      <SectionAnchor.Provider value={id}>{children}</SectionAnchor.Provider>
     </Panel>
   );
 }
 
 function Prose({ lines }: { lines: string[] }) {
-  return <>{lines.map((l, i) => <p key={i} style={i ? undefined : { marginTop: 0 }}>{l}</p>)}</>;
+  const idOf = useEntryId();
+  return <>{lines.map((l, i) => <p key={i} id={idOf(l)} style={i ? undefined : { marginTop: 0 }}>{l}</p>)}</>;
 }
 
-/** A named table: trait, scar or relic-rule entries. */
-function Entries({ title, entries, roll }: { title?: string; entries: TableEntry[]; roll?: boolean }) {
+/**
+ * A named table: trait, scar or relic-rule entries. An entry's key (for its element id, idKey) is its name unless given, and
+ * "<group>: <name>" with a group (tables that share names, as the search index keys them).
+ */
+function Entries({ title, entries, roll, group }: { title?: string; entries: (TableEntry & { idKey?: string })[]; roll?: boolean; group?: string }) {
+  const idOf = useEntryId();
   return (
     <>
       {title && <h3><IconText text={title} /></h3>}
       <table className="compact small">
         <tbody>
           {entries.map((e, i) => (
-            <tr key={e.name}>
+            <tr key={e.name} id={idOf(group ? `${group}: ${e.idKey ?? e.name}` : e.idKey ?? e.name)}>
               {roll && <td className="muted">{i + 1}</td>}
               <td><b><IconText text={e.name} /></b></td>
               <td>{e.desc}</td>
@@ -58,14 +71,15 @@ function Entries({ title, entries, roll }: { title?: string; entries: TableEntry
   );
 }
 
-/** A D6 (or longer) roll table of text results. */
-function Rolls({ title, entries }: { title: string; entries: { text: string }[] }) {
+/** A D6 (or longer) roll table of text results. With a group, a row's key (for its element id) is "<group>: <text>". */
+function Rolls({ title, entries, group }: { title: string; entries: { text: string }[]; group?: string }) {
+  const idOf = useEntryId();
   return (
     <>
       <h3>{title}</h3>
       <table className="compact small">
         <tbody>
-          {entries.map((e, i) => <tr key={i}><td className="muted" style={{ width: '2rem' }}>{i + 1}</td><td>{e.text}</td></tr>)}
+          {entries.map((e, i) => <tr key={i} id={idOf(group ? `${group}: ${e.text}` : e.text)}><td className="muted" style={{ width: '2rem' }}>{i + 1}</td><td>{e.text}</td></tr>)}
         </tbody>
       </table>
     </>
@@ -76,6 +90,7 @@ function Rolls({ title, entries }: { title: string; entries: { text: string }[] 
 function RelicCase({ relics, source }: { relics: RelicDef[]; source?: (r: RelicDef) => string }) {
   const { state } = useStore();
   const held = relicHolders(state.forces, state.campaign);
+  const idOf = useEntryId();
   return (
     <>
       {TIERS.map((tier) => {
@@ -87,7 +102,7 @@ function RelicCase({ relics, source }: { relics: RelicDef[]; source?: (r: RelicD
               {list.map((r) => {
                 const by = held.get(r.name) ?? [];
                 return (
-                  <div key={r.name} className={`relic-card ${tier.toLowerCase()}`}>
+                  <div key={r.name} id={idOf(r.name)} className={`relic-card ${tier.toLowerCase()}`}>
                     <div className="relic-name">{r.name}</div>
                     {r.profile && <div className="relic-profile mono small">{r.profile}</div>}
                     {r.desc && <p className="small">{r.desc}</p>}
@@ -139,26 +154,44 @@ const RELIC_TAB_OF: Record<string, RelicPage> = { 'x-crusade': 'crusade', 'x-nex
 /** The campaign rules: the Crusade rules, with the trait tables, the relics and the Nexus Wars expansion on their own sub-pages. */
 export default function RulesPage({ sub }: { sub?: RulesSub }) {
   const [query, setQuery] = useState('');
-  const [target, setTarget] = useState<string | null>(null);
+  const [target, setTarget] = useState<RuleHit | null>(null);
   const [relicTab, setRelicTab] = useState<{ page: RelicPage; n: number }>({ page: 'rules', n: 0 });
   const hits = query.trim().length > 1 ? searchRules(query) : null;
 
-  // After opening a search hit, scroll to its section once the page has drawn.
+  // After opening a search hit, scroll to the entry that matched once the page has drawn, and flash it. A folded section
+  // is opened first; if the entry still isn't there, its section will do.
   useEffect(() => {
     if (!target) return;
-    const t = window.setTimeout(() => {
-      document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const timers: number[] = [];
+    const show = (retry: boolean) => {
+      const el = document.getElementById(target.entry);
+      const section = target.anchor ? document.getElementById(target.anchor) : null;
+      if (!el && retry && section?.classList.contains('collapsed')) {
+        section.querySelector<HTMLButtonElement>('button.fold')?.click();
+        timers.push(window.setTimeout(() => show(false), 60));
+        return;
+      }
       setTarget(null);
-    }, 120);
-    return () => window.clearTimeout(t);
+      if (!el) {
+        if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        else window.scrollTo(0, 0);
+        return;
+      }
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.remove('rule-flash');
+      void el.offsetWidth; // restart the animation when the same entry is opened twice
+      el.classList.add('rule-flash');
+      timers.push(window.setTimeout(() => el.classList.remove('rule-flash'), 2200));
+    };
+    timers.push(window.setTimeout(() => show(true), 120));
+    return () => timers.forEach((t) => window.clearTimeout(t));
   }, [target, sub]);
 
   const open = (h: RuleHit) => {
     setQuery('');
     if (h.page === 'relics') setRelicTab((r) => ({ page: RELIC_TAB_OF[h.anchor] ?? 'rules', n: r.n + 1 }));
     window.location.hash = href.rules(h.page);
-    if (h.anchor) setTarget(h.anchor);
-    else window.scrollTo(0, 0);
+    setTarget(h);
   };
 
   return (
@@ -243,7 +276,7 @@ function CrusadeRules() {
       <Section id="r-start" title="Starting a force">
         <Prose lines={CRUSADE_TEXT.starting} />
         <table className="compact small">
-          <tbody>{CATEGORIES.map((c) => <tr key={c}><td><b>{c}</b></td><td>{CATEGORY_HINT[c]}</td></tr>)}</tbody>
+          <tbody>{CATEGORIES.map((c) => <tr key={c} id={entryId('r-start', c)}><td><b>{c}</b></td><td>{CATEGORY_HINT[c]}</td></tr>)}</tbody>
         </table>
       </Section>
 
@@ -261,7 +294,7 @@ function CrusadeRules() {
         <table className="compact small">
           <tbody>
             {REQUISITIONS.map((r) => (
-              <tr key={r.name}>
+              <tr key={r.name} id={entryId('r-req', r.name)}>
                 <td><b>{r.name}</b></td>
                 <td className="muted">{r.cost} RP</td>
                 <td>{r.name === 'Increase Supply' ? `+${supplyPerRp} Supply Limit.` : r.desc}</td>
@@ -273,7 +306,7 @@ function CrusadeRules() {
 
       <Section id="r-rewards" title="Reward tables">
         <p className="muted small" style={{ marginTop: 0 }}>Roll a D10. Umbra Shards, trait tokens and Combat Manipulations are Nexus Wars rewards; a force outside Nexus Wars re-rolls trait tokens and Combat Manipulations, and the record wizard's Roll button does that for it.</p>
-        {rewardKeys.map((k) => <Rolls key={k} title={REWARD_TABLES[k].label} entries={REWARD_TABLES[k].entries} />)}
+        {rewardKeys.map((k) => <Rolls key={k} title={REWARD_TABLES[k].label} group={REWARD_TABLES[k].label} entries={REWARD_TABLES[k].entries} />)}
       </Section>
 
       <Section id="r-deaths" title="Deaths & battle scars">
@@ -316,25 +349,25 @@ function TraitRules() {
       </div>
 
       <Section id="t-traits" title="Trait tables">
-        {Object.entries(TRAIT_TABLES).map(([k, entries]) => <Entries key={k} title={k} entries={entries} />)}
+        {Object.entries(TRAIT_TABLES).map(([k, entries]) => <Entries key={k} title={k} group={`${k} traits`} entries={entries} />)}
       </Section>
 
       <Section id="t-unique" title="Unique traits">
-        {CATEGORIES.map((c) => <Entries key={c} title={c} entries={UNIQUE_TRAIT_TABLES[c]} />)}
+        {CATEGORIES.map((c) => <Entries key={c} title={c} group={`Unique ${c} traits`} entries={UNIQUE_TRAIT_TABLES[c]} />)}
       </Section>
 
       <Section id="t-weapons" title="Weapon traits">
-        <Entries title="Melee" entries={WEAPON_TRAIT_TABLES.Melee} />
-        <Entries title="Ranged" entries={WEAPON_TRAIT_TABLES.Ranged} />
-        <Entries title="Melee (unique)" entries={UNIQUE_WEAPON_TRAIT_TABLES.Melee} />
-        <Entries title="Ranged (unique)" entries={UNIQUE_WEAPON_TRAIT_TABLES.Ranged} />
+        <Entries title="Melee" group="Melee weapon traits" entries={WEAPON_TRAIT_TABLES.Melee} />
+        <Entries title="Ranged" group="Ranged weapon traits" entries={WEAPON_TRAIT_TABLES.Ranged} />
+        <Entries title="Melee (unique)" group="Unique melee weapon traits" entries={UNIQUE_WEAPON_TRAIT_TABLES.Melee} />
+        <Entries title="Ranged (unique)" group="Unique ranged weapon traits" entries={UNIQUE_WEAPON_TRAIT_TABLES.Ranged} />
       </Section>
 
       <Section id="t-nexus" title="Nexus traits">
         <p className="muted small" style={{ marginTop: 0 }}>
           <a href={href.rules('nexus')}>Nexus Wars</a> only. Unlocked by Research stations, Research Station homes, Anomalies and the Void table.
         </p>
-        {CATEGORIES.map((c) => <Entries key={c} title={c} entries={NEXUS_TRAITS[c]} />)}
+        {CATEGORIES.map((c) => <Entries key={c} title={c} group={`Nexus ${c} traits`} entries={NEXUS_TRAITS[c]} />)}
       </Section>
     </>
   );
@@ -350,7 +383,7 @@ const RELIC_PAGES = [
 type RelicPage = (typeof RELIC_PAGES)[number][0];
 
 /** The relics page, split into the rules and one case per kind of relic. */
-function RelicRules({ initial = 'rules' }: { initial?: RelicPage }) {
+export function RelicRules({ initial = 'rules' }: { initial?: RelicPage }) {
   const [page, setPage] = useState<RelicPage>(initial);
   return (
     <>
@@ -529,6 +562,7 @@ function NexusRules() {
         {TECH_BRANCHES.map((br) => (
           <Entries key={br.id} title={`${br.icon} ${br.name} — ${br.desc}`} entries={BUILDINGS.filter((b) => b.branch === br.id).map((b) => ({
             name: `${b.icon} ${b.name}`,
+            idKey: b.name,
             desc: [
               `Tier ${b.tier}${b.tier > 1 ? ` (${NEXUS_TECH.cost[b.tier]} Research${b.requires?.length ? `, after ${b.requires.map((r) => BUILDINGS.find((x) => x.id === r)?.name ?? r).join(' and ')}` : ''})` : ''}.`,
               `${b.cost} Materials${b.shards ? ` + ${b.shards} Umbra Shard${b.shards === 1 ? '' : 's'}` : ''}${b.homeOnly ? ', home only' : ''}.`,
@@ -552,7 +586,7 @@ function NexusRules() {
       <Section id="n-warlords" title="Warlords">
         <Prose lines={NEXUS_TEXT.warlords} />
         {WARLORDS.paths.map((p) => (
-          <Entries key={p.id} title={`${p.icon} ${p.name}: ${p.desc}`} entries={p.perks.map((k, i) => ({ name: `Level ${WARLORDS.levels[i]}: ${k.name}`, desc: k.desc }))} />
+          <Entries key={p.id} title={`${p.icon} ${p.name}: ${p.desc}`} entries={p.perks.map((k, i) => ({ name: `Level ${WARLORDS.levels[i]}: ${k.name}`, idKey: k.name, desc: k.desc }))} />
         ))}
       </Section>
 
@@ -565,8 +599,8 @@ function NexusRules() {
       </Section>
 
       <Section id="n-tables" title="Anomaly & Void tables">
-        <Rolls title="Anomaly table (D10, each round)" entries={ANOMALY_TABLE} />
-        <Rolls title="Void / Space hulk table (D10, once, for beating the AI there)" entries={VOID_TABLE} />
+        <Rolls title="Anomaly table (D10, each round)" group="Anomaly table" entries={ANOMALY_TABLE} />
+        <Rolls title="Void / Space hulk table (D10, once, for beating the AI there)" group="Void table" entries={VOID_TABLE} />
       </Section>
 
       <Section id="n-shop" title="Umbra Shard shop">
@@ -574,7 +608,7 @@ function NexusRules() {
         <table className="compact small">
           <tbody>
             {UMBRA_SHOP.map((s) => (
-              <tr key={s.key}><td><b>{s.name}</b></td><td className="muted">{s.cost}{s.key === 'relic' ? '+' : ''} US</td><td>{s.desc}</td></tr>
+              <tr key={s.key} id={entryId('n-shop', s.name)}><td><b>{s.name}</b></td><td className="muted">{s.cost}{s.key === 'relic' ? '+' : ''} US</td><td>{s.desc}</td></tr>
             ))}
           </tbody>
         </table>
