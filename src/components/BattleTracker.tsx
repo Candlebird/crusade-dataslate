@@ -57,7 +57,7 @@ import { isReinforced } from '../rules/production';
 import SectorDanger from './SectorDanger';
 import { forceTotals } from '../rules/engine';
 import { SOLO_PATROL } from '../rules/downtimeData';
-import { MAX_PLAYERS, randomForces, randomFormat, type Format } from '../rules/randomBattle';
+import { MAX_PLAYERS, formatSlots, randomForces, randomFormat, type Format } from '../rules/randomBattle';
 import AiActivation from './AiActivation';
 import TableMap from './TableMap';
 import { deploymentMap, suggestTable } from '../rules/tableMap';
@@ -360,17 +360,25 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
   const [withAi, setWithAi] = useState(false);
   const [pickForces, setPickForces] = useState(true);
   const [pickMission, setPickMission] = useState(true);
-  const [forces, setForces] = useState<Force[]>([]);
+  // The force picked for each side, in formatSlots order ('' leaves it to load on the tracker, or the AI to generate).
+  const [picks, setPicks] = useState<string[]>([]);
+  const slots = formatSlots(format);
+  const ready = state.forces.filter((f) => f.units.some((u) => u.status === 'active'));
   const randomize = () => {
     const f = randomFormat(players, withAi);
     setFormat(f);
     if (pickMission) setId(rollAdvancedMission().id);
-    setForces(pickForces ? randomForces(state.forces, f.teams.flat().length) : []);
+    setPicks(pickForces ? randomForces(state.forces, f.teams.flat().length).map((x) => x.id) : []);
   };
   const choose = (f: Format) => {
     setFormat(f);
-    setForces([]);
+    setPicks([]);
   };
+  const pickSlot = (i: number, forceId: string) => setPicks((p) => {
+    const next = slots.map((_, j) => p[j] ?? '');
+    next[i] = forceId;
+    return next;
+  });
   const m = missions.find((x) => x.id === id) ?? missions[0];
   const groups: [string, MissionDef[]][] = [];
   for (const x of missions) {
@@ -384,10 +392,14 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
       const b = newBattle(mission, uid(), nowIso(), Math.random, format);
       if (crisis && s.campaign) atCrisis(b, s.campaign, s.forces, s.settings);
       else if (sector && s.campaign) atSector(b, s.campaign, s.forces, s.settings, sector.id, attacker, attacker === preset ? presetForce : undefined);
-      // Randomly picked forces fill the sides nothing was loaded into, players first.
-      const open = [...b.sides.filter((x) => !x.ai), ...b.sides.filter((x) => x.ai)].filter((x) => !x.forceId);
-      const left = forces.filter((f) => !b.sides.some((x) => x.forceId === f.id));
-      open.forEach((side, i) => left[i] && loadForce(side, left[i], undefined, s.settings, s.campaign));
+      // The picked forces fill their sides, players first. Over a sector or in the Crisis some sides load already, so
+      // the picks (the randomizer's) fill whatever is still open.
+      const order = [...b.sides.filter((x) => !x.ai), ...b.sides.filter((x) => x.ai)];
+      const chosen = picks.map((fid) => s.forces.find((f) => f.id === fid));
+      if (sector || crisis) {
+        const left = chosen.filter((f): f is Force => !!f && !b.sides.some((x) => x.forceId === f.id));
+        order.filter((x) => !x.forceId).forEach((side, i) => left[i] && loadForce(side, left[i], undefined, s.settings, s.campaign));
+      } else order.forEach((side, i) => chosen[i] && loadForce(side, chosen[i]!, undefined, s.settings, s.campaign));
       s.battle = b;
     });
     if (sector || crisis) go(href.tracker());
@@ -410,7 +422,7 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
         </Panel>
       )}
       <Panel id="battle.start" title="Start a battle">
-        <p className="muted">Pick players and a mission, then load each side's force on the next screen. The battle stays on this device until you finish or discard it.</p>
+        <p className="muted">Pick the players, their forces and a mission. The battle stays on this device until you finish or discard it.</p>
         {c && wantCrisis && !crisis && <p className="small"><span className="tag red">There is no Nexus Crisis this round.</span> <a href={href.tracker()}>Start an ordinary battle</a></p>}
         {c && crisis && (
           <>
@@ -455,25 +467,56 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
             )}
           </>
         )}
-        <h3>Players</h3>
+        <h3>1. Players</h3>
         <div className="row">
           {FORMATS.map((f) => (
             <button key={f.label} className={f.label === format.label ? 'primary' : ''} onClick={() => choose(f)}>{f.label}</button>
           ))}
           {!FORMATS.some((f) => f.label === format.label) && <button className="primary">{format.label}</button>}
         </div>
-        <div className="row randomizer">
-          <span className="row"><span>Players</span><Stepper value={players} min={withAi ? 1 : 2} onChange={(n) => setPlayers(Math.min(MAX_PLAYERS, n))} /></span>
-          <label className="row"><input type="checkbox" checked={withAi} onChange={(e) => { setWithAi(e.target.checked); if (!e.target.checked) setPlayers((n) => Math.max(2, n)); }} />Include AI</label>
-          <label className="row"><input type="checkbox" checked={pickForces} onChange={(e) => setPickForces(e.target.checked)} />Random forces</label>
-          <label className="row"><input type="checkbox" checked={pickMission} onChange={(e) => setPickMission(e.target.checked)} />Random mission</label>
-          <button onClick={randomize} data-tip="Split players into random teams (or all vs the AI). Rolls forces and a mission if ticked."><Icon name="g:perspective-dice-six-faces-six" /> Randomize</button>
+        <details className="start-random">
+          <summary className="small">Roll a random battle…</summary>
+          <div className="row randomizer">
+            <span className="row"><span>Players</span><Stepper value={players} min={withAi ? 1 : 2} onChange={(n) => setPlayers(Math.min(MAX_PLAYERS, n))} /></span>
+            <label className="row"><input type="checkbox" checked={withAi} onChange={(e) => { setWithAi(e.target.checked); if (!e.target.checked) setPlayers((n) => Math.max(2, n)); }} />Include AI</label>
+            <label className="row"><input type="checkbox" checked={pickForces} onChange={(e) => setPickForces(e.target.checked)} />Random forces</label>
+            <label className="row"><input type="checkbox" checked={pickMission} onChange={(e) => setPickMission(e.target.checked)} />Random mission</label>
+            <button onClick={randomize} data-tip="Split players into random teams (or all vs the AI). Rolls forces and a mission if ticked."><Icon name="g:perspective-dice-six-faces-six" /> Randomize</button>
+          </div>
+        </details>
+        <p className="muted small">Teammates share objectives and VP. You can add, remove or regroup players once the battle starts.</p>
+        <h3>2. Forces</h3>
+        {sector || crisis ? (
+          <p className="muted small">
+            {crisis ? 'Each faction with only 1 force has it loaded.' : "The attacker's force loads for you."} Pick the other sides' forces on the next screen.
+            {picks.some(Boolean) && <> Random forces: {picks.map((fid) => state.forces.find((f) => f.id === fid)?.name).filter(Boolean).join(', ')}.</>}
+          </p>
+        ) : !ready.length ? (
+          <p className="muted small">No force has an active unit yet. <a href={href.forces()}>Build a force</a>, or start anyway and add units by hand.</p>
+        ) : (
+          <div className="start-forces">
+            {slots.map((slot, i) => (
+              <label key={i} className={`field team-${slot.team}`}>
+                <span>Team {slot.team} · {slot.ai ? 'AI' : `Player ${slots.slice(0, i + 1).filter((x) => !x.ai).length}`}</span>
+                <select value={picks[i] ?? ''} onChange={(e) => pickSlot(i, e.target.value)}>
+                  <option value="">{slot.ai ? `${ECHOES.name} (generate on the next screen)` : 'Pick on the next screen'}</option>
+                  {ready.map((f) => {
+                    const t = forceTotals(f, state.settings);
+                    return <option key={f.id} value={f.id} disabled={picks.some((x, j) => j !== i && x === f.id)}>{f.name} ({t.pointsUsed} pts, {t.bp} BP)</option>;
+                  })}
+                </select>
+              </label>
+            ))}
+          </div>
+        )}
+        <h3>3. Mission</h3>
+        <div className="row">
+          <button className="small" onClick={() => setId(rollAdvancedMission().id)} data-tip="Roll the mission type (1-2 Face-Off, 3-4 Progressive, 5-6 Attack & Defend), then a D6"><Icon name="g:perspective-dice-six-faces-six" /> Random OPR mission</button>
+          <a className="small" href={href.missions()}>Make your own in the Mission library</a>
         </div>
-        {forces.length > 0 && <p className="small">Forces, in side order: {forces.map((f) => { const t = forceTotals(f, state.settings); return `${f.name} (${t.pointsUsed} pts, ${t.bp} BP)`; }).join(', ')}. Swap them once the battle starts.</p>}
-        <p className="muted small">Teams share objectives and VP. Add, remove or regroup players once the battle starts.</p>
         {groups.map(([group, list]) => (
           <div key={group}>
-            <h3>{group}</h3>
+            <h4 className="start-group">{group}</h4>
             <div className="mission-pick">
               {list.map((x) => (
                 <label key={x.id} className={`shop-item${x.id === m?.id ? ' selected' : ''}`}>
@@ -487,9 +530,12 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
             </div>
           </div>
         ))}
-        <div className="row" style={{ marginTop: '0.8rem' }}>
-          <button className="primary" disabled={!m} onClick={() => m && start(m)}>Start {m ? m.name : 'battle'}</button>
-          <button onClick={() => setId(rollAdvancedMission().id)} data-tip="Roll the mission type (1-2 Face-Off, 3-4 Progressive, 5-6 Attack & Defend), then a D6"><Icon name="g:perspective-dice-six-faces-six" /> Random OPR mission</button>
+        <div className="start-bar">
+          <span className="grow small">
+            <b>{m ? m.name : 'No mission'}</b> · {format.label}
+            {picks.some(Boolean) && <span className="muted"> · {picks.filter(Boolean).length} of {slots.length} forces picked</span>}
+          </span>
+          <button className="primary" disabled={!m} onClick={() => m && start(m)} data-tip={m ? undefined : 'Pick a mission first'}><Icon name="g:crossed-swords" /> Start battle</button>
         </div>
       </Panel>
       {!sector && !crisis && <SoloPatrol mission={m} />}

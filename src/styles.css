@@ -1369,3 +1369,17 @@ table.ledger td:first-child { white-space: nowrap; }
 .zb-modes button { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; padding: 12px; white-space: normal; height: auto; }
 .zb-modes button span { text-transform: none; letter-spacing: normal; font-weight: 400; line-height: 1.4; }
 .zb-modes button.primary span.muted { color: inherit; opacity: 0.8; }
+
+/* === UX pass: battles === */
+/* Start a battle: a force per side, and the Start button pinned to the foot of the screen while the missions scroll. */
+.start-forces { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.6rem; margin-bottom: 1rem; }
+.start-forces .field > span:first-child { color: var(--team); }
+.start-forces select { border-left: 3px solid var(--team); }
+.start-random { margin: 0.5rem 0 0; }
+.start-random summary { cursor: pointer; color: var(--muted-2); }
+.start-group { margin: 0.9rem 0 0.2rem; color: var(--muted-2); font-size: 0.85rem; letter-spacing: 0.06em; text-transform: uppercase; }
+.start-bar {
+  position: sticky; bottom: 0; z-index: 5; display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;
+  margin: 0.8rem -0.25rem 0; padding: 0.6rem 0.75rem; background: var(--panel-2); border: 1px solid var(--gold-dim);
+  box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.5);
+}
