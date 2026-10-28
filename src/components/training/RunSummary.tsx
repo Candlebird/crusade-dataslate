@@ -28,10 +28,14 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
   const record = banks && best !== undefined && run.cleared > best;
   const shared = banks && run.phase === 'over' ? sharedPreview(run) : [];
   const drill = banks && force && run.phase === 'over' ? drillPreview(force, run) : [];
+  const why = run.phase === 'over' ? endReason(run) : null;
+  const total = banks ? Object.values(xp).reduce((a, b) => a + b, 0) : 0;
   return (
     <div className="training-summary small">
+      {why && <div className="training-summary-why">{why}</div>}
       <div style={{ marginBottom: 4 }}>
         <b>{run.cleared} wave{run.cleared === 1 ? '' : 's'} cleared</b>
+        {total > 0 && <span> · <b style={{ color: 'var(--gold)' }}>+{total} XP</b> to your units</span>}
         {record && <span style={{ color: 'var(--gold)' }}> · a new best</span>}
         {lead && lead.kills > 0 && <span className="muted"> · {lead.name} led the defence</span>}
       </div>
@@ -103,4 +107,13 @@ export function RunSummary({ run, best, force }: RunSummaryProps) {
       )}
     </div>
   );
+}
+
+/** How the run ended, from its closing log line ("The base falls. Waves cleared: 7." gives "The base falls."). */
+export function endReason(run: TrainingRun): string | null {
+  for (let i = run.log.length - 1; i >= 0; i--) {
+    const m = /^(.*?)\s*Waves cleared: \d+\.$/.exec(run.log[i]);
+    if (m) return m[1] || null;
+  }
+  return null;
 }
