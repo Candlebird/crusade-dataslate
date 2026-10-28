@@ -49,15 +49,15 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
   const [recordAt, setRecordAt] = useState<{ sectorId: string; n: number }>({ sectorId: '', n: 0 });
   const [pickedView, setViewAs] = useState<string>();
   const [tab, setTab] = useCampaignTab();
-  const [logSeen, setLogSeen] = useState(tab === 'log');
-  if (tab === 'log' && !logSeen) setLogSeen(true);
+  const [logSeen, setLogSeen] = useState(tab === 'chronicle');
+  if (tab === 'chronicle' && !logSeen) setLogSeen(true);
   const [focus, setFocus] = useState<Focus>();
   const showSector = (sectorId: string) => {
     setTab('map');
     setFocus((p) => ({ sectorId, n: (p?.n ?? 0) + 1 }));
   };
   const showGame = (id: string) => {
-    setTab('log');
+    setTab('chronicle');
     setTimeout(() => {
       const el = document.getElementById(`log-${id}`);
       if (!el) return;
@@ -70,10 +70,11 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
   const jump = (e: ChronicleEntry) => (e.eventId ? showGame(e.eventId) : e.sectorId && showSector(e.sectorId));
   // A link to a tab (#/campaign/:tab[/:at]): a game to show on the log, a sector on the map.
   useEffect(() => {
-    if (!TABS.some((x) => x.id === openTab)) return;
+    const t = tabOf(openTab);
+    if (!t) return;
     if (openTab === 'log' && at) showGame(at);
-    else if (openTab === 'map' && at) showSector(at);
-    else setTab(openTab as CampaignTab);
+    else if (t === 'map' && at) showSector(at);
+    else setTab(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openTab, at, !!state.campaign]);
   // Signed out, this browser is the GM's own copy.
@@ -208,11 +209,15 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
             <JournalPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />
           </>
         )}
-        {tab === 'chronicle' && <ChroniclePanel c={c} viewer={fog} onJump={jump} />}
+        {tab === 'chronicle' && (
+          <>
+            <ChroniclePanel c={c} viewer={fog} onJump={jump} />
+            <LogPanel c={c} setC={setC} viewer={fog} />
+          </>
+        )}
         {tab === 'night' && <GameNightPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />}
         {tab === 'bounties' && <BountyBoardPanel c={c} setC={setC} gm={false} />}
         {tab === 'stats' && <WarRoomPanel c={c} />}
-        {tab === 'log' && <LogPanel c={c} setC={setC} viewer={fog} />}
         {footer}
       </>
     );
@@ -246,7 +251,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
           <FactionsPanel c={c} setC={setC} />
           <Suspense fallback={<Loading />}><HexMapPanel c={c} setC={setC} focus={focus} onRecord={(sectorId) => {
             setRecordAt((p) => ({ sectorId, n: p.n + 1 }));
-            setTab('log');
+            setTab('chronicle');
             setTimeout(() => document.getElementById('record-game')?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
           }} /></Suspense>
           <OrdersPanel c={c} />
@@ -261,23 +266,23 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
           <JournalPanel c={c} setC={setC} gm />
         </>
       )}
-      {tab === 'chronicle' && <ChroniclePanel c={c} onJump={jump} />}
       {tab === 'night' && <GameNightPanel c={c} setC={setC} gm />}
       {tab === 'bounties' && <BountyBoardPanel c={c} setC={setC} gm />}
       {tab === 'stats' && <WarRoomPanel c={c} />}
       {/* Kept mounted once opened, so a half-filled record survives a look at another tab. */}
       {logSeen && (
-        <div className="cols-2" style={tab === 'log' ? undefined : { display: 'none' }}>
+        <div className="cols-2" style={tab === 'chronicle' ? undefined : { display: 'none' }}>
           <RecordPanel c={c} setC={setC} preset={recordAt} />
           <LogPanel c={c} setC={setC} />
         </div>
       )}
+      {tab === 'chronicle' && <ChroniclePanel c={c} onJump={jump} />}
       {footer}
     </>
   );
 }
 
-type CampaignTab = 'map' | 'warlord' | 'duels' | 'bounties' | 'stats' | 'night' | 'chronicle' | 'log';
+type CampaignTab = 'map' | 'warlord' | 'duels' | 'bounties' | 'stats' | 'night' | 'chronicle';
 const TABS: { id: CampaignTab; label: string }[] = [
   { id: 'map', label: 'Map' },
   { id: 'warlord', label: 'Warlord' },
@@ -285,17 +290,18 @@ const TABS: { id: CampaignTab; label: string }[] = [
   ...(BOUNTY.enabled ? [{ id: 'bounties' as const, label: 'Bounties' }] : []),
   { id: 'stats', label: 'War Room' },
   { id: 'night', label: 'Game night' },
-  { id: 'chronicle', label: 'Chronicle' },
-  { id: 'log', label: 'Log' },
+  { id: 'chronicle', label: 'Chronicle & log' },
 ];
+/** A tab id from a link or an older save: the Log tab is part of the Chronicle's now. */
+const tabOf = (t: string | null | undefined): CampaignTab | undefined =>
+  t === 'log' ? 'chronicle' : TABS.find((x) => x.id === t)?.id;
 const TAB_KEY = 'opr-campaign-tab';
 
 /** The campaign page's open tab, remembered per device. */
 function useCampaignTab(): [CampaignTab, (t: CampaignTab) => void] {
   const [tab, setTab] = useState<CampaignTab>(() => {
     try {
-      const t = localStorage.getItem(TAB_KEY);
-      return TABS.some((x) => x.id === t) ? (t as CampaignTab) : 'map';
+      return tabOf(localStorage.getItem(TAB_KEY)) ?? 'map';
     } catch {
       return 'map';
     }
