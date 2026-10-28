@@ -1378,3 +1378,8 @@ table.ledger td:first-child { white-space: nowrap; }
 /* The GM's Campaign settings (RoundPanel.tsx): one setting per block, its note under it. */
 .settings-list { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); }
 .settings-list p { margin: 0.3rem 0 0; }
+
+/* === UX pass: downtime modes === */
+.sortie-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; margin-top: 6px; }
+.sortie-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.zb-key { margin: 4px 0 0; }

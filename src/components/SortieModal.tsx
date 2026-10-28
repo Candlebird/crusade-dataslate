@@ -17,7 +17,7 @@ import {
   active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, startRound, nextTurn, braceFor, omensRead, sigWeaker,
   isFort, keepsHaul, leaveCombat, leaveEvent, memberName, memberUp, nextSlots, onField, patchUp, pickBoon, quitRun, distOf, DISTANCES, reachText, reachable, runXp, skillProblem,
   skillTargets, skillsOf, slotOf, SLOTS, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
-  ambushOdds, beastInfo, boonDrawText, boonLabel, heldBoon, isUpgrade, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons,
+  ambushOdds, beastInfo, tierPay, boonDrawText, boonLabel, heldBoon, isUpgrade, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons,
   type SortieBoonDraw, type SortieFx, type SortieIntentKind, type SortieModel, type SortieNode, type SortieNodeKind, type SortieRun, type SortieSkill, type SortieSkillKind, type SortieSquad,
 } from '../rules/sortie';
 import { SORTIE_BOSSES, SORTIE_REGIONS, type SortieSignature } from '../rules/sortieStory';
@@ -207,6 +207,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
   const [bestiaryOpen, setBestiaryOpen] = useState(false);
   const [marks, setMarks] = useState<SortieMarkId[]>([]);
   const [boonsOpen, setBoonsOpen] = useState(false);
+  const [rulesOpen, setRulesOpen] = useState(false);
   const week = weekKey(localDate());
   const offKey = offTableKey(c, localDate());
   const story = (state.forces.find((f) => f.id === force.id) ?? force).sortie;
@@ -358,14 +359,28 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
       <Modal
         title="Sortie"
         onClose={onClose}
-        footer={<><button onClick={onClose}>Cancel</button><button className="primary" disabled={!!problem} onClick={begin}>Set out</button></>}
+        footer={
+          <>
+            {problem && <span className="small grow" style={{ color: 'var(--warn)' }}>{problem}</span>}
+            <button onClick={onClose}>Cancel</button>
+            <button className="primary" disabled={!!problem} data-tip={problem ?? undefined} onClick={begin}>Set out</button>
+          </>
+        }
       >
         <p className="small" style={{ marginTop: 0 }}>
-          A party of 3 crosses a branching map of Echo fights, camps, shrines and caches to an Echo lord. The party stands Front, Middle and Back,
-          and shifts every round: Middle to Front, Front to Back, Back to Middle. A Fortification always holds the Back. Echo squads stand Close, Mid
-          or Far, and each slot behind the Front adds 1 step of distance. Blades and Charges work only from the Front. Guns reach as far as their range allows.
-          Every attack, yours and the Echoes', rolls to hit twice and keeps the better. Wounds carry over between fights.
+          A party of 3 crosses a branching map of Echo fights, camps, shrines and caches to an Echo lord.
+          {' '}<button className="ghost small" aria-expanded={rulesOpen} onClick={() => setRulesOpen(!rulesOpen)}>
+            How fights work <Icon name={rulesOpen ? 'l:chevron-up' : 'l:chevron-down'} />
+          </button>
         </p>
+        {rulesOpen && (
+          <p className="muted small">
+            The party stands Front, Middle and Back,
+            and shifts every round: Middle to Front, Front to Back, Back to Middle. A Fortification always holds the Back. Echo squads stand Close, Mid
+            or Far, and each slot behind the Front adds 1 step of distance. Blades and Charges work only from the Front. Guns reach as far as their range allows.
+            Every attack, yours and the Echoes', rolls to hit twice and keeps the better. Wounds carry over between fights.
+          </p>
+        )}
         <div className="small" style={{ marginBottom: 4 }}><b>Party</b> <span className="muted">({picked.length}/3)</span></div>
         {fit.length < 3 && <p className="muted small">A Sortie needs 3 active units.</p>}
         <div className="sortie-pick">
@@ -399,10 +414,9 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               ? 'Any time, as often as you like. XP only: units aren’t busy and suffer nothing if they fall.'
               : <>Costs {SORTIE.cost} Umbra Shards (you have {force.umbraShards}){c ? ' and uses all 3 units’ task for the round' : ''}. Beat the boss or head home from a camp to bring home Supply, RP and up to {SORTIE.haul.maxUs} Umbra Shards. Each unit wiped out takes a scar or is left Comatose.</>}
           </p>
-          {problem && picked.length > 0 && <p className="small" style={{ color: 'var(--warn)', margin: '4px 0 0' }}>{problem}</p>}
-          <div className="small" style={{ marginTop: 8 }}><b>Road</b></div>
+          <div className="small" style={{ marginTop: 8 }}><b>Map</b></div>
           <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-            <button className={!weekly ? 'primary' : ''} onClick={() => setWeekly(false)}>Your own</button>
+            <button className={!weekly ? 'primary' : ''} onClick={() => setWeekly(false)}>New map</button>
             <button className={weekly ? 'primary' : ''} onClick={() => setWeekly(true)}>Weekly challenge ({week})</button>
           </div>
           {weekly ? (
@@ -584,7 +598,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
       footer={
         <>
           <label className="row small" style={{ gap: 4, marginRight: 'auto' }} data-tip="The party plays itself: path, orders, boons and shrine choices.">
-            <input type="checkbox" checked={auto} disabled={!!run.over} onChange={(e) => setAuto(e.target.checked)} /> Auto
+            <input type="checkbox" checked={auto} disabled={!!run.over} onChange={(e) => setAuto(e.target.checked)} /> Auto-play
           </label>
           {!run.over && <button onClick={close}>Turn back</button>}
           {run.over && <button className="primary" onClick={onClose}>Done</button>}
@@ -762,7 +776,9 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
           ) : null}
         </div>
       ))}
-      <div>XP <b>{runXp(run)}</b> / {cap} <span className="muted">({+run.xp.toFixed(2)} earned)</span></div>
+      <div data-tip={`${+run.xp.toFixed(2)} earned so far${tierPay(run) !== 1 ? `, ×${+tierPay(run).toFixed(2)} for the difficulty` : ''}, rounded down. A unit wiped out takes half.`}>
+        XP per unit: <b>{runXp(run)}</b> <span className="muted">(at most {cap})</span>
+      </div>
       {run.mode === 'shard' ? <div>Haul: {haulText(run)}</div> : <div>Supply: {run.haul.supply} <span className="muted">(for shops)</span></div>}
       <div>Nodes cleared: {run.depth}</div>
       {!run.marks?.length ? null : <div data-tip={marksOf(run).map((m) => m.text).join(' ')}>Pact marks: {marksOf(run).map((m) => m.name.replace(/^Mark of (the )?/, '')).join(', ')} <span className="muted">({markHeat(run)} heat)</span></div>}
@@ -865,6 +881,20 @@ function MapScreen({ run, onEnter }: { run: SortieRun; onEnter: (n: SortieNode) 
           );
         })}
       </svg>
+      <MapLegend run={run} />
+    </div>
+  );
+}
+
+/** What the map's icons mean: only the kinds of step on this map, with ? and the omen mark when they're there. */
+function MapLegend({ run }: { run: SortieRun }) {
+  const nodes = run.map.flat();
+  const kinds = (Object.keys(NODE_NAME) as SortieNodeKind[]).filter((k) => nodes.some((n) => !n.hidden && n.kind === k));
+  return (
+    <div className="sortie-legend small muted">
+      {kinds.map((k) => <span key={k}><Icon name={NODE_ICON[k]} /> {NODE_NAME[k]}</span>)}
+      {nodes.some((n) => n.hidden) && <span><b>?</b> Unseen</span>}
+      {nodes.some((n) => n.omen && !n.hidden) && <span><Icon name="g:diamonds" /> Omen of the lord</span>}
     </div>
   );
 }
@@ -1109,7 +1139,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
         <>
           <div className="row small" style={{ gap: 6, marginTop: 8 }}>
             <span className="grow">{who} {chosen && <b>Pick a target at {reachText(chosen.reach)}.</b>}</span>
-            {(import.meta.env.DEV || mixed) && <button onClick={onAuto} data-tip="Let the unit choose this one">Auto</button>}
+            {(import.meta.env.DEV || mixed) && <button onClick={onAuto} data-tip="Let the unit choose this one">Auto pick</button>}
           </div>
           {([['Attacks', skills.filter((sk) => ATTACKS.includes(sk.kind))], ['Abilities', skills.filter((sk) => !ATTACKS.includes(sk.kind))]] as const).map(([head, list]) => list.length > 0 && (
             <div key={head} className="sortie-skillset">

@@ -343,6 +343,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     orders = (
       <div className="zb-panel">
         <h3>Heroes join units</h3>
+        <p className="small muted">A hero can join one of your units and fight as part of it, or fight on its own. Then start deployment.</p>
         {heroes.length ? heroes.map((h) => (
           <label key={h.id} className="field small">{h.name}
             <select value="" onChange={(e) => e.target.value && step((b) => joinHero(b, h.id, e.target.value))}>
@@ -381,7 +382,8 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
           const reserve = mineReady.filter((u) => u.sq < 0 && actions(z, u).includes('arrive'));
           return (
             <>
-              <p className="small muted">{attacking ? `${pend!.name} is shooting.` : 'Tap one of your units that has yet to act to give it orders. A tap on any other unit shows it.'}</p>
+              {/* The bar over the board says what a tap does; here, just how much of the round is left and how to look at a unit. */}
+              {!attacking && <p className="small muted">{mineReady.length} unit{mineReady.length === 1 ? '' : 's'} left to act this round. A tap on any other unit shows its profile here.</p>}
               {!attacking && reserve.length > 0 && (
                 <div className="zb-list">
                   <span className="small muted">In Ambush:</span>
@@ -398,7 +400,12 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     orders = (
       <div className="zb-panel">
         <h3>{r.winner === 'draw' ? 'A draw' : `${sideName(r.winner)} wins`}</h3>
-        <p className="small">{r.why}. Points lost: {sideName(0)} {r.lost[0]}, {sideName(1)} {r.lost[1]}.</p>
+        <p className="small">{r.why}.</p>
+        <p className="small">
+          <span className="muted">Victory points:</span> {sideName(0)} {vp[0]}, {sideName(1)} {vp[1]}
+          <br /><span className="muted">Points lost:</span> {sideName(0)} {r.lost[0]}, {sideName(1)} {r.lost[1]}
+        </p>
+        {!z.practice && <p className="small muted">Nothing is recorded until you take the result.</p>}
         <button className="primary" onClick={() => onDone(z, mode)}>{z.practice ? 'Close' : 'Take the result'}</button>
       </div>
     );
@@ -410,9 +417,9 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const log = <BattleLog lines={z.log} open={open} setOpen={setOpen} />;
   const tools = (
     <div className="row wrap small">
-      {z.phase !== 'ended' && mode === 'command' && canQuick && anyMine && <button className="small" onClick={toQuick}>Auto-Battle</button>}
-      {z.phase !== 'ended' && !anyMine && <button className="small" onClick={skip}>Skip to the end</button>}
-      {z.phase === 'battle' && <button className="small danger" onClick={concede}>End now</button>}
+      {z.phase !== 'ended' && mode === 'command' && canQuick && anyMine && <button className="small" onClick={toQuick} data-tip={`The AI plays the rest for both sides. Rewards drop to Quick: ${Math.round(ZONE_REWARDS.quick.xp * 100)}% XP, no reward rolls`}>Auto-Battle</button>}
+      {z.phase !== 'ended' && !anyMine && <button className="small" onClick={skip} data-tip="The AI plays out the rest at once">Skip to the end</button>}
+      {z.phase === 'battle' && <button className="small danger" onClick={concede} data-tip="Stop here and score the battle as it stands">End now</button>}
       {z.phase !== 'ended' && <button className="small" onClick={runForecast} disabled={odds === 'busy'} data-tip="The AI plays it out from here many times over">Forecast</button>}
       {odds && odds !== 'busy' && <span className="muted">{sideName(0)} {Math.round((odds.wins[0] / odds.n) * 100)}% · {sideName(1)} {Math.round((odds.wins[1] / odds.n) * 100)}% · draw {Math.round((odds.draws / odds.n) * 100)}% ({odds.n} sims)</span>}
       {odds === 'busy' && <span className="muted">Forecasting…</span>}
@@ -426,6 +433,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
           {head}
           {hint}
           {board}
+          <p className="zb-key small muted">A letter marks terrain and ◆ an objective: hover or tap a square for its rules.</p>
           {effects.length > 0 && <ul className="zb-effects small muted">{effects.map((e) => <li key={e}>{e}</li>)}</ul>}
         </div>
         <div className="zb-side">
