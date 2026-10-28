@@ -57,6 +57,15 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
   - Players don't see a greyed-out "Reset to defaults".
   - Browse on Army Books scrolls to the book.
   - The Guide covers the new panels.
+- **Forces and units, round 2** (4 commits):
+  - Top bar: Settings, Rules and Guide sit under a "More" menu. On a phone, Dice and Sign in sit beside the title, and nothing scrolls sideways.
+  - Unit sheet:
+    - Each trait says what it does.
+    - Experience shows the XP left to the next level, "N of M upgrades used" and a gold "N to pick" tag.
+    - Scars count "n of 3".
+    - Comatose and fallen units get a banner.
+  - A brand-new player gets "Your first force in three steps" on Forces (import a book, create a force, add units). It disappears once a force has a unit.
+  - One search box covers all the rules pages, including Nexus Wars and the relic tabs, and highlights matches.
 - **Training, round 1** (3 commits):
   - The build phase shows three steps (Place 5 / Keep 1 / Start wave N). After the keep, links point to Recipes (ready count) and the Shop (credits to spend).
   - The keep table names each Shard's type. The HUD labels Base, Credits and Luck on wide screens and no longer jumps when a wave starts.
@@ -102,6 +111,8 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
 - **Battle rewards for non-campaign forces.** They can roll Nexus-only reward results, which must be re-rolled or changed by hand. The wizard now flags them as a To do. Should the roll skip them instead? That would be a rules change.
 - **Expedition Materials with no bank.** With no bank they seem to be lost ("no bank had room"). Warn before setting out?
 - **"US" for Umbra Shards** is used everywhere. Spell it out for new players?
+- **Buy a relic with 0 RP** is allowed, because the relic picker offers a free relic. Is that intended?
+- **Unit sheet order.** Should the Profile panel move below Experience and Traits, so what changed comes first? Units also keep no XP history, so the sheet can't show what changed after each battle without a change to the saved data.
 - **Unit tasks.** They only show when the force is linked to a faction in the loaded campaign, the same as before. Is that intended?
 
 ## Test by hand
