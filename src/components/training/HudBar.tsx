@@ -37,14 +37,14 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
         <Icon name="g:crossed-swords" /> {live ? 'Wave' : 'Cleared'} <b>{live ? run.wave : run.cleared}</b>
         {best ? <span className="muted"> · best {Math.max(best, run.cleared)}</span> : null}
       </span>
-      <span className="training-hud-stat" data-tip="Base HP: each enemy that gets through costs some">
-        <Icon name="g:castle" /> <b style={{ color: low ? 'var(--red)' : undefined }}>{run.baseHp}/{TRAINING.baseHp}</b>
+      <span className="training-hud-stat" data-tip="Base HP: each enemy that gets through costs some. At 0 the run ends.">
+        <Icon name="g:castle" /> <span className="training-hud-lbl">Base</span> <b style={{ color: low ? 'var(--red)' : undefined }}>{run.baseHp}/{TRAINING.baseHp}</b>
       </span>
-      <span className="training-hud-stat" data-tip="Credits: for levels, luck and mending the base">
-        <Icon name="g:two-coins" /> <b style={{ color: 'var(--gold)' }}>{Math.floor(run.credits)}</b>
+      <span className="training-hud-stat" data-tip="Credits: earned each wave; spend them in the Shop (luck, mending) or on levels and upgrades from a piece's card on the map">
+        <Icon name="g:two-coins" /> <span className="training-hud-lbl">Credits</span> <b style={{ color: 'var(--gold)' }}>{Math.floor(run.credits)}</b>
       </span>
       <span className="training-hud-stat" data-tip={`Luck: better Shard grades in each draft (up to ${luckCap(run)} this run)`}>
-        <Icon name="g:sparkles" /> {run.luck}/{luckCap(run)}
+        <Icon name="g:sparkles" /> <span className="training-hud-lbl">Luck</span> {run.luck}/{luckCap(run)}
       </span>
       {run.phase === 'build' && <NextRoundIcon run={run} />}
       {run.siege && (

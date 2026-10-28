@@ -36,7 +36,15 @@ export function WaveStatus({ run }: WavePreviewProps) {
           </span>
         )}
       </div>
-      {live ? <div className="muted">{left} enem{left === 1 ? 'y' : 'ies'} left</div> : <WavePreview run={run} />}
+      {live ? (
+        <div className="muted">
+          {left} enem{left === 1 ? 'y' : 'ies'} left
+          {' · '}
+          {run.leaked
+            ? <span style={{ color: 'var(--red)' }} data-tip="Each enemy that reaches the base costs base HP; a wave with none through pays bonus credits">{run.leaked} got through</span>
+            : <span data-tip="A wave with none through pays bonus credits">none through yet</span>}
+        </div>
+      ) : <WavePreview run={run} />}
     </div>
   );
 }

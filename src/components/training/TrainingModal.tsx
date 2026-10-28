@@ -144,9 +144,9 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   if (!run) {
     return (
       <Modal title="Training sim" onClose={onClose} footer={<>
-        <button onClick={onClose}>Cancel</button>
+        <button onClick={onClose}>Close</button>
         {saved && <button className="primary" onClick={() => begin(saved.run)}>Resume</button>}
-        <button className={saved ? '' : 'primary'} disabled={!force.units.length} onClick={newRun}>{siege ? 'Start the siege' : 'New run'}</button>
+        <button className={saved ? '' : 'primary'} disabled={!force.units.length} data-tip={saved ? 'Starts over: the saved run ends here' : undefined} onClick={newRun}>{siege ? 'Start the siege' : 'New run'}</button>
       </>}>
         <StartScreen force={force} c={c} saved={saved} cleared={cleared} siege={siege} onSiege={setSiege} week={thisWeek()} />
       </Modal>

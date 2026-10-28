@@ -35,6 +35,7 @@ export function CardOffer({ run, offer, portraits, auto, autoPick, onPick, onPee
       <div className="training-cards-title">
         <div className="training-cards-kicker">{run.nemesis?.slain && run.wave === TRAINING.shared.nemesis.wave ? run.nemesis.name : 'The Echo Lord'} falls · wave {run.wave}</div>
         <h2>Choose a boon</h2>
+        <div className="training-cards-sub">Take one: it lasts the rest of this run.</div>
       </div>
       <div className="training-cards-row">
         {offer.map((d, i) => {

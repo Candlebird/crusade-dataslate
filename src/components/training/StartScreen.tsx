@@ -96,6 +96,8 @@ function bestText(force: Force): string {
 /** The campaign's Nexus as a new run meets it: threat and affixes, the Galactic Event, and the Echo Lords by wave. */
 function NexusBrief({ force, c }: { force: Force; c?: Campaign }) {
   const nx = nexusOf(c);
+  // Outside a campaign there is no threat and every boss is a plain Echo Lord: nothing worth a box.
+  if (!nx) return null;
   const lines = nexusLines(nx, !!pickNemesis(force.sortie), finaleOpen(force));
   return (
     <div className="small training-nexus">
