@@ -36,8 +36,10 @@ export function digest(c: Campaign | undefined, myForces: Force[], me?: string):
 
   const report = c.reports?.[c.reports.length - 1];
   if (report) {
-    out.push({ key: `report:${report.round}`, icon: '📰', text: `Round ${report.round}'s turn report is in.`, href: href.campaign('map') });
-    for (const l of reportFor(report, me)) {
+    const mine = reportFor(report, me);
+    const news = mine.length ? `: ${mine.length} dispatch${mine.length === 1 ? '' : 'es'} for your faction` : ': no news reached your faction';
+    out.push({ key: `report:${report.round}`, icon: '📰', text: `Round ${report.round}'s turn report is in${news}.`, href: href.campaign('map', 'report') });
+    for (const l of mine) {
       const s = c.sectors.find((x) => x.id === l.sectorId);
       if (l.icon === '🏴' && s?.owner === me) out.push({ key: `raid:${report.round}:${s.id}`, icon: '🏴', text: l.text, href: href.campaign('map', s.id) });
     }
