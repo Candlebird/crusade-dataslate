@@ -7,6 +7,7 @@ import {
   CATEGORIES,
   CATEGORY_HINT,
   MAX_NORMAL_TRAITS,
+  MAX_SCARS,
   MAX_UNIQUE_TRAITS,
   MAX_WEAPON_TRAITS,
   NEXUS_TRAITS,
@@ -53,6 +54,7 @@ import { traitMark } from './marks';
 import { Issues, Panel, Stepper, TextArea, TextField, XpBar, toast } from './ui';
 import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
 import { localDate } from '../model/date';
+import { scarText, statusNote, traitDesc, weaponTraitDesc, xpNextText } from '../model/unitSheet';
 import { Icon } from './Icon';
 import { carryProblem, equipRelic, stowRelic, vaultOf } from '../rules/relicVault';
 
@@ -234,11 +236,14 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             </label>
           )}
           {edit ? (
-            <select value={u.status} onChange={(e) => set((d) => void (d.status = e.target.value as UnitStatus))}>
-              <option value="active">Active</option>
-              <option value="comatose">Comatose (sits out)</option>
-              <option value="removed">Fallen / removed</option>
-            </select>
+            <label className="row small muted">
+              Status
+              <select value={u.status} onChange={(e) => set((d) => void (d.status = e.target.value as UnitStatus))}>
+                <option value="active">Active</option>
+                <option value="comatose">Comatose (sits out)</option>
+                <option value="removed">Fallen / removed</option>
+              </select>
+            </label>
           ) : (
             <>
               {u.heroicRise && <span className="tag gold">Heroic Rise</span>}
@@ -251,6 +256,12 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
       </div>
 
       <EditModeNotice f={f} />
+
+      {statusNote(u) && (
+        <div className={`panel notice unit-status ${u.status}`}>
+          <b>{statusNote(u)}</b>
+        </div>
+      )}
 
       {theirs && (
         <div className="panel notice">
@@ -368,9 +379,21 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           </Panel>
 
           {/* XP */}
-          <Panel id="unit.xp" title="Experience" extra={<span className="muted small">{used} of {earned} level(s) spent</span>}>
+          <Panel
+            id="unit.xp"
+            title="Experience"
+            extra={
+              <span className="row">
+                <span className="muted small" data-tip="Each level buys one trait, weapon trait or relic">{used} of {earned} upgrade{earned === 1 ? '' : 's'} used</span>
+                {pending > 0 && <span className="tag gold">{pending} to pick</span>}
+              </span>
+            }
+          >
             <XpBar xp={u.xp} />
-            {!edit && <p className="small muted">{u.xp} XP · {u.battles} battle{u.battles === 1 ? '' : 's'} · {u.kills} kill{u.kills === 1 ? '' : 's'}</p>}
+            <p className="small muted" style={{ marginBottom: 0 }}>
+              {xpNextText(u.xp)}
+              {!edit && <> {u.battles} battle{u.battles === 1 ? '' : 's'} · {u.kills} kill{u.kills === 1 ? '' : 's'}.</>}
+            </p>
             {edit && <div className="row" style={{ marginTop: '0.75rem' }}>
               <Stepper value={u.xp} min={0} onChange={(n) => set((d) => void (d.xp = n))} />
               {[1, 2, 3, 5].map((n) => (
@@ -396,7 +419,10 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             {u.upgrades.length === 0 && <p className="muted small">No traits yet.</p>}
             {u.upgrades.map((up, i) => !edit ? (
               <div key={up.id} className="list-item">
-                <b className="grow">{traitMark(up)} {up.name}</b>
+                <div className="grow">
+                  <b>{traitMark(up)} {up.name}</b>
+                  {traitDesc(up.name) && <div className="muted small">{traitDesc(up.name)}</div>}
+                </div>
                 {up.nexus && <span className="tag cyan">Nexus</span>}
                 {up.unique && !up.nexus && <span className="tag gold">Unique</span>}
                 {up.free && <span className="tag">Free</span>}
@@ -405,6 +431,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               <div key={up.id} className="list-item">
                 <div className="grow">
                   <TextField className="wide" value={up.name} onCommit={(v) => set((d) => void (d.upgrades[i].name = v))} />
+                  {traitDesc(up.name) && <div className="muted small" style={{ marginTop: 2 }}>{traitDesc(up.name)}</div>}
                 </div>
                 {up.nexus && <span className="tag cyan">Nexus</span>}
                 <label className="row small" data-tip="Unique traits are worth more BP and have their own limit">
@@ -491,7 +518,9 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               ))}
             </Panel>
             <Panel id="unit.scars" title="Battle scars" h={3} extra={edit && <button className="danger" onClick={() => setPicker({ kind: 'scar' })}>+ Scar</button>}>
-              {u.scars.length === 0 && <p className="muted small">Unblemished.</p>}
+              {u.scars.length === 0 ? <p className="muted small">Unblemished.</p> : (
+                <p className="small" style={{ marginTop: 0, color: u.scars.length >= MAX_SCARS ? 'var(--warn)' : undefined }}>{scarText(u)}</p>
+              )}
               {u.scars.map((sc, i) => (
                 <div key={sc.id} className="list-item">
                   <div className="grow">
@@ -598,7 +627,7 @@ function FixedWeapon({ w }: { w: Weapon }) {
       {w.traits.length > 0 && (
         <div className="row" style={{ marginTop: 6 }}>
           {w.traits.map((t) => (
-            <span key={t.id} className={`tag ${t.unique ? 'gold' : 'green'}`} data-tip={t.free ? 'Free' : undefined}>
+            <span key={t.id} className={`tag ${t.unique ? 'gold' : 'green'}`} data-tip={weaponTraitDesc(t.name) ?? (t.free ? 'Free' : undefined)}>
               {traitMark(t)} {t.name}{t.free && ' (free)'}
             </span>
           ))}
