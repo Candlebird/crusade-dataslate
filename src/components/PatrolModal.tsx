@@ -78,11 +78,13 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
             const on = picked.includes(u.id);
             const spent = used.includes(u.id);
             const over = !on && points + u.points > SOLO_PATROL.points;
+            const bp = battlePoints(u, state.settings);
             return (
-              <label key={u.id} className={`shop-item${on ? ' selected' : ''}${over ? ' disabled' : ''}`}>
+              <label key={u.id} className={`shop-item${on ? ' selected' : ''}${over ? ' disabled' : ''}`}
+                data-tip={over ? `Too big: the patrol would go over ${SOLO_PATROL.points} pts` : undefined}>
                 <input type="checkbox" checked={on} disabled={over} onChange={() => setPicked(on ? picked.filter((x) => x !== u.id) : [...picked, u.id])} />
                 <div className="grow">
-                  <b>{unitName(u)}</b> <span className="muted small">{u.points} pts · {battlePoints(u, state.settings)} BP</span>
+                  <b>{unitName(u)}</b> <span className="muted small">{u.points} pts{bp ? ` · ${bp} BP` : ''}</span>
                   {spent && <> <span className="tag gold" data-tip="Already fought this round: -1 Quality and -1 Defense">Battle-Worn</span></>}
                 </div>
               </label>
@@ -96,7 +98,7 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
       <>
         <b className="grow">{points} / {SOLO_PATROL.points} pts</b>
         <button onClick={onClose}>Cancel</button>
-        <button className="primary" disabled={!picked.length} onClick={setOut}>Send patrol</button>
+        <button className="primary" disabled={!picked.length} data-tip={picked.length ? undefined : 'Pick at least one unit'} onClick={setOut}>Send patrol</button>
       </>
     );
   } else {
@@ -104,8 +106,9 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
     body = (
       <>
         <p>
-          Your patrol ({names.join(', ')} · {points} pts) has found a <b>{found.points} pts</b> force of the {ECHOES.name}.
+          Your patrol has found a force of the {ECHOES.name}: <b>{points} pts</b> of yours against <b>{found.points} pts</b> of theirs.
         </p>
+        <p className="small"><span className="muted">Your patrol:</span> {names.join(', ')}</p>
         <p className="small"><span className="muted">Mission:</span> <b>{found.mission.name}</b></p>
         {found.echoes && (
           <ul className="small">
@@ -115,6 +118,7 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
         <p className="muted small">
           Fight: the battle opens on the Battle page. Record it when it's over.
           {' '}Turn back: each unit gets +{SOLO_PATROL.declineXp} XP{linked ? ' and sits out the rest of this round' : ''}.
+          {' '}Closing this window also turns back.
         </p>
       </>
     );
