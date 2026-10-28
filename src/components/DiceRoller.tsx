@@ -67,7 +67,7 @@ function DiceModal({ onClose }: { onClose: () => void }) {
     <Modal title="Dice roller" onClose={onClose}>
       <div className="row" style={{ alignItems: 'flex-end' }}>
         <label className="field">Dice<Stepper value={count} min={1} onChange={(n) => setCount(Math.min(60, n))} /></label>
-        <label className="field">
+        <label className="field" onClick={(e) => e.target === e.currentTarget && e.preventDefault()}>
           Type
           <div className="row">
             {SIDES.map((n) => (

@@ -96,6 +96,13 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
   - The Battle page flags past battles still waiting for one of your forces to claim, and their rows get a gold edge.
   - The dice roller has one-tap "Success on" buttons and sorts dice against a target.
   - The AI activation hint counts the units left and explains Roll vs Decide.
+- **Review** (2 commits): a separate pass over the whole diff found no ground-rule breaks and checked the new on-screen rule text against src/rules. It found and fixed one bug: clicking the "Success on" caption in the dice roller pressed "Any". The older "Type" caption had the same problem and is fixed too.
+  - Left as notes:
+    - A sealed-order attack line doesn't say that an attack not played at the table becomes a siege.
+    - The Game night intro doesn't mention the patrol fallback.
+    - "Back to past battles" goes to the Battle page, which shows any battle in progress first.
+    - The AI side's Army sheet link now sits inside the folded side settings.
+    - The Training "Flying" tag says "they fly", but a flying boss's escorts walk.
 
 ## Open questions
 - **Nexus: other factions' readiness.** Should players see the GM checklist, such as whose orders are locked in?
