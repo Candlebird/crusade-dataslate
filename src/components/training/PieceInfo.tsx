@@ -21,7 +21,7 @@ export interface PieceInfoProps {
 const r1 = (n: number) => Math.round(n * 10) / 10;
 
 /** A weapon in one line: attacks, reach, damage a hit and its rules. */
-function gunLine(t: Tower, g: TowerGun): string {
+export function gunLine(t: Tower, g: TowerGun): string {
   const rules = [g.ap ? `AP(${g.ap})` : '', g.blast > 1 ? `Blast(${g.blast})` : '', g.deadly > 1 ? `Deadly(${g.deadly})` : '', g.rending ? 'Rending' : '']
     .filter(Boolean).join(', ');
   const dmg = Math.max(1, g.deadly) + levelDmg(t, g);
