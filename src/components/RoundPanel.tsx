@@ -1,6 +1,7 @@
 import { nowIso, uid } from '../model/factory';
 import { useStore } from '../model/store';
-import type { Campaign } from '../model/types';
+import type { Campaign, Sector } from '../model/types';
+import { placeGuardians, rerollGuardians } from '../rules/guardians';
 import {
   ECHOES, GALACTIC_EVENTS, NEXUS_CRISIS, NEXUS_ROUNDS, STRATEGIC_ASSETS, activeCrisis, activeEvent, crisisUntil, currentRound, factionColor, factionName, lordById,
 } from '../rules/nexus';
@@ -44,7 +45,6 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
   const end = useEndRound();
   const { state, update } = useStore();
   const range = difficultyRange(c, state.forces);
-  const rated = c.sectors.some((s) => s.difficulty !== undefined);
   const round = currentRound(c);
   const threat = threatOf(c);
   const coming = nextThreat(c);
@@ -92,30 +92,6 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
       + ` Sectors rescale to ${range.min}–${range.max} Supply; AI-held sectors roll new modifiers.`)) return;
     end();
   };
-  const rescale = () => {
-    if (rated && !confirmAction(`Rescale every sector to ${range.min}–${range.max} Supply? Sectors keep their modifiers; unrated ones roll theirs.`)) return;
-    update((d) => {
-      if (!d.campaign) return;
-      rateSectors(d.campaign, d.forces);
-      d.campaign.updatedAt = nowIso();
-    });
-    toast(`Sectors rated ${range.min}–${range.max} Supply.`);
-  };
-  // A new difficulty level rescales the sectors straight away (if they're rated yet), so the map always matches it.
-  const setDifficulty = (id: string) => {
-    let text = '';
-    update((d) => {
-      if (!d.campaign) return;
-      d.campaign.difficulty = id;
-      if (rated) {
-        const r = rateSectors(d.campaign, d.forces);
-        text = ` Sectors rescaled to ${r.min}–${r.max} Supply.`;
-      }
-      d.campaign.updatedAt = nowIso();
-    });
-    toast(`Difficulty: ${DIFFICULTY_LEVELS.find((l) => l.id === id)?.name}.${text}`);
-  };
-
   return (
     <Panel id="campaign.round" title={`Round ${round}`}
       extra={gm && <button className="primary" onClick={endNow} data-tip="When everyone has played this round">End round…</button>}>
@@ -159,25 +135,7 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
         <span className="tag" data-tip={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}, × ${difficultyLevel(c).scale} for ${difficultyLevel(c).name} difficulty; rescaled when the round ends`}>
           Sector difficulty {range.min}–{range.max} Supply
         </span>
-        {gm && <><button className="small" onClick={rescale} data-tip="Rate sectors against current faction Supply (round end does this too)">
-          {rated ? 'Rescale sectors now' : 'Rate sectors'}
-        </button>
-        <label className="row" style={{ gap: '0.35rem' }} data-tip="Scales every sector rating; changing it rescales now">
-          <span className="muted">Difficulty</span>
-          <select value={difficultyLevel(c).id} onChange={(e) => setDifficulty(e.target.value)}>
-            {DIFFICULTY_LEVELS.map((l) => (
-              <option key={l.id} value={l.id}>{l.name} (×{l.scale})</option>
-            ))}
-          </select>
-        </label>
-        <label className="row" style={{ gap: '0.35rem' }} data-tip="Until then only you see zone battles, and players keep the old auto-battle">
-          <input type="checkbox" checked={!!c.zoneOpen} onChange={(e) => update((d) => {
-            if (!d.campaign) return;
-            d.campaign.zoneOpen = e.target.checked || undefined;
-            d.campaign.updatedAt = nowIso();
-          })} />
-          <span className="muted">Zone battles for everyone</span>
-        </label></>}
+        {gm && <span className="muted">Difficulty, rescaling and zone battles: <b>Campaign settings</b>, below.</span>}
       </div>
       {grace && (
         <p className="small" style={{ margin: '0.5rem 0 0' }}>
@@ -199,6 +157,80 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
       <EventRow c={c} gm={gm} />
       {crisis && <CrisisRow c={c} />}
       {c.factions.length > 0 && (gm || viewer) && <AssetsRow c={c} only={gm ? undefined : viewer} />}
+    </Panel>
+  );
+}
+
+/**
+ * The GM's rarely used campaign settings, folded away from the round: difficulty, rescaling sectors, opening zone
+ * battles to everyone, and the guardians.
+ */
+export function CampaignSettingsPanel({ c }: { c: Campaign }) {
+  const { state, update } = useStore();
+  const range = difficultyRange(c, state.forces);
+  const rated = c.sectors.some((s) => s.difficulty !== undefined);
+  const change = (fn: (d: Campaign) => void) => update((s) => {
+    if (!s.campaign) return;
+    fn(s.campaign);
+    s.campaign.updatedAt = nowIso();
+  });
+  const rescale = () => {
+    if (rated && !confirmAction(`Rescale every sector to ${range.min}–${range.max} Supply? Sectors keep their modifiers; unrated ones roll theirs.`)) return;
+    change((d) => void rateSectors(d, state.forces));
+    toast(`Sectors rated ${range.min}–${range.max} Supply.`);
+  };
+  // A new difficulty level rescales the sectors straight away (if they're rated yet), so the map always matches it.
+  const setDifficulty = (id: string) => {
+    let text = '';
+    change((d) => {
+      d.difficulty = id;
+      if (rated) {
+        const r = rateSectors(d, state.forces);
+        text = ` Sectors rescaled to ${r.min}–${r.max} Supply.`;
+      }
+    });
+    toast(`Difficulty: ${DIFFICULTY_LEVELS.find((l) => l.id === id)?.name}.${text}`);
+  };
+  const guard = () => {
+    let placed: Sector[] = [];
+    change((d) => void (placed = placeGuardians(d, state.books, state.forces, Math.random, uid)));
+    toast(placed.length
+      ? `Guardians placed: ${placed.map((s) => s.name).join(', ')}.`
+      : "No new guardians: every site has already rolled for one, or Void Echoes isn't imported.");
+  };
+  const reguard = () => {
+    if (!confirmAction('Re-roll every guardian? Each AI-held site loses its guardian (and its relic) and rolls again.')) return;
+    let placed: Sector[] = [];
+    change((d) => void (placed = rerollGuardians(d, state.books, state.forces, Math.random, uid)));
+    toast(placed.length ? `Guardians re-rolled: ${placed.map((s) => s.name).join(', ')}.` : 'Guardians re-rolled: none this time.');
+  };
+  return (
+    <Panel id="campaign.settings" title="Campaign settings" collapsed>
+      <div className="settings-list small">
+        <div>
+          <label className="row" style={{ gap: '0.35rem' }}>
+            <b>Difficulty</b>
+            <select value={difficultyLevel(c).id} onChange={(e) => setDifficulty(e.target.value)}>
+              {DIFFICULTY_LEVELS.map((l) => <option key={l.id} value={l.id}>{l.name} (×{l.scale})</option>)}
+            </select>
+          </label>
+          <p className="muted">Scales every sector rating; changing it rescales the sectors now.</p>
+        </div>
+        <div>
+          <button onClick={rescale}>{rated ? 'Rescale sectors now' : 'Rate sectors'}</button>
+          <p className="muted">Rates sectors {range.min}–{range.max} Supply against current faction Supply. Each round end does this too.</p>
+        </div>
+        <div>
+          <label className="row" style={{ gap: '0.35rem' }}>
+            <input type="checkbox" checked={!!c.zoneOpen} onChange={(e) => change((d) => void (d.zoneOpen = e.target.checked || undefined))} /> <b>Zone battles for everyone</b>
+          </label>
+          <p className="muted">Until then only you see zone battles, and players keep the old auto-battle.</p>
+        </div>
+        <div>
+          <span className="row"><button onClick={guard}>Place guardians</button><button onClick={reguard}>Re-roll guardians</button></span>
+          <p className="muted">Place rolls for a guardian at each AI-held planet, station, anomaly, void sector and Lost Archive that hasn't rolled yet (round end does this too). Re-roll removes every guardian and rolls each site again.</p>
+        </div>
+      </div>
     </Panel>
   );
 }
@@ -271,12 +303,14 @@ function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
     fn(s.campaign);
     s.campaign.updatedAt = nowIso();
   });
+  // Only the factions with an asset this round (earned or spent): a row of "0 of 0" says nothing.
+  const shown = c.factions.filter((f) => (!only || f.id === only) && (assetsOf(c, f.id).earned > 0 || assetsOf(c, f.id).spent.length > 0));
   return (
     <div className="small" style={{ marginTop: '0.5rem' }}>
       <span className="muted" data-tip={`One per skirmish won this round, and one per Weekly Siege won (Training), up to ${NEXUS_ROUNDS.assetsMax} in all. Spend them in the Battle; unspent ones are lost at round end.`}>
-        Strategic Assets (1 per skirmish or Weekly Siege won, up to {NEXUS_ROUNDS.assetsMax}; lost if unspent at round end):
+        Strategic Assets (1 per skirmish or Weekly Siege won, up to {NEXUS_ROUNDS.assetsMax}; lost if unspent at round end){shown.length ? ':' : `: ${only ? 'none' : 'nobody has one'} this round.`}
       </span>
-      {c.factions.filter((f) => !only || f.id === only).map((f) => {
+      {shown.map((f) => {
         const a = assetsOf(c, f.id);
         return (
           <div key={f.id} className="row" style={{ flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.25rem' }}>

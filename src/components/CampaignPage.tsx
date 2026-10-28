@@ -7,10 +7,9 @@ import { BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, benefitOf, factionCol
 import { href } from '../route';
 import { useCloud } from '../cloud/CloudSync';
 import { logFor, type ChronicleEntry } from '../rules/chronicle';
-import { placeGuardians, rerollGuardians } from '../rules/guardians';
 import { reportFor } from '../rules/report';
 import OrdersPanel, { OrdersLockStrip } from './NexusOrders';
-import RoundPanel from './RoundPanel';
+import RoundPanel, { CampaignSettingsPanel } from './RoundPanel';
 import { RoundChecklist, ThisRound } from './RoundTodo';
 import TechTreePanel from './TechTree';
 import WarlordsPanel from './Warlords';
@@ -215,20 +214,6 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
     );
   }
 
-  const guard = () => {
-    let placed: Sector[] = [];
-    setC((d) => void (placed = placeGuardians(d, state.books, state.forces, Math.random, uid)));
-    toast(placed.length
-      ? `Guardians placed: ${placed.map((s) => s.name).join(', ')}.`
-      : "No new guardians: every site has already rolled for one, or Void Echoes isn't imported.");
-  };
-  const reguard = () => {
-    if (!confirmAction('Re-roll every guardian? Each AI-held site loses its guardian (and its relic) and rolls again.')) return;
-    let placed: Sector[] = [];
-    setC((d) => void (placed = rerollGuardians(d, state.books, state.forces, Math.random, uid)));
-    toast(placed.length ? `Guardians re-rolled: ${placed.map((s) => s.name).join(', ')}.` : 'Guardians re-rolled: none this time.');
-  };
-
   return (
     <>
       <div className="page-head">
@@ -238,8 +223,6 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         </div>
         <div className="row">
           <a className="btn" href={href.campaign()}><Icon name="l:arrow-left" /> Player view</a>
-          <button onClick={guard} data-tip="Roll for a guardian at each AI-held planet, station, anomaly, void sector and Lost Archive that hasn't rolled yet (round end does this too)">Place guardians</button>
-          <button onClick={reguard} data-tip="Remove every guardian and roll each AI-held site again">Re-roll guardians</button>
           <button className="primary" onClick={() => exportCampaign(c)}>Export campaign.json</button>
         </div>
       </div>
@@ -252,6 +235,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
 
       <RoundChecklist c={c} />
       <RoundPanel c={c} />
+      <CampaignSettingsPanel c={c} />
       <OrdersLockStrip c={c} />
       <CampaignTabs tab={tab} setTab={setTab} />
       {tab === 'map' && (
