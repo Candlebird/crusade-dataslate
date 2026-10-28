@@ -80,7 +80,6 @@ export function RoundChecklist({ c }: { c: Campaign }) {
     const done = own.filter(locks!.isDeclared).length;
     return <span className={`tag${done === own.length ? ' green' : ''}`}>{done === own.length ? <Icon name="l:check" /> : '…'} {done}/{own.length}</span>;
   };
-  const anyForces = rows.some((r) => r.forces > 0);
 
   return (
     <Panel id="campaign.checklist" title="Round checklist"
@@ -89,18 +88,12 @@ export function RoundChecklist({ c }: { c: Campaign }) {
       {rows.length === 0 ? <p className="muted small">No factions yet: add them on the Map tab.</p> : (
         <div className="table-wrap">
           <table className="compact stack round-check">
-            <thead><tr><th>Faction</th><th>Orders</th><th>Income</th><th>Assets left</th><th>Echo marks</th><th>Journal</th><th>Warlord</th><th>Game night</th></tr></thead>
+            <thead><tr><th>Faction</th><th>Orders</th><th>Assets left</th><th>Echo marks</th><th>Journal</th><th>Warlord</th><th>Game night</th></tr></thead>
             <tbody>
               {rows.map((r) => (
                 <tr key={r.id}>
                   <td className="s-full" data-label="Faction"><b>{r.name}</b>{r.player && <span className="muted"> · {r.player}</span>}</td>
                   <td data-label="Orders">{ordersFor(r.id)}</td>
-                  <td data-label="Income" data-tip="Sector income from ended rounds: players claim it on their force page">
-                    {!c.rounds?.length ? <span className="muted">No round ended yet</span>
-                      : r.unclaimed === undefined ? <span className="muted">No force here</span>
-                      : r.unclaimed ? <span className="tag gold">{r.unclaimed} round{r.unclaimed === 1 ? '' : 's'} to claim</span>
-                      : <span className="tag green"><Icon name="l:check" /> Claimed</span>}
-                  </td>
                   <td data-label="Assets left">{r.assetsLeft ? <span className="tag gold">{r.assetsLeft}</span> : <span className="muted">0</span>}</td>
                   <td data-label="Echo marks">
                     {r.openMarks.length ? <span className="tag red" data-tip="Fall at round end unless a detachment stands there">{r.openMarks.join(', ')}</span> : <span className="muted">None open</span>}
@@ -115,7 +108,6 @@ export function RoundChecklist({ c }: { c: Campaign }) {
           </table>
         </div>
       )}
-      {!anyForces && rows.length > 0 && <p className="muted small">Income shows only for factions whose forces are on this device.</p>}
       <p className="muted small" style={{ marginBottom: 0 }}>When everyone has played what they will this round, press <b>End round…</b> in the Round panel below.</p>
     </Panel>
   );

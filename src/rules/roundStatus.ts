@@ -96,10 +96,6 @@ export interface FactionStatus {
   id: string;
   name: string;
   player: string;
-  /** Its forces on this device. */
-  forces: number;
-  /** Ended rounds it hasn't claimed income for; undefined when none of its forces are on this device. */
-  unclaimed?: number;
   assetsLeft: number;
   openMarks: string[];
   breaks: number;
@@ -110,16 +106,12 @@ export interface FactionStatus {
 
 /** Each faction's round, for the GM's checklist. `forces`: every force on this device. */
 export function factionStatus(c: Campaign, forces: Force[]): FactionStatus[] {
-  const ended = c.rounds?.length ? c.rounds[c.rounds.length - 1].round : undefined;
   return c.factions.map((f) => {
-    const own = factionForces(forces, f.id);
     const j = journalOf(c, f.id);
     return {
       id: f.id,
       name: f.name,
       player: f.player,
-      forces: own.length,
-      unclaimed: !own.length ? undefined : ended === undefined ? 0 : claimableRounds(c, own[0].nexus!, forces).length,
       assetsLeft: assetsOf(c, f.id).left,
       openMarks: openMarks(c, forces, f.id).map((s) => s.name),
       breaks: breaksLeft(c, f.id),

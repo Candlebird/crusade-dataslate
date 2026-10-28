@@ -62,13 +62,12 @@ describe('roundTodos', () => {
 });
 
 describe('factionStatus', () => {
-  it('counts unclaimed rounds only for factions with forces on this device', () => {
+  it('gives one row per faction, with no income column (it only knew about forces on this device)', () => {
     const c = campaign();
-    const [a, b] = factionStatus(c, [force('A')]);
-    expect(a).toMatchObject({ id: 'A', player: 'Ann', forces: 1, unclaimed: 1 });
-    expect(b.forces).toBe(0);
-    expect(b.unclaimed).toBeUndefined();
-    expect(factionStatus(c, [force('A', 4)])[0].unclaimed).toBe(0);
+    const rows = factionStatus(c, [force('A')]);
+    expect(rows.map((r) => r.id)).toEqual(c.factions.map((f) => f.id));
+    expect(rows[0]).toMatchObject({ id: 'A', player: 'Ann' });
+    expect(rows[0]).not.toHaveProperty('unclaimed');
   });
 });
 
