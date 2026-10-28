@@ -203,7 +203,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
 
         {viewAs && viewAs !== '-' && <ThisRound c={c} me={viewAs} />}
         <RoundPanel c={c} gm={false} viewer={fog} />
-        <OrdersLockStrip c={c} />
+        <OrdersLockStrip c={c} byFaction />
         <CampaignTabs tab={tab} setTab={setTab} />
         {tab === 'map' && (
           <>

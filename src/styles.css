@@ -1535,3 +1535,8 @@ table.ledger td:first-child { white-space: nowrap; }
 /* Dice roller: Success-on buttons for D6 stay on one line where they fit. */
 .dice-targets { gap: 0.25rem; }
 .dice-targets button { min-width: 2.6rem; padding-left: 0.4rem; padding-right: 0.4rem; }
+/* === UX pass: nexus decisions === */
+/* Players' "Sealed orders locked in": one row per faction, yes or no. */
+.lock-rows ul { list-style: none; margin: 0.4rem 0 0; padding: 0; }
+.lock-rows li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.2rem 0; border-top: 1px solid var(--line); }
+.lock-rows li:first-child { border-top: none; }

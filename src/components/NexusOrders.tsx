@@ -72,13 +72,37 @@ export function lockedIn(c: Campaign, forces: Force[], declared: Declared[], rou
   return { expected, isDeclared, waiting: expected.filter((f) => !isDeclared(f)) };
 }
 
-/** A short line near the top of the campaign page: how many detachments have locked in orders, and whose. It never shows the picks. */
-export function OrdersLockStrip({ c }: { c: Campaign }) {
+/** A short line near the top of the campaign page: how many detachments have locked in orders, and whose. It never shows the picks.
+ *  `byFaction` (the players' view): one row per faction instead, yes or no. */
+export function OrdersLockStrip({ c, byFaction }: { c: Campaign; byFaction?: boolean }) {
   const { state } = useStore();
   const { current, revealed, declared } = useSealedOrders(c);
   if (!current || revealed) return null;
   const { expected, isDeclared } = lockedIn(c, state.forces, declared, current.round);
   if (!expected.length) return null;
+  if (byFaction) {
+    // Only factions with detachments to declare for; the AI and empty factions don't pick orders.
+    const rows = c.factions.flatMap((x) => {
+      const own = expected.filter((f) => f.nexus!.factionId === x.id);
+      return own.length ? [{ id: x.id, name: x.name, locked: own.every(isDeclared) }] : [];
+    });
+    const n = rows.filter((r) => r.locked).length;
+    return (
+      <div className="panel small lock-rows">
+        <b><Icon name="l:lock" /> Sealed orders locked in: {n} of {rows.length} faction{rows.length === 1 ? '' : 's'}</b>
+        <ul>
+          {rows.map((r) => (
+            <li key={r.id}>
+              <span>{r.name}</span>
+              {r.locked
+                ? <span className="tag green"><Icon name="l:check" /> Locked in</span>
+                : <span className="tag" data-tip="Still picking">… Not yet</span>}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
   const done = expected.filter(isDeclared).length;
   return (
     <div className="panel row small" style={{ flexWrap: 'wrap', gap: '0.4rem' }}>
