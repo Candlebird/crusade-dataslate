@@ -77,22 +77,21 @@ function DiceModal({ onClose }: { onClose: () => void }) {
         </label>
         <label className="field">
           Success on
-          <select value={target} onChange={(e) => setTarget(Number(e.target.value))}>
-            <option value={0}>— just roll —</option>
-            {Array.from({ length: sides - 1 }, (_, i) => i + 2).map((n) => <option key={n} value={n}>{n}+</option>)}
-          </select>
+          {sides === 6 ? (
+            // The usual case at the table (a Quality or Defense test): one tap per target.
+            <div className="row dice-targets">
+              {[0, 2, 3, 4, 5, 6].map((n) => (
+                <button key={n} className={target === n ? 'primary' : ''} onClick={() => setTarget(n)}>{n ? `${n}+` : 'Any'}</button>
+              ))}
+            </div>
+          ) : (
+            <select value={target} onChange={(e) => setTarget(Number(e.target.value))}>
+              <option value={0}>— just roll —</option>
+              {Array.from({ length: sides - 1 }, (_, i) => i + 2).map((n) => <option key={n} value={n}>{n}+</option>)}
+            </select>
+          )}
         </label>
         <button className="primary" onClick={roll}>Roll {count}D{sides}</button>
-      </div>
-
-      <div className="row" style={{ marginTop: '0.75rem', alignItems: 'flex-end' }}>
-        <label className="field" style={{ flex: 1 }}>
-          Campaign table
-          <select value={table} onChange={(e) => setTable(e.target.value)}>
-            {TABLES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
-          </select>
-        </label>
-        <button onClick={rollTable}><Icon name="g:perspective-dice-six-faces-six" /> Roll on table</button>
       </div>
 
       {last && (
@@ -103,11 +102,22 @@ function DiceModal({ onClose }: { onClose: () => void }) {
             {last.dice.length > 1 && <span className="muted small">total {last.dice.reduce((a, b) => a + b, 0)}</span>}
           </div>
           <div className="dice-tray">
-            {last.dice.map((d, i) => <DieFace key={i} value={d} item={last} />)}
+            {/* With a target, successes are grouped first so they're easy to count off. */}
+            {(last.target ? [...last.dice].sort((a, b) => b - a) : last.dice).map((d, i) => <DieFace key={i} value={d} item={last} />)}
           </div>
           {last.result && <div><Icon name="l:arrow-right" /> {last.result}</div>}
         </div>
       )}
+
+      <div className="row" style={{ marginTop: '0.75rem', alignItems: 'flex-end' }}>
+        <label className="field" style={{ flex: 1 }}>
+          Campaign table
+          <select value={table} onChange={(e) => setTable(e.target.value)}>
+            {TABLES.map((t) => <option key={t.key} value={t.key}>{t.label}</option>)}
+          </select>
+        </label>
+        <button onClick={rollTable}><Icon name="g:perspective-dice-six-faces-six" /> Roll on table</button>
+      </div>
 
       {history.length > 1 && (
         <div className="history">

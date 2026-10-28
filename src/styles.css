@@ -1420,3 +1420,6 @@ table.ledger td:first-child { white-space: nowrap; }
 .reward-todo { margin: -0.25rem 0 0.6rem; }
 /* Past battles: a battle one of your forces still has to claim stands out. */
 .past-battle.waiting { border-left: 3px solid var(--gold); padding-left: 0.6rem; }
+/* Dice roller: Success-on buttons for D6 stay on one line where they fit. */
+.dice-targets { gap: 0.25rem; }
+.dice-targets button { min-width: 2.6rem; padding-left: 0.4rem; padding-right: 0.4rem; }
