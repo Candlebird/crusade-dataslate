@@ -33,7 +33,15 @@ export function useEndRound() {
       out = { r, c: d.campaign };
     });
     if (out) {
-      toast(roundEndText(out.c, out.r));
+      const { c, r } = out;
+      // With the turn report on the page it tells the round; the toast just says it ended and what the report leaves out.
+      const shown = !!document.getElementById('turn-report');
+      toast(shown
+        ? `Round ${r.round} ended: ${ECHOES.name} threat ${r.threatBefore} → ${r.threat}.`
+          + (r.difficulty ? ` Sectors rescaled to ${r.difficulty.min}–${r.difficulty.max} Supply.` : '')
+          + (r.warlords?.lost ?? []).map((w) => ` ${factionName(c, w.factionId)} lost its Warlord, ${w.name}.`).join('')
+          + ` Round ${currentRound(c)} begins: the turn report below has the rest.`
+        : roundEndText(c, r));
       // The new turn report is what everyone reads next: bring it into view where it's on the page (the Map tab).
       setTimeout(() => {
         const el = document.getElementById('turn-report');
@@ -92,15 +100,19 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
   };
 
   const endNow = () => {
-    if (!confirmAction(`End round ${round}? Sector income is fixed (players claim it on their force page), `
-      + (marked
-        ? `the ${ECHOES.name} take ${open.length ? open.join(', ') : 'nothing (the line held everywhere)'}, and their threat goes to ${coming}.`
-        : `the ${ECHOES.name}' threat goes to ${coming} and they spread ${spreads} sector${spreads === 1 ? '' : 's'}${grace ? ' (into unclaimed space only)' : ''}.`)
-      + (breakers.length ? ` ${breakers.map((f) => f.name).join(', ')} still ha${breakers.length === 1 ? 's' : 've'} a mark to break: it goes to their own marked sector.` : '')
-      + (crisis && crisis.result !== 'won' && round >= crisisUntil(crisis) ? ` The Nexus Crisis wasn't won: the ${ECHOES.name} take each faction's sector nearest ${lordById(crisis.lord)?.name ?? 'the Lord'}.` : '')
-      + (unspent ? ` ${unspent} unspent Strategic Asset${unspent === 1 ? ' is' : 's are'} lost.` : '')
-      + ' Claimed space hulks drift off, new points of interest appear and a Galactic Event is rolled.'
-      + ` Sectors rescale to ${range.min}–${range.max} Supply; AI-held sectors roll new modifiers.`)) return;
+    // One fact per line: confirm() can't format more, but a list reads at a glance.
+    const facts = [
+      'Sector income is fixed (players claim it on their force page).',
+      marked
+        ? `The ${ECHOES.name} take ${open.length ? open.join(', ') : 'nothing (the line held everywhere)'}; their threat goes to ${coming}.`
+        : `The ${ECHOES.name}' threat goes to ${coming}; they spread ${spreads} sector${spreads === 1 ? '' : 's'}${grace ? ' (into unclaimed space only)' : ''}.`,
+      ...(breakers.length ? [`${breakers.map((f) => f.name).join(', ')} still ha${breakers.length === 1 ? 's' : 've'} a mark to break: it goes to their own marked sector.`] : []),
+      ...(crisis && crisis.result !== 'won' && round >= crisisUntil(crisis) ? [`The Nexus Crisis wasn't won: the ${ECHOES.name} take each faction's sector nearest ${lordById(crisis.lord)?.name ?? 'the Lord'}.`] : []),
+      ...(unspent ? [`${unspent} unspent Strategic Asset${unspent === 1 ? ' is' : 's are'} lost.`] : []),
+      'Claimed space hulks drift off, new points of interest appear and a Galactic Event is rolled.',
+      `Sectors rescale to ${range.min}–${range.max} Supply; AI-held sectors roll new modifiers.`,
+    ];
+    if (!confirmAction(`End round ${round}?\n\n${facts.map((f) => `• ${f}`).join('\n')}`)) return;
     end();
   };
   return (
