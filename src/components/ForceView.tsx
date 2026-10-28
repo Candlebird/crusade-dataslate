@@ -77,6 +77,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const [showRemoved, setShowRemoved] = useState(false);
   const [shopping, setShopping] = useState(false);
   const [umbra, setUmbra] = useState(false);
+  const [claiming, setClaiming] = useState(false);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [practice, setPractice] = useState<TrackedBattle | null>(null);
   const zoneOn = useZoneBattles();
@@ -99,6 +100,11 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const units = listed.filter((u) => matchesTags(unitTags(u, state.books), tagFilter));
   const removedCount = f.units.filter((u) => u.status === 'removed').length;
   const levelling = f.units.filter((u) => pendingLevels(u) > 0);
+  // Round income waiting for this force's faction: shown at the top, so it isn't missed at the bottom of the page.
+  const c = state.campaign;
+  const n = f.nexus;
+  const inCampaign = !!c && !!n && c.factions.some((x) => x.id === n.factionId);
+  const toClaim = !theirs && c && n && inCampaign ? claimableRounds(c, n, state.forces) : [];
 
   const addLedger = (label: string, rp: number, supply: number) =>
     set((d) => void d.ledger.push({ id: uid(), date: localDate(), label, rp, supply }));
@@ -120,7 +126,6 @@ export default function ForceView({ forceId }: { forceId: string }) {
         </div>
         <div className="row">
           {armyUrl && <a className="btn" href={armyUrl} target="_blank" rel="noreferrer">Army Forge <Icon name="l:external-link" /></a>}
-          <button onClick={() => exportForce(f)}>Export force file</button>
           {/* A Nexus Wars force raises its units at its planets (Production, in the Nexus Wars panel); adding one here skips the bank. */}
           {edit && <button onClick={() => setAdding(true)}>+ Add unit</button>}
           {zoneOn && !theirs && (
@@ -141,18 +146,28 @@ export default function ForceView({ forceId }: { forceId: string }) {
         </div>
       )}
 
-      {!theirs && levelling.length > 0 && (
+      {(toClaim.length > 0 || (!theirs && levelling.length > 0)) && (
         <div className="panel notice">
           <div className="panel-title">
-            <h3><Icon name="g:upgrade" /> {levelling.length === 1 ? '1 unit needs' : `${levelling.length} units need`} to finish levelling up</h3>
+            <h3><Icon name="g:upgrade" /> Waiting on you</h3>
           </div>
-          {levelling.map((u) => {
-            const n = pendingLevels(u);
+          {toClaim.length > 0 && c && (
+            <div className="list-item">
+              <span className="grow">
+                <b>Round income</b>{' '}
+                <span className="muted small">ready for {toClaim.length === 1 ? `round ${toClaim[0].round}` : `${toClaim.length} rounds`}</span>
+              </span>
+              <ClaimAll force={f} c={c} onPick={() => setClaiming(true)} />
+              <button onClick={() => setClaiming(true)}>Choose…</button>
+            </div>
+          )}
+          {!theirs && levelling.map((u) => {
+            const k = pendingLevels(u);
             return (
               <div key={u.id} className="list-item">
                 <span className="grow">
                   <b>{u.name || u.unitType}</b>{' '}
-                  <span className="muted small">level {levelForXp(u.xp)} · {n} upgrade{n > 1 ? 's' : ''} to pick</span>
+                  <span className="muted small">level {levelForXp(u.xp)} · {k} upgrade{k > 1 ? 's' : ''} to pick</span>
                 </span>
                 <a className="btn primary" href={href.unit(f.id, u.id)}>Level up</a>
               </div>
@@ -370,8 +385,11 @@ export default function ForceView({ forceId }: { forceId: string }) {
           </Panel>
           <RelicVault f={f} readOnly={theirs} />
           <NexusPanel f={f} onShop={() => setUmbra(true)} />
-          {theirs ? null : <div className="panel">
-            <div className="panel-title"><h3>Danger zone</h3></div>
+          {theirs ? <div className="panel"><button onClick={() => exportForce(f)}>Export force file</button></div> : <div className="panel">
+            <div className="panel-title"><h3>Manage force</h3></div>
+            <div className="row" style={{ marginBottom: '0.5rem' }}>
+              <button onClick={() => exportForce(f)} data-tip="A file with this force and its units, to back it up or import it on another device">Export force file</button>
+            </div>
             {cloud.email && f.owner === cloud.email && <TransferForce f={f} />}
             <button
               className="danger"
@@ -388,6 +406,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
         </div>
       </div>
 
+      {claiming && c && <RoundIncome force={f} c={c} onClose={() => setClaiming(false)} />}
       {umbra && <UmbraShop force={f} onClose={() => setUmbra(false)} />}
       {practice && (
         <ZoneFight id={practiceId(f.id)} title={`${f.name}: practice`} tracked={practice} ctx={{ kind: 'practice', forceId: f.id }} modes={['command', 'quick']} practice
@@ -562,7 +581,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const { state, updateForce } = useStore();
   const c = state.campaign;
   const set = (fn: Parameters<typeof updateForce>[1]) => updateForce(f.id, fn);
-  const { edit } = useEditMode(f);
+  const { edit, theirs } = useEditMode(f);
   const n = f.nexus;
   const faction = n && c?.factions.find((x) => x.id === n.factionId);
   const home = c && n ? homeOf(c, n.factionId) : undefined;
@@ -572,7 +591,7 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
   const claimedThrough = n && factionClaimedRound(state.forces, n.factionId);
 
   return (
-    <Panel id="force.nexus" title="Nexus Wars" h={3} className="nexus-box" extra={<button className="primary" onClick={onShop}>Spend Umbra Shards</button>}>
+    <Panel id="force.nexus" title="Nexus Wars" h={3} className="nexus-box" extra={!theirs && <button className={f.umbraShards > 0 ? 'primary' : undefined} onClick={onShop}>Spend Umbra Shards</button>}>
       {!c ? (
         <>
           <p className="muted small">No campaign loaded. <a href={href.campaign()}>Import or start one</a> to link a faction.</p>
@@ -607,8 +626,8 @@ function NexusPanel({ f, onShop }: { f: Force; onShop: () => void }) {
                     ? <><b>Income ready</b> for {toClaim.length === 1 ? `round ${toClaim[0].round}` : `${toClaim.length} rounds`}.</>
                     : <span className="muted">Round income claimed{claimedThrough ? ` through round ${claimedThrough}` : ''}{factionForces(state.forces, n.factionId).length > 1 ? ' for the faction' : ''}. More arrives when the GM ends the round.</span>}
                 </span>
-                {toClaim.length > 0 && <ClaimAll force={f} c={c} onPick={() => setClaiming(true)} />}
-                <button disabled={!toClaim.length} onClick={() => setClaiming(true)}>Claim round income…</button>
+                {!theirs && toClaim.length > 0 && <ClaimAll force={f} c={c} onPick={() => setClaiming(true)} />}
+                {!theirs && <button disabled={!toClaim.length} onClick={() => setClaiming(true)}>Claim round income…</button>}
               </div>
               {claiming && <RoundIncome force={f} c={c} onClose={() => setClaiming(false)} />}
               <DetachmentsBox f={f} c={c} />
