@@ -1373,3 +1373,4 @@ table.ledger td:first-child { white-space: nowrap; }
 /* === UX pass: downtime modes === */
 .sortie-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 12px; margin-top: 6px; }
 .sortie-legend span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.zb-key { margin: 4px 0 0; }
