@@ -1401,3 +1401,5 @@ table.ledger td:first-child { white-space: nowrap; }
 .training-recipe-need { font-size: 12px; line-height: 1.3; }
 .training-recipe-what { font-size: 12px; line-height: 1.35; }
 .training-recipe-what > summary { cursor: pointer; }
+.training-victory-choice { margin: 6px 0 0; padding-left: 18px; }
+.training-victory-choice li { margin: 3px 0; }

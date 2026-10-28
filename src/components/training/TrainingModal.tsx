@@ -19,7 +19,7 @@ import { glowIds } from './recipeView';
 import { RunSummary } from './RunSummary';
 import { SidePanel, wideSide, type Tab } from './SidePanel';
 import { StartScreen } from './StartScreen';
-import { useBank } from './useBank';
+import { useBank, type BankNews } from './useBank';
 import { useRunLoop } from './useRunLoop';
 import { useAuto } from './useAuto';
 import { freshRun } from './freshRun';
@@ -31,7 +31,9 @@ import { thisWeek, useSiegeSettle } from './useSiegeSettle';
  */
 export default function TrainingModal({ force, c, onClose }: { force: Force; c?: Campaign; onClose: () => void }) {
   const portraits = useMemo(() => Object.fromEntries(force.units.map((u) => [u.id, unitPortrait(u, force)])), [force]);
-  const bank = useBank(force, c);
+  // What the run's end banked into the force, for its summary (the toast fades); null until then.
+  const [news, setNews] = useState<BankNews | null>(null);
+  const bank = useBank(force, c, setNews);
   // An older version's save is dropped first (and the start screen says so, once).
   const [cleared] = useState(() => staleSave(force.id));
   useEffect(() => ackStale(force.id), [force.id]);
@@ -68,6 +70,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
 
   const begin = (r: TrainingRun) => {
     bank.reset();
+    setNews(null);
     best.current = force.trainingBest ?? 0;
     hpLost.current = {};
     hpStart.current = null;
@@ -274,7 +277,15 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
               <div className="training-over" role="dialog" aria-label="Victory">
                 <div className="training-over-card small">
                   <div style={{ marginBottom: 4, color: 'var(--gold)' }}><b>Victory!</b> {finalBoss(run)} falls on the Final wave {run.finale!.final}, the base standing at {run.baseHp}/{TRAINING.baseHp}.</div>
-                  <div className="muted">Bank it and end the run here, or go on into Endless: waves with no Final ahead, every one climbing steeper. The Victory stands either way.</div>
+                  <div className="muted">The Victory stands either way.</div>
+                  <ul className="training-victory-choice">
+                    <li><b>Bank and end:</b> the run ends here and banks what it earned.</li>
+                    <li>
+                      <b>Continue into Endless:</b> waves with no Final ahead, each climbing steeper, at {Math.round(TRAINING.finale.endlessCredits * 100)}% credits.
+                      {' '}You keep {TRAINING.finale.endlessCarry} credits{run.credits > TRAINING.finale.endlessCarry ? <> and leave <b>{Math.floor(run.credits - TRAINING.finale.endlessCarry)}</b> behind (spend them first)</> : ''}.
+                      {' '}Units go on earning XP up to the run's cap, and the force keeps its deepest Endless wave as a record.
+                    </li>
+                  </ul>
                   <div className="training-over-actions">
                     <button onClick={() => onVictory(false)}>Bank and end</button>
                     <button className="primary" onClick={() => onVictory(true)}>Continue into Endless</button>
@@ -285,7 +296,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
             {over && (
               <div className="training-over">
                 <div className="training-over-card">
-                  <RunSummary run={run} best={best.current} force={force} />
+                  <RunSummary run={run} best={best.current} force={force} news={news ?? undefined} />
                   <div className="training-over-actions">
                     <button onClick={again}>{run.siege ? 'Siege again' : 'Train again'}</button>
                     <button className="primary" onClick={onClose}>Done</button>
