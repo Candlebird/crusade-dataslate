@@ -365,7 +365,7 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
   }
   // Battle scars are for the run only, but the recap names them.
   const scars = run.party.flatMap((m) => (m.scars ?? []).map((id) => `${memberName(m)} ${SORTIE.scars[id].name}`));
-  if (scars.length) bits.push(`battle scars: ${scars.join(', ')}`);
+  if (scars.length) bits.push(`battle scars, for this run only: ${scars.join(', ')}`);
   if (fresh.length) bits.push(`met ${fresh.join(', ')} for the first time`);
   if (learned.length) bits.push(`learned the lore of ${learned.join(', ')}`);
   // Winning at the top tier unlocks the next Ascension level.

@@ -385,14 +385,12 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
         {fit.length < 3 && <p className="muted small">A Sortie needs 3 active units.</p>}
         <div className="sortie-pick">
           {fit.map((u) => {
-            const at = lineUp(picked.map((id) => force.units.find((x) => x.id === id)!).filter(Boolean)).findIndex((x) => x.id === u.id);
             const on = picked.includes(u.id);
             return (
               <label key={u.id} className="row small" style={{ gap: 6 }}>
                 <input type="checkbox" checked={on} disabled={!on && picked.length >= 3} onChange={() => toggle(u.id)} />
                 <Portrait unit={u} size={22} />
                 <span className="grow">{unitName(u)}{veteranTitle(u) && <span className="sortie-title"> · {veteranTitle(u)}</span>} <span className="muted">· {u.category} · level {levelForXp(u.xp)} · {u.points} pts{mode === 'free' ? ` · ${offTableLeft(u, offKey)} off-table XP left` : ''}</span></span>
-                {at >= 0 && <span className="sortie-slot-tag">{SLOTS[at]}</span>}
               </label>
             );
           })}
@@ -694,7 +692,12 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                 {run.won} fight{run.won === 1 ? '' : 's'} won, {run.depth} node{run.depth === 1 ? '' : 's'} cleared. <b>+{runXp(run)} XP</b> per unit (cap {cap}){run.party.some((m) => !memberUp(m)) && <>, half for a unit wiped out</>}.
                 {run.mode === 'shard' && (keepsHaul(run) ? ` The haul comes home: ${haulText(run)}.` : ' The haul was lost.')}
               </p>
-              {summary && <p className="muted small">{summary}</p>}
+              {summary && (
+                <div className="small panel sortie-recorded">
+                  <b>Recorded on {force.name}:</b>
+                  <ul>{summary.split('; ').map((x, i) => <li key={i}>{x.charAt(0).toUpperCase() + x.slice(1)}</li>)}</ul>
+                </div>
+              )}
               {run.weekly && <p className="small">Weekly challenge {run.weekly}: <b>{weeklyScore(run)} pts</b>{c ? ' (posted to the campaign board)' : ''}.</p>}
               {story?.recaps?.[0] && (
                 <>
@@ -795,7 +798,8 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
         </div>
       )}
       <div className="sortie-journal">
-        {[...run.journal].reverse().slice(0, 8).map((l, i) => <div key={i} className={`tone-${l.tone}`}>{l.text}</div>)}
+        {/* Before the first step the map shows the region's intro, so the journal leaves it out. */}
+        {[...run.journal].filter((l) => run.row >= 0 || l.text !== regionIntro(run)).reverse().slice(0, 8).map((l, i) => <div key={i} className={`tone-${l.tone}`}>{l.text}</div>)}
       </div>
     </div>
   );
@@ -831,7 +835,7 @@ function MapScreen({ run, onEnter }: { run: SortieRun; onEnter: (n: SortieNode) 
   return (
     <div className="sortie-panel">
       <h3>{regionName(run)}</h3>
-      {run.row < 0 && <p className="small sortie-scene">{run.deep ? regionOf(run).deep.intro : regionOf(run).intro}</p>}
+      {run.row < 0 && <p className="small sortie-scene">{regionIntro(run)}</p>}
       <p className="muted small" style={{ marginTop: 0 }}>
         {run.row < 0 ? 'Pick where to start.' : 'Pick the next step.'} {bossOf(run).name} waits at the top.
         {run.map.some((row) => row.some((n) => n.hidden)) && ` ? is unseen ground. The party sees ${sightOf(run)} step${sightOf(run) === 1 ? '' : 's'} ahead.`}
@@ -885,6 +889,8 @@ function MapScreen({ run, onEnter }: { run: SortieRun; onEnter: (n: SortieNode) 
     </div>
   );
 }
+
+const regionIntro = (run: SortieRun) => (run.deep ? regionOf(run).deep.intro : regionOf(run).intro);
 
 /** What the map's icons mean: only the kinds of step on this map, with ? and the omen mark when they're there. */
 function MapLegend({ run }: { run: SortieRun }) {

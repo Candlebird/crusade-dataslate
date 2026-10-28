@@ -51,6 +51,8 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
   // Why the task can't be set yet, or null when it can.
   const problem = !unit
     ? 'Choose a unit.'
+    : (task === 'project' || task === 'garrison') && !worlds.length ? 'Your faction holds no worlds yet, so there is none to work on or guard.'
+    : task === 'recon' && !targets.length ? 'Nothing is in range to scout yet.'
     : task === 'mentor' ? mentorProblem(unit, pupil)
     : task === 'project' ? projectProblem(sector, pid, factionId)
     : !sector ? 'Choose a sector.'
@@ -87,8 +89,8 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
   if (done) {
     return (
       <Modal title="Unit task" onClose={onClose} footer={<button className="primary" onClick={onClose}>Done</button>}>
-        <p className="small"><b>Recorded:</b> {done}</p>
-        <p className="muted small">The unit{task === 'mentor' ? 's are' : ' is'} busy until the GM ends the round.</p>
+        <p className="small panel"><b>Recorded on {force.name}:</b> {done}</p>
+        <p className="muted small">The unit{task === 'mentor' ? 's are' : ' is'} busy until the GM ends the round: no Expedition, and Battle-Worn (-1 Quality and -1 Defense) in any battle.</p>
       </Modal>
     );
   }
