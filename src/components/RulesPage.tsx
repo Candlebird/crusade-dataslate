@@ -15,7 +15,7 @@ import { rewardText } from '../rules/downtime';
 import { relicSource } from '../rules/sortie';
 import { featInfo } from '../rules/feats';
 import { relicHolderText, relicHolders } from '../rules/engine';
-import { Panel } from './ui';
+import { Panel, UsAbbr } from './ui';
 import { searchRules, type RuleHit } from '../model/rulesSearch';
 import { IconText } from './Icon';
 
@@ -574,7 +574,7 @@ function NexusRules() {
         <table className="compact small">
           <tbody>
             {UMBRA_SHOP.map((s) => (
-              <tr key={s.key}><td><b>{s.name}</b></td><td className="muted">{s.cost}{s.key === 'relic' ? '+' : ''} US</td><td>{s.desc}</td></tr>
+              <tr key={s.key}><td><b>{s.name}</b></td><td className="muted">{s.cost}{s.key === 'relic' ? '+' : ''} <UsAbbr /></td><td>{s.desc}</td></tr>
             ))}
           </tbody>
         </table>

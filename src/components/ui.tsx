@@ -171,6 +171,11 @@ export function Loading() {
 
 export const confirmAction = (text: string) => window.confirm(text);
 
+/** "US", for stat tiles and compact cost labels only (spell out Umbra Shards everywhere else), with the full name on hover. */
+export const UsAbbr = () => <abbr className="us-abbr" title="Umbra Shards">US</abbr>;
+/** "3 Umbra Shards", "1 Umbra Shard": the words for sentences, buttons and headings. */
+export const umbraShards = (n: number) => `${n} Umbra Shard${n === 1 ? '' : 's'}`;
+
 // ---- collapsible panels ----
 
 const COLLAPSED_KEY = 'opr-collapsed-panels';

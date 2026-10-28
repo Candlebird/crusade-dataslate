@@ -12,7 +12,7 @@ import {
 import { journalEndings } from '../rules/journalAi';
 import { JOURNAL, JOURNAL_CATALYSTS, JOURNAL_COMPLICATIONS, JOURNAL_CONTEXTS, type JournalSkillId } from '../rules/journalData';
 import { currentRound, factionName } from '../rules/nexus';
-import { Panel, TextArea, confirmAction, toast } from './ui';
+import { Panel, TextArea, confirmAction, toast, umbraShards } from './ui';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
 import { href } from '../route';
@@ -148,7 +148,7 @@ function JournalCard({ c, setC, j, gm, own }: { c: Campaign; setC: SetC; j: Cros
   const Reroll = ({ which, r }: { which: JournalCheck; r: JournalRoll }) =>
     canPlay && !r.pass && canReroll(j, which)
       ? <button className="small" disabled={!force || force.umbraShards < JOURNAL.rerollCost} onClick={() => reroll(which)}
-        data-tip={!force ? "The force isn't on this device" : force.umbraShards < JOURNAL.rerollCost ? `${force.name} has ${force.umbraShards} Umbra Shards` : 'Roll this check again, once'}>Re-roll ({JOURNAL.rerollCost} US)</button>
+        data-tip={!force ? "The force isn't on this device" : force.umbraShards < JOURNAL.rerollCost ? `${force.name} has ${force.umbraShards} Umbra Shards` : 'Roll this check again, once'}>Re-roll ({umbraShards(JOURNAL.rerollCost)})</button>
       : null;
 
   const tally = async () => {

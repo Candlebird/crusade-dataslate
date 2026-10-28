@@ -9,7 +9,7 @@ import {
   factionForces, plannedPoints, reorganise, reorganisePlan, reorganiseProblems, reorganisedThisRound, supplyLimit, type ReorganisePlan,
 } from '../rules/detachments';
 import { href } from '../route';
-import { Modal, Stepper, confirmAction, toast } from './ui';
+import { Modal, Stepper, UsAbbr, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
 
 const COST = NEXUS_DETACHMENTS.reorganiseCost;
@@ -54,7 +54,7 @@ export function DetachmentsBox({ f, c }: { f: Force; c: Campaign }) {
       {all.map((x) => (
         <div key={x.id}>
           {x.id === f.id ? <b>{x.name}</b> : <a href={href.force(x.id)}>{x.name}</a>}
-          <span className="muted"> — {supplyLimit(x)} Supply · {x.umbraShards} US{x.owner && x.owner !== cloud.email ? ` · ${x.owner}` : ''}</span>
+          <span className="muted"> — {supplyLimit(x)} Supply · {x.umbraShards} <UsAbbr />{x.owner && x.owner !== cloud.email ? ` · ${x.owner}` : ''}</span>
         </div>
       ))}
       <div className="row" style={{ marginTop: '0.35rem' }}>
@@ -166,18 +166,18 @@ function ReorganiseModal({ forces: existing, first, make, payer, c, onClose }: {
                   <b>{f.name}</b>
                   {isFresh(f.id)
                     ? <div className="muted small">new detachment · <button className="ghost small" onClick={() => drop(f.id)}>Remove</button></div>
-                    : <div className="muted small">now {supplyLimit(f)} Supply · {f.umbraShards} US</div>}
+                    : <div className="muted small">now {supplyLimit(f)} Supply · {f.umbraShards} <UsAbbr /></div>}
                 </td>
                 <td className="num" data-label="Points"><span className={points[f.id] > plan.supply[f.id] ? 'tag red' : ''}>{points[f.id]}</span></td>
                 <td data-label="Supply"><Stepper value={plan.supply[f.id]} step={50} min={0} onChange={(v) => setNum('supply', f.id, v)} /></td>
-                <td data-label="US"><Stepper value={plan.us[f.id]} min={0} onChange={(v) => setNum('us', f.id, v)} /></td>
+                <td data-label="Umbra Shards"><Stepper value={plan.us[f.id]} min={0} onChange={(v) => setNum('us', f.id, v)} /></td>
               </tr>
             ))}
             <tr>
               <td className="s-full"><b>Total</b></td>
               <td />
               <td data-label="Supply"><span className={sum(plan.supply) === supplyTotal ? 'muted' : 'tag red'}>{sum(plan.supply)} of {supplyTotal}</span></td>
-              <td data-label="US"><span className={sum(plan.us) === usTotal ? 'muted' : 'tag red'}>{sum(plan.us)} of {Math.max(0, usTotal)}</span></td>
+              <td data-label="Umbra Shards"><span className={sum(plan.us) === usTotal ? 'muted' : 'tag red'}>{sum(plan.us)} of {Math.max(0, usTotal)}</span></td>
             </tr>
           </tbody>
         </table>

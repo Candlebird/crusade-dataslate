@@ -31,7 +31,7 @@ import {
 } from '../rules/battle';
 import { go, href } from '../route';
 import NexusBox, { UnitSelect } from './NexusBox';
-import { Stepper, confirmAction, toast } from './ui';
+import { Stepper, UsAbbr, confirmAction, toast, umbraShards } from './ui';
 import { SOLO_PATROL } from '../rules/downtimeData';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
@@ -615,13 +615,13 @@ function SummaryStep({ outcome }: { outcome: BattleOutcome }) {
       </div>
       <div>
         <div className="panel">
-          <div className="panel-title"><h3>Requisition</h3><b>+{outcome.rp} RP{outcome.supply ? ` · +${outcome.supply} Supply` : ''}{outcome.us ? ` · +${outcome.us} US` : ''}</b></div>
+          <div className="panel-title"><h3>Requisition</h3><b>+{outcome.rp} RP{outcome.supply ? ` · +${outcome.supply} Supply` : ''}{outcome.us ? ` · +${umbraShards(outcome.us)}` : ''}</b></div>
           {outcome.ledger.map((l, i) => (
             <div key={i} className="list-item small">
               <span className="grow">{l.label}</span>
               {l.rp !== 0 && <span className="tag gold">{l.rp > 0 ? '+' : ''}{l.rp} RP</span>}
               {l.supply !== 0 && <span className="tag">+{l.supply}</span>}
-              {!!l.us && <span className="tag cyan">+{l.us} US</span>}
+              {!!l.us && <span className="tag cyan">+{l.us} <UsAbbr /></span>}
             </div>
           ))}
         </div>

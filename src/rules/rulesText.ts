@@ -60,7 +60,7 @@ export const CRUSADE_TEXT = {
     'Wagering Relics (optional, both players must agree): players may bet relics on a match. The winner takes them and assigns them under the normal relic rules; the loser removes them and adjusts BP.',
   ],
   nexusRelics: [
-    `Nexus relics are only found in the Nexus Umbra. Buy one in the Umbra Shard shop (${NEXUS_RELIC_US.Common} / ${NEXUS_RELIC_US.Rare} / ${NEXUS_RELIC_US.Legendary} US for a Common / Rare / Legendary, on top of the normal relic requisition, ${NEXUS_ROUNDS.relicCollectorDiscount} US less with a Relic Collector home), or roll a 6 on the Void table. Otherwise they follow the normal relic rules.`,
+    `Nexus relics are only found in the Nexus Umbra. Buy one in the Umbra Shard shop (${NEXUS_RELIC_US.Common} / ${NEXUS_RELIC_US.Rare} / ${NEXUS_RELIC_US.Legendary} Umbra Shards for a Common / Rare / Legendary, on top of the normal relic requisition, ${NEXUS_ROUNDS.relicCollectorDiscount} Umbra Shards less with a Relic Collector home), or roll a 6 on the Void table. Otherwise they follow the normal relic rules.`,
   ],
 };
 
@@ -264,6 +264,6 @@ export const NEXUS_TEXT = {
   ],
   shop: [
     'Umbra Shards (US) come from sector income, match bonuses and rewards. Spend them on the Umbra Shard shop on your force page.',
-    `A Relic Collector home makes Nexus Relics ${R.relicCollectorDiscount} US cheaper.`,
+    `A Relic Collector home makes Nexus Relics ${R.relicCollectorDiscount} Umbra Shards cheaper.`,
   ],
 };

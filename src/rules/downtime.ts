@@ -87,7 +87,7 @@ export function scaledReward(r: ExpeditionReward, stage: number): Required<Exped
 }
 
 export function rewardText(r: ExpeditionReward): string {
-  const parts = [r.xp ? `+${r.xp} XP each` : '', r.supply ? `+${r.supply} Supply` : '', r.rp ? `+${r.rp} RP` : '', r.us ? `+${r.us} US` : '', r.materials ? `+${r.materials} Materials` : ''];
+  const parts = [r.xp ? `+${r.xp} XP each` : '', r.supply ? `+${r.supply} Supply` : '', r.rp ? `+${r.rp} RP` : '', r.us ? `+${r.us} Umbra Shard${r.us === 1 ? '' : 's'}` : '', r.materials ? `+${r.materials} Materials` : ''];
   return parts.filter(Boolean).join(', ') || 'nothing';
 }
 

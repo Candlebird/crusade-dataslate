@@ -1540,3 +1540,5 @@ table.ledger td:first-child { white-space: nowrap; }
 .lock-rows ul { list-style: none; margin: 0.4rem 0 0; padding: 0; }
 .lock-rows li { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; padding: 0.2rem 0; border-top: 1px solid var(--line); }
 .lock-rows li:first-child { border-top: none; }
+/* "US" in stat tiles and cost labels: the full name is on hover. */
+abbr.us-abbr { text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; }

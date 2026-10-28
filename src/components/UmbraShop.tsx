@@ -7,7 +7,7 @@ import { forceTotals, relicCost as relicRp, relicHolders, relicTaken } from '../
 import { unitName } from '../rules/battle';
 import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_RELIC_US, NEXUS_ROUNDS, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
 import { isReinforced } from '../rules/production';
-import { Modal, RelicOption, toast } from './ui';
+import { Modal, RelicOption, UsAbbr, toast, umbraShards } from './ui';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
 
@@ -144,13 +144,13 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
 
   return (
     <Modal title={`Umbra Shards — ${us} available`} onClose={onClose} wide
-      footer={<><span className="muted small grow">{why}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>Buy{item ? ` (${cost} US${rpCost ? ` + ${rpCost} RP` : ''})` : ''}</button></>}>
+      footer={<><span className="muted small grow">{why}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>Buy{item ? ` (${umbraShards(cost)}${rpCost ? ` + ${rpCost} RP` : ''})` : ''}</button></>}>
       <div className="cols-2">
         <div>
           {UMBRA_SHOP.map((x) => (
             <div key={x.key} className={`shop-item${sel === x.key ? ' selected' : ''}${costOf(x) > us ? ' disabled' : ''}`} onClick={() => pick(x.key)}
               data-tip={costOf(x) > us ? `Needs ${costOf(x)} Umbra Shards (this force has ${us})` : undefined}>
-              <span className="cost" data-tip={x.key === 'relic' && collector ? 'Relic Collector discount' : undefined}>{costOf(x)}{x.key === 'relic' && x.key !== sel ? '+' : ''} US</span>
+              <span className="cost" data-tip={x.key === 'relic' && collector ? 'Relic Collector discount' : undefined}>{costOf(x)}{x.key === 'relic' && x.key !== sel ? '+' : ''} <UsAbbr /></span>
               <div className="grow"><b>{x.name}</b><div className="muted small">{x.desc}</div></div>
             </div>
           ))}
@@ -184,7 +184,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
                   <label className="field">
                     Tier
                     <select value={tier} onChange={(e) => { setTier(e.target.value as RelicTier); setChoice(''); }}>
-                      {TIERS.map((t) => <option key={t} value={t}>{t} ({relicUs(t)} US + {relicRp(t)} RP)</option>)}
+                      {TIERS.map((t) => <option key={t} value={t}>{t} ({umbraShards(relicUs(t))} + {relicRp(t)} RP)</option>)}
                     </select>
                   </label>
                   <label className="field">

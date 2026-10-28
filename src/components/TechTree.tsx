@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import type { Campaign } from '../model/types';
 import { BUILDINGS, NEXUS_TECH, TECH_BRANCHES, type Building } from '../rules/nexusData';
 import { research, researchBlock, researchRate, techCost, techStatus, type ResearchVia } from '../rules/tech';
-import { Panel, confirmAction, toast } from './ui';
+import { Panel, UsAbbr, confirmAction, toast } from './ui';
 import { Glyph, Icon } from './Icon';
 
 type SetC = (fn: (c: Campaign) => void) => void;
@@ -78,7 +78,7 @@ export default function TechTreePanel({ c, setC, faction }: { c: Campaign; setC:
                       </div>
                       <div className="small">{b.desc}</div>
                       <div className="tech-tags">
-                        <span className="tag">{b.cost} Materials{b.shards ? ` + ${b.shards} US` : ''}</span>
+                        <span className="tag">{b.cost} Materials{b.shards ? <> + {b.shards} <UsAbbr /></> : ''}</span>
                         {b.homeOnly && <span className="tag cyan" data-tip="Can only be built at a home">home only</span>}
                         {b.rule === 'table' && <span className="tag" data-tip="Not applied by the app: remember it at the table">at the table</span>}
                       </div>

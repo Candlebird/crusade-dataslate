@@ -4,7 +4,7 @@ import { useCloud } from '../cloud/CloudSync';
 import { forceTotals } from '../rules/engine';
 import { href } from '../route';
 import type { Force } from '../model/types';
-import { Panel, TextField } from './ui';
+import { Panel, TextField, UsAbbr } from './ui';
 import { EditModeButton, EditModeNotice, useEditMode } from './editMode';
 import { Icon } from './Icon';
 
@@ -45,7 +45,7 @@ export function LedgerTable({ f, edit, set, limit }: { f: Force; edit: boolean; 
     <div className="table-wrap">
       <table className="stack ledger">
         <thead>
-          <tr><th>Date</th><th>Entry</th><th className="num">RP</th><th className="num">Supply</th><th className="num">US</th><th /></tr>
+          <tr><th>Date</th><th>Entry</th><th className="num">RP</th><th className="num">Supply</th><th className="num"><UsAbbr /></th><th /></tr>
         </thead>
         <tbody>
           {rows.map(({ e, i }) => edit ? (
@@ -63,7 +63,7 @@ export function LedgerTable({ f, edit, set, limit }: { f: Force; edit: boolean; 
               <td className="s-full ledger-entry" data-label="Entry"><LedgerLabel text={e.label} /></td>
               <td className="num" data-label="RP">{e.rp}</td>
               <td className="num" data-label="Supply">{e.supply}</td>
-              <td className="num small" data-label="US">{us(e.us)}</td>
+              <td className="num small" data-label="US" title="Umbra Shards">{us(e.us)}</td>
               <td className="s-end" />
             </tr>
           ))}

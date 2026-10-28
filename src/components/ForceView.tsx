@@ -29,7 +29,7 @@ import { RESULT_LABEL, unitName } from '../rules/battle';
 import { listTotals, newList } from '../rules/lists';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
 import { TagFilter, UnitTags } from './Tags';
-import { Panel, Stepper, TextArea, TextField, XpBar, confirmAction, toast } from './ui';
+import { Panel, Stepper, TextArea, TextField, XpBar, confirmAction, toast, umbraShards } from './ui';
 import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
 import { localDate } from '../model/date';
 import { EmblemButton } from './Emblem';
@@ -527,7 +527,7 @@ function HeroOffers({ f, c }: { f: Force; c: Campaign }) {
         return (
           <div key={o.id} className="row" data-tip={o.unit.rules.join(', ')}>
             <span className="grow">
-              <Icon name="g:round-star" /> <b>{o.unit.unitType}</b> <span className="muted">— level {levelForXp(o.unit.xp)}, {o.unit.points} pts{relic ? <>, carrying <b>{relic.name}</b> ({relic.tier})</> : ''}. {o.fee} US; {offerEnds(o) > currentRound(c) ? 'leaves after next round' : 'leaves when this round ends'}.</span>
+              <Icon name="g:round-star" /> <b>{o.unit.unitType}</b> <span className="muted">— level {levelForXp(o.unit.xp)}, {o.unit.points} pts{relic ? <>, carrying <b>{relic.name}</b> ({relic.tier})</> : ''}. {umbraShards(o.fee)}; {offerEnds(o) > currentRound(c) ? 'leaves after next round' : 'leaves when this round ends'}.</span>
             </span>
             <button disabled={!!block} data-tip={block ?? `Hire for ${o.fee} Umbra Shards. They join ${f.name} for good.`} onClick={() => {
               if (!confirmAction(`Hire ${o.unit.unitType} into ${f.name} for ${o.fee} Umbra Shards?`)) return;

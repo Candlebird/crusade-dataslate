@@ -50,10 +50,10 @@ export function cleanWager(w: DuelWager): DuelWager {
   return out;
 }
 
-/** The wager in a few words: "3 US, 40 Materials, Blade of Ages". */
+/** The wager in a few words: "3 Umbra Shards, 40 Materials, Blade of Ages". */
 export function wagerText(w: DuelWager): string {
   const parts: string[] = [];
-  if (w.shards) parts.push(`${w.shards} US`);
+  if (w.shards) parts.push(`${w.shards} Umbra Shard${w.shards === 1 ? '' : 's'}`);
   if (w.materials) parts.push(`${w.materials} Materials`);
   for (const s of FACTION_STAKES) if (w[s.key]) parts.push(`${w[s.key]} ${s.name}`);
   for (const r of w.relics ?? []) parts.push(r.name);

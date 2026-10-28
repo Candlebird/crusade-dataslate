@@ -14,7 +14,7 @@ import {
 } from '../rules/rounds';
 import { difficultyLevel, difficultyRange, rateSectors } from '../rules/difficulty';
 import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY } from '../rules/nexusData';
-import { Panel, confirmAction, toast } from './ui';
+import { Panel, confirmAction, toast, umbraShards } from './ui';
 import { localDate } from '../model/date';
 import { breaksLeft, echoMarks, holders } from '../rules/voidspawn';
 import { Icon } from './Icon';
@@ -172,7 +172,7 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
             <span key={f.id} className="tag" style={{ borderColor: factionColor(c, f.id) }}>
               {f.name}: {counts[f.id] ?? 0} sector{counts[f.id] === 1 ? '' : 's'}
               {ahead.has(f.id) && ' · leading'}
-              {(behind[f.id] ?? 0) > 0 && ` · catch-up +${behind[f.id]} US`}
+              {(behind[f.id] ?? 0) > 0 && ` · catch-up +${umbraShards(behind[f.id])}`}
             </span>
           ))}
         </div>
@@ -306,7 +306,7 @@ function CrisisRow({ c }: { c: Campaign }) {
       </div>
       <p style={{ margin: '0.25rem 0 0' }}>
         {lord?.desc} All factions fight it together against the AI, by the end of round {crisisUntil(crisis)}; a lost battle can be fought again.
-        Win: the threat drops {NEXUS_CRISIS.threatDrop}, each side claims +{NEXUS_CRISIS.winUs} US and the side whose units earned the most XP takes a {NEXUS_CRISIS.mvpTier} relic
+        Win: the threat drops {NEXUS_CRISIS.threatDrop}, each side claims +{umbraShards(NEXUS_CRISIS.winUs)} and the side whose units earned the most XP takes a {NEXUS_CRISIS.mvpTier} relic
         {crisis.mvp ? ` (MVP: ${state.forces.find((f) => f.id === crisis.mvp)?.name ?? 'a force not on this device'})` : ''}.
         {crisis.result !== 'won' && <> Still standing after round {crisisUntil(crisis)}: the threat goes to {NEXUS_ROUNDS.threatMax} and the {ECHOES.name} take {forfeits.length
           ? forfeits.map((x) => `${x.name} (${factionName(c, x.owner)})`).join(', ')

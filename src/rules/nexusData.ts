@@ -204,7 +204,7 @@ export const UMBRA_SHOP: { key: UmbraBuy; name: string; cost: number; desc: stri
   { key: 'strike', name: ORGANIZED_STRIKE, cost: 6, desc: '+200 Supply Limit once, when attacking a sector.' },
   { key: 'reinforce', name: 'Reinforce Sector', cost: 9, desc: '+200 Supply Limit when defending that sector. One per sector; lost if the sector changes hands.' },
   { key: 'expansion', name: 'Forced Expansion', cost: 15, desc: 'Take an uncontrolled sector without a match (no match rewards).' },
-  { key: 'relic', name: 'Nexus Relic', cost: NEXUS_RELIC_US.Common, desc: `${NEXUS_RELIC_US.Common} / ${NEXUS_RELIC_US.Rare} / ${NEXUS_RELIC_US.Legendary} US for a Common / Rare / Legendary, bought together with the normal Crusade relic requisition (its RP cost too).` },
+  { key: 'relic', name: 'Nexus Relic', cost: NEXUS_RELIC_US.Common, desc: `${NEXUS_RELIC_US.Common} / ${NEXUS_RELIC_US.Rare} / ${NEXUS_RELIC_US.Legendary} Umbra Shards for a Common / Rare / Legendary, bought together with the normal Crusade relic requisition (its RP cost too).` },
   { key: 'evolution', name: 'Umbral Evolution', cost: 36, desc: 'A free unique Nexus trait: BP goes up, but it does not use a level.' },
 ];
 

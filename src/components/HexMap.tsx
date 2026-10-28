@@ -30,7 +30,7 @@ import type { TrackedBattle } from '../rules/tracker';
 import AutoBattleModal from './AutoBattleModal';
 import { BUILDINGS, GUARDIANS, MARAUDERS, PRODUCTION } from '../rules/nexusData';
 import { href } from '../route';
-import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
+import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast, umbraShards } from './ui';
 import SectorDanger from './SectorDanger';
 import { localDate } from '../model/date';
 import { GLYPHS, Glyph, Icon, SvgIcon } from './Icon';
@@ -763,7 +763,7 @@ function ProductionBox({ s }: { s: Sector }) {
     fn(x, d.campaign, d.forces);
     d.campaign.updatedAt = nowIso();
   });
-  const price = (x: { cost: number; shards: number }) => `${x.cost} Materials${x.shards ? ` + ${x.shards} US` : ''}`;
+  const price = (x: { cost: number; shards: number }) => `${x.cost} Materials${x.shards ? ` + ${umbraShards(x.shards)}` : ''}`;
   // What a building costs here: an Architect Warlord's faction pays less.
   const priced = (x: { cost: number; shards: number }) => ({ ...x, cost: buildCost(x, s, c ?? undefined) });
   const rate = productionRate(s, c ?? undefined);
@@ -828,7 +828,7 @@ function ProductionBox({ s }: { s: Sector }) {
               {b.shards > 0 && forces.length > 1 && (
                 <label>Shards from{' '}
                   <select value={payer?.id ?? ''} onChange={(e) => setPayer(e.target.value)} aria-label="Force paying the Umbra Shards">
-                    {forces.map((f) => <option key={f.id} value={f.id}>{f.name} ({f.umbraShards} US)</option>)}
+                    {forces.map((f) => <option key={f.id} value={f.id}>{f.name} ({umbraShards(f.umbraShards)})</option>)}
                   </select>
                 </label>
               )}
@@ -843,7 +843,7 @@ function ProductionBox({ s }: { s: Sector }) {
       {hasBuilding(s, 'exchange') && (
         <div className="row" style={{ marginTop: '0.25rem' }}>
           <span className="grow"><Icon name="l:arrow-left-right" /> Grand Exchange{s.exchanged === (c?.round ?? 1) ? <span className="muted"> — traded this round</span> : <span className="muted"> — once a round, with {payer?.name ?? 'a force'}</span>}</span>
-          {([['buyShard', `${X.materials} Materials → ${X.shards} US`], ['sellShard', `${X.shards} US → ${X.back} Materials`]] as [ExchangeTrade, string][]).map(([t, label]) => (
+          {([['buyShard', `${X.materials} Materials → ${umbraShards(X.shards)}`], ['sellShard', `${umbraShards(X.shards)} → ${X.back} Materials`]] as [ExchangeTrade, string][]).map(([t, label]) => (
             <button key={t} disabled={!!trade1(t)} data-tip={trade1(t)} onClick={() => {
               edit((y, cc, fs) => {
                 const f = fs.find((x) => x.id === payer?.id);
