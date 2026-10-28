@@ -116,7 +116,7 @@ export default function GuidePage() {
         </Step>
         <Step n={4} title="Spend requisition" where="Requisition ledger">
           <p>
-            <b>Requisition…</b> buys upgrades with RP. <b>Increase supply</b> trades 1 RP for more points. Every entry is logged, and
+            <b>Requisition…</b> buys upgrades with RP; its <b>Increase Supply</b> trades 1 RP for more points. Every entry is logged, and
             you can edit or delete it.
           </p>
         </Step>
