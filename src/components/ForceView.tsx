@@ -193,7 +193,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
             )}
           </div>
 
-          {!theirs && <DowntimePanel f={f} />}
+          {!theirs && f.units.length > 0 && <DowntimePanel f={f} />}
 
           <Panel
             id="force.units"

@@ -1401,6 +1401,52 @@ table.ledger td:first-child { white-space: nowrap; }
 .downtime-why { display: block; color: var(--warn); }
 .force-group { margin: 1.25rem 0 0.6rem; font-size: 1.1rem; }
 .force-group .small { font-family: inherit; letter-spacing: 0; text-transform: none; margin-left: 0.4rem; }
+/* Top bar: on a phone Settings, Rules and Guide fold into a "More" menu, and dice + account sit beside the title. */
+.topbar nav:not(.nav-tools) { margin-left: auto; }
+.topbar nav.nav-tools { margin-left: -0.75rem; }
+.nav-more { display: none; position: relative; }
+.nav-more-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; display: flex; flex-direction: column; min-width: 9rem; background: #15171b; border: 1px solid var(--gold-dim); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6); }
+.topbar nav .nav-more-menu a { padding: 0.6rem 0.9rem; text-align: left; }
+/* Too narrow for one line: title with dice + account on the first row, the page links on their own row below. */
+@media (max-width: 1150px) {
+  .brand { flex: 1 1 0; min-width: 0; }
+  .brand-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .topbar nav.nav-tools { order: 2; width: auto; margin-left: 0; flex-wrap: nowrap; }
+  .topbar nav:not(.nav-tools) { order: 3; width: 100%; margin-left: 0; }
+}
+@media (max-width: 640px) {
+  .topbar nav.nav-tools a { flex: 0 0 auto; padding: 0.3rem 0.45rem; }
+  .topbar nav:not(.nav-tools) { flex-wrap: nowrap; gap: 0.15rem; }
+  .topbar nav > a, .nav-more > a { padding: 0.45rem 0.35rem; }
+  .nav-wide, .nav-long { display: none; }
+  .nav-more { display: block; flex: 1 1 auto; }
+  .nav-more > a { display: block; text-align: center; white-space: nowrap; font-size: 0.85rem; letter-spacing: 0.06em; }
+}
+.unit-status.removed b { color: #e08a80; }
+/* Forces page first-run checklist. */
+.first-step { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.6rem 0; border-top: 1px solid var(--line); }
+.panel-title + .first-step { border-top: none; }
+.first-step h3 { margin: 0.15rem 0 0; }
+.first-step p { margin: 0.25rem 0 0; }
+.first-step.done h3 { color: var(--muted); }
+.first-step.done .guide-num { color: var(--green); border-color: var(--green); }
+.first-step-act { flex-shrink: 0; align-self: center; }
+@media (max-width: 640px) {
+  .first-step { flex-wrap: wrap; }
+  .first-step .grow { flex: 1 1 0; min-width: 0; }
+  .first-step-act { flex-basis: 100%; padding-left: 2.75rem; }
+}
+/* Rules page search. */
+.rules-search { margin-bottom: 1rem; }
+.rules-search input { width: 100%; margin-bottom: 0.3rem; }
+.rules-hit { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.55rem 0; border-top: 1px solid var(--line); color: var(--text); }
+.rules-hit:first-of-type { border-top: none; }
+.rules-hit:hover b { color: var(--gold); }
+.rules-hit mark { background: rgba(201, 162, 74, 0.3); color: inherit; padding: 0 1px; }
+@media (max-width: 640px) {
+  .rules-tabs { flex-wrap: wrap; }
+  .rules-tabs button { flex: 1 1 auto; }
+}
 
 /* === UX pass: training === */
 .training-phase-steps { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; padding: 0; list-style: none; }

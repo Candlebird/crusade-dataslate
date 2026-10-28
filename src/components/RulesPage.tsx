@@ -1,4 +1,4 @@
-import { useState, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useState, type MouseEvent, type ReactNode } from 'react';
 import { href, type RulesSub } from '../route';
 import { useStore } from '../model/store';
 import {
@@ -16,6 +16,7 @@ import { relicSource } from '../rules/sortie';
 import { featInfo } from '../rules/feats';
 import { relicHolderText, relicHolders } from '../rules/engine';
 import { Panel } from './ui';
+import { searchRules, type RuleHit } from '../model/rulesSearch';
 import { IconText } from './Icon';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
@@ -123,30 +124,100 @@ const PAGES: { sub?: RulesSub; tab: string; title: string }[] = [
   { sub: 'nexus', tab: 'Nexus Wars', title: 'Nexus Wars' },
 ];
 
-function Tabs({ sub }: { sub?: RulesSub }) {
+function Tabs({ sub, onPick }: { sub?: RulesSub | null; onPick: () => void }) {
   return (
-    <div className="seg">
+    <div className="seg rules-tabs">
       {PAGES.map((p) => (
-        <button key={p.tab} className={p.sub === sub ? 'on' : ''} onClick={() => (window.location.hash = href.rules(p.sub))}>{p.tab}</button>
+        <button key={p.tab} className={sub !== null && p.sub === sub ? 'on' : ''} onClick={() => { onPick(); window.location.hash = href.rules(p.sub); }}>{p.tab}</button>
       ))}
     </div>
   );
 }
 
+const RELIC_TAB_OF: Record<string, RelicPage> = { 'x-crusade': 'crusade', 'x-nexus': 'nexus', 'x-sortie': 'sortie', 'x-training': 'training' };
+
 /** The campaign rules: the Crusade rules, with the trait tables, the relics and the Nexus Wars expansion on their own sub-pages. */
 export default function RulesPage({ sub }: { sub?: RulesSub }) {
+  const [query, setQuery] = useState('');
+  const [target, setTarget] = useState<string | null>(null);
+  const [relicTab, setRelicTab] = useState<{ page: RelicPage; n: number }>({ page: 'rules', n: 0 });
+  const hits = query.trim().length > 1 ? searchRules(query) : null;
+
+  // After opening a search hit, scroll to its section once the page has drawn.
+  useEffect(() => {
+    if (!target) return;
+    const t = window.setTimeout(() => {
+      document.getElementById(target)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      setTarget(null);
+    }, 120);
+    return () => window.clearTimeout(t);
+  }, [target, sub]);
+
+  const open = (h: RuleHit) => {
+    setQuery('');
+    if (h.page === 'relics') setRelicTab((r) => ({ page: RELIC_TAB_OF[h.anchor] ?? 'rules', n: r.n + 1 }));
+    window.location.hash = href.rules(h.page);
+    if (h.anchor) setTarget(h.anchor);
+    else window.scrollTo(0, 0);
+  };
+
   return (
     <>
       <div className="page-head">
         <div>
           <div className="crumbs">Crusade Command · Rules</div>
-          <h1>{PAGES.find((p) => p.sub === sub)?.title}</h1>
+          <h1>{hits ? 'Search the rules' : PAGES.find((p) => p.sub === sub)?.title}</h1>
         </div>
-        <Tabs sub={sub} />
+        <Tabs sub={hits ? null : sub} onPick={() => setQuery('')} />
       </div>
-      {sub === 'traits' ? <TraitRules /> : sub === 'relics' ? <RelicRules /> : sub === 'nexus' ? <NexusRules /> : <CrusadeRules />}
+      <div className="rules-search">
+        <input
+          type="search"
+          value={query}
+          placeholder="Search all rules: a trait, relic, scar…"
+          aria-label="Search the rules"
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => e.key === 'Escape' && setQuery('')}
+        />
+        {!hits && <div className="muted small">New to the app? <a href={href.guide()}>Getting started</a> walks you through making your first force.</div>}
+      </div>
+      {hits ? <SearchResults query={query} hits={hits} open={open} />
+        : sub === 'traits' ? <TraitRules /> : sub === 'relics' ? <RelicRules key={relicTab.n} initial={relicTab.page} /> : sub === 'nexus' ? <NexusRules /> : <CrusadeRules />}
     </>
   );
+}
+
+/** Search hits from all four rules pages, each opening its page at its section. */
+function SearchResults({ query, hits, open }: { query: string; hits: RuleHit[]; open: (h: RuleHit) => void }) {
+  const words = query.toLowerCase().split(/\s+/).filter((w) => w.length > 1);
+  if (!hits.length) return <div className="panel empty">Nothing in the rules matches “{query.trim()}”. Try a single word, like a trait or relic name.</div>;
+  return (
+    <div className="panel">
+      <p className="muted small" style={{ marginTop: 0 }}>{hits.length === 40 ? 'The first 40 matches' : `${hits.length} match${hits.length === 1 ? '' : 'es'}`}. Pick one to open it in place.</p>
+      {hits.map((h, i) => (
+        <a key={i} className="rules-hit" href={href.rules(h.page)} onClick={(e) => { e.preventDefault(); open(h); }}>
+          <span className="muted small">{PAGES.find((p) => p.sub === h.page)?.tab} · {h.section}</span>
+          {h.title && <b><Highlight text={h.title} words={words} /></b>}
+          {h.text && <span className="small"><Highlight text={snippet(h.text, words)} words={words} /></span>}
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/** A window of the text around the first matching word. */
+function snippet(text: string, words: string[], size = 220): string {
+  if (text.length <= size) return text;
+  const lower = text.toLowerCase();
+  const at = Math.min(...words.map((w) => lower.indexOf(w)).filter((n) => n >= 0), text.length);
+  const start = Math.max(0, Math.min(at - 60, text.length - size));
+  return `${start > 0 ? '…' : ''}${text.slice(start, start + size).trim()}${start + size < text.length ? '…' : ''}`;
+}
+
+function Highlight({ text, words }: { text: string; words: string[] }) {
+  if (!words.length) return <>{text}</>;
+  const re = new RegExp(`(${words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi');
+  return <>{text.split(re).map((part, i) => (i % 2 ? <mark key={i}>{part}</mark> : part))}</>;
 }
 
 function CrusadeRules() {
@@ -279,8 +350,8 @@ const RELIC_PAGES = [
 type RelicPage = (typeof RELIC_PAGES)[number][0];
 
 /** The relics page, split into the rules and one case per kind of relic. */
-function RelicRules() {
-  const [page, setPage] = useState<RelicPage>('rules');
+function RelicRules({ initial = 'rules' }: { initial?: RelicPage }) {
+  const [page, setPage] = useState<RelicPage>(initial);
   return (
     <>
       <div className="seg" style={{ marginBottom: '1rem' }}>
