@@ -11,6 +11,7 @@ import { placeGuardians, rerollGuardians } from '../rules/guardians';
 import { reportFor } from '../rules/report';
 import OrdersPanel, { OrdersLockStrip } from './NexusOrders';
 import RoundPanel from './RoundPanel';
+import { RoundChecklist, ThisRound } from './RoundTodo';
 import TechTreePanel from './TechTree';
 import WarlordsPanel from './Warlords';
 import DuelsPanel from './Duels';
@@ -183,6 +184,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
           {' '}Pick a sector to see what's known and <b>Start a battle here</b>. Full rules: <a href={href.rules('nexus')}>Rules</a>.
         </p>
 
+        {viewAs && viewAs !== '-' && <ThisRound c={c} me={viewAs} />}
         <RoundPanel c={c} gm={false} viewer={fog} />
         <OrdersLockStrip c={c} />
         <CampaignTabs tab={tab} setTab={setTab} />
@@ -248,6 +250,7 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         Full rules: <a href={href.rules('nexus')}>Rules</a>.
       </p>
 
+      <RoundChecklist c={c} />
       <RoundPanel c={c} />
       <OrdersLockStrip c={c} />
       <CampaignTabs tab={tab} setTab={setTab} />

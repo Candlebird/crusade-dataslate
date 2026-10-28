@@ -65,7 +65,7 @@ export function useSealedOrders(c: Campaign) {
 }
 
 /** Which detachments have declared this set of orders. One pick per detachment (older orders were keyed by faction, which still counts for all its detachments). */
-function lockedIn(c: Campaign, forces: Force[], declared: Declared[], round: number) {
+export function lockedIn(c: Campaign, forces: Force[], declared: Declared[], round: number) {
   const expected = playedDetachments(c, forces);
   const declaredNow = new Set(declared.filter((d) => d.round === round).flatMap((d) => d.factions));
   const isDeclared = (f: Force) => declaredNow.has(f.id) || declaredNow.has(f.nexus!.factionId);
