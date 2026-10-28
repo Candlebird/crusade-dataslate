@@ -261,7 +261,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
           <Panel
             id="force.lists"
             title="Battle lists"
-            extra={
+            extra={!theirs && (
               <button
                 className="primary"
                 onClick={() => {
@@ -272,7 +272,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
               >
                 + New list
               </button>
-            }
+            )}
           >
             {!f.lists?.length ? (
               <p className="muted small">Pick units for a game and print their stats, traits, relics and rules.</p>
@@ -292,7 +292,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
           <Panel
             id="force.ledger"
             title="Requisition ledger"
-            extra={
+            extra={!theirs && (
               <div className="row">
                 <button className="primary" onClick={() => setShopping(true)}>Requisition…</button>
                 {edit && <button onClick={() => addLedger('Battle reward', 1, 0)}>+1 RP</button>}
@@ -305,7 +305,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                 </button>
                 {edit && <button onClick={() => addLedger('Adjustment', 0, 0)}>+ Entry</button>}
               </div>
-            }
+            )}
           >
             {f.ledger.length === 0 ? (
               <p className="muted small">No entries. Starting Supply Limit is {f.startingSupply}.</p>
