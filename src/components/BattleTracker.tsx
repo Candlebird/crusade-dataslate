@@ -100,6 +100,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
     ? overrunBlock(fought, state.forces.find((f) => membersOf(b, b.attacker!).some((x) => x.forceId === f.id)))
     : '';
   const zoneWhy = zoneBattleBlock(b, state.campaign);
+  const empty = b.sides.filter((x) => !x.units.length);
   const finish = () => {
     update((s) => {
       // Already finished (a second click, or on another device): don't put it in the history twice.
@@ -137,14 +138,15 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
           <h1>{b.mission.name} {b.patrol && <span className="tag cyan">Solo patrol</span>}</h1>
         </div>
         <div className="row">
-          <a className="btn" href={href.missions()}>Mission library</a>
           {!b.ended && zoneOn && <button onClick={() => setZone(true)} disabled={!zoneSave && !!zoneWhy}
             data-tip={zoneSave ? 'Pick the zone battle up where you left it' : zoneWhy ? `${zoneWhy}.` : 'Fight it out on a board of zones: you give the orders, or the AI plays it while you watch'}>
             <Icon name="g:crossed-swords" /> {zoneSave ? 'Resume zone battle' : 'Zone battle'}</button>}
           {!b.ended && !zoneOn && <button onClick={() => setAuto(true)} disabled={!!autoBlock}
             data-tip={autoBlock ? `Play this one at the table (no overrun: ${autoBlock}). The GM can still auto-battle it.` : 'Let the units fight it out on their stats'}><Icon name="g:power-lightning" /> Auto-battle</button>}
-          {!b.ended && <button className="primary" onClick={() => set((d) => void (d.ended = true))}>End battle</button>}
-          <button className="danger" onClick={() => confirmAction('Throw away this battle?') && update((s) => void delete s.battle)}>Discard</button>
+          {!b.ended && <button className={last ? 'primary' : ''} onClick={() => set((d) => void (d.ended = true))}
+            data-tip="Stop scoring and go on to recording the result. Resume takes you back.">End battle</button>}
+          <button className="danger" onClick={() => confirmAction('Throw away this battle?') && update((s) => void delete s.battle)}
+            data-tip="Throw the battle away without recording it">Discard</button>
         </div>
       </div>
 
@@ -177,6 +179,13 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
       )}
 
       {b.ended && <Result b={b} set={set} onFinish={finish} game={game} crisis={cg} />}
+
+      {!b.ended && empty.length > 0 && (
+        <p className="battle-hint small">
+          {empty.map((x) => x.name).join(', ')} {empty.length === 1 ? 'has' : 'have'} no units yet. {empty.every((x) => x.ai) ? `Generate ${empty.length === 1 ? 'its' : 'their'} ${ECHOES.name} army` : 'Load a force'} in the side settings below, so damage and XP are tracked and carry into the result.{' '}
+          <button className="ghost small" onClick={() => document.getElementById('battle-sides')?.scrollIntoView({ behavior: 'smooth' })}>Go to the sides</button>
+        </p>
+      )}
 
       <div className={`panel scoreboard${teams.length === 2 ? ' duel' : ''}`}>
         {teams.map((t) => (
@@ -252,7 +261,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
           )}
         </Panel>
 
-        <Panel id="battle.mission" title="Mission">
+        <Panel id="battle.mission" title="Mission" extra={<a className="small" href={href.missions()}>Mission library</a>}>
           <p>{b.mission.summary}</p>
           {b.deploymentStyle && <p className="small"><b>Deployment style.</b> {b.deploymentStyle} <span className="muted">(map in the OPR Advanced Rules)</span></p>}
           {b.mission.deployment && <p className="small"><b>Deployment.</b> {b.mission.deployment}</p>}
@@ -270,7 +279,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis }: {
         </Panel>
       </div>
 
-      <div className="cols-2">
+      <div className="cols-2" id="battle-sides">
         {b.sides.map((x) => <SidePanel key={x.id} id={x.id} b={b} set={set} forces={state.forces} />)}
       </div>
 
@@ -763,6 +772,12 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
         </span>
       </div>
 
+      {/* Who plays the side and with what: open until units are on it, then folded so play has the room. */}
+      <details className="side-setup" open={!side.units.length}>
+        <summary className="small">
+          <b>Side settings</b>
+          <span className="muted"> · Team {side.team} · {side.ai ? 'AI' : 'player'} · {force ? force.name : side.units.length ? 'units added by hand' : 'no force loaded'}{side.vpAdjust ? ` · ${side.vpAdjust > 0 ? '+' : ''}${side.vpAdjust} VP` : ''}</span>
+        </summary>
       <div className="fields">
         <label className="field">
           <span>Team</span>
@@ -812,46 +827,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
           <Stepper value={side.vpAdjust} onChange={(n) => setSide((s) => void (s.vpAdjust = n))} />
         </label>
       </div>
-
-      <h3>Agendas <span className="muted small">{side.agendas.length} / {MAX_AGENDAS}</span></h3>
-      {side.agendas.map((a, i) => (
-        <div key={a.name} className="tally">
-          <label className="row grow">
-            <input type="checkbox" checked={a.done} onChange={(e) => setSide((s) => void (s.agendas[i].done = e.target.checked))} />
-            <span>
-              <b>{a.name}</b>
-              <div className="muted small">{AGENDAS.find((x) => x.name === a.name)?.desc}</div>
-            </span>
-          </label>
-          <Stepper value={a.count} min={0} onChange={(n) => setSide((s) => void (s.agendas[i].count = n))} />
-          <button className="ghost icon" aria-label="Remove agenda" onClick={() => setSide((s) => void s.agendas.splice(i, 1))}><Icon name="l:x" /></button>
-        </div>
-      ))}
-      {side.agendas.length < MAX_AGENDAS && (
-        <select value="" onChange={(e) => e.target.value && setSide((s) => void s.agendas.push({ name: e.target.value, count: 0, done: false }))}>
-          <option value="">+ Add an agenda…</option>
-          {AGENDAS.filter((a) => !taken.has(a.name)).map((a) => <option key={a.name} value={a.name}>{a.name}</option>)}
-        </select>
-      )}
-
-      <h3>Nexus effects</h3>
-      {side.manipulations.length === 0 && <p className="muted small">None this match.</p>}
-      {side.manipulations.map((m, i) => (
-        <div key={i} className="tally">
-          <label className={`row grow${m.used ? ' muted' : ''}`}>
-            <input type="checkbox" checked={m.used} onChange={(e) => setSide((s) => void (s.manipulations[i].used = e.target.checked))} />
-            <span style={m.used ? { textDecoration: 'line-through' } : undefined}>
-              {m.text}
-              <div className="muted small">{COMBAT_MANIPULATIONS.find((c) => m.text.includes(c.name))?.desc}</div>
-            </span>
-          </label>
-          <button className="ghost icon" aria-label="Remove" onClick={() => setSide((s) => void s.manipulations.splice(i, 1))}><Icon name="l:x" /></button>
-        </div>
-      ))}
-      <select value="" onChange={(e) => e.target.value && setSide((s) => void s.manipulations.push({ text: `${MANIPULATION_PREFIX}: ${e.target.value}`, used: false }))}>
-        <option value="">+ Add a Combat Manipulation…</option>
-        {COMBAT_MANIPULATIONS.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
-      </select>
+      </details>
 
       {side.ai && side.units.length > 0 && (
         <>
@@ -861,7 +837,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
       )}
 
       <h3>Units</h3>
-      {side.units.length === 0 && <p className="muted small">Load a crusade force above, or add units by hand.</p>}
+      {side.units.length === 0 && <p className="muted small">{side.ai ? `Generate a ${ECHOES.name} army` : 'Pick a crusade force'} in the side settings above, or add units by hand.</p>}
       {side.units.length > 0 && <p className="muted small">XP: 1 per wound of each model destroyed (½ per model in 10+ model, 1-wound units). It carries into the record wizard as Kill XP.</p>}
       {side.units.length > 0 && (
         <div className="table-wrap">
@@ -898,6 +874,51 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
         <input value={adding} placeholder="+ Add a unit by name" onChange={(e) => setAdding(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addUnit()} onBlur={addUnit} />
         {side.units.some((u) => u.activated) && <button className="ghost small" onClick={() => setSide((s) => s.units.forEach((u) => (u.activated = false)))}>Clear activations</button>}
       </div>
+
+      <h3>Agendas <span className="muted small">{side.agendas.length} / {MAX_AGENDAS}</span></h3>
+      {side.agendas.map((a, i) => (
+        <div key={a.name} className="tally">
+          <label className="row grow">
+            <input type="checkbox" checked={a.done} onChange={(e) => setSide((s) => void (s.agendas[i].done = e.target.checked))} />
+            <span>
+              <b>{a.name}</b>
+              <div className="muted small">{AGENDAS.find((x) => x.name === a.name)?.desc}</div>
+            </span>
+          </label>
+          <Stepper value={a.count} min={0} onChange={(n) => setSide((s) => void (s.agendas[i].count = n))} />
+          <button className="ghost icon" aria-label="Remove agenda" onClick={() => setSide((s) => void s.agendas.splice(i, 1))}><Icon name="l:x" /></button>
+        </div>
+      ))}
+      {side.agendas.length < MAX_AGENDAS && (
+        <select value="" onChange={(e) => e.target.value && setSide((s) => void s.agendas.push({ name: e.target.value, count: 0, done: false }))}>
+          <option value="">+ Add an agenda…</option>
+          {AGENDAS.filter((a) => !taken.has(a.name)).map((a) => <option key={a.name} value={a.name}>{a.name}</option>)}
+        </select>
+      )}
+
+      {/* Combat Manipulations come from Nexus Wars, so outside a campaign the section only shows if one was added. */}
+      {(state.campaign || side.manipulations.length > 0) && (
+        <>
+      <h3>Nexus effects</h3>
+      {side.manipulations.length === 0 && <p className="muted small">None this match.</p>}
+      {side.manipulations.map((m, i) => (
+        <div key={i} className="tally">
+          <label className={`row grow${m.used ? ' muted' : ''}`}>
+            <input type="checkbox" checked={m.used} onChange={(e) => setSide((s) => void (s.manipulations[i].used = e.target.checked))} />
+            <span style={m.used ? { textDecoration: 'line-through' } : undefined}>
+              {m.text}
+              <div className="muted small">{COMBAT_MANIPULATIONS.find((c) => m.text.includes(c.name))?.desc}</div>
+            </span>
+          </label>
+          <button className="ghost icon" aria-label="Remove" onClick={() => setSide((s) => void s.manipulations.splice(i, 1))}><Icon name="l:x" /></button>
+        </div>
+      ))}
+      <select value="" onChange={(e) => e.target.value && setSide((s) => void s.manipulations.push({ text: `${MANIPULATION_PREFIX}: ${e.target.value}`, used: false }))}>
+        <option value="">+ Add a Combat Manipulation…</option>
+        {COMBAT_MANIPULATIONS.map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+      </select>
+        </>
+      )}
     </div>
   );
 }

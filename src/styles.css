@@ -1383,3 +1383,24 @@ table.ledger td:first-child { white-space: nowrap; }
   margin: 0.8rem -0.25rem 0; padding: 0.6rem 0.75rem; background: var(--panel-2); border: 1px solid var(--gold-dim);
   box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.5);
 }
+/* The running battle: a hint while sides have no units, and each side's settings folded away once it has them. */
+.battle-hint { margin: 0 0 1rem; padding: 0.55rem 0.75rem; border: 1px solid var(--gold-dim); border-left-width: 3px; background: var(--panel-2); }
+.side-setup { margin: 0.25rem 0 0.5rem; }
+.side-setup > summary { cursor: pointer; padding: 0.25rem 0; }
+.side-setup[open] > summary { margin-bottom: 0.5rem; }
+/* Two sides side by side leave each one too narrow for the units table, so it turns into cards there as on a phone. */
+.side-panel { container-type: inline-size; }
+@container (max-width: 560px) {
+  table.tracker-units, table.tracker-units tbody { display: block; }
+  table.tracker-units thead { display: none; }
+  table.tracker-units tr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem 0.75rem; padding: 0.6rem 0.1rem; border-bottom: 1px solid var(--line); }
+  table.tracker-units td { border: 0; padding: 0; min-width: 0; text-align: left; }
+  table.tracker-units td[data-label]::before {
+    content: attr(data-label); display: block; font-size: 0.68rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.12em; font-weight: 600;
+  }
+  table.tracker-units .s-2 { grid-column: span 2; }
+  table.tracker-units .s-end { grid-column: 3 / -1; grid-row: 1; justify-self: end; text-align: right; white-space: nowrap; }
+  .table-wrap:has(> table.tracker-units) { overflow-x: visible; }
+}
+.side-panel > h3 { margin-top: 1rem; }
