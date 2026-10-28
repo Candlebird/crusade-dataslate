@@ -1393,7 +1393,7 @@ table.ledger td:first-child { white-space: nowrap; }
 @container (max-width: 560px) {
   table.tracker-units, table.tracker-units tbody { display: block; }
   table.tracker-units thead { display: none; }
-  table.tracker-units tr { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.35rem 0.75rem; padding: 0.6rem 0.1rem; border-bottom: 1px solid var(--line); }
+  table.tracker-units tr { display: grid; grid-template-columns: minmax(0, 0.7fr) minmax(0, 0.9fr) minmax(0, 1.8fr) minmax(0, 0.9fr); gap: 0.35rem 0.75rem; padding: 0.6rem 0.1rem; border-bottom: 1px solid var(--line); }
   table.tracker-units td { border: 0; padding: 0; min-width: 0; text-align: left; }
   table.tracker-units td[data-label]::before {
     content: attr(data-label); display: block; font-size: 0.68rem; color: var(--muted);
