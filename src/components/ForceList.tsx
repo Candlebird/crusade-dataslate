@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useStore } from '../model/store';
 import type { Force } from '../model/types';
 import { newForce } from '../model/factory';
@@ -11,6 +12,7 @@ import { EmblemBadge } from './Emblem';
 import { forceEmblem } from '../model/emblem';
 import SinceLastLooked from './SinceLastLooked';
 import { Icon } from './Icon';
+import { firstSteps, type FirstSteps } from '../model/firstSteps';
 
 export default function ForceList() {
   const { state, update } = useStore();
@@ -24,6 +26,7 @@ export default function ForceList() {
   const isTheirs = (f: Force) => !!cloud.email && !!f.owner && f.owner !== cloud.email;
   const mine = state.forces.filter((f) => !isTheirs(f));
   const theirs = state.forces.filter(isTheirs);
+  const steps = firstSteps(state.books.length, mine);
 
   const create = () => {
     const f = newForce();
@@ -62,7 +65,7 @@ export default function ForceList() {
         </div>
       )}
 
-      {state.forces.length === 0 && <div className="panel empty">No forces yet. Create one or drop a force file below. New here? See the <a href={href.guide()}>getting started guide</a>.</div>}
+      {steps.next && <FirstStepsPanel steps={steps} create={create} />}
 
       {theirs.length > 0 && mine.length > 0 && <h2 className="force-group">Your forces</h2>}
       {mine.length > 0 && <div className="grid grid-cards">{mine.map((f) => <ForceCard key={f.id} f={f} />)}</div>}
@@ -73,13 +76,52 @@ export default function ForceList() {
         </>
       )}
 
-      <div className="panel" style={{ marginTop: '1.5rem' }}>
+      <div className="panel" id="force-import" style={{ marginTop: '1.5rem' }}>
         <div className="panel-title"><h3>Import</h3></div>
         <Dropzone accept=".json,application/json" onFiles={importFiles}>
           Drop a <b>.force.json</b>, a <b>backup</b>, an <b>Army Forge list</b> (builds a full force) or an <b>Army Forge book</b> JSON here, or click to choose.
         </Dropzone>
       </div>
     </>
+  );
+}
+
+/** The first-run checklist: import a book, make a force, add units. It goes away once a force of yours has units. */
+function FirstStepsPanel({ steps, create }: { steps: FirstSteps; create: () => void }) {
+  const toImport = () => document.getElementById('force-import')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const row = (key: 'book' | 'force' | 'units', n: number, title: string, body: ReactNode, action: ReactNode) => {
+    const done = steps[key];
+    const now = steps.next === key;
+    return (
+      <div className={`first-step${done ? ' done' : ''}${now ? ' now' : ''}`}>
+        <div className="guide-num">{done ? <Icon name="l:check" /> : n}</div>
+        <div className="grow">
+          <h3>{title}</h3>
+          {!done && <p className="muted small">{body}</p>}
+        </div>
+        {!done && <div className="first-step-act">{action}</div>}
+      </div>
+    );
+  };
+  return (
+    <div className="panel first-steps">
+      <div className="panel-title"><h3>Your first force in three steps</h3></div>
+      {row('book', 1, 'Import your army book',
+        <>Copy your army's link from Army Forge and paste it on Army Books. One import covers the whole group, so it may already be there.</>,
+        <a className={`btn${steps.next === 'book' ? ' primary' : ''}`} href={href.books()}>Army Books</a>)}
+      {row('force', 2, 'Create your force',
+        <>Start an empty force, or drop a list exported from Army Forge in <b>Import</b> below to build the force with all its units in one go.</>,
+        <span className="row">
+          <button className={steps.next === 'force' ? 'primary' : ''} onClick={create}>+ New force</button>
+          <button onClick={toImport}>Import a list</button>
+        </span>)}
+      {row('units', 3, 'Add units',
+        <>On the force page press <b>+ Add unit</b> and pick datasheets from your army book.</>,
+        steps.empty ? <a className={`btn${steps.next === 'units' ? ' primary' : ''}`} href={href.force(steps.empty.id)}>Open {steps.empty.name}</a> : null)}
+      <p className="muted small" style={{ marginBottom: 0 }}>
+        More help in the <a href={href.guide()}>getting started guide</a>.
+      </p>
+    </div>
   );
 }
 

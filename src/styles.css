@@ -1399,3 +1399,17 @@ table.ledger td:first-child { white-space: nowrap; }
   .nav-more { display: block; flex: 1 1 auto; }
   .nav-more > a { display: block; text-align: center; white-space: nowrap; font-size: 0.85rem; letter-spacing: 0.06em; }
 }
+.unit-status.removed b { color: #e08a80; }
+/* Forces page first-run checklist. */
+.first-step { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.6rem 0; border-top: 1px solid var(--line); }
+.panel-title + .first-step { border-top: none; }
+.first-step h3 { margin: 0.15rem 0 0; }
+.first-step p { margin: 0.25rem 0 0; }
+.first-step.done h3 { color: var(--muted); }
+.first-step.done .guide-num { color: var(--green); border-color: var(--green); }
+.first-step-act { flex-shrink: 0; align-self: center; }
+@media (max-width: 640px) {
+  .first-step { flex-wrap: wrap; }
+  .first-step .grow { flex: 1 1 0; min-width: 0; }
+  .first-step-act { flex-basis: 100%; padding-left: 2.75rem; }
+}
