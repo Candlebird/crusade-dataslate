@@ -104,30 +104,38 @@ Branch `overnight-ux`, local only (never pushed). Small commits, each with `npx 
     - The AI side's Army sheet link now sits inside the folded side settings.
     - The Training "Flying" tag says "they fly", but a flying boss's escorts walk.
 
-## Open questions
-- **Nexus: other factions' readiness.** Should players see the GM checklist, such as whose orders are locked in?
-- **Nexus: income on the GM checklist.** The Income column only knows about forces on the GM's device; others read "No force here", because claims aren't in the synced campaign file.
-- **Nexus: order of the merged tab.** For the GM, recording a game and the game log sit above the chronicle. Is that the order you want?
-- **Patrol vs Expedition.** A patrol takes units that already went out (Battle-Worn), while an Expedition refuses them. Is that intended? Only the wording changed to match.
-- **Ledger.** "Increase supply (−1 RP)" repeats the one inside Requisition…. Keep it as a shortcut?
-- **Between games.** Should the panel start folded? Right now it starts open and remembers a fold.
-- **Training: smaller merges.** Should Combine offer smaller merges, such as 2 of a set of 4 alike? That would be a rules change.
-- **Battle tracker: Nexus effects** are now hidden outside a campaign unless one was already added. Is that OK?
-- **Battle result: Finish & save** turns gold once every force has recorded, but it can still be pressed before that, as it could before. Should it be blocked?
-- **Battle: Prev round** is hidden once a battle ends too (Resume brings both back). OK?
-- **Battle rewards for non-campaign forces.** They can roll Nexus-only reward results, which must be re-rolled or changed by hand. The wizard now flags them as a To do. Should the roll skip them instead? That would be a rules change.
-- **Expedition Materials with no bank.** With no bank they seem to be lost ("no bank had room"). Warn before setting out?
-- **"US" for Umbra Shards** is used everywhere. Spell it out for new players?
-- **Buy a relic with 0 RP** is allowed, because the relic picker offers a free relic. Is that intended?
-- **Unit sheet order.** Should the Profile panel move below Experience and Traits, so what changed comes first? Units also keep no XP history, so the sheet can't show what changed after each battle without a change to the saved data.
-- **Unit tasks.** They only show when the force is linked to a faction in the loaded campaign, the same as before. Is that intended?
-- **Nexus: GM panels fold.** Factions and Sectors fold once they have content. Is that right for you, or should they stay open?
-- **Nexus: End round toast.** The toast is short when the turn report is on screen. Is that enough?
-- **Battle: "Back to past battles"** scrolls to the list. Is that where you expect to land?
-- **Dice: sort with "Any".** Dice only sort against a target once one is picked. Should they sort high to low otherwise?
-- **Training: the "Base −N HP" note** only covers waves played in this sitting. Showing it after a reload would need saved data.
-- **Training HUD labels.** Base, Credits and Luck only have words above 1200 px wide; below that they're icons. Lower it?
-- **Search hits on the Traits page** scroll to the section (for example Trait tables), not to the single trait.
+## Decisions (2026-10-28)
+To do:
+- **Nexus:**
+  - Players see one row per faction saying whether its orders are locked in. They don't see what the orders are.
+  - The GM checklist drops the Income column.
+  - Factions and Sectors start folded but remember if you open them.
+- **Battles:**
+  - Pressing Finish & save before every force has recorded asks first. The other forces can still claim the battle later.
+  - Outside a campaign, the reward roll rerolls Nexus-only results. This is a small rules change.
+  - "Back to past battles" scrolls to the Past battles list.
+- **Dice:** with "Any" selected, dice sort high to low.
+- **Rules search:** a hit scrolls to and flashes the exact entry, not just its section.
+- **Expedition:** with no bank, the setup screen warns "No bank: any Materials found are lost."
+- **Unit task** is always listed in Between games. Without a link to a Nexus faction it is greyed out and says why.
+- **Ledger:** the duplicate "Increase supply" button is removed; it stays under Requisition….
+- **Relics:** at 0 RP with a free relic due, the button reads "Pick your free relic".
+- **Umbra Shards:** spelled out in sentences and headings. "US" stays only in stat tiles and costs, with a tooltip.
+- **Unit sheet:** Experience and Traits come before Profile.
+- **Training:**
+  - The HUD shows words down to 900 px wide.
+  - The Flying tag says who flies: the boss flies and its escorts walk.
+
+Kept as they are:
+- **Nexus:** the merged tab keeps the GM's Record form and game log first, and the End round toast stays short.
+- **Battles:** Nexus effects stay hidden outside a campaign, and Prev round stays hidden once a battle ends.
+- **Downtime:** Patrol still takes Battle-Worn units while Expedition refuses them, which is intended. Between games starts open.
+- **Training:** merges stay full sets only, and the base HP note covers this sitting only.
+- **Not fixing:**
+  - The siege line on attack orders.
+  - The patrol fallback in the Game night intro.
+  - The AI Army sheet link stays inside the fold.
+- **Dice:** the "Type" caption fix stays.
 
 ## Test by hand
 - **Phone width.** Chrome on a desktop won't go below 500 px, where nothing scrolls sideways. Check 390 px on a real phone: the force page, the unit sheet, the battle start, the campaign tabs and Rules.
