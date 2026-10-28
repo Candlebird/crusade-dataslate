@@ -1376,3 +1376,5 @@ table.ledger td:first-child { white-space: nowrap; }
 .downtime-icon { color: var(--gold); font-size: 1.35rem; line-height: 1; padding-top: 0.15rem; width: 1.5rem; flex-shrink: 0; text-align: center; }
 .downtime-what { display: block; }
 .downtime-why { display: block; color: var(--warn); }
+.force-group { margin: 1.25rem 0 0.6rem; font-size: 1.1rem; }
+.force-group .small { font-family: inherit; letter-spacing: 0; text-transform: none; margin-left: 0.4rem; }
