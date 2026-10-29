@@ -103,7 +103,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis, pas
   // Over a Nexus sector, a player may only auto-battle an Overrun; anything else is for the table, or the GM's fallback.
   const fought = state.campaign?.sectors.find((s) => s.id === b.sectorId);
   const autoBlock = fought && b.attacker && cloud.email && !cloud.isGm
-    ? overrunBlock(fought, state.forces.find((f) => membersOf(b, b.attacker!).some((x) => x.forceId === f.id)))
+    ? overrunBlock(fought, state.forces.find((f) => membersOf(b, b.attacker!).some((x) => x.forceId === f.id)), state.campaign)
     : '';
   const zoneWhy = zoneBattleBlock(b, state.campaign);
   const empty = b.sides.filter((x) => !x.units.length);
@@ -463,9 +463,9 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
               Fighting over <b>{sector.name}</b> <span className="tag">{SECTOR_TYPES[sector.type].label}</span>, held by <b>{factionName(c, sector.owner)}</b>.
               Team A attacks; everyone else defends. The result goes into the campaign log and the map.
             </p>
-            <SectorDanger s={sector} factionId={attacker} />
-            {aiDefended(sector) && ratingFor(sector, attacker) !== undefined && (
-              <p className="muted small">The {ECHOES.name} hold it with a {ratingFor(sector, attacker)}-Supply garrison. Play <b>1 v AI</b> and generate their army at that size. Modifiers favour the defender.</p>
+            <SectorDanger s={sector} factionId={attacker} c={state.campaign} />
+            {aiDefended(sector) && ratingFor(sector, attacker, state.campaign) !== undefined && (
+              <p className="muted small">The {ECHOES.name} hold it with a {ratingFor(sector, attacker, state.campaign)}-Supply garrison. Play <b>1 v AI</b> and generate their army at that size. Modifiers favour the defender.</p>
             )}
             {homeChallengeBlock(c, sector) && <p className="small"><span className="tag red">{homeChallengeBlock(c, sector)}</span> Check with the GM before playing this one.</p>}
             <label className="field">
@@ -783,7 +783,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
   const reinforced = defending && !!sector && isReinforced(sector);
   const enemies = b.sides.filter((x) => x.team !== side.team).reduce((n, x) => n + sidePoints(x), 0) + (reinforced ? NEXUS_REINFORCE_BONUS : 0);
   // Holding an AI sector, the Echoes field its garrison: the sector's difficulty rating.
-  const garrison = defending && sector && aiDefended(sector) && state.campaign ? ratingFor(sector, teamFaction(b, b.attacker!, state.campaign, forces)) : undefined;
+  const garrison = defending && sector && aiDefended(sector) && state.campaign ? ratingFor(sector, teamFaction(b, b.attacker!, state.campaign, forces), state.campaign) : undefined;
   const [target, setTarget] = useState(() => garrison || enemies || 1000);
   const generate = () => {
     if (!book) return;

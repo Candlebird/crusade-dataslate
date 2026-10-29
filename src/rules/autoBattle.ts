@@ -501,7 +501,8 @@ export function autoSetup(b: TrackedBattle, forces: Force[], c?: Campaign): Auto
   if (event?.id === 'ionStorm') {
     give(fighters, `${event.name}: often -1 to hit shooting in rounds 1 and 2 (long range)`, (f) => (f.earlyShoot -= 0.5));
     setup.effects.push(`${event.name}: everyone often gets -1 to hit shooting in rounds 1 and 2, while the armies are far apart.`);
-  } else if (event?.battle) setup.effects.push(`${event.name}: ${event.battle} Not part of the auto-battle: apply it yourself.`);
+  } else if (event?.xp) setup.effects.push(`${event.name}: every unit that survives earns +${event.xp} XP (the battle report adds it).`);
+  else if (event?.battle) setup.effects.push(`${event.name}: ${event.battle} Not part of the auto-battle: apply it yourself.`);
   // A Conqueror Warlord's Onslaught: it hits harder and its side holds firmer, while it's in the fight.
   if (c) for (const side of b.sides) {
     const force = forces.find((f) => f.id === side.forceId);

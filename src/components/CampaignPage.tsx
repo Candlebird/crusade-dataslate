@@ -17,11 +17,9 @@ import DuelsPanel from './Duels';
 import JournalPanel from './Journal';
 import ChroniclePanel from './Chronicle';
 import GameNightPanel from './GameNight';
-import BountyBoardPanel, { useBountyPayouts } from './BountyBoard';
 import WarRoomPanel from './WarRoom';
 import type { Focus } from './HexMap';
 import { useImporter } from './importer';
-import { BOUNTY } from '../rules/nexusData';
 import { Dropzone, Loading, Panel, TextField, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
 import { Glyph, Icon } from './Icon';
@@ -96,7 +94,6 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
   const myFaction = c?.factions.some((f) => f.id === mine) ? mine : undefined;
   // The player page's eyes: your faction's, or (for the GM only) any faction's or everything (''). '-' sees nothing.
   const viewAs = canGm ? pickedView ?? myFaction ?? '' : myFaction ?? '-';
-  useBountyPayouts(BOUNTY.enabled ? c : undefined, canGm);
 
   const importer = (
     <Dropzone accept=".json,application/json" onFiles={importFiles}>
@@ -229,7 +226,6 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
           </>
         )}
         {tab === 'night' && <GameNightPanel c={c} setC={setC} me={viewAs && viewAs !== '-' ? viewAs : undefined} gm={canGm} />}
-        {tab === 'bounties' && <BountyBoardPanel c={c} setC={setC} gm={false} />}
         {tab === 'stats' && <WarRoomPanel c={c} />}
         {footer}
       </>
@@ -280,7 +276,6 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
         </>
       )}
       {tab === 'night' && <GameNightPanel c={c} setC={setC} gm />}
-      {tab === 'bounties' && <BountyBoardPanel c={c} setC={setC} gm />}
       {tab === 'stats' && <WarRoomPanel c={c} />}
       {/* Kept mounted once opened, so a half-filled record survives a look at another tab. */}
       {logSeen && (
@@ -295,12 +290,11 @@ export default function CampaignPage({ gm = false, tab: openTab, at }: { gm?: bo
   );
 }
 
-type CampaignTab = 'map' | 'warlord' | 'duels' | 'bounties' | 'stats' | 'night' | 'chronicle';
+type CampaignTab = 'map' | 'warlord' | 'duels' | 'stats' | 'night' | 'chronicle';
 const TABS: { id: CampaignTab; label: string }[] = [
   { id: 'map', label: 'Map' },
   { id: 'warlord', label: 'Warlord' },
   { id: 'duels', label: 'Duels & Journal' },
-  ...(BOUNTY.enabled ? [{ id: 'bounties' as const, label: 'Bounties' }] : []),
   { id: 'stats', label: 'War Room' },
   { id: 'night', label: 'Game night' },
   { id: 'chronicle', label: 'Chronicle & log' },

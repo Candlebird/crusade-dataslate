@@ -11,8 +11,9 @@ const X = TRAINING.nexus;
 
 const isBossPlan = (s: SpawnPlan) => TRAINING_ENEMIES[s.kind].spawn === 'boss';
 
-/** A wave's plans with the affixes on them, rolling `r`: Frenzied wounds, Proud elites, Armoured saves. */
+/** A wave's plans with the affixes on them, rolling `r`: Frenzied wounds, Proud elites, Armoured saves; and a Blood Moon's wounds. */
 export function affixPlan(r: Rng, run: Pick<TrainingRun, 'nexus'>, plans: SpawnPlan[]): SpawnPlan[] {
+  if (eventIs(run, 'bloodMoon')) for (const s of plans) s.hp *= X.events.bloodMoon.hp;
   const t = threatOf(run);
   if (!t || !run.nexus?.affixes.length) return plans;
   const armoured = Math.min(X.armoured.max, X.armoured.share * t);

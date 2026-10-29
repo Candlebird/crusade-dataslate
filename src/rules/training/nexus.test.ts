@@ -43,10 +43,11 @@ describe('nexus', () => {
     expect(nexusOf(campaign(2, [], { event: { id: 'convoys', round: 1 } }))!.event).toBeUndefined();
     expect(nexusOf(campaign(2, [], { event: { id: 'convoys', round: 2 } }))!.event).toBe('convoys');
     expect(nexusOf(campaign(2, [], { event: { id: 'risingDark', round: 2 } }))!.threat).toBe(3);
+    expect(nexusOf(campaign(2, [], { event: { id: 'forgeSurge', round: 2 } }))!.threat).toBe(3);
   });
 
   it('applies the events that map, and shows the rest as flavour', () => {
-    for (const id of ['warpStorm', 'ceasefire', 'resonance']) {
+    for (const id of ['warpStorm', 'ceasefire', 'resonance', 'breakthrough']) {
       expect(eventMapped(id)).toBe(false);
       expect(nexusLines({ threat: 1, affixes: [], event: id, lords: [] }).event).toMatch(/flavour/);
     }
@@ -60,6 +61,10 @@ describe('nexus', () => {
     expect(runXpCap(at('glory'))).toBe(TRAINING.xpCap + X.events.glory.xp);
     expect(budgetMul(at('echoSurge'))).toBeCloseTo(X.events.echoSurge.budget);
     expect(budgetMul(at('voidLull'))).toBeCloseTo(X.events.voidLull.budget);
+    expect(budgetMul(at('huntingSeason'))).toBeCloseTo(X.events.huntingSeason.budget);
+    expect(creditMul(at('huntingSeason'))).toBeCloseTo(X.events.huntingSeason.credits);
+    expect(creditMul(at('bloodMoon'))).toBeCloseTo(X.events.bloodMoon.credits);
+    expect(at('forgeSurge').credits).toBe(plain.credits + X.events.forgeSurge.credits);
   });
 
   it('starts the base lower under Bleed, and copies the Nexus into the run as plain JSON', () => {

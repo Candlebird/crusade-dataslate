@@ -24,7 +24,7 @@ export const eventMapped = (id: string | undefined): id is keyof Events => !!id 
 export function nexusOf(c?: Campaign): RunNexus | undefined {
   if (!c) return undefined;
   const event = eventNow(c);
-  const rise = event === 'risingDark' ? X.events.risingDark.threat : 0;
+  const rise = event === 'risingDark' ? X.events.risingDark.threat : event === 'forgeSurge' ? X.events.forgeSurge.threat : 0;
   const threat = Math.max(0, Math.min(X.threatMax, (c.threat ?? NEXUS_ROUNDS.threatStart) + rise));
   const r = { rng: seedOf(`${c.id}:${c.round ?? 1}`) };
   const n = Math.min(X.affixes.max, Math.ceil(threat / X.affixes.per));
@@ -42,12 +42,14 @@ export const hasAffix = (run: Pick<TrainingRun, 'nexus'>, id: NexusAffixId) => !
 export const eventIs = <K extends keyof Events>(run: Pick<TrainingRun, 'nexus'>, id: K) => run.nexus?.event === id;
 
 /** Earned credits are this many times as many: 1 + credit × threat. */
-export const creditMul = (run: Pick<TrainingRun, 'nexus'>) => 1 + X.credit * threatOf(run);
+export const creditMul = (run: Pick<TrainingRun, 'nexus'>) => (1 + X.credit * threatOf(run))
+  * (eventIs(run, 'huntingSeason') ? X.events.huntingSeason.credits : eventIs(run, 'bloodMoon') ? X.events.bloodMoon.credits : 1);
 
-/** Waves are this many times as big: Fierce, Echo Surge, Void Lull. */
+/** Waves are this many times as big: Fierce, Echo Surge, Void Lull, Hunting Season. */
 export function budgetMul(run: Pick<TrainingRun, 'nexus'>): number {
   const fierce = hasAffix(run, 'fierce') ? 1 + X.fierce.per * threatOf(run) : 1;
-  const ev = eventIs(run, 'echoSurge') ? X.events.echoSurge.budget : eventIs(run, 'voidLull') ? X.events.voidLull.budget : 1;
+  const E = X.events;
+  const ev = eventIs(run, 'echoSurge') ? E.echoSurge.budget : eventIs(run, 'voidLull') ? E.voidLull.budget : eventIs(run, 'huntingSeason') ? E.huntingSeason.budget : 1;
   return fierce * ev;
 }
 
@@ -56,7 +58,7 @@ export function budgetMul(run: Pick<TrainingRun, 'nexus'>): number {
 export function nexusStart(run: Pick<TrainingRun, 'nexus'>) {
   const E = X.events;
   return {
-    credits: eventIs(run, 'convoys') ? E.convoys.credits : 0,
+    credits: eventIs(run, 'convoys') ? E.convoys.credits : eventIs(run, 'forgeSurge') ? E.forgeSurge.credits : 0,
     baseHp: hasAffix(run, 'bleed') ? -X.bleed.per * threatOf(run) : 0,
     cover: eventIs(run, 'derelicts') ? E.derelicts.cover : 0,
     luck: eventIs(run, 'shardRush') ? E.shardRush.luck : 0,
@@ -100,6 +102,9 @@ export function eventEffect(id: string): string {
     case 'risingDark': return `+${E.risingDark.threat} threat (counted above).`;
     case 'derelicts': return `+${E.derelicts.cover} patches of dangerous terrain (Echoes walk slower through them).`;
     case 'glory': return `Each unit can earn +${E.glory.xp} XP this run.`;
+    case 'huntingSeason': return `Waves are ${pc(E.huntingSeason.budget - 1)} bigger, and earned credits ${pc(E.huntingSeason.credits - 1)} more.`;
+    case 'bloodMoon': return `Echoes have ${pc(E.bloodMoon.hp - 1)} more wounds, and earned credits are ${pc(E.bloodMoon.credits - 1)} more.`;
+    case 'forgeSurge': return `+${E.forgeSurge.credits} credits to start, and +${E.forgeSurge.threat} threat (counted above).`;
     default: return '';
   }
 }

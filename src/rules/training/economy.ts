@@ -15,9 +15,13 @@ export function squadPower(units: Unit[]): number {
 }
 
 /** The points Training prices a unit by: its points, × TRAINING.immobileSurcharge if it is Immobile or a Fortification
- *  (a rule OPR prices low that costs nothing here). Recipe tier, level cap and cost, and the run's power go by it. */
-export const trainPoints = (u: Pick<Unit, 'points' | 'rules' | 'category'>): number =>
-  u.points * (hasRule(u.rules, 'Immobile') || u.category === 'Fortification' ? TRAINING.immobileSurcharge : 1);
+ *  (a rule OPR prices low that costs nothing here), or × TRAINING.longRange.surcharge if its longest gun also reaches
+ *  longRange.from" or more. Recipe tier, level cap and cost, and the run's power go by it. */
+export const trainPoints = (u: Pick<Unit, 'points' | 'rules' | 'category' | 'weapons'>): number => {
+  if (!hasRule(u.rules, 'Immobile') && u.category !== 'Fortification') return u.points;
+  const reach = Math.max(0, ...(u.weapons ?? []).map((w) => w.range));
+  return u.points * (reach >= TRAINING.longRange.from ? TRAINING.longRange.surcharge : TRAINING.immobileSurcharge);
+};
 
 /** The most level-ups a unit of these points may have (TRAINING.levels.caps). */
 export const levelCap = (points: number): number => (TRAINING.levels.caps.find((c) => points <= c.upTo) ?? TRAINING.levels.caps[TRAINING.levels.caps.length - 1]).cap;

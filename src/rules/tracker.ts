@@ -317,7 +317,7 @@ export function nexusNotes(b: TrackedBattle, c: Campaign | undefined, forces: Fo
     const defenders = b.sides.filter((x) => x.team !== b.attacker);
     if (isReinforced(sector) && defenders.length)
       notes.push(`${defenders.map((x) => x.name).join(' & ')} ${defenders.length > 1 ? 'defend' : 'defends'} a Reinforced sector: +200 Supply Limit.`);
-    const rating = c && ratingFor(sector, teamFaction(b, b.attacker, c, forces));
+    const rating = c && ratingFor(sector, teamFaction(b, b.attacker, c, forces), c);
     if (rating !== undefined && aiDefended(sector)) notes.push(`${sector.name}'s AI garrison: ${rating} Supply.`);
     for (const m of (sector.modifiers ?? []).map(modifierOf)) if (m) notes.push(`Sector modifier, ${m.name}: ${m.desc}`);
     for (const x of membersOf(b, b.attacker))

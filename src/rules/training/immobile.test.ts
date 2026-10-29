@@ -10,7 +10,7 @@ import { createRun } from './run';
 
 const gun = (name: string, range: number, attacks: number, count: number, rules: string[] = []): Weapon =>
   ({ id: name, name, range, attacks, count, rules, traits: [] });
-const weapons = () => [gun('Heavy Cannon', 36, 2, 1, ['AP(2)']), gun('Twin MG', 24, 3, 1, ['AP(1)'])];
+const weapons = () => [gun('Heavy Cannon', 24, 2, 1, ['AP(2)']), gun('Twin MG', 18, 3, 1, ['AP(1)'])];
 
 describe('Immobile surcharge', () => {
   const S = TRAINING.immobileSurcharge;
@@ -40,5 +40,14 @@ describe('Immobile surcharge', () => {
 
   it('gives the waves the surcharged power', () => {
     expect(createRun('f', [bunker], 1).power).toBeCloseTo(createRun('f', [twin], 1).power);
+  });
+
+  it('counts a long-range turret at the higher surcharge, by its longest gun', () => {
+    const L = TRAINING.longRange;
+    const long = { ...bunker, weapons: [...weapons(), gun('Railgun', L.from, 1, 1, ['AP(4)'])] };
+    expect(trainPoints(long)).toBeCloseTo(160 * L.surcharge);
+    expect(trainPoints({ ...long, weapons: [gun('Railgun', L.from - 1, 1, 1)] })).toBeCloseTo(160 * S);
+    expect(trainPoints({ ...plain, weapons: long.weapons })).toBe(160);
+    expect(L.surcharge).toBeGreaterThan(S);
   });
 });

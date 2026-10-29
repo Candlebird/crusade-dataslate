@@ -202,12 +202,12 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
             const picked = own?.picks[f.id] ?? own?.picks[f.nexus!.factionId] ?? '';
             const target = attacks.find((s) => s.id === picked) ?? moves.find((s) => s.id === picked);
             const isAttack = !!target && attacks.includes(target);
-            const rating = isAttack && aiDefended(target!) ? ratingFor(target!, f.nexus!.factionId) : undefined;
+            const rating = isAttack && aiDefended(target!) ? ratingFor(target!, f.nexus!.factionId, c) : undefined;
             const means = !picked ? <>Not declared yet: pick before the GM reveals, or it just stays where it is.</>
               : picked === HOLD ? <>Stays at {at?.name ?? 'its sector'}.{digsIn(c, f) && ' Dug in: if attacked it fights and picks the deployment.'}{fx(at?.id)}</>
               : !target ? <>That sector is out of reach now: pick again.</>
               : isAttack ? <>Attacks {target.name}: a battle against {rating !== undefined ? `its ${rating} Supply AI garrison` : factionName(c, target.owner)}, at the table
-                {zoneOn ? ' or as a zone battle' : !overrunBlock(target, f) ? ' or overrun (an auto-battle)' : ''}, from this panel after the reveal. Win and it moves in.</>
+                {zoneOn ? ' or as a zone battle' : !overrunBlock(target, f, c) ? ' or overrun (an auto-battle)' : ''}, from this panel after the reveal. Win and it moves in.</>
               : <>Moves to {target.name} when the GM moves detachments after the reveal.{fx(target.id)}</>;
             return (
               <label key={f.id} className="field">
@@ -223,8 +223,8 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
                   {attacks.length > 0 && (
                     <optgroup label="Attack">
                       {attacks.map((s) => {
-                        const rating = aiDefended(s) ? ratingFor(s, f.nexus!.factionId) : undefined;
-                        return <option key={s.id} value={s.id}>{s.name} ({factionName(c, s.owner)}){rating !== undefined ? ` — ${rating} Supply` : ''}{overrunBlock(s, f) ? '' : ' · ⚡ can overrun'}</option>;
+                        const rating = aiDefended(s) ? ratingFor(s, f.nexus!.factionId, c) : undefined;
+                        return <option key={s.id} value={s.id}>{s.name} ({factionName(c, s.owner)}){rating !== undefined ? ` — ${rating} Supply` : ''}{overrunBlock(s, f, c) ? '' : ' · ⚡ can overrun'}</option>;
                       })}
                     </optgroup>
                   )}
@@ -337,7 +337,7 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
         const fought = foughtFor(c, a, currentRound(c)); // games are logged by campaign round, not by orders #
         const sector = c.sectors.find((s) => s.id === a.sectorId);
         const force = state.forces.find((f) => f.id === a.forceId);
-        const block = sector ? overrunBlock(sector, force) : 'the sector is gone';
+        const block = sector ? overrunBlock(sector, force, c) : 'the sector is gone';
         const mine = gm || (!!cloud.email && force?.owner === cloud.email);
         return (
           <div key={a.forceId ?? a.factionId} className="list-item small">

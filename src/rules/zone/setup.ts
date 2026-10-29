@@ -132,7 +132,9 @@ export function startZoneBattle(b: TrackedBattle, forces: Force[], books: Catalo
   if (event?.id === 'ionStorm') {
     gift(units, event.name, [{ k: 'hit', n: -1, c: { when: 'shoot', over: 18 } }], 'next');
     effects.push(`${event.name}: everyone gets -1 to hit shooting over 18" in rounds 1 and 2.`);
-  } else if (event?.battle) effects.push(`${event.name}: ${event.battle} Not part of a zone battle.`);
+  } else if (event?.cast) effects.push(`${event.name}: casters get +${event.cast} to their casting rolls.`);
+  else if (event?.xp) effects.push(`${event.name}: every unit that survives earns +${event.xp} XP (the battle report adds it, in full).`);
+  else if (event?.battle) effects.push(`${event.name}: ${event.battle} Not part of a zone battle.`);
   // A Conqueror Warlord's Onslaught: it hits harder and its side holds firmer.
   if (c) for (const side of b.sides) {
     const force = forces.find((f) => f.id === side.forceId);
@@ -150,6 +152,7 @@ export function startZoneBattle(b: TrackedBattle, forces: Force[], books: Catalo
   for (const l of later) for (const id of l.ids) battle.units.find((u) => u.id === id)?.effects.push({ ...l.e, from: l.from });
   for (const f of board) f(battle);
   if (first !== undefined) battle.first = first;
+  if (event?.cast) battle.castBonus = event.cast;
   for (const e of effects) battle.log.push({ round: 0, kind: 'info', text: e });
   return { battle, effects };
 }

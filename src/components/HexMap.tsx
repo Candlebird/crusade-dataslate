@@ -386,7 +386,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                     {markOn(c, s.id) && !markOn(c, s.id)!.brokenBy && (
                       <SvgIcon name="g:hazard-sign" x={p.x + 19} y={p.y + 9} size={11} className="hex-mark hex-echo" title={MARK_TIP} />
                     )}
-                    {ratingFor(s, viewAs) !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff" data-tip={`AI garrison${viewAs ? ` for ${factionName(c, viewAs)}` : " (the biggest faction's scale)"}: ${ratingFor(s, viewAs)} Supply`}>{ratingFor(s, viewAs)}</text>}
+                    {ratingFor(s, viewAs, c) !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff" data-tip={`AI garrison${viewAs ? ` for ${factionName(c, viewAs)}` : " (the biggest faction's scale)"}: ${ratingFor(s, viewAs, c)} Supply`}>{ratingFor(s, viewAs, c)}</text>}
                     {/* Detachments: your own always, anyone else's only while you can see the sector. */}
                     {(() => {
                       const here = (posted.get(s.id) ?? []).filter((f) => !viewAs || known === 'visible' || f.nexus?.factionId === viewAs);
@@ -548,12 +548,12 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
         <EchoMarkTag c={c} s={s} gm={gm} viewer={viewer} setC={setC} />
       </div>
       <p className="small">{benefit ? <><b>{benefit.name}:</b> {benefit.desc}</> : SECTOR_TYPES[s.type].desc}</p>
-      <SectorDanger s={s} factionId={viewer} />
+      <SectorDanger s={s} factionId={viewer} c={c} />
       {g && (
         <p className="small" data-tip={g.unit.notes}>
           <span className={`tag${g.tier === 'Legendary' ? ' gold' : g.tier === 'Rare' ? ' red' : ''}`}><Icon name="g:warlord-helmet" /> {g.tier} guardian</span>{' '}
           <b>{g.name}</b>, a {g.unit.unitType} ({g.unit.points} pts) with doubled Tough{g.unit.relics[0] ? <>, carrying <b>{g.unit.relics[0].name}</b></> : ''}.
-          {' '}It leads the garrison{ratingFor(s, viewer) !== undefined ? <>: <b>{ratingFor(s, viewer)} Supply</b> in all</> : ''}. Slay it with a Hero and roll {GUARDIANS.stealRoll}+ to take its relic.
+          {' '}It leads the garrison{ratingFor(s, viewer, c) !== undefined ? <>: <b>{ratingFor(s, viewer, c)} Supply</b> in all</> : ''}. Slay it with a Hero and roll {GUARDIANS.stealRoll}+ to take its relic.
         </p>
       )}
       {manage && <ProductionBox s={s} />}

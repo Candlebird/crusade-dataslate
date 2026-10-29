@@ -541,9 +541,12 @@ export const TRAINING = {
   /**
    * Immobile units (and Fortifications) are cheap in OPR for a rule that costs nothing in a tower defence: wherever
    * Training prices a unit by its points (recipe tier, level cap and cost, the waves' power) they count this many times
-   * their points (economy.trainPoints). Their real points are untouched everywhere else.
+   * their points (economy.trainPoints). Their real points are untouched everywhere else. A long-range turret (one whose
+   * longest gun reaches `longRange.from`" or more) counts `longRange.surcharge` times instead, since from a fixed spot it
+   * still rakes most of the maze.
    */
   immobileSurcharge: 1.125,
+  longRange: { from: 30, surcharge: 1.25 },
   levels: {
     caps: [{ upTo: 100, cap: 5 }, { upTo: 200, cap: 4 }, { upTo: 300, cap: 3 }, { upTo: 400, cap: 2 }, { upTo: Infinity, cap: 1 }],
     base: 30,
@@ -881,6 +884,8 @@ export const TRAINING = {
    * - shrouded: shots at an Echo more than `from` − `per` × threat of the gun's reach away (at least `min`) are at -1.
    * - proud: `per` of the plain Echoes from wave 1 come as elites too. - bleed: the base starts `per` lower.
    * Events (`events`, by GALACTIC_EVENTS id) that map to the maze; any other is flavour on the start screen and HUD.
+   * `budget` scales waves, `hp` every Echo's wounds, `credits` (a share) what kills and waves pay or (a number) the
+   * credits to start, `threat` the run's threat.
    * Lords: up to `lords.max` of the campaign's own (Echo-held guardians by tier, then the Nexus Crisis lord last)
    * take the boss waves from `lords.from` on, in tier order, skipping the nemesis's wave; their wounds × `lords.hp` by
    * tier (the crisis lord counts as Legendary). Each has one trick (`tricks`, by ECHO_LORDS id; a guardian's from its
@@ -908,6 +913,9 @@ export const TRAINING = {
       risingDark: { threat: 1 },
       derelicts: { cover: 2 },
       glory: { xp: 1 },
+      huntingSeason: { budget: 1.1, credits: 1.15 },
+      bloodMoon: { hp: 1.1, credits: 1.15 },
+      forgeSurge: { credits: 40, threat: 1 },
     },
     lords: {
       max: 5, from: 5,

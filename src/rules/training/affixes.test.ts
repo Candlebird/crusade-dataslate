@@ -23,6 +23,9 @@ describe('threat affixes', () => {
   it('do nothing at threat 0 or outside a campaign', () => {
     const plans = [plan()];
     expect(affixPlan({ rng: 1 }, blankRun(), plans)).toEqual([plan()]);
+    // A Blood Moon swells every Echo's wounds, threat or no.
+    const moon = { ...blankRun(), nexus: { threat: 0, affixes: [], event: 'bloodMoon', lords: [] } };
+    expect(affixPlan({ rng: 1 }, moon, [plan()])[0].hp).toBeCloseTo(100 * X.events.bloodMoon.hp);
     expect(affixPace(blankRun(), testEnemy())).toBe(1);
   });
 

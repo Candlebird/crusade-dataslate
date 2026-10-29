@@ -22,11 +22,11 @@ export function overrunMax(supply: number): number {
 }
 
 /** Why `force` can't overrun `s`, or '' when it can. */
-export function overrunBlock(s: Sector, force: Force | undefined): string {
+export function overrunBlock(s: Sector, force: Force | undefined, c?: Campaign): string {
   if (!aiDefended(s)) return 'only AI-held sectors can be overrun';
   if (s.type === 'home' || s.type === 'voidspawn') return 'set pieces are fought at the table';
   if (s.guardian) return `${s.guardian.name} is fought at the table`;
-  const rating = ratingFor(s, force?.nexus?.factionId);
+  const rating = ratingFor(s, force?.nexus?.factionId, c);
   if (!force || rating === undefined) return 'the sector is not rated yet';
   const max = overrunMax(supplyLimit(force));
   return rating > max ? `its ${rating} Supply garrison is over the ${max} this detachment can overrun` : '';
@@ -52,7 +52,7 @@ export function attackBattle(c: Campaign, a: Attack, forces: Force[], books: Cat
   if (defender) loadForce(b.sides[1], defender, undefined, settings, c);
   else {
     const attacker = forces.find((f) => f.id === a.forceId);
-    const target = ratingFor(s, a.factionId) ?? (attacker ? supplyLimit(attacker) : 1000);
+    const target = ratingFor(s, a.factionId, c) ?? (attacker ? supplyLimit(attacker) : 1000);
     loadUnits(b.sides.find((x) => x.ai)!, ECHOES.name, garrison(s, echoesBook(books), target, rand));
   }
   return b;

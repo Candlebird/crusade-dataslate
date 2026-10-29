@@ -3,7 +3,7 @@ import type { AssetUse, Campaign, CatalogBook, EchoMark, Force, ForceNexus, Hero
 import { CATEGORIES } from './data';
 import { refreshSectors, type Rand } from './hexmap';
 import {
-  ECHOES, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRATEGIC_ASSETS, activeCrisis, activeEvent, crisisUntil, currentRound, emptyNexusPick, eventById, nexusEntry,
+  ECHOES, MANIPULATION_PREFIX, NEXUS_CRISIS, NEXUS_ROUNDS, PRODUCTION, STRATEGIC_ASSETS, activeCrisis, activeEvent, crisisUntil, currentRound, emptyNexusPick, eventById, nexusEntry, stormed,
   WARLORDS, factionName, incomeItems, lordById, type NexusItem, type NexusPick,
 } from './nexus';
 import { endSieges } from './sieges';
@@ -21,10 +21,7 @@ import { accrueResearch } from './tech';
 import { buildReport } from './report';
 import { hasPerk, syncWarlords } from './warlords';
 import { localDate } from '../model/date';
-import { claimBounties, holdBounties, refreshBounties } from './bounties';
-import { BOUNTY } from './nexusData';
 import { siegeAssets } from './training/siegeBoard';
-import type { FinishedBattle } from './tracker';
 
 // Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
 // a Strategic Asset, and one against the Echoes is a patrol). The round closes with the Battle: the sealed-order attacks.
@@ -96,9 +93,11 @@ export function nextThreat(c: Campaign) {
   const { wins, voidspawn, patrols } = echoWins(c, currentRound(c));
   const R = NEXUS_ROUNDS;
   const event = activeEvent(c)?.threat ?? 0;
+  // Hunting Season: every win against the Echoes counts for more.
+  const hunt = activeEvent(c)?.perWin ?? 0;
   // However many Umbral Spires stand, the threat drops by one Spire's worth.
   const spires = c.factions.some((f) => buildingsHeld(c, f.id, 'spire') > 0) ? PRODUCTION.spire.threat : 0;
-  const threat = clamp(threatOf(c) + R.threatPerRound + event - wins * R.threatPerWin - voidspawn * R.threatPerVoidspawnWin - patrols * R.threatPerPatrolWin - spires, 0, R.threatMax);
+  const threat = clamp(threatOf(c) + R.threatPerRound + event - wins * R.threatPerWin - voidspawn * R.threatPerVoidspawnWin - patrols * R.threatPerPatrolWin - (wins + voidspawn + patrols) * hunt - spires, 0, R.threatMax);
   // The Crisis: a win pushes the Echoes back further; left standing to its last round, they rage at full threat.
   const crisis = activeCrisis(c);
   if (!crisis) return threat;
@@ -147,7 +146,7 @@ export function placeEchoMarks(c: Campaign, rand: Rand = Math.random, threat = t
   const weight = (s: Sector) =>
     (s.owner && ahead.has(s.owner) ? NEXUS_ROUNDS.leaderWeight : 1) * (s.owner && buildingsHeld(c, s.owner, 'spire') ? PRODUCTION.spire.weight : 1);
   const marks: EchoMark[] = [];
-  const only = (s: Sector) => (!inGrace(c) || !s.owner) && !warded(c, s) && !marks.some((m) => m.sectorId === s.id);
+  const only = (s: Sector) => (!inGrace(c) || !s.owner) && !warded(c, s) && !stormed(c, s.id) && !marks.some((m) => m.sectorId === s.id);
   for (let i = 0; i < Math.max(0, spreadsAt(threat) + (activeEvent(c)?.spread ?? 0)); i++) {
     const target = pickSpread(c, rand, weight, only);
     if (!target) break;
@@ -205,17 +204,14 @@ export interface RoundEnd {
  * campaign's forces, sector difficulty is rescaled to their Supply too.
  */
 export function endRound(
-  c: Campaign, rand: Rand = Math.random, date = localDate(), forces?: Force[], books?: CatalogBook[], history: FinishedBattle[] = [],
+  c: Campaign, rand: Rand = Math.random, date = localDate(), forces?: Force[], books?: CatalogBook[],
 ): RoundEnd {
   const round = currentRound(c);
-  // Bounties the round's games earned are claimed; a hold counts the sectors as the round leaves them.
-  const bounties = BOUNTY.enabled ? claimBounties(c, history, forces ?? [], date) : [];
   // Warlords' levels are brought up to date, and fallen ones lost, before their perks count.
   const warlords = forces ? syncWarlords(c, forces) : undefined;
   const holdings: RoundSnapshot['holdings'] = {};
   for (const f of c.factions) holdings[f.id] = c.sectors.filter((s) => s.owner === f.id).map((s) => s.id);
   const snapshot: RoundSnapshot = { round, date, holdings, underdog: underdogBonus(c) };
-  if (BOUNTY.enabled) bounties.push(...holdBounties(c, holdings, round, forces ?? [], date));
   const event = activeEvent(c);
   if (event) snapshot.event = event.id;
 
@@ -263,19 +259,15 @@ export function endRound(
   const marauders = moveMarauders(c, threat, rand, uid, forces);
   const offers = forces && books ? rollOffers(c, books, forces, rand, uid) : undefined;
   const guardians = forces && books ? placeGuardians(c, books, forces, rand, uid) : [];
-  // Claimed bounties (and ones whose target is gone) make way for new ones.
-  const posted = BOUNTY.enabled ? refreshBounties(c, rand, uid) : [];
   const end: Omit<RoundEnd, 'report'> = {
     round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, marks, marked: next, difficulty, cleared, fresh,
     event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, research, built, offers, guardians, marauders, warlords,
   };
   const report = buildReport(c, end, { production, research, built, offers, guardians }, date, rand);
-  report.lines.push(...bounties.map((text) => ({ icon: '🎯', text })));
   for (const x of lapsed) {
     const f = forces?.find((y) => y.id === x.forceId);
     report.lines.push({ icon: '⛺', text: `${f?.name ?? factionName(c, x.factionId)}'s siege of ${c.sectors.find((y) => y.id === x.sectorId)?.name ?? 'a sector'} lapsed unfought.` });
   }
-  if (posted.length) report.lines.push({ icon: '🎯', text: `${posted.length} new bount${posted.length === 1 ? 'y is' : 'ies are'} on the Bounty Board.` });
   return { ...end, report };
 }
 

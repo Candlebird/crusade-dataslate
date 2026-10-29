@@ -4,3 +4,4 @@ dist
 *.tsbuildinfo
 .wrangler
 .claude/settings.local.json
+.serena/

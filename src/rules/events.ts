@@ -23,7 +23,7 @@ export function setEvent(c: Campaign, id: string, rand: Rand = Math.random, roun
   }
 }
 
-/** Roll (D12) a round's Galactic Event. */
+/** Roll (D16) a round's Galactic Event. */
 export function rollEvent(c: Campaign, rand: Rand = Math.random, round = currentRound(c)) {
   setEvent(c, pick(GALACTIC_EVENTS, rand).id, rand, round);
 }

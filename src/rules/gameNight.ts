@@ -65,7 +65,7 @@ export function planNight(c: Campaign, forces: Force[], attacks: Attack[], comin
     const base = { forceId: a.forceId, sectorId: s.id, mission: attackMission(), notes };
     seated.add(a.factionId);
     if (aiDefended(s)) {
-      tables.push({ ...base, kind: s.guardian ? 'guardian' : 'ai', factions: [a.factionId], points: ratingFor(s, a.factionId) ?? points,
+      tables.push({ ...base, kind: s.guardian ? 'guardian' : 'ai', factions: [a.factionId], points: ratingFor(s, a.factionId, c) ?? points,
         foe: s.guardian ? `${s.guardian.name} (guardian)` : s.owner ? ECHOES.name : 'The sector\'s defenders' });
       continue;
     }

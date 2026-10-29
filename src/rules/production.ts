@@ -1,7 +1,7 @@
 import type { Campaign, CampaignEvent, Force, Sector, Unit } from '../model/types';
 import { hexDistance, isPlaced, type Hex } from './hexmap';
 import { positionOf } from './movement';
-import { BUILDINGS, PRODUCTION, WARLORDS, type Building } from './nexusData';
+import { BUILDINGS, GALACTIC_EVENTS, PRODUCTION, WARLORDS, type Building } from './nexusData';
 import { knows } from './tech';
 import { hasPerk } from './warlords';
 
@@ -115,6 +115,8 @@ export function depositBanked(c: Campaign, factionId: string, n: number, from?: 
 /** Round end: every held producing sector banks its production. Returns what each sector gained. */
 export function accrueProduction(c: Campaign): { sector: Sector; gained: number }[] {
   const out: { sector: Sector; gained: number }[] = [];
+  // A Forge Surge banks more everywhere (nexus.ts activeEvent, read here without importing it).
+  const surge = c.event?.round === (c.round ?? 1) ? GALACTIC_EVENTS.find((e) => e.id === c.event!.id)?.materials ?? 0 : 0;
   for (const s of c.sectors) {
     if (!produces(s) || !s.owner || !c.factions.some((f) => f.id === s.owner)) continue;
     // Marauders raided it: nothing this round.
@@ -124,7 +126,7 @@ export function accrueProduction(c: Campaign): { sector: Sector; gained: number 
       if (raided) continue;
     }
     const before = s.bank ?? 0;
-    s.bank = Math.max(before, Math.min(bankCap(s, c), before + productionRate(s, c)));
+    s.bank = Math.max(before, Math.min(bankCap(s, c), before + productionRate(s, c) + surge));
     if (s.bank > before) out.push({ sector: s, gained: s.bank - before });
   }
   return out;

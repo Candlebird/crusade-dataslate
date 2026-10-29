@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest';
 import type { Campaign, NexusCrisis } from '../model/types';
 import { crisisForfeits, crisisRound, placeCrisis, rollEvent, setEvent, settleCrisis } from './events';
 import { ECHOES, NEXUS_CRISIS, NEXUS_ROUNDS, activeCrisis, activeEvent, homeChallengeBlock, nexusGeneration, removeSectorGame } from './nexus';
-import { endRound, nextThreat, roundIncomeItems } from './rounds';
+import { endRound, nextThreat, placeEchoMarks, roundIncomeItems } from './rounds';
+import { resolveMarks } from './voidspawn';
+import { accrueProduction } from './production';
+import { researchRate } from './tech';
+import { visibleTo } from './fog';
+import { ratingFor } from './difficulty';
+import { FOG, GALACTIC_EVENTS } from './nexusData';
 import { parseRoute } from '../route';
 import { mvpForce, type TrackedBattle } from './tracker';
 
@@ -168,5 +174,78 @@ describe('Crisis MVP', () => {
 
   it('goes to no one when no unit earned XP', () => {
     expect(mvpForce(battle([0], []))).toBeUndefined();
+  });
+});
+
+describe('Galactic Events: the D16', () => {
+  it('has 16 events, all ids distinct', () => {
+    expect(GALACTIC_EVENTS).toHaveLength(16);
+    expect(new Set(GALACTIC_EVENTS.map((e) => e.id)).size).toBe(16);
+  });
+
+  it('a Warp Storm keeps the Echoes out too: no marks there, and a marked sector there is cut off', () => {
+    const c = campaign();
+    setEvent(c, 'warpStorm', () => 0);
+    const storm = c.event!.sectorIds!;
+    for (let i = 0; i < 20; i++) for (const m of placeEchoMarks(c, Math.random, 10)) expect(storm).not.toContain(m.sectorId);
+    const ends = resolveMarks(c, storm.filter((id) => sector(c, id).owner !== ECHOES.id).map((sectorId) => ({ sectorId })), '2026-10-20');
+    for (const e of ends) expect(e.result).toBe('cutOff');
+  });
+
+  it('a Void Lull spreads into 2 fewer sectors, not none', () => {
+    expect(GALACTIC_EVENTS.find((e) => e.id === 'voidLull')!.spread).toBe(-2);
+  });
+
+  it('Hunting Season: every win against the Echoes drops threat one more', () => {
+    const win = (c: Campaign) => c.log.push({ id: 'w', date: '', round: 4, sectorId: 'e1', attacker: 'A', defender: ECHOES.id, winner: 'A' } as Campaign['log'][number]);
+    const base = campaign();
+    win(base);
+    const hunt = campaign();
+    win(hunt);
+    setEvent(hunt, 'huntingSeason');
+    expect(nextThreat(hunt)).toBe(nextThreat(base) - 1);
+  });
+
+  it('Blood Moon swells AI garrisons ×1.1 (to the nearest 10) and pays 3 Shards a win against them', () => {
+    const c = campaign();
+    sector(c, 'e1').difficulty = 1000;
+    sector(c, 'b1').difficulty = 1000;
+    expect(ratingFor(sector(c, 'e1'), 'A', c)).toBe(1000);
+    setEvent(c, 'bloodMoon');
+    expect(ratingFor(sector(c, 'e1'), 'A', c)).toBe(1100);
+    expect(ratingFor(sector(c, 'b1'), 'A', c)).toBe(1000); // a player's sector isn't swollen
+    expect(ratingFor(sector(c, 'e1'))).toBe(1000); // without the campaign, the base rating
+    const won = nexusGeneration(c, 'A', 'e1', 'win', true).items.find((x) => x.key === 'eventWin');
+    expect(won?.us).toBe(3);
+    expect(nexusGeneration(c, 'A', 'e1', 'loss', true).items.some((x) => x.key === 'eventWin')).toBe(false);
+    expect(nexusGeneration(c, 'A', 'b1', 'win', true).items.some((x) => x.key === 'eventWin')).toBe(false);
+  });
+
+  it('Forge Surge banks +100 Materials a producing sector; Breakthrough +1 Research; Ceasefire +1 sight', () => {
+    const plain = campaign();
+    const surge = campaign();
+    setEvent(surge, 'forgeSurge');
+    const gained = (c: Campaign) => accrueProduction(c).reduce((n, x) => n + x.gained, 0);
+    const a = gained(plain);
+    const b = gained(surge);
+    expect(b).toBeGreaterThan(a);
+    const r = researchRate(plain, 'A');
+    setEvent(plain, 'breakthrough');
+    expect(researchRate(plain, 'A')).toBe(r + 1);
+    const fog = campaign();
+    // One hex past what B's home sees, and further still from B's planet.
+    fog.sectors.push({ id: 'edge', name: 'Edge', type: 'planet', benefit: 'fertileLand', notes: '', q: 9 + FOG.homeSight + 1, r: 9 });
+    expect(visibleTo(fog, 'B').has('edge')).toBe(false);
+    const seen = visibleTo(fog, 'B').size;
+    setEvent(fog, 'ceasefire');
+    expect(visibleTo(fog, 'B').size).toBeGreaterThan(seen);
+    expect(visibleTo(fog, 'B').has('edge')).toBe(true);
+    expect(GALACTIC_EVENTS.find((e) => e.id === 'ceasefire')!.sight).toBe(1);
+  });
+
+  it('Glory Seekers hands the battle report its +1 XP', () => {
+    const c = campaign();
+    setEvent(c, 'glory');
+    expect(nexusGeneration(c, 'A', 'e1', 'win', true).glory).toBe(1);
   });
 });

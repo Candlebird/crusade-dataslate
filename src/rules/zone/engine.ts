@@ -646,7 +646,7 @@ function impactOf(u: ZUnit): number {
 
 // ---- Spells ----
 
-/** Casts a spell: tokens spent, a 4+ (5+ if an enemy caster within 18" spends a token to stop it). */
+/** Casts a spell: tokens spent, a 4+ (5+ if an enemy caster within 18" spends a token to stop it), less the battle's castBonus. */
 export function cast(c: Ctx, u: ZUnit, name: string, targetIds: string[]): boolean {
   const b = c.b;
   const s = u.spells.find((x) => x.name === name);
@@ -656,7 +656,7 @@ export function cast(c: Ctx, u: ZUnit, name: string, targetIds: string[]): boole
   u.tokens -= s.threshold;
   const stopper = onTable(b).find((x) => x.side !== u.side && x.tokens > 0 && inches(b, u, x) <= 18 && !has(rulesOf(b, x), 'silenced'));
   if (stopper) stopper.tokens--;
-  const need = stopper ? 5 : 4;
+  const need = (stopper ? 5 : 4) - (b.castBonus ?? 0);
   const r = d6(c.rng);
   const dice: LogDice[] = [{ label: `Cast ${s.name}`, need, rolls: [r], ok: r >= need ? 1 : 0 }];
   if (r < need) {

@@ -1,7 +1,7 @@
 import { uid } from '../model/factory';
 import type { Campaign, CampaignEvent, EchoMark, Force, Sector } from '../model/types';
 import { frontier, isPlaced, type Rand } from './hexmap';
-import { ECHOES, ECHOES_SKIP, changeHands, currentRound, isStronghold } from './nexus';
+import { ECHOES, ECHOES_SKIP, changeHands, currentRound, isStronghold, stormed } from './nexus';
 import { ECHO_MARKS } from './nexusData';
 import { warded } from './production';
 import { localDate } from '../model/date';
@@ -123,7 +123,7 @@ export function resolveMarks(c: Campaign, marks: EchoMark[], date = localDate(),
     const owner = s.owner;
     const held = holders(c, s, forces);
     const result: MarkResult = m.brokenBy ? 'broken' : held.length ? 'held'
-      : !spreadTargets(c).some((x) => x.id === s.id) ? 'cutOff' : warded(c, s) ? 'warded' : 'fell';
+      : !spreadTargets(c).some((x) => x.id === s.id) || stormed(c, s.id) ? 'cutOff' : warded(c, s) ? 'warded' : 'fell';
     if (result === 'fell' && !spreadInto(c, s.id, date)) continue;
     out.push({ sector: s, result, by: m.brokenBy ? [m.brokenBy] : held, ...(owner ? { owner } : {}), ...(auto.has(m) ? { auto: true } : {}) });
   }

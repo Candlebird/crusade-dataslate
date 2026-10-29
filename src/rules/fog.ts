@@ -1,7 +1,7 @@
 import type { Campaign, Sector } from '../model/types';
 import { hexDistance, isPlaced } from './hexmap';
 import { RECON } from './downtimeData';
-import { FOG, WARLORDS } from './nexusData';
+import { FOG, GALACTIC_EVENTS, WARLORDS } from './nexusData';
 import { hasPerk } from './warlords';
 
 // Fog of war (Nexus Wars). A faction sees the sectors it holds and every placed sector within sight of them: FOG.sight
@@ -12,12 +12,15 @@ import { hasPerk } from './warlords';
 export const sightOf = (s: Sector) =>
   (s.type === 'home' ? FOG.homeSight : FOG.sight) + (s.buildings?.includes('watchtower') ? FOG.watchtower : 0) + (s.buildings?.includes('listeningPost') ? FOG.listeningPost : 0);
 
+/** Extra sight from the round's Galactic Event (nexus.ts activeEvent, read here without importing it). */
+const eventSight = (c: Campaign) => (c.event?.round === (c.round ?? 1) ? GALACTIC_EVENTS.find((e) => e.id === c.event!.id)?.sight ?? 0 : 0);
+
 /** The sectors a faction can see right now. */
 export function visibleTo(c: Campaign, factionId: string): Set<string> {
   const held = c.sectors.filter((s) => s.owner === factionId);
   const out = new Set(held.map((s) => s.id));
-  // A Shadow Warlord's faction sees further.
-  const spy = hasPerk(c, factionId, 'spymaster') ? WARLORDS.spymaster : 0;
+  // A Shadow Warlord's faction sees further, and so does everyone in a Ceasefire.
+  const spy = (hasPerk(c, factionId, 'spymaster') ? WARLORDS.spymaster : 0) + eventSight(c);
   const scouts = hasPerk(c, factionId, 'scouts') ? WARLORDS.scouts : 0;
   for (const h of held.filter(isPlaced))
     for (const s of c.sectors) if (isPlaced(s) && hexDistance(h, s) <= sightOf(h) + spy) out.add(s.id);

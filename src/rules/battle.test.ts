@@ -37,6 +37,15 @@ describe('battle resolution', () => {
     expect(out.warnings).toEqual([]);
   });
 
+  it('Glory Seekers: units that fought and lived earn its XP', () => {
+    const { f, input, id } = setup();
+    input.nexus = { items: [], notes: [], glory: 1 };
+    input.units.b = { ...input.units.b, destroyed: true, death: { dice: [1], outcome: 'scar' }, scar: 'scar:Weakened Armor' };
+    const out = resolveBattle(f, input, id);
+    expect(out.units[0].parts).toContainEqual({ label: 'Glory Seekers', xp: 1 });
+    expect(out.units[1].parts.some((p) => p.label === 'Glory Seekers')).toBe(false);
+  });
+
   it('applies scars, undo, and lose-a-trait', () => {
     const { f, input, id } = setup();
     input.units.a = { ...input.units.a, destroyed: true, death: { dice: [1], outcome: 'scar' }, scar: 'scar:Weakened Armor' };

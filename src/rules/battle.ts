@@ -432,6 +432,8 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
     }
     // A zone battle earns a share of the XP a table game would (what its reward rolls give comes on top, in full).
     if (input.zone) for (const p of parts) p.xp = Math.round(p.xp * ZONE_REWARDS[input.zone].xp * 10) / 10;
+    // Glory Seekers: every unit that fought and lived earns a little more, in full however the battle was fought.
+    if (r.in && !r.destroyed && input.nexus?.glory && !input.patrol) parts.push({ label: 'Glory Seekers', xp: input.nexus.glory });
     parts.push(...(extra[u.id] ?? []));
 
     const o: UnitOutcome = { unitId: u.id, name, played: r.in, parts, gain: 0, xpBefore, xpAfter: 0, levelsGained: 0, removedScars: [], free: free[u.id] ?? [], wokeUp };

@@ -28,7 +28,7 @@ export function useEndRound() {
     let out: { r: RoundEnd; c: Campaign } | undefined;
     update((d) => {
       if (!d.campaign) return;
-      const r = endRound(d.campaign, Math.random, undefined, d.forces, d.books, d.battleHistory);
+      const r = endRound(d.campaign, Math.random, undefined, d.forces, d.books);
       d.campaign.updatedAt = nowIso();
       out = { r, c: d.campaign };
     });
@@ -272,7 +272,7 @@ function EventRow({ c, gm }: { c: Campaign; gm: boolean }) {
     <div className="small" style={{ marginTop: '0.5rem' }}>
       <div className="row" style={{ flexWrap: 'wrap', gap: '0.5rem' }}>
         <span className="tag gold"><Icon name="g:diamonds" /> Galactic Event: {event ? event.name : 'none'}</span>
-        {gm && <><button className="small" onClick={() => change((d) => rollEvent(d))} data-tip="Roll a D12 on the Galactic Events table">{event ? 'Re-roll' : 'Roll a Galactic Event'}</button>
+        {gm && <><button className="small" onClick={() => change((d) => rollEvent(d))} data-tip={`Roll a D${GALACTIC_EVENTS.length} on the Galactic Events table`}>{event ? 'Re-roll' : 'Roll a Galactic Event'}</button>
         <select value="" aria-label="Pick the Galactic Event" onChange={(e) => e.target.value && change((d) => setEvent(d, e.target.value))}>
           <option value="">Pick one…</option>
           {GALACTIC_EVENTS.map((x, i) => <option key={x.id} value={x.id}>{i + 1}. {x.name}</option>)}

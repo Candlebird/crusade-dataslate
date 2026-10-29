@@ -1,5 +1,5 @@
 import type { Campaign, CampaignFaction } from '../model/types';
-import { BUILDINGS, NEXUS_TECH, WARLORDS, type Building } from './nexusData';
+import { BUILDINGS, GALACTIC_EVENTS, NEXUS_TECH, WARLORDS, type Building } from './nexusData';
 import { hasPerk } from './warlords';
 
 // The tech tree (Nexus Wars). Each building is a tech: tier 1 is known from the start, tiers 2 and 3 are researched
@@ -59,7 +59,9 @@ export function researchRate(c: Campaign, factionId: string): number {
   const stations = held.filter((s) => s.type === 'research' || (s.type === 'home' && s.benefit === 'researchStation')).length;
   const observatories = held.filter((s) => s.buildings?.includes('observatory')).length;
   return NEXUS_TECH.perRound + stations * NEXUS_TECH.perStation + observatories * NEXUS_TECH.perObservatory
-    + (hasPerk(c, factionId, 'research') ? WARLORDS.research : 0);
+    + (hasPerk(c, factionId, 'research') ? WARLORDS.research : 0)
+    // A Breakthrough: the round's Galactic Event (nexus.ts activeEvent, read here without importing it).
+    + (c.event?.round === (c.round ?? 1) ? GALACTIC_EVENTS.find((e) => e.id === c.event!.id)?.research ?? 0 : 0);
 }
 
 /** Round end: every faction earns its Research. Returns what each gained. */

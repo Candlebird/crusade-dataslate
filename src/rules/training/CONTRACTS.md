@@ -223,7 +223,7 @@ Numbers in `TRAINING.nexus`. Outside a campaign run.nexus is undefined: threat 0
   `guardianTrick(g)`, `TRICK_NAMES`, `trickText(k)`, `lordWaves(nx, nemesis, final = finale.from)` (boss waves from lords.from, skipping the nemesis wave and the Final; the crisis lord, if last, takes the Final at finale.to), `lordIndex(run, w)`, `nextLord(run, w?)`, `lordLine(l, wave?)`, `lordsSlain(run)`, `GENERIC_LORD`.
 - lords.ts: `lordOf(run, e)` (i −1: run.finale.lord), `lordPlan(run, plans)` (boss plan not the nemesis's → lord i, hp × lords.hp[tier]), `lordTick(run, dt)`,
   `lordHit(run, g, e)` (Mirror Veil −1 to shots; combat.fire), `lordDmg(run, by, e, dmg, how)` (Umbral Hide, Ward; harm.hurt).
-- affixes.ts: `affixPlan(r, run, plans)` (Frenzied hp, Proud elites, Armoured hard), `affixPace(run, e)` (Swift, Warp Currents, a Vengeful surge; waves.speedOf),
+- affixes.ts: `affixPlan(r, run, plans)` (Frenzied hp, Proud elites, Armoured hard, a Blood Moon's hp), `affixPace(run, e)` (Swift, Warp Currents, a Vengeful surge; waves.speedOf),
   `affixTick(run, dt)`, `onEchoDeath(run, dead)` (Vengeful; harm.hurt after payKill), `affixHit(run, g, d, reach)` (Shrouded, Ion Storm; combat.fire, never melee).
 - Elsewhere: harm.unsaved − Enemy.hard; economy payKill / waveCredits × creditMul; shards.`drawSize(run)`; run.`runXpCap(run)` (xpCap + Glory);
   tally beastOf → `real:<i>`, marks slain; bestiary.beastKey `real:<i>` → the lord's key (banked slain, not drill); sortie.beastInfo knows `nexus:` keys

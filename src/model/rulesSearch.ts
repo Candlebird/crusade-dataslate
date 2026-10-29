@@ -4,7 +4,7 @@ import {
   TRAIT_TABLES, UNIQUE_TRAIT_TABLES, UNIQUE_WEAPON_TRAIT_TABLES, WEAPON_TRAIT_TABLES, type RewardTableKey,
 } from '../rules/data';
 import {
-  ANOMALY_TABLE, BENEFITS, BOUNTY, BUILDINGS, COMBAT_MANIPULATIONS, ECHO_LORDS, GALACTIC_EVENTS, SECTOR_MODIFIERS, STRATEGIC_ASSETS,
+  ANOMALY_TABLE, BENEFITS, BUILDINGS, COMBAT_MANIPULATIONS, ECHO_LORDS, GALACTIC_EVENTS, SECTOR_MODIFIERS, STRATEGIC_ASSETS,
   UMBRA_SHOP, VOID_TABLE, WARLORDS,
 } from '../rules/nexusData';
 import { CRUSADE_TEXT, NEXUS_TEXT } from '../rules/rulesText';
@@ -71,7 +71,6 @@ const NEXUS_SECTIONS: Record<keyof typeof NEXUS_TEXT, [string, string]> = {
   warlords: ['n-warlords', 'Warlords'],
   duels: ['n-duels', 'Nexus Duels'],
   gameNight: ['n-night', 'Game night'],
-  bounties: ['n-bounties', 'Bounty Board'],
   warRoom: ['n-warroom', 'War Room'],
   catchUp: ['n-catchup', 'Catching up'],
   shop: ['n-shop', 'Umbra Shard shop'],
@@ -117,7 +116,6 @@ export function rulesIndex(): RuleHit[] {
   out.push(...named('relics', 'x-rules', 'Relic weapon rules', RELIC_WEAPON_RULES));
 
   for (const [k, lines] of Object.entries(NEXUS_TEXT) as [keyof typeof NEXUS_TEXT, string[]][]) {
-    if (k === 'bounties' && !BOUNTY.enabled) continue;
     const [anchor, section] = NEXUS_SECTIONS[k] ?? ['', 'Nexus Wars'];
     for (const text of lines) out.push({ page: 'nexus', anchor, section, text });
   }

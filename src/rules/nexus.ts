@@ -290,6 +290,8 @@ export interface NexusContext {
   bounty?: boolean;
   /** Match bonuses the faction's other detachments already earned this round (the cap is the faction's). */
   matchesElsewhere?: number;
+  /** Glory Seekers: XP each unit that fought and survived earns on top (never scaled by a zone battle). */
+  glory?: number;
 }
 
 /** Did this faction take the sector back from the Void Echoes (whether or not the game is logged yet)? */
@@ -297,6 +299,12 @@ function retookFromEchoes(c: Campaign, factionId: string, s: Sector) {
   if (isStronghold(s)) return false;
   if (s.owner === ECHOES.id) return true;
   return s.owner === factionId && c.log.some((e) => e.sectorId === s.id && e.winner === factionId && e.undo?.owner === ECHOES.id && (e.round ?? 1) === currentRound(c));
+}
+
+/** Was the sector's AI garrison (unclaimed or the Echoes') what this faction fought, whether or not the game is logged yet? */
+function foughtEchoes(c: Campaign, factionId: string, s: Sector) {
+  if (s.type === 'voidspawn' || !s.owner || s.owner === ECHOES.id) return true;
+  return s.owner === factionId && c.log.some((e) => e.sectorId === s.id && e.winner === factionId && (e.undo?.owner === '' || e.undo?.owner === ECHOES.id) && (e.round ?? 1) === currentRound(c));
 }
 
 /** The guardian a faction beat at a sector: still standing there (the game isn't logged yet), or taken by its win this round. */
@@ -334,11 +342,14 @@ export function nexusGeneration(
 ): NexusContext {
   if (!c || !factionId || !c.factions.some((f) => f.id === factionId)) return { items: [], notes: [] };
   const won = result === 'win';
-  if (battle?.crisis && c.crisis?.round === battle.crisis) return crisisGeneration(c, won, battle.forceId, battle.mvp ?? c.crisis.mvp);
+  const event = activeEvent(c);
+  const glory = event?.xp ? { glory: event.xp } : {};
+  if (battle?.crisis && c.crisis?.round === battle.crisis) return { ...crisisGeneration(c, won, battle.forceId, battle.mvp ?? c.crisis.mvp), ...glory };
   const fought = c.sectors.find((s) => s.id === sectorId);
   const notes: string[] = [];
   const items: NexusItem[] = [];
-  const ctx: NexusContext = { items, notes, round: currentRound(c) };
+  const ctx: NexusContext = { items, notes, round: currentRound(c), ...glory };
+  if (event?.xp) notes.push(`${event.name}: every unit that fought and survived earns +${event.xp} XP.`);
 
   if (fought?.type === 'home' && !vsAi && result !== 'draw' && fought.owner) {
     const defending = fought.owner === factionId;
@@ -370,6 +381,8 @@ export function nexusGeneration(
   const reaver = won && battle?.forceId && lord?.forceId === battle.forceId
     ? (hasPerk(c, factionId, 'plunder') ? WARLORDS.plunder : 0) + (hasPerk(c, factionId, 'warlust') ? WARLORDS.warlust : 0) : 0;
   if (reaver) items.push({ key: 'warlord', kind: 'us', source: `Warlord ${lord!.name} (Reaver)`, us: reaver });
+  // A Blood Moon pays for every win against an Echo garrison.
+  if (won && vsAi && event?.winUs && fought && foughtEchoes(c, factionId, fought)) items.push({ key: 'eventWin', kind: 'us', source: `${event.name}: a win against the ${ECHOES.name}`, us: event.winUs });
   const home = homeOf(c, factionId);
   if (won && home?.benefit === 'relicCollector') items.push({ key: home.id, kind: 'relicRoll', source: `${home.name}: Relic Collector` });
 

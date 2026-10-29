@@ -1,7 +1,7 @@
 import type { Campaign, Force, Sector } from '../model/types';
 import { factionForces, supplyLimit } from './detachments';
 import { hexDistance, isPlaced, type Hex, type Rand } from './hexmap';
-import { ECHOES } from './nexus';
+import { ECHOES, activeEvent } from './nexus';
 import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY, SECTOR_MODIFIERS } from './nexusData';
 
 // Nexus Wars sector difficulty. Every sector off a faction's home is rated in Supply: the size of the AI garrison that
@@ -37,8 +37,15 @@ export function difficultyRange(c: Campaign, forces: Force[], factionId?: string
   };
 }
 
-/** The garrison `factionId` faces at `s`: its own rating, else the sector's (the biggest faction's scale). */
-export const ratingFor = (s: Sector, factionId?: string) => (factionId && s.ratings?.[factionId]) || s.difficulty;
+/**
+ * The garrison `factionId` faces at `s`: its own rating, else the sector's (the biggest faction's scale). With the
+ * campaign, the round's Galactic Event counts too (a Blood Moon swells AI garrisons, to the nearest 10).
+ */
+export function ratingFor(s: Sector, factionId?: string, c?: Campaign): number | undefined {
+  const rating = (factionId && s.ratings?.[factionId]) || s.difficulty;
+  const swell = c && aiDefended(s) ? activeEvent(c)?.garrison : undefined;
+  return rating !== undefined && swell ? Math.round((rating * swell) / 10) * 10 : rating;
+}
 
 /** Is the sector held by the AI (unclaimed, or the Echoes'), so an attacker faces its garrison? */
 export const aiDefended = (s: Sector) => !s.owner || s.owner === ECHOES.id;

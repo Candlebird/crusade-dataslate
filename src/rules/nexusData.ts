@@ -1,4 +1,4 @@
-import type { BountyKind, SectorType } from '../model/types';
+import type { SectorType } from '../model/types';
 import type { RelicTier } from './data';
 
 // Nexus Wars homebrew values: sector types, benefits, the Anomaly / Void tables, Combat Manipulations
@@ -277,7 +277,7 @@ export const SECTOR_MODIFIERS: { id: string; name: string; desc: string }[] = [
 ];
 
 /**
- * Galactic Events: one is rolled (D12) for each new round when the GM ends the last one; the GM can re-roll it or pick
+ * Galactic Events: one is rolled (a D16) for each new round when the GM ends the last one; the GM can re-roll it or pick
  * another. An event lasts its round. What each field does:
  *  battle — a rule every battle that round plays with (shown in the tracker);
  *  spread — extra sectors the Echoes spread into when the round ends (negative: fewer);
@@ -286,7 +286,16 @@ export const SECTOR_MODIFIERS: { id: string; name: string; desc: string }[] = [
  *  noHome — no home-sector challenges that round;
  *  income — added to every faction's income for the round;
  *  hulks — extra space hulks that drift into the contested middle when the round ends;
- *  move — added to how far every detachment moves that round (NEXUS_MOVE).
+ *  move — added to how far every detachment moves that round (NEXUS_MOVE);
+ *  sight — added to how far every faction sees that round (FOG);
+ *  perWin — the threat drops this much more for every win against the Echoes that round (sector, Voidspawn or patrol);
+ *  garrison — Echo garrisons field this many times their rating that round;
+ *  winUs — Umbra Shards for every win against the Echoes that round;
+ *  materials — Materials every producing sector banks on top when the round ends (still up to its bank's cap);
+ *  research — Research every faction earns on top when the round ends;
+ *  xp — XP every unit that fought and survived a battle that round earns (added in the battle report, never scaled);
+ *  cast — added to casting rolls in zone battles that round.
+ * A Warp Storm's sectors are cut off for the Echoes too: they can't spread into them that round.
  * (Event ids are stored in saved campaigns, so rename an event's name, not its id.)
  */
 export interface GalacticEvent {
@@ -301,21 +310,33 @@ export interface GalacticEvent {
   income?: { us?: number; supply?: number };
   hulks?: number;
   move?: number;
+  sight?: number;
+  perWin?: number;
+  garrison?: number;
+  winUs?: number;
+  materials?: number;
+  research?: number;
+  xp?: number;
+  cast?: number;
 }
 
 export const GALACTIC_EVENTS: GalacticEvent[] = [
   { id: 'warpCurrents', name: 'Warp Currents', desc: 'Fast currents run through the Nexus: every detachment moves 1 hex further this round.', move: 1 },
-  { id: 'warpStorm', name: 'Warp Storm', desc: 'Two random sectors are swallowed by the storm: they can’t be attacked this round.', storm: 2 },
-  { id: 'ceasefire', name: 'Ceasefire Accords', desc: 'The factions agree to leave each other’s homeworlds alone: no home-sector challenges this round.', noHome: true },
+  { id: 'warpStorm', name: 'Warp Storm', desc: 'Two random sectors are swallowed by the storm: no one can attack or enter them this round, and the Echoes can’t spread into them.', storm: 2 },
+  { id: 'ceasefire', name: 'Ceasefire Accords', desc: 'The factions agree to leave each other’s homeworlds alone and share their scouting reports: no home-sector challenges this round, and every faction sees 1 hex further.', noHome: true, sight: 1 },
   { id: 'shardRush', name: 'Shard Rush', desc: 'Umbra seams surface everywhere: +3 Umbra Shards in every faction’s income for this round.', income: { us: 3 } },
   { id: 'convoys', name: 'Supply Convoys', desc: 'Merchant fleets brave the Nexus: +25 Supply in every faction’s income for this round.', income: { supply: 25 } },
   { id: 'echoSurge', name: 'Echo Surge', desc: 'The Echoes swell: they spread into 1 more sector when this round ends.', spread: 1 },
-  { id: 'voidLull', name: 'Void Lull', desc: 'The Echoes fall silent: they don’t spread when this round ends (their threat still moves).', spread: -99 },
+  { id: 'voidLull', name: 'Void Lull', desc: 'The Echoes fall quiet: they spread into 2 fewer sectors when this round ends (their threat still moves).', spread: -2 },
   { id: 'risingDark', name: 'Rising Dark', desc: 'Something vast stirs in the Voidspawn: the Echoes’ threat rises 1 more when this round ends.', threat: 1 },
-  { id: 'glory', name: 'Glory Seekers', desc: 'Warriors fight to be remembered.', battle: 'Every unit that survives the battle earns +1 XP (add it as Bonus XP).' },
+  { id: 'glory', name: 'Glory Seekers', desc: 'Warriors fight to be remembered.', battle: 'Every unit that survives the battle earns +1 XP (the battle report adds it).', xp: 1 },
   { id: 'ionStorm', name: 'Ion Storm', desc: 'Charged clouds scatter targeting systems and slow the fleets: every detachment moves 1 hex less this round (at least 1).', move: -1, battle: 'Shooting at targets over 18″ away is at −1 to hit.' },
   { id: 'derelicts', name: 'Derelict Fleet', desc: 'A lost fleet drifts into the Nexus: 2 extra space hulks appear in the contested middle when this round ends.', hulks: 2 },
-  { id: 'resonance', name: 'Nexus Resonance', desc: 'The Nexus hums with power.', battle: 'Casters get +1 to their casting rolls.' },
+  { id: 'resonance', name: 'Nexus Resonance', desc: 'The Nexus hums with power.', battle: 'Casters get +1 to their casting rolls.', cast: 1 },
+  { id: 'huntingSeason', name: 'Hunting Season', desc: 'The Echoes stir and leave their lairs: they spread into 1 more sector when this round ends, but every win against them this round drops their threat 1 more.', spread: 1, perWin: 1 },
+  { id: 'bloodMoon', name: 'Blood Moon', desc: 'The Echoes gorge under a red sky: their garrisons field 10% more points this round, and every win against them pays +3 Umbra Shards.', garrison: 1.1, winUs: 3 },
+  { id: 'forgeSurge', name: 'Forge Surge', desc: 'The forges run hot and the glow draws the Void: every planet and home banks +100 Materials when this round ends, and the Echoes’ threat rises 1 more.', materials: 100, threat: 1 },
+  { id: 'breakthrough', name: 'Breakthrough', desc: 'A lost theorem resurfaces in the Nexus archives: every faction earns +1 Research when this round ends.', research: 1 },
 ];
 
 /**
@@ -681,43 +702,6 @@ export const GAME_NIGHT = {
   /** Table points round down to this. */
   step: 50,
 };
-
-/**
- * The GM's Bounty Board (rules/bounties.ts). Bounties are dealt from BOUNTY_KINDS; what one pays is worth `budget` (by
- * difficulty, in Umbra Shards, the Crossroads Journal yardstick journalData effectValue), in up to `maxRewards` rewards.
- */
-export const BOUNTY = {
-  /** Off for now: the tab, its rules and round-end bounties are hidden until the board is reworked. */
-  enabled: false,
-  slots: 5,
-  budget: [0, 3, 6, 10],
-  maxRewards: 2,
-  /** What a bounty can pay, and the step amounts come in. */
-  rewards: [
-    { kind: 'materials', step: 25 },
-    { kind: 'research', step: 1 },
-    { kind: 'blueprints', step: 1 },
-    { kind: 'cores', step: 1 },
-    { kind: 'archives', step: 1 },
-    { kind: 'shards', step: 1 },
-    { kind: 'traitToken', step: 1 },
-    { kind: 'relic', step: 1 },
-  ] as const,
-  /** hold: the round ends to hold through, by difficulty. */
-  holdRounds: [0, 1, 2, 3],
-  /** Claimed bounties kept off the board, so a force not yet paid still is. */
-  keepClaimed: 30,
-};
-
-export const BOUNTY_KINDS: { id: BountyKind; name: string; desc: string; difficulty?: number }[] = [
-  { id: 'band', name: 'Break the band', desc: 'Beat {band} in a Marauder game.' },
-  { id: 'hold', name: 'Take and hold', desc: 'Hold {sector} through {rounds}.' },
-  { id: 'take', name: 'Seize the sector', desc: 'Win an attack on {sector}.' },
-  { id: 'topple', name: 'Topple the leader', desc: 'Beat {faction} in any game.', difficulty: 2 },
-  { id: 'guardian', name: 'Slay the guardian', desc: 'Beat {guardian}, the guardian of {sector}.' },
-  { id: 'noHero', name: 'No heroes', desc: 'Win a game tracked in the battle tracker with no Hero in your army.', difficulty: 2 },
-  { id: 'void', name: 'Into the Void', desc: 'Beat the Void Echoes at their Voidspawn, {sector}.', difficulty: 3 },
-];
 
 /**
  * Overrun (rules/overrun.ts): a detachment may settle an attack on a weak AI garrison by auto-battle instead of at

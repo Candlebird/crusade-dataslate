@@ -141,6 +141,8 @@ export interface ZBattle {
   pending?: { unit: string; target?: string };
   /** Practice battles don't write anything back. */
   practice?: boolean;
+  /** Added to every casting roll (a Nexus Resonance). */
+  castBonus?: number;
 }
 
 export const unitById = (b: ZBattle, id: string) => b.units.find((u) => u.id === id);

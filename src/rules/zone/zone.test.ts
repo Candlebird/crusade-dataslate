@@ -12,6 +12,7 @@ import { playOut, quickBattle, randomArmy, simSetup } from './sim';
 import { act, attackNow, createBattle, onActivation, ready, deploy, pickDeploy, startDeploy, toDeploy } from './engine';
 import { aiTurn } from './ai';
 import type { ZBattle } from './state';
+import type { Campaign } from '../../model/types';
 import { applyZoneBattle, startZoneBattle, zoneKey, ZONE_REWARDS } from './setup';
 import { newBattle, trackerUnit } from '../tracker';
 
@@ -156,6 +157,10 @@ describe('campaign hookup', () => {
     playOut(battle);
     expect(battle.phase).toBe('ended');
     applyZoneBattle(t, battle, ZONE_REWARDS.quick.xp);
+    // Nexus Resonance: casters get +1 to cast.
+    const c = { id: 'c', name: '', updatedAt: '', round: 2, factions: [], sectors: [], log: [], event: { id: 'resonance', round: 2 } } as Campaign;
+    const res = startZoneBattle(newBattle(STANDARD_MISSION, 'tb2', '2026-10-26', () => 0.5), [], books, 'quick', c, 9);
+    expect(res.battle.castBonus).toBe(1);
     expect(t.ended).toBe(true);
     expect(t.auto?.winner).toBeDefined();
     expect(t.control.length).toBe(battle.history.length);
