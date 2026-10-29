@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { TRAINING } from '../../rules/downtimeData';
 import { endlessDepth, eventInfo, finalBoss, finalOf, inEndless, lordLine, luckCap, nemesisTricks, nexusLines, nextLord, startProblem, type TrainingRun } from '../../rules/training';
 import { Icon } from '../Icon';
@@ -30,9 +31,19 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
   const why = run.phase === 'build' ? startProblem(run) : null;
   const next = run.wave + 1;
   const live = run.phase === 'wave';
+  // On an upright phone the HUD is pinned over the scrolling page; the panel tabs pin just under it, so they need its height.
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    const game = el?.closest<HTMLElement>('.training-game');
+    if (!el || !game) return;
+    const ro = new ResizeObserver(() => game.style.setProperty('--hud-h', `${el.offsetHeight}px`));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   // What the next wave brings in full is on the wave line beside the map; the HUD has its icon (tap for what it does).
   return (
-    <div className="training-hud small" role="toolbar" aria-label="Training run">
+    <div ref={ref} className="training-hud small" role="toolbar" aria-label="Training run">
       <span className="training-hud-stat" data-tip={live ? 'The wave under way' : 'Waves cleared'}>
         <Icon name="g:crossed-swords" /> {live ? 'Wave' : 'Cleared'} <b>{live ? run.wave : run.cleared}</b>
         {best ? <span className="muted"> · best {Math.max(best, run.cleared)}</span> : null}
