@@ -115,6 +115,8 @@ export interface ZBattle {
   phase: 'join' | 'deploy' | 'battle' | 'ended';
   /** Whose turn it is to deploy or activate. */
   turn: SideIx;
+  /** The start of a round where units wait in Ambush: the sides take turns placing them (or keeping them waiting) before anyone activates. */
+  placing?: boolean;
   /** Who goes first: in deployment, then each round (the side that finished activating first last round). */
   first: SideIx;
   finishedFirst?: SideIx;

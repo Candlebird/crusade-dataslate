@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiTurn } from '../rules/zone/ai';
 import { xy, zoneOf } from '../rules/zone/board';
-import { castable, act, attackNow, actions, hasGuns, arriveSquares, autoDeploy, autoJoin, chargeTargets, deploy, deploySquares, endNow, isHeroUnit, joinHero, joinTargets, moves, onActivation, ready, startDeploy, toDeploy, vpOf, type Action, type Order } from '../rules/zone/engine';
+import { castable, act, attackNow, actions, hasGuns, arriveSquares, autoDeploy, autoJoin, chargeTargets, deploy, deployHint, deploySquares, endNow, isHeroUnit, joinHero, joinTargets, moves, onActivation, ready, startDeploy, toDeploy, vpOf, type Action, type Order } from '../rules/zone/engine';
 import { shootable, woundsLeft } from '../rules/zone/combat';
 import { forecastSims, type ZForecast } from '../rules/zone/forecast';
 import { alive, maxWoundsOf } from '../rules/zone/profile';
@@ -31,10 +31,11 @@ const ACTION_TIP: Record<Action, string> = {
   rush: 'Move 2 squares (12"), no shooting',
   charge: 'Move up to 2 squares into an enemy and fight in melee',
   idle: 'Shaken: spend the activation recovering',
-  arrive: 'Come on from Ambush, over 9" from every enemy',
+  arrive: 'Come on from Ambush, over 9" from every enemy; it then activates this round as usual',
+  wait: 'Stay in Ambush and come on in a later round',
 };
 
-const ORDER_NAME: Record<Action, string> = { hold: 'Hold', advance: 'Advance', rush: 'Rush', charge: 'Charge', idle: 'Recover', arrive: 'Arrive' };
+const ORDER_NAME: Record<Action, string> = { hold: 'Hold', advance: 'Advance', rush: 'Rush', charge: 'Charge', idle: 'Recover', arrive: 'Arrive', wait: 'Keep waiting' };
 
 const isPhone = () => typeof window !== 'undefined' && !!window.matchMedia?.('(max-width: 700px)').matches;
 
@@ -169,7 +170,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   // An order from the pop-up: Hold and Recover go at once, the rest wait for a square or an enemy.
   const choose = (a: Action) => {
     setMenu(false);
-    if (a === 'hold' || a === 'idle') go(a);
+    if (a === 'hold' || a === 'idle' || a === 'wait') go(a);
     else setOrder(a);
   };
   // Back from a square or enemy to the orders.
@@ -213,7 +214,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
       <div className="zb-pop-back" onClick={cancel}>
         <div className="zb-pop" role="dialog" onClick={(e) => e.stopPropagation()}>
           <h3>{unit!.name}</h3>
-          <p className="small muted">{acts.includes('idle') ? 'Shaken: it can only spend the activation recovering.' : acts.includes('arrive') ? 'Waiting in Ambush.' : 'What does it do?'}</p>
+          <p className="small muted">{acts.includes('idle') ? 'Shaken: it can only spend the activation recovering.' : acts.includes('wait') ? `Waiting in Ambush.${acts.includes('arrive') ? '' : ' No square is over 9" from every enemy this round.'}` : 'What does it do?'}</p>
           <div className="zb-pop-acts">
             {acts.map((a) => (
               <button key={a} onClick={() => choose(a)}>
@@ -272,6 +273,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
         : canAct && order === 'arrive' ? `${unit!.name}: tap a lit square to come on from Ambush.`
         : canAct && order ? `${unit!.name}: tap a lit square to ${order === 'rush' ? 'Rush' : 'Advance'} there.`
         : attacking ? `${pend!.name} is shooting.`
+        : myTurn && z.placing ? 'Start of the round: tap a unit waiting in Ambush to bring it on or keep it waiting.'
         : myTurn ? 'Tap a unit marked in gold to give it orders.'
         : `${sideName(z.turn)} is acting…`}</span>
       {waiting && <button className="small" onClick={() => (attacking ? setAiming(false) : back())}>Back</button>}
@@ -366,7 +368,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
         <h3>Deployment</h3>
         {myTurn ? (
           <>
-            <p className="small muted">Pick a unit, then a lit square in your zone. Deployment alternates; Scouts go last.</p>
+            <p className="small muted">{deployHint(z, z.turn)}</p>
             <div className="zb-list">
               {left.map((u) => <button key={u.id} className={`ghost small${u.id === sel ? ' on' : ''}`} onClick={() => setSel(u.id)}>{u.name}{u.scout ? ' (Scout)' : ''}{u.ambush ? ' (Ambush)' : ''}</button>)}
             </div>
@@ -380,13 +382,15 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   } else if (z.phase === 'battle') {
     orders = (
       <div className="zb-panel">
-        <h3>{myTurn ? 'Your activation' : `${sideName(z.turn)} is acting…`}</h3>
+        <h3>{z.placing ? (myTurn ? 'Ambush' : `${sideName(z.turn)} is placing Ambushers…`) : myTurn ? 'Your activation' : `${sideName(z.turn)} is acting…`}</h3>
         {myTurn && (() => {
-          const reserve = mineReady.filter((u) => u.sq < 0 && actions(z, u).includes('arrive'));
+          const reserve = mineReady.filter((u) => u.sq < 0);
           return (
             <>
               {/* The bar over the board says what a tap does; here, just how much of the round is left and how to look at a unit. */}
-              {!attacking && <p className="small muted">{mineReady.length} unit{mineReady.length === 1 ? '' : 's'} left to act this round. A tap on any other unit shows its profile here.</p>}
+              {!attacking && (z.placing
+                ? <p className="small muted">Before anyone activates, the sides take turns placing units from Ambush. Each comes on over 9" from every enemy and then activates this round as usual.{z.round >= z.rounds ? ' This is the last round: a unit placed now can\'t seize or contest markers.' : ''}</p>
+                : <p className="small muted">{mineReady.length} unit{mineReady.length === 1 ? '' : 's'} left to act this round. A tap on any other unit shows its profile here.</p>)}
               {!attacking && reserve.length > 0 && (
                 <div className="zb-list">
                   <span className="small muted">In Ambush:</span>

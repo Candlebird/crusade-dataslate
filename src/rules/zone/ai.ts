@@ -122,6 +122,7 @@ export function orderFor(b: ZBattle, u: ZUnit, smart = true): Order {
     const to = smart && target.length ? squares.sort((x, y) => Math.min(...target.map((t) => dist(b.board, x, t))) - Math.min(...target.map((t) => dist(b.board, y, t))))[0] : squares[0];
     return { unit: u.id, action: 'arrive', to };
   }
+  if (can.includes('wait')) return { unit: u.id, action: 'wait' };
   if (can.includes('idle') || !can.length) return { unit: u.id, action: 'idle' };
   const spell = pickSpell(b, u);
   const base = { unit: u.id, ...(spell ? { spell } : {}) };

@@ -181,22 +181,66 @@ export function toDeploy(b: ZBattle, side: SideIx): ZUnit[] {
 
 export function startDeploy(b: ZBattle) {
   b.phase = 'deploy';
-  b.turn = b.first;
+  b.turn = isAmbushMission(b) ? nextDeployer(b, 0) : b.first;
   if (!toDeploy(b, b.turn).length) b.turn = other(b.turn);
 }
 
-/** Squares a unit may deploy on: its zone, or up to 2 squares out of it for a Scout once everyone else is down. */
+/** A Fortification (Immobile): it may set up anywhere outside the enemy's deployment zone. */
+export const isFortification = (u: ZUnit) => has(unitHooks(u.p), 'immobile');
+
+/** The Ambush mission: the defender puts half its army down, the attacker deploys among it, then the defender the rest. */
+const isAmbushMission = (b: Pick<ZBattle, 'mission'>) => b.mission.id === 'opr-ambush';
+const defenderDown = (b: ZBattle) => b.units.filter((u) => u.side === 1 && fighting(u) && (u.sq >= 0 || u.used.ambushing || u.used.reserve)).length;
+/** The Ambush mission's first wave: half the defender's units, rounded up. */
+const firstWave = (b: ZBattle) => Math.ceil(b.units.filter((u) => u.side === 1 && fighting(u)).length / 2);
+const inFirstWave = (b: ZBattle, side: SideIx) => side === 1 && defenderDown(b) < firstWave(b);
+
+/** Who deploys next after `acted`: the sides alternate, or on Ambush the mission's three waves. */
+function nextDeployer(b: ZBattle, acted: SideIx): SideIx {
+  if (isAmbushMission(b)) {
+    if (inFirstWave(b, 1) && toDeploy(b, 1).length) return 1;
+    return toDeploy(b, 0).length ? 0 : 1;
+  }
+  const o = other(acted);
+  return toDeploy(b, o).length ? o : acted;
+}
+
+/**
+ * Squares a unit may deploy on: its zone, or up to 2 squares out of it for a Scout once everyone else is down. On
+ * Ambush, after the defender's first wave, anywhere over 12" from the enemy (and the attacker within 6" of a friend
+ * once it has one down). A Fortification may also go anywhere outside the enemy's zone.
+ */
 export function deploySquares(b: ZBattle, u: ZUnit): number[] {
   const zone = b.board.deploy[u.side];
   const plainLeft = [0, 1].some((s) => b.units.some((x) => x.side === s && fighting(x) && x.sq < 0 && !x.scout && !x.used.ambushing && !x.used.reserve));
+  const enemyZone = new Set(b.board.deploy[other(u.side)]);
   let squares = zone;
-  if (u.scout && !plainLeft) {
+  const open = isAmbushMission(b) && !inFirstWave(b, u.side);
+  if (open) {
+    const foes = onTable(b).filter((x) => x.side !== u.side), friends = onTable(b).filter((x) => x.side === u.side);
+    squares = all(b.board).filter((sq) => foes.every((f) => dist(b.board, sq, f.sq) >= 3)
+      && (u.side === 1 || !friends.length || friends.some((f) => dist(b.board, sq, f.sq) <= 1)));
+    if (isFortification(u)) squares = all(b.board).filter((sq) => !enemyZone.has(sq) && foes.every((f) => dist(b.board, sq, f.sq) >= 3));
+  } else if (isFortification(u)) {
+    squares = all(b.board).filter((sq) => !enemyZone.has(sq) || zone.includes(sq));
+  } else if (u.scout && !plainLeft) {
     const set = new Set(zone);
     for (const z of zone) for (const [sq] of reachable(b.board, z, 2, { flying: true })) set.add(sq);
-    const enemyZone = new Set(b.board.deploy[other(u.side)]);
     squares = [...set].filter((sq) => !enemyZone.has(sq) || zone.includes(sq));
   }
   return squares.filter((sq) => canStand(b, u, sq));
+}
+
+const all = (b: Pick<ZBattle['board'], 'w' | 'h'>) => Array.from({ length: b.w * b.h }, (_, i) => i);
+
+/** What the deploying player is told about where its units go. */
+export function deployHint(b: ZBattle, side: SideIx): string {
+  const fort = toDeploy(b, side).some(isFortification) ? ' Fortifications may go anywhere outside the enemy\'s zone.' : '';
+  if (!isAmbushMission(b)) return `Pick a unit, then a lit square in your zone. Deployment alternates; Scouts go last.${fort}`;
+  if (inFirstWave(b, side)) return `Ambush: the defender first deploys half its army (${firstWave(b)} units) in its zone.${fort}`;
+  return side === 0
+    ? `Ambush: deploy anywhere over 12" from the enemy, each unit after the first within 6" of a friend.${fort}`
+    : `Ambush: deploy the rest anywhere over 12" from the enemy.${fort}`;
 }
 
 /** Puts a unit down (or in Ambush), then passes the turn. Once everyone is down, round 1 begins. */
@@ -212,8 +256,7 @@ export function deploy(b: ZBattle, id: string, where: number | 'ambush') {
     u.sq = where;
     b.log.push({ round: 0, side: u.side, unit: u.id, kind: 'deploy', text: `${u.name} deploys.`, path: [where, where] });
   }
-  const o = other(b.turn);
-  b.turn = toDeploy(b, o).length ? o : b.turn;
+  b.turn = nextDeployer(b, b.turn);
   if (!toDeploy(b, 0).length && !toDeploy(b, 1).length) beginBattle(b);
 }
 
@@ -222,13 +265,17 @@ export function pickDeploy(b: ZBattle, u: ZUnit): number | 'ambush' {
   if (u.ambush && u.ai !== 'shooting') return 'ambush';
   const opts = deploySquares(b, u);
   if (!opts.length) return u.ambush ? 'ambush' : -1;
-  const enemyZone = b.board.deploy[other(u.side)];
+  // On Ambush the enemy may already stand outside its zone: what to keep near (or away from) is its units.
+  const foes = onTable(b).filter((x) => x.side !== u.side).map((x) => x.sq);
+  const enemyZone = isAmbushMission(b) && foes.length ? foes : b.board.deploy[other(u.side)];
   const markers = b.board.objectives.map((o) => o.sq);
   const scoreSq = (sq: number) => {
     const toEnemy = enemyZone.length ? Math.min(...enemyZone.map((e) => dist(b.board, sq, e))) : 0;
     const toMarker = markers.length ? Math.min(...markers.map((m) => dist(b.board, sq, m))) : 0;
     const load = zoneLoad(b, u.side, zoneOf(b.board, sq));
     const cover = b.board.terrain[sq]?.cover ? 1 : 0;
+    // A Fortification can't move once down: on a marker if it can, in cover, and out of easy charge reach.
+    if (isFortification(u)) return -toMarker * 1.2 - load * 0.8 + cover * 0.5 - Math.max(0, 3 - toEnemy);
     const fwd = u.ai === 'shooting' ? toEnemy * 0.3 : -toEnemy;
     return fwd - toMarker * 0.6 - load * 0.8 + cover * (u.ai === 'shooting' ? 1 : 0.3);
   };
@@ -245,7 +292,7 @@ export function autoDeploy(b: ZBattle, side: SideIx, all = false) {
     if (!u) break;
     if (s !== side && !all) break;
     const at = pickDeploy(b, u);
-    if (at === -1) { u.used.reserve = 1; b.turn = toDeploy(b, other(s)).length ? other(s) : s; if (!toDeploy(b, 0).length && !toDeploy(b, 1).length) beginBattle(b); continue; }
+    if (at === -1) { u.used.reserve = 1; b.turn = nextDeployer(b, s); if (!toDeploy(b, 0).length && !toDeploy(b, 1).length) beginBattle(b); continue; }
     deploy(b, u.id, at);
   }
 }
@@ -258,10 +305,15 @@ function beginBattle(b: ZBattle) {
 
 // ---- Rounds ----
 
-/** Units that can still activate this round. */
+/** Units that can still activate this round; while Ambushers are being placed, the side's ones still to place. */
 export function ready(b: ZBattle, side: SideIx): ZUnit[] {
-  return b.units.filter((u) => u.side === side && fighting(u) && !u.activated && (u.sq >= 0 || (u.used.ambushing && b.round >= 2)));
+  if (b.placing) return inAmbush(b, side);
+  return b.units.filter((u) => u.side === side && fighting(u) && !u.activated && u.sq >= 0);
 }
+
+/** A side's units in Ambush not yet placed (or kept waiting) this round. */
+const inAmbush = (b: ZBattle, side: SideIx) =>
+  b.units.filter((u) => u.side === side && fighting(u) && u.sq < 0 && u.used.ambushing && !u.used[`wait:${b.round}`]);
 
 function startRound(c: Ctx) {
   const b = c.b;
@@ -276,7 +328,46 @@ function startRound(c: Ctx) {
   missionRoundStart(c);
   for (const u of onTable(b)) fire(c, u, 'roundStart');
   sweep(c);
+  // Ambush: from round 2, units waiting in Ambush are placed first, the sides alternating from the one that activates first.
+  if (b.round >= 2 && (inAmbush(b, 0).length || inAmbush(b, 1).length)) {
+    b.placing = true;
+    if (!inAmbush(b, b.turn).length) b.turn = other(b.turn);
+    return;
+  }
+  openRound(c);
+}
+
+/** The activations begin: the first side, or the other if the first has nobody to activate. */
+function openRound(c: Ctx) {
+  const b = c.b;
+  delete b.placing;
+  b.turn = b.first;
   if (!ready(b, b.turn).length) b.turn = other(b.turn);
+  // Nobody on the table to activate (every unit waiting in Ambush): the round passes.
+  if (!ready(b, b.turn).length) endRound(c);
+}
+
+/**
+ * Places a unit from Ambush anywhere over 9" from every enemy, or keeps it waiting for a later round. Placing isn't its
+ * activation: it activates in the round as usual. Placed in the last round, it can't seize or contest markers.
+ */
+function placeAmbusher(c: Ctx, u: ZUnit, o: Order) {
+  const b = c.b;
+  const squares = arriveSquares(b, u);
+  if (o.action === 'arrive' && squares.length) {
+    const sq = o.to !== undefined && squares.includes(o.to) ? o.to : squares[0];
+    u.sq = sq;
+    delete u.used.ambushing;
+    const late = b.round >= b.rounds;
+    if (late) u.used.late = 1;
+    line(c, { side: u.side, unit: u.id, kind: 'move', text: `${u.name} arrives from Ambush${late ? ': in the last round, it can\'t seize or contest markers' : ''}.`, path: [sq, sq] });
+  } else {
+    u.used[`wait:${b.round}`] = 1;
+    line(c, { side: u.side, unit: u.id, kind: 'info', text: `${u.name} stays in Ambush.` });
+  }
+  const o2 = other(u.side);
+  if (inAmbush(b, o2).length) b.turn = o2;
+  else if (!inAmbush(b, u.side).length) openRound(c);
 }
 
 /** Passes the turn after an activation; ends the round when no one has a unit left to activate. */
@@ -311,7 +402,7 @@ const hasReserves = (b: ZBattle, side: SideIx) => b.units.some((u) => u.side ===
 
 // ---- Activations ----
 
-export type Action = 'hold' | 'advance' | 'rush' | 'charge' | 'idle' | 'arrive';
+export type Action = 'hold' | 'advance' | 'rush' | 'charge' | 'idle' | 'arrive' | 'wait';
 
 export interface Order {
   unit: string;
@@ -381,7 +472,7 @@ export function arriveSquares(b: ZBattle, u: ZUnit): number[] {
 
 /** The orders a unit can take now. */
 export function actions(b: ZBattle, u: ZUnit): Action[] {
-  if (u.sq < 0) return u.used.ambushing && b.round >= 2 && arriveSquares(b, u).length ? ['arrive'] : [];
+  if (u.sq < 0) return b.placing && inAmbush(b, u.side).includes(u) ? (arriveSquares(b, u).length ? ['arrive', 'wait'] : ['wait']) : [];
   if (u.shaken && !has(rulesOf(b, u), 'rally')) return ['idle'];
   const out: Action[] = ['hold'];
   const s = speed(b, u);
@@ -399,6 +490,7 @@ export function actions(b: ZBattle, u: ZUnit): Action[] {
 export function act(b: ZBattle, o: Order, split: boolean | 'always' = false): LogLine[] {
   const u = unitById(b, o.unit);
   if (!u || b.phase !== 'battle' || b.pending || u.side !== b.turn || !ready(b, u.side).includes(u)) return [];
+  if (b.placing) return withDice(b, (c) => { placeAmbusher(c, u, o); sweep(c); }).out;
   return withDice(b, (c) => {
     const next = activate(c, u, o);
     if (next === 'shoot' && fighting(u) && u.sq >= 0) {
@@ -451,15 +543,7 @@ function activate(c: Ctx, u: ZUnit, o: Order): 'shoot' | 'done' | 'quiet' {
   const b = c.b;
   u.activated = true;
   for (const e of u.effects) if (e.until === 'once' && e.mark === undefined) e.spend = true;
-  if (u.sq < 0) {
-    const sq = o.to !== undefined && arriveSquares(b, u).includes(o.to) ? o.to : arriveSquares(b, u)[0];
-    if (sq === undefined) return 'quiet';
-    u.sq = sq;
-    delete u.used.ambushing;
-    line(c, { side: u.side, unit: u.id, kind: 'move', text: `${u.name} arrives from Ambush.`, path: [sq, sq] });
-    u.held = false;
-    return 'quiet';
-  }
+  if (u.sq < 0) return 'quiet';
   if (u.shaken) {
     const rally = has(rulesOf(b, u), 'rally');
     const r = rally ? d6(c.rng) : 0;
@@ -872,7 +956,7 @@ export const markerName = (b: ZBattle, i: number) => {
 function pickUp(c: Ctx, u: ZUnit) {
   const b = c.b;
   const k = kindOf(b);
-  if (!['carry', 'rescue', 'smash'].includes(k) || u.sq < 0 || u.shaken || !fighting(u)) return;
+  if (!['carry', 'rescue', 'smash'].includes(k) || u.sq < 0 || u.shaken || u.used.late || !fighting(u)) return;
   if ((k === 'rescue' || k === 'smash') && u.side !== 0) return;
   if (b.carried.includes(u.id)) return;
   const zone = zoneOf(b.board, u.sq);
@@ -894,7 +978,7 @@ function pickUp(c: Ctx, u: ZUnit) {
 function presence(b: ZBattle, sq: number): [boolean, boolean] {
   const z = zoneOf(b.board, sq);
   const out: [boolean, boolean] = [false, false];
-  for (const u of onTable(b)) if (!u.shaken && zoneOf(b.board, u.sq) === z) out[u.side] = true;
+  for (const u of onTable(b)) if (!u.shaken && !u.used.late && zoneOf(b.board, u.sq) === z) out[u.side] = true;
   return out;
 }
 

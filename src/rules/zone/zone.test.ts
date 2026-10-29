@@ -9,9 +9,10 @@ import { mulberry32 } from './dice';
 import { join, maxWoundsOf, profileOf, unitHooks, woundsOf } from './profile';
 import { woundsLeft } from './combat';
 import { playOut, quickBattle, randomArmy, simSetup } from './sim';
-import { act, attackNow, createBattle, onActivation, ready, deploy, pickDeploy, startDeploy, toDeploy } from './engine';
+import { act, actions, arriveSquares, attackNow, autoDeploy, createBattle, deploySquares, isHeroUnit, onActivation, ready, deploy, pickDeploy, startDeploy, toDeploy } from './engine';
+import { onTable } from './state';
 import { aiTurn } from './ai';
-import type { ZBattle } from './state';
+import type { ZBattle, ZUnit } from './state';
 import type { Campaign } from '../../model/types';
 import { applyZoneBattle, startZoneBattle, zoneKey, ZONE_REWARDS } from './setup';
 import { newBattle, trackerUnit } from '../tracker';
@@ -198,5 +199,133 @@ describe('saving', () => {
     for (let i = 1; i < both; i++) expect(sides[i]).not.toBe(sides[i - 1]);
     expect(b.phase).toBe('battle');
     for (const u of b.units.filter((x) => !x.joinedTo && !x.destroyed)) expect(u.sq >= 0 || !!u.used.ambushing).toBe(true);
+  });
+});
+
+describe('ambush and fortifications', () => {
+  const battle = (mission = STANDARD_MISSION, seed = 5) => {
+    const rng = mulberry32(seed);
+    return createBattle(simSetup(mission, { book: ECHOES, units: randomArmy(ECHOES, 1500, rng, 'e') }, { book: DOTHEA, units: randomArmy(DOTHEA, 1500, rng, 'd') }, seed));
+  };
+  /** Deploys every unit, `pick` choosing where (a unit with no square left goes to reserve, as Auto-deploy does). */
+  const deployAll = (b: ZBattle, pick: (u: ZUnit) => number | 'ambush' = (u) => pickDeploy(b, u), seen?: (u: ZUnit, at: number | 'ambush') => void) => {
+    if (b.phase === 'join') startDeploy(b);
+    for (let n = 0; b.phase === 'deploy' && n < 400; n++) {
+      const u = toDeploy(b, b.turn)[0];
+      const at = pick(u);
+      seen?.(u, at);
+      if (at === -1) autoDeploy(b, b.turn);
+      else deploy(b, u.id, at);
+    }
+  };
+
+  it('places Ambushers at the start of round 2, before anyone activates, and they still activate that round', () => {
+    const b = battle();
+    const amb = b.units.find((u) => u.side === 0 && !u.destroyed && !isHeroUnit(u))!;
+    for (const u of b.units) delete u.ambush;
+    amb.ambush = true;
+    deployAll(b, (u) => (u === amb ? 'ambush' : pickDeploy(b, u)));
+    // Not in round 1.
+    expect(ready(b, 0)).not.toContain(amb);
+    expect(actions(b, amb)).toEqual([]);
+    for (let n = 0; b.round === 1 && b.phase === 'battle' && n < 200; n++) act(b, aiTurn(b, b.turn)!);
+    expect(b.round).toBe(2);
+    expect(b.placing).toBe(true);
+    expect(b.turn).toBe(0);
+    expect(ready(b, 0)).toEqual([amb]);
+    expect(actions(b, amb)).toEqual(['arrive', 'wait']);
+    const sq = arriveSquares(b, amb)[0];
+    for (const e of onTable(b).filter((x) => x.side === 1)) expect(dist(b.board, sq, e.sq)).toBeGreaterThanOrEqual(2);
+    act(b, { unit: amb.id, action: 'arrive', to: sq });
+    expect(amb.sq).toBe(sq);
+    expect(b.placing).toBeUndefined();
+    expect(amb.activated).toBe(false);
+    expect(ready(b, 0)).toContain(amb);
+  });
+
+  it('can keep waiting, and one placed in the last round neither seizes nor contests', () => {
+    const b = battle();
+    const amb = b.units.find((u) => u.side === 0 && !u.destroyed && !isHeroUnit(u))!;
+    for (const u of b.units) delete u.ambush;
+    amb.ambush = true;
+    b.rounds = 2;
+    deployAll(b, (u) => (u === amb ? 'ambush' : pickDeploy(b, u)));
+    for (let n = 0; b.round === 1 && b.phase === 'battle' && n < 200; n++) act(b, aiTurn(b, b.turn)!);
+    expect(b.placing).toBe(true);
+    // Every enemy off the table, so the marker is the Ambusher's alone if it may take it.
+    for (const e of b.units.filter((u) => u.side === 1)) e.destroyed = true;
+    b.control = b.control.map(() => '');
+    act(b, { unit: amb.id, action: 'arrive', to: b.board.objectives[0].sq });
+    expect(amb.used.late).toBe(1);
+    for (const u of b.units.filter((x) => x.side === 0 && x !== amb)) u.destroyed = true;
+    act(b, { unit: amb.id, action: 'hold' });
+    expect(b.history[b.history.length - 1][0]).toBe('');
+    // Keeping one waiting.
+    const w = battle(STANDARD_MISSION, 6);
+    const amb2 = w.units.find((u) => u.side === 1 && !u.destroyed && !isHeroUnit(u))!;
+    for (const u of w.units) delete u.ambush;
+    amb2.ambush = true;
+    deployAll(w, (u) => (u === amb2 ? 'ambush' : pickDeploy(w, u)));
+    for (let n = 0; w.round === 1 && w.phase === 'battle' && n < 200; n++) act(w, aiTurn(w, w.turn)!);
+    w.turn = 1;
+    act(w, { unit: amb2.id, action: 'wait' });
+    expect(amb2.sq).toBe(-1);
+    expect(w.placing).toBeUndefined();
+    expect(ready(w, 1)).not.toContain(amb2);
+  });
+
+  it('plays the Ambush mission\'s three deployment waves', () => {
+    const mission = ATTACK_DEFEND_MISSIONS.find((m) => m.id === 'opr-ambush')!;
+    const b = battle(mission, 11);
+    const defenders = b.units.filter((u) => u.side === 1 && !u.destroyed && !u.joinedTo).length;
+    const order: number[] = [];
+    deployAll(b, (u) => pickDeploy(b, u), (u, at) => {
+      if (typeof at === 'number' && at >= 0) {
+        const foes = onTable(b).filter((x) => x.side !== u.side);
+        if (u.side === 0 || order.filter((s) => s === 1).length >= Math.ceil(defenders / 2)) {
+          for (const f of foes) expect(dist(b.board, at, f.sq)).toBeGreaterThanOrEqual(3);
+        } else expect(b.board.deploy[1]).toContain(at);
+        const friends = onTable(b).filter((x) => x.side === 0);
+        if (u.side === 0 && friends.length) expect(friends.some((f) => dist(b.board, at, f.sq) <= 1)).toBe(true);
+      }
+      order.push(b.turn);
+    });
+    expect(b.phase).toBe('battle');
+    const half = Math.ceil(defenders / 2);
+    expect(order.slice(0, half).every((s) => s === 1)).toBe(true);
+    const firstAttacker = order.indexOf(0);
+    expect(firstAttacker).toBe(half);
+    expect(order.slice(firstAttacker).indexOf(1)).toBe(order.filter((s) => s === 0).length);
+  });
+
+  it('lets a Fortification set up anywhere but the enemy\'s zone', () => {
+    const b = battle();
+    const fort = b.units.find((u) => u.side === 0 && !u.destroyed && !isHeroUnit(u))!;
+    fort.p = { ...fort.p, shared: [...fort.p.shared, { k: 'immobile' } as never] };
+    startDeploy(b);
+    b.turn = 0;
+    const squares = deploySquares(b, fort);
+    const enemy = new Set(b.board.deploy[1]);
+    expect(squares.some((sq) => enemy.has(sq))).toBe(false);
+    expect(squares.some((sq) => !b.board.deploy[0].includes(sq))).toBe(true);
+    // Other units still go in their own zone.
+    const plain = b.units.find((u) => u.side === 0 && u !== fort && !u.destroyed && !u.scout)!;
+    expect(deploySquares(b, plain).every((sq) => b.board.deploy[0].includes(sq))).toBe(true);
+    deployAll(b);
+    expect(b.phase).toBe('battle');
+    expect(enemy.has(fort.sq)).toBe(false);
+  });
+
+  it('plays out every mission with Ambushers and Fortifications on both sides', () => {
+    for (const m of [STANDARD_MISSION, ...ATTACK_DEFEND_MISSIONS]) {
+      const b = battle(m, 21);
+      for (const s of [0, 1]) {
+        const us = b.units.filter((u) => u.side === s && !u.destroyed && !isHeroUnit(u));
+        us[0].ambush = true;
+        us[1].p = { ...us[1].p, shared: [...us[1].p.shared, { k: 'immobile' } as never] };
+      }
+      playOut(b);
+      expect(b.phase, m.id).toBe('ended');
+    }
   });
 });
