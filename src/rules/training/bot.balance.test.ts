@@ -62,11 +62,13 @@ describe('training balance (bot)', () => {
     expect(mean(mid) / 8).toBeLessThanOrEqual(0.6);
   });
 
-  it('every sample force reaches about wave 20-27', () => {
+  // Since Training got about a fifth harder (enemyHp, wave.crowd, wave.wide), a narrow, pricey force (Spears of Dothea:
+  // 3-5 units) may fall as early as wave 8; that's accepted. The floor only catches a force that can't get going at all.
+  it('every sample force gets past wave 7', () => {
     console.log(cases.map(({ f, seed }, k) => `${f.name.padEnd(22)} ${String(f.units.reduce((n, u) => n + u.points, 0)).padStart(4)} pts ${f.units.length} units  seed ${seed}: wave ${outs[k].cleared}` +
       `  crafted ${outs[k].crafted}  luck ${outs[k].luck}  ${Math.round(outs[k].ms)} ms`).join('\n'));
     for (const o of outs) {
-      expect(o.cleared).toBeGreaterThanOrEqual(15);
+      expect(o.cleared).toBeGreaterThanOrEqual(7);
       expect(o.cleared).toBeLessThanOrEqual(35);
     }
   });
