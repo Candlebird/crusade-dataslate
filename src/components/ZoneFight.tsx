@@ -15,11 +15,9 @@ const ZoneBattleModal = lazy(() => import('./ZoneBattleModal'));
 // Starting and resuming a zone battle: pick how it's played, then the battle itself. It's saved (and synced) after
 // every step, so closing it, or picking it up on another device, loses nothing.
 
-/** Zone battles ship to the GM first (and to anyone not signed in, playing on their own device), until the GM opens them to all. */
+/** Zone battles are open to every player (they once shipped to the GM first, behind `Campaign.zoneOpen`). */
 export function useZoneBattles() {
-  const cloud = useCloud();
-  const { state } = useStore();
-  return cloud.isGm || !cloud.email || !!state.campaign?.zoneOpen;
+  return true;
 }
 
 /** The saved zone battle with this id, if any. */

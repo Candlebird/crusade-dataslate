@@ -772,7 +772,7 @@ export interface Campaign {
   gameNight?: GameNight;
   /** Attacks that must be played at the table, held open for a few rounds with their detachment pinned (rules/sieges.ts). */
   sieges?: Siege[];
-  /** The GM has opened zone battles to every player (until then only the GM sees them, and players keep the old auto-battle). */
+  /** No longer read: zone battles are open to every player. Kept so older saves still type-check. */
   zoneOpen?: boolean;
 }
 

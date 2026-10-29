@@ -158,7 +158,7 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
         <span className="tag" data-tip={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}, × ${difficultyLevel(c).scale} for ${difficultyLevel(c).name} difficulty; rescaled when the round ends`}>
           Sector difficulty {range.min}–{range.max} Supply
         </span>
-        {gm && <span className="muted">Difficulty, rescaling and zone battles: <b>Campaign settings</b>, below.</span>}
+        {gm && <span className="muted">Difficulty and rescaling: <b>Campaign settings</b>, below.</span>}
       </div>
       {grace && (
         <p className="small" style={{ margin: '0.5rem 0 0' }}>
@@ -242,12 +242,6 @@ export function CampaignSettingsPanel({ c }: { c: Campaign }) {
         <div>
           <button onClick={rescale}>{rated ? 'Rescale sectors now' : 'Rate sectors'}</button>
           <p className="muted">Rates sectors {range.min}–{range.max} Supply against current faction Supply. Each round end does this too.</p>
-        </div>
-        <div>
-          <label className="row" style={{ gap: '0.35rem' }}>
-            <input type="checkbox" checked={!!c.zoneOpen} onChange={(e) => change((d) => void (d.zoneOpen = e.target.checked || undefined))} /> <b>Zone battles for everyone</b>
-          </label>
-          <p className="muted">Until then only you see zone battles, and players keep the old auto-battle.</p>
         </div>
         <div>
           <span className="row"><button onClick={guard}>Place guardians</button><button onClick={reguard}>Re-roll guardians</button></span>
