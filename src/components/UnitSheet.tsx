@@ -280,7 +280,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
           <div className="panel-title">
             <h3><Icon name="g:upgrade" /> Level {earned} reached — {pending} upgrade{pending > 1 ? 's' : ''} to pick</h3>
           </div>
-          <p className="muted small" style={{ marginTop: 0 }}>Each level buys one trait, weapon trait or relic.</p>
+          <p className="muted small" style={{ marginTop: 0 }}>Each level buys one trait, weapon trait or relic (a hero's first relic doesn't need one).</p>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <button className="primary" onClick={() => setPicker({ kind: 'trait' })}>Roll a trait</button>
             {u.weapons.length > 0 && (
@@ -321,7 +321,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
             title="Experience"
             extra={
               <span className="row">
-                <span className="muted small" data-tip="Each level buys one trait, weapon trait or relic">{used} of {earned} upgrade{earned === 1 ? '' : 's'} used</span>
+                <span className="muted small" data-tip="Each level buys one trait, weapon trait or relic (a hero's first relic doesn't need one)">{used} of {earned} upgrade{earned === 1 ? '' : 's'} used</span>
                 {pending > 0 && <span className="tag gold">{pending} to pick</span>}
               </span>
             }

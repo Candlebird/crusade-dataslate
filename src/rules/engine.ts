@@ -181,7 +181,10 @@ export function dropWeaponTrait(u: Unit, weaponId: string, traitId: string): voi
   u.weapons = u.weapons.filter((x) => x !== w);
 }
 
-/** Levels spent on upgrades, weapon upgrades and relics (free ones excluded). */
+/** Relics a relic bearer carries without spending a level on them (they still add BP). */
+export const FREE_BEARER_RELICS = 1;
+
+/** Levels spent on upgrades, weapon upgrades and relics (free ones, and a bearer's first relic, excluded). */
 export function upgradesUsed(u: Unit): number {
   const infantry = u.category === 'Infantry';
   const unitUps = u.upgrades.filter((x) => !x.free).length;
@@ -189,7 +192,8 @@ export function upgradesUsed(u: Unit): number {
     (sum, w) => sum + weaponUpgradeCount(w, infantry, false) + weaponUpgradeCount(w, infantry, true),
     0,
   );
-  return unitUps + weaponUps + u.relics.length;
+  const relicUps = Math.max(0, u.relics.length - (relicBearer(u) ? FREE_BEARER_RELICS : 0));
+  return unitUps + weaponUps + relicUps;
 }
 
 /** Levels earned but not yet spent on an upgrade: the unit still has to finish levelling up. Fallen units have none. */

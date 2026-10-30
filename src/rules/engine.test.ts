@@ -54,7 +54,7 @@ describe('pending level-ups', () => {
 describe('relic slots', () => {
   it('follows the XP brackets', () => {
     expect([0, 9, 10, 40, 41, 59, 60, 120, 121, 199, 200].map(relicSlots))
-      .toEqual([0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5]);
+      .toEqual([1, 1, 1, 1, 2, 2, 3, 3, 4, 4, 5]);
   });
 });
 
@@ -88,6 +88,17 @@ describe('battle points', () => {
     expect(battlePoints(u, DEFAULT_SETTINGS)).toBe(1);
     expect(upgradesUsed(u)).toBe(1);
   });
+  it("doesn't spend a level on a hero's first relic, but still counts its BP", () => {
+    const orb = { id: 'r', name: 'Oblivion Orb', tier: 'Legendary' as const };
+    const hero = unit({ xp: 10, relics: [orb] });
+    expect(upgradesUsed(hero)).toBe(0);
+    expect(pendingLevels(hero)).toBe(1);
+    expect(battlePoints(hero, DEFAULT_SETTINGS)).toBe(4);
+    expect(validateUnit(hero).some((i) => i.text.includes('upgrades taken'))).toBe(false);
+    expect(upgradesUsed(unit({ relics: [orb, { ...orb, id: 'r2', name: 'Other' }] }))).toBe(1);
+    expect(upgradesUsed(unit({ category: 'Infantry', relics: [orb] }))).toBe(1);
+    expect(upgradesUsed(unit({ category: 'Infantry', heroicRise: true, relics: [orb] }))).toBe(0);
+  });
 });
 
 describe('validation', () => {
@@ -95,11 +106,11 @@ describe('validation', () => {
     const u = unit({
       xp: 5,
       upgrades: Array.from({ length: 6 }, (_, i) => ({ id: String(i), name: `T${i}`, unique: false })),
-      relics: [{ id: 'r', name: 'Vortex Grenade', tier: 'Rare' }],
+      relics: [{ id: 'r', name: 'Vortex Grenade', tier: 'Rare' }, { id: 'r2', name: 'Oblivion Orb', tier: 'Common' }],
     });
     const text = validateUnit(u).map((i) => i.text).join('\n');
     expect(text).toMatch(/6\/5 normal traits/);
-    expect(text).toMatch(/only 0 relic slot/);
+    expect(text).toMatch(/2 relics but only 1 relic slot/);
     expect(text).toMatch(/needs 41\+ XP/);
   });
 });

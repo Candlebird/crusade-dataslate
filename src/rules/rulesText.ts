@@ -55,7 +55,7 @@ export const CRUSADE_TEXT = {
     'Blessings: for every point of Battle Points difference between the two forces, the underdog gets 1 re-roll. Each unit can use at most one re-roll per round.',
   ],
   relics: [
-    'Only heroes can carry relics. Instead of taking an upgrade, a hero may take a relic of a tier its XP allows (buying it with RP as a requisition), as long as it has a free relic slot.',
+    'Only heroes can carry relics. A hero may take a relic of a tier its XP allows (buying it with RP as a requisition), as long as it has a free relic slot. A hero\'s first relic doesn\'t cost a level; each relic after that takes the place of an upgrade. Every relic still adds its Battle Points.',
     'Stealing Relics (optional, both players must agree): if your hero kills a hero that carries a relic, on a 3+ yours takes one of its relics. The hero who lost it gets +1 to hit against the thief. Only one copy of each relic can exist at a time, and players may also trade relics.',
     'Wagering Relics (optional, both players must agree): players may bet relics on a match. The winner takes them and assigns them under the normal relic rules; the loser removes them and adjusts BP.',
   ],

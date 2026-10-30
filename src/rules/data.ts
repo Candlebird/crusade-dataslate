@@ -28,8 +28,7 @@ export type RelicTier = 'Common' | 'Rare' | 'Legendary';
 
 /** Relic slots by XP: [minXp, slots]. */
 export const RELIC_SLOTS: [number, number][] = [
-  [0, 0],
-  [10, 1],
+  [0, 1],
   [41, 2],
   [60, 3],
   [121, 4],
