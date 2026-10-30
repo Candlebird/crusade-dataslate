@@ -196,6 +196,12 @@ describe('statuses and dots', () => {
     afflict(run, unit(), e, 'knock');
     expect(toGo(run, e)).toBeGreaterThan(before);
   });
+  it('knock never moves a boss', () => {
+    const lord = enemy({ leg: 1, x: 20.5, y: 24.5 }, 'lord');
+    afflict(run, unit(), lord, 'knock');
+    afflict(run, unit(), lord, 'knock');
+    expect([lord.leg, lord.x, lord.y]).toEqual([1, 20.5, 24.5]);
+  });
   it('a bleed is a dot credited to its tower, worn down by tickEnemies', () => {
     const t = unit();
     const e = enemy();

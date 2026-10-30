@@ -162,7 +162,8 @@ function deathBlasts(run: TrainingRun, dead: Enemy) {
 export function afflict(run: TrainingRun, t: Tower, e: Enemy, status: Status): void {
   if (e.hp <= 0) return;
   if (status === 'knock') {
-    if (e.heldBy !== undefined) return;
+    // Bosses stand their ground: stacked knocks could hold one back for ever.
+    if (e.heldBy !== undefined || isBoss(e)) return;
     if (e.flies) {
       // Straight back toward the pad it left.
       const from = centre(WAYPOINTS[e.leg]);
