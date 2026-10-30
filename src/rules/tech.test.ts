@@ -7,7 +7,7 @@ import { randomLoadout } from './echoForce';
 import { ECHOES, emptyNexus, incomeItems, nexusEntry, recordSectorGame, removeSectorGame, rollGuardianLoot } from './nexus';
 import { BUILDINGS, GUARDIAN_LOOT, NEXUS_TECH, PRODUCTION, TECH_BRANCHES } from './nexusData';
 import {
-  bankCap, bankRoom, buildBlock, buildingSlots, depositNearest, depositText, rewardOrigin, coreBlock, exchange, exchangeBlock, installCore, produceCost, productionRate, tradeBonus,
+  accrueProduction, bankCap, bankRoom, build, buildBlock, buildCost, buildingSlots, cancelBuilding, finishConstruction, depositNearest, depositText, rewardOrigin, coreBlock, exchange, exchangeBlock, installCore, produceCost, productionRate, tradeBonus,
 } from './production';
 import { repels } from './marauders';
 import { accrueResearch, knows, research, researchBlock, researchRate, techStatus } from './tech';
@@ -180,6 +180,74 @@ describe('Building Expansions', () => {
     expect(coreBlock(c, sector(c, 'hA'))).toMatch(/Only planets/);
     expect(installCore(c, s)).toBe(true);
     expect([buildingSlots(s), faction(c, 'A').cores, coreBlock(c, s)]).toEqual([(PRODUCTION.slots.planet ?? 0) + PRODUCTION.coreSlots, 1, 'This planet already has one']);
+  });
+});
+
+describe('space stations', () => {
+  // Held empty space at (4,0): A Planet 2 at (2,0) is its nearest bank, A Planet at (1,0) the next.
+  const withStation = () => {
+    const c = campaign();
+    c.sectors.push({ id: 'st', name: 'Drift', type: 'empty', owner: 'A', notes: '', q: 4, r: 0 });
+    return c;
+  };
+
+  it('give held empty space one slot, but not unclaimed space', () => {
+    const c = withStation();
+    expect(buildingSlots(sector(c, 'st'))).toBe(PRODUCTION.station.slots);
+    c.sectors.push({ id: 'free', name: 'Open', type: 'empty', notes: '', q: 6, r: 0 });
+    expect(buildingSlots(sector(c, 'free'))).toBe(0);
+    expect(buildBlock(sector(c, 'free'), 'watchtower', force('A'), c)).toMatch(/space stations/);
+  });
+
+  it('cost the extra Materials, paid from the nearest banks, and refund there', () => {
+    const c = withStation();
+    const s = sector(c, 'st');
+    const cost = building('watchtower').cost + PRODUCTION.station.extra;
+    expect(buildCost(building('watchtower'), s, c)).toBe(cost);
+    sector(c, 'pA').bank = 500;
+    sector(c, 'pA2').bank = 100;
+    expect(build(c, s, 'watchtower', force('A'))).toBe(true);
+    expect([sector(c, 'pA2').bank, sector(c, 'pA').bank]).toEqual([undefined, 600 - cost]);
+    expect(s.bank).toBeUndefined();
+    cancelBuilding(s, [], '', () => '', c);
+    // The whole refund goes back to the nearest bank.
+    expect([s.construction, sector(c, 'pA2').bank, s.bank]).toEqual([undefined, cost, undefined]);
+  });
+
+  it('need enough Materials across the faction, and take only one building', () => {
+    const c = withStation();
+    const s = sector(c, 'st');
+    sector(c, 'pA').bank = 150;
+    expect(buildBlock(s, 'watchtower', force('A'), c)).toBe(`Needs ${building('watchtower').cost + PRODUCTION.station.extra} Materials (150 banked across your sectors)`);
+    sector(c, 'hA').bank = 300;
+    expect(build(c, s, 'watchtower', force('A'))).toBe(true);
+    finishConstruction(c);
+    expect(s.buildings).toEqual(['watchtower']);
+    expect(buildBlock(s, 'observatory', force('A'), c)).toMatch(/No free slot/);
+  });
+
+  it("can't take a building that needs production", () => {
+    const c = withStation();
+    sector(c, 'hA').bank = 1000;
+    for (const b of BUILDINGS.filter((x) => x.producing && !x.homeOnly))
+      expect(buildBlock(sector(c, 'st'), b.id, force('A', 20), c)).toMatch(/makes no units/);
+    expect(buildBlock(sector(c, 'st'), 'walls', force('A', 20), c)).toBeUndefined();
+  });
+
+  it('send their income to the nearest bank once the planets have banked, spilling into the next', () => {
+    const c = withStation();
+    const near = sector(c, 'pA2');
+    // After its own production, the nearest bank has 20 room left.
+    near.bank = bankCap(near, c) - productionRate(near, c) - 20;
+    delete sector(c, 'pA').bank;
+    const made = accrueProduction(c);
+    expect(near.bank).toBe(bankCap(near, c));
+    expect(sector(c, 'pA').bank).toBe(productionRate(sector(c, 'pA'), c) + PRODUCTION.station.perRound - 20);
+    expect(made.find((x) => x.sector.id === 'st')?.gained).toBe(PRODUCTION.station.perRound);
+    expect(sector(c, 'st').bank).toBeUndefined();
+    // Unclaimed empty space makes nothing.
+    delete sector(c, 'st').owner;
+    expect(accrueProduction(c).some((x) => x.sector.id === 'st')).toBe(false);
   });
 });
 

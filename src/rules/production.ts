@@ -10,7 +10,9 @@ import { hasPerk } from './warlords';
 // worth), and a new unit is produced at one of them, paid from its bank. Banks are lost when a sector changes hands;
 // buildings stay for the new owner. Buildings are paid from the bank too (the strong ones also cost Umbra Shards); a
 // sector builds one at a time, finished when the round ends, and only buildings its owner has researched
-// (rules/tech.ts). Values live in nexusData.ts. Materials are saved as `bank` and `construction.supply`.
+// (rules/tech.ts). Held empty space is a space station: it banks and produces nothing, but takes one building, paid
+// (at a premium) from the faction's other banks. Values live in nexusData.ts. Materials are saved as `bank` and
+// `construction.supply`.
 
 export const buildingById = (id: string) => BUILDINGS.find((b) => b.id === id);
 export const hasBuilding = (s: Sector, id: string) => !!s.buildings?.includes(id);
@@ -19,8 +21,10 @@ export const hasBuilding = (s: Sector, id: string) => !!s.buildings?.includes(id
 export const isReinforced = (s: Sector) => !!s.reinforced || hasBuilding(s, 'walls');
 
 export const produces = (s: Sector) => (PRODUCTION.slots[s.type] ?? 0) > 0;
-/** Building slots a sector has (0 for sectors that don't produce): a Building Expansion adds one. */
-export const buildingSlots = (s: Sector, c?: Campaign) => (produces(s)
+/** Held empty space: a space station, with room for one building paid from the faction's other banks. */
+export const isStation = (s: Sector) => s.type === 'empty' && !!s.owner;
+/** Building slots a sector has (0 for sectors that don't produce, bar a station's): a Building Expansion adds one. */
+export const buildingSlots = (s: Sector, c?: Campaign) => (isStation(s) ? PRODUCTION.station.slots : produces(s)
   ? (PRODUCTION.slots[s.type] ?? 0) + (s.core ? PRODUCTION.coreSlots : 0) + (s.type === 'home' && hasPerk(c, s.owner, 'homeSlot') ? WARLORDS.homeSlots : 0)
   : 0);
 
@@ -86,6 +90,22 @@ export function depositNearest(c: Campaign, factionId: string, n: number, from?:
   return out;
 }
 
+/** Materials banked across all the faction's sectors: what a space station's building is paid from. */
+export const factionBanked = (c: Campaign, factionId: string) => productionSites(c, factionId).reduce((t, s) => t + (s.bank ?? 0), 0);
+
+/** Take `n` Materials from the faction's banks, nearest `from` first (a space station's building). */
+function withdrawNearest(c: Campaign, factionId: string, n: number, from: Sector) {
+  const far = (s: Sector) => (isPlaced(s) && isPlaced(from) ? hexDistance(s, from) : Infinity);
+  let left = n;
+  for (const s of productionSites(c, factionId).filter((x) => x.bank).sort((a, b) => far(a) - far(b))) {
+    const k = Math.min(left, s.bank ?? 0);
+    s.bank = (s.bank ?? 0) - k;
+    if (!s.bank) delete s.bank;
+    left -= k;
+    if (!left) break;
+  }
+}
+
 /** Free room across the faction's banks: 0 means a Materials reward would be lost ("no bank had room"). */
 export const bankRoom = (c: Campaign, factionId: string) =>
   productionSites(c, factionId).reduce((t, s) => t + Math.max(0, bankCap(s, c) - (s.bank ?? 0)), 0);
@@ -112,7 +132,10 @@ export function depositBanked(c: Campaign, factionId: string, n: number, from?: 
   return deposited(depositNearest(c, factionId, n, from));
 }
 
-/** Round end: every held producing sector banks its production. Returns what each sector gained. */
+/**
+ * Round end: every held producing sector banks its production, then every space station sends its income to the
+ * faction's nearest bank (spilling to the next when full). Returns what each sector gained (a station: what it sent).
+ */
 export function accrueProduction(c: Campaign): { sector: Sector; gained: number }[] {
   const out: { sector: Sector; gained: number }[] = [];
   // A Forge Surge banks more everywhere (nexus.ts activeEvent, read here without importing it).
@@ -129,15 +152,20 @@ export function accrueProduction(c: Campaign): { sector: Sector; gained: number 
     s.bank = Math.max(before, Math.min(bankCap(s, c), before + productionRate(s, c) + surge));
     if (s.bank > before) out.push({ sector: s, gained: s.bank - before });
   }
+  for (const s of c.sectors) {
+    if (!isStation(s) || !c.factions.some((f) => f.id === s.owner)) continue;
+    const gained = depositBanked(c, s.owner!, PRODUCTION.station.perRound, isPlaced(s) ? s : undefined);
+    if (gained) out.push({ sector: s, gained });
+  }
   return out;
 }
 
 /** Slots not built on or under construction. */
 export const freeSlots = (s: Sector, c?: Campaign) => buildingSlots(s, c) - (s.buildings?.length ?? 0) - (s.construction ? 1 : 0);
 
-/** The Materials a building costs at this sector: less for an Architect Warlord's faction. */
+/** The Materials a building costs at this sector: less for an Architect Warlord's faction, more on a space station. */
 export const buildCost = (b: Pick<Building, 'cost'>, s: Sector, c?: Campaign) =>
-  hasPerk(c, s.owner, 'cheapBuild') ? Math.round(b.cost * (1 - WARLORDS.buildDiscount)) : b.cost;
+  (hasPerk(c, s.owner, 'cheapBuild') ? Math.round(b.cost * (1 - WARLORDS.buildDiscount)) : b.cost) + (isStation(s) ? PRODUCTION.station.extra : 0);
 
 /**
  * Why the building can't be started here, if it can't. `payer` is the force paying its Umbra Shards; pass the campaign
@@ -146,25 +174,30 @@ export const buildCost = (b: Pick<Building, 'cost'>, s: Sector, c?: Campaign) =>
 export function buildBlock(s: Sector, id: string, payer?: Force, c?: Campaign): string | undefined {
   const b = buildingById(id);
   if (!b) return 'Unknown building';
-  if (!produces(s)) return 'Only planets and home sectors have buildings';
+  if (!produces(s) && !isStation(s)) return 'Only planets, home sectors and space stations (held empty space) have buildings';
   if (hasBuilding(s, id)) return 'Already built';
+  if (b.producing && isStation(s)) return "A space station makes no units and has no bank, so it can't use one";
   if (b.homeOnly && s.type !== 'home') return 'Only a home sector can build it';
   if (b.onePerFaction && c && s.owner && c.sectors.some((x) => x.owner === s.owner && (hasBuilding(x, id) || x.construction?.id === id)))
     return `Only one ${b.name} per faction`;
   if (c && !knows(c.factions.find((f) => f.id === s.owner), b)) return 'Not researched yet (see the tech tree)';
   if (s.construction) return `${buildingById(s.construction.id)?.name ?? 'A building'} is already being built here: one at a time`;
   if (freeSlots(s, c) <= 0) return `No free slot (${buildingSlots(s, c)})`;
-  if ((s.bank ?? 0) < buildCost(b, s, c)) return `Needs ${buildCost(b, s, c)} Materials (${s.bank ?? 0} banked here)`;
+  if (isStation(s)) {
+    const banked = c ? factionBanked(c, s.owner!) : 0;
+    if (banked < buildCost(b, s, c)) return `Needs ${buildCost(b, s, c)} Materials (${banked} banked across your sectors)`;
+  } else if ((s.bank ?? 0) < buildCost(b, s, c)) return `Needs ${buildCost(b, s, c)} Materials (${s.bank ?? 0} banked here)`;
   if (b.shards && (payer?.umbraShards ?? 0) < b.shards) return `Needs ${b.shards} Umbra Shard${b.shards === 1 ? '' : 's'}${payer ? ` (${payer.name} has ${payer.umbraShards})` : ' from one of your forces (none loaded here)'}`;
   return undefined;
 }
 
-/** Start a building: its Materials come from the bank, its Umbra Shards from `payer`. It's finished when the round ends. False when it can't be started. */
+/** Start a building: its Materials come from the bank (a station's from the faction's nearest banks), its Umbra Shards from `payer`. It's finished when the round ends. False when it can't be started. */
 export function build(c: Campaign, s: Sector, id: string, payer?: Force, date = '', newId: () => string = () => ''): boolean {
   if (buildBlock(s, id, payer, c)) return false;
   const b = buildingById(id)!;
   const cost = buildCost(b, s, c);
-  s.bank = (s.bank ?? 0) - cost;
+  if (isStation(s)) withdrawNearest(c, s.owner!, cost, s);
+  else s.bank = (s.bank ?? 0) - cost;
   s.construction = { id, round: c.round ?? 1, supply: cost, shards: b.shards };
   if (b.shards && payer) {
     payer.umbraShards -= b.shards;
@@ -174,11 +207,18 @@ export function build(c: Campaign, s: Sector, id: string, payer?: Force, date = 
   return true;
 }
 
-/** Stop the building going up: everything paid for it comes back (Materials to the bank, shards to the force that paid). */
-export function cancelBuilding(s: Sector, forces: Force[], date = '', newId: () => string = () => ''): void {
+/**
+ * Stop the building going up: everything paid for it comes back (Materials to the bank, shards to the force that paid).
+ * A station's Materials go to the faction's nearest bank (pass the campaign), even past its cap.
+ */
+export function cancelBuilding(s: Sector, forces: Force[], date = '', newId: () => string = () => '', c?: Campaign): void {
   const k = s.construction;
   if (!k) return;
-  s.bank = (s.bank ?? 0) + k.supply;
+  if (isStation(s)) {
+    const far = (x: Sector) => (isPlaced(x) && isPlaced(s) ? hexDistance(x, s) : Infinity);
+    const to = c && [...productionSites(c, s.owner!)].sort((a, b) => far(a) - far(b))[0];
+    if (to) to.bank = (to.bank ?? 0) + k.supply;
+  } else s.bank = (s.bank ?? 0) + k.supply;
   const payer = forces.find((f) => f.id === k.forceId);
   if (payer && k.shards) {
     payer.umbraShards += k.shards;

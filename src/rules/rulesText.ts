@@ -5,7 +5,7 @@ import {
 import { AUTO_BATTLE, STANCES } from './autoBattle';
 import { ZONE_REWARDS } from './zone/rewards';
 import { SIEGE } from './sieges';
-import { ECHOES, ECHO_MARKS, DIFFICULTY_LEVELS, FOG, GALACTIC_EVENTS, GAME_NIGHT, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_DUELS, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_RELIC_US, NEXUS_ROUNDS, OVERRUN, PRODUCTION, WARLORDS } from './nexusData';
+import { BUILDINGS, ECHOES, ECHO_MARKS, DIFFICULTY_LEVELS, FOG, GALACTIC_EVENTS, GAME_NIGHT, GUARDIANS, NEXUS_MOVE, GUARDIAN_LOOT, HERO_OFFERS, MARAUDERS, NEXUS_TECH, NEXUS_CRISIS, NEXUS_DETACHMENTS, NEXUS_DIFFICULTY, NEXUS_DUELS, NEXUS_MAP, NEXUS_REINFORCE_BONUS, NEXUS_RELIC_US, NEXUS_ROUNDS, OVERRUN, PRODUCTION, WARLORDS } from './nexusData';
 import { BIG_UNIT, BIG_UNIT_PER } from './echoForce';
 import { FEATS, rewardText } from './feats';
 import { TITLES } from './training/titles';
@@ -200,6 +200,7 @@ export const NEXUS_TEXT = {
     ` Produce units at one of them from the Nexus Wars panel on your force page: they cost their points in Materials from that sector's bank and still need room under the force's Supply Limit.`,
     `Rewards: some results on the battle, Anomaly, Void, Journal and expedition tables also give Materials. They go to your faction's bank nearest where the force fought or is standing (home breaks a tie), and spill into the next nearest when that one is full. Materials only go to a Nexus Wars force's faction.`,
     `Buildings: a home has ${PRODUCTION.slots.home} building slots and a planet ${PRODUCTION.slots.planet} (${(PRODUCTION.slots.planet ?? 0) + PRODUCTION.coreSlots} with a Building Expansion). Start one from the sector's panel on the map. Each costs Materials from that sector's bank, and the stronger ones Umbra Shards too, from one of your forces; you pay when you start it.`,
+    `Space stations: empty space you hold (won in battle) is a space station. It makes ${PRODUCTION.station.perRound} Materials a round, sent to your nearest bank (the next nearest when that's full), and takes one building. It has no bank, so the building costs its price + ${PRODUCTION.station.extra} Materials, taken from your nearest banks. A station produces no units, so buildings that only work where units are made or Materials banked (${BUILDINGS.filter((b) => b.producing && !b.homeOnly).map((b) => b.name).join(', ')}) can't go on one.`,
     'A sector builds one building at a time, and it is finished when the round ends: it works from the next round. Cancel it before then and everything paid comes back. Tear a finished building down (no refund) to free its slot.',
     'If the sector is taken, anything still being built is lost with the bank.',
     'A sector that changes hands loses its bank, but its buildings stay for the new owner.',

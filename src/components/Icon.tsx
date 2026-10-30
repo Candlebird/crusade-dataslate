@@ -37,7 +37,7 @@ export function SvgIcon({ name, x, y, size, className, title }: { name: IconName
  */
 export const GLYPHS: Record<string, IconName> = {
   // Sectors
-  '♜': 'g:white-tower', '◉': 'g:ringed-planet', '⌬': 'g:atom', '✠': 'g:holy-symbol', '✺': 'g:vortex', '☣': 'g:biohazard', '❖': 'g:bookshelf',
+  '♜': 'g:white-tower', '◉': 'g:ringed-planet', '⌬': 'g:atom', '✠': 'g:holy-symbol', '✺': 'g:vortex', '☣': 'g:biohazard', '❖': 'g:bookshelf', '🛰': 'g:defense-satellite',
   // Map marks
   '⛨': 'g:checked-shield', '🌀': 'g:tornado', '☠': 'g:crowned-skull', '♛': 'g:warlord-helmet', '⚠': 'g:hazard-sign', '⚑': 'g:barbute', '🏴': 'g:hood',
   // Reports and the chronicle

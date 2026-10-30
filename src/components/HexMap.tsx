@@ -14,7 +14,7 @@ import { breakMark, breaksLeft, holders, markOn, pickSpread, restoreMark, spread
 import { aiDefended, rateSectors, ratingFor } from '../rules/difficulty';
 import {
   bankCap, build, buildBlock, buildCost, buildingById, buildingSlots, cancelBuilding, coreBlock, demolish, exchange, exchangeBlock, freeSlots, hasBuilding, installCore,
-  isReinforced, produces, productionRate, tradeBonus, type ExchangeTrade,
+  factionBanked, isReinforced, isStation, produces, productionRate, tradeBonus, type ExchangeTrade,
 } from '../rules/production';
 import { knows } from '../rules/tech';
 import { sightMap, type Sight } from '../rules/fog';
@@ -40,10 +40,14 @@ type Tool = 'select' | 'type' | 'owner' | 'move' | 'unplace';
 
 const SIZE = 40;
 const GLYPH: Record<SectorType, string> = { home: '♜', planet: '◉', research: '⌬', void: '✠', anomaly: '✺', empty: '·', voidspawn: '☣', archive: '❖' };
-/** A sector's glyph drawn in the map: its icon, or the plain dot for empty space. */
-function HexGlyph({ type, x, y }: { type: SectorType; x: number; y: number }) {
-  const name = GLYPHS[GLYPH[type]];
-  return name ? <SvgIcon name={name} x={x} y={y - 4} size={18} className="hex-glyph" /> : <text x={x} y={y + 3} className="hex-glyph">{GLYPH[type]}</text>;
+const STATION_GLYPH = '🛰';
+/** A space station that's built (or building) something: held empty space with a building. */
+const hasStation = isStation;
+/** A sector's glyph drawn in the map: its icon, a space station's, or the plain dot for empty space. */
+function HexGlyph({ type, x, y, station }: { type: SectorType; x: number; y: number; station?: boolean }) {
+  const g = station ? STATION_GLYPH : GLYPH[type];
+  const name = GLYPHS[g];
+  return name ? <SvgIcon name={name} x={x} y={y - 4} size={18} className="hex-glyph" /> : <text x={x} y={y + 3} className="hex-glyph">{g}</text>;
 }
 const TOOLS: { key: Tool; label: string; hint: string }[] = [
   { key: 'select', label: 'Select', hint: 'Click a hex to see or edit it' },
@@ -376,7 +380,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                     {s.image && <image href={s.image} x={p.x - SIZE} y={p.y - SIZE} width={SIZE * 2} height={SIZE * 2} preserveAspectRatio="xMidYMid slice" clipPath={`url(#clip-${s.id})`} opacity="0.75" />}
                     {col && <polygon points={hexCorners(p.x, p.y, SIZE - 1)} fill={col} fillOpacity={s.image ? 0.15 : 0.3} />}
                     <polygon points={hexCorners(p.x, p.y, SIZE - (col ? 3 : 1))} fill="none" className="hex-edge" stroke={col ?? (front?.has(s.id) ? '#5fb3b3' : '#4a525c')} strokeWidth={col || front?.has(s.id) ? 3 : 1} />
-                    <HexGlyph type={s.type} x={p.x} y={p.y} />
+                    <HexGlyph type={s.type} x={p.x} y={p.y} station={hasStation(s)} />
                     <text x={p.x} y={p.y + 21} className="hex-name">{s.name.length > 16 ? s.name.slice(0, 15) + '…' : s.name}</text>
                     {isReinforced(s) && <SvgIcon name="g:checked-shield" x={p.x - 15} y={p.y - 21} size={11} className="hex-mark" title="Reinforced" />}
                     {s.type === 'void' && s.rewardClaimed && <SvgIcon name="g:check-mark" x={p.x + 15} y={p.y - 21} size={11} className="hex-mark" title="Reward claimed" />}
@@ -532,13 +536,14 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
     );
   }
   const g = s.guardian;
-  const manage = produces(s) && !!s.owner && c.factions.some((f) => f.id === s.owner) && (gm || viewer === s.owner);
+  const manage = (produces(s) || isStation(s)) && !!s.owner && c.factions.some((f) => f.id === s.owner) && (gm || viewer === s.owner);
   return (
     <>
       {s.image && <img className="sector-art" src={s.image} alt="" />}
       <h3 style={{ marginBottom: 0 }}>{s.name}</h3>
       <div className="small">
         <span className="tag"><Glyph g={GLYPH[s.type]} /> {SECTOR_TYPES[s.type].label}</span>
+        {hasStation(s) && <span className="tag"><Glyph g={STATION_GLYPH} /> Space station</span>}
         <span className="tag" style={ownerColor ? { borderColor: ownerColor, color: ownerColor } : undefined}>{factionName(c, s.owner)}</span>
         {isReinforced(s) && <span className="tag"><Icon name="g:checked-shield" /> Reinforced{hasBuilding(s, 'walls') ? ' (Walls)' : ''}</span>}
         {s.type === 'void' && s.rewardClaimed && <span className="tag"><Icon name="l:check" /> Reward claimed</span>}
@@ -737,7 +742,7 @@ function DetachmentsHere({ c, s, forces, gm, setC }: { c: Campaign; s: Sector; f
   );
 }
 
-/** A held planet's production: its bank, its buildings, and starting a new one. */
+/** A held planet's production: its bank, its buildings, and starting a new one. Held empty space gets a station's one slot. */
 function ProductionBox({ s }: { s: Sector }) {
   const { state, update } = useStore();
   const [pick, setPick] = useState('');
@@ -749,8 +754,10 @@ function ProductionBox({ s }: { s: Sector }) {
   const c = state.campaign;
   const owner = c?.factions.find((f) => f.id === s.owner);
   const block = pick ? buildBlock(s, pick, payer, c) : undefined;
-  // What the owner can build here: researched, and home-only ones at home.
-  const options = BUILDINGS.filter((x) => !hasBuilding(s, x.id) && knows(owner, x) && (!x.homeOnly || s.type === 'home'));
+  const station = isStation(s);
+  const banked = station && c ? factionBanked(c, s.owner!) : s.bank ?? 0;
+  // What the owner can build here: researched, home-only ones at home, and nothing that needs production on a station.
+  const options = BUILDINGS.filter((x) => !hasBuilding(s, x.id) && knows(owner, x) && (!x.homeOnly || s.type === 'home') && !(station && x.producing));
   const locked = BUILDINGS.filter((x) => !knows(owner, x)).length;
   const k = s.construction;
   const going = k ? buildingById(k.id) : undefined;
@@ -774,12 +781,21 @@ function ProductionBox({ s }: { s: Sector }) {
   const trade1 = (t: ExchangeTrade) => (c ? exchangeBlock(c, s, t, payer) : 'No campaign');
   return (
     <div className="small" style={{ margin: '0.5rem 0' }}>
-      <div>
-        <b><Icon name="g:anvil" /> Production</b>{' '}
-        <span className="muted" data-tip={`Banks ${rate} Materials each round${trade ? ` (${trade} from its Trade Hub)` : ''}, up to ${cap}. Lost if the sector is taken.`}>
-          {s.bank ?? 0}/{cap} Materials banked · +{rate} a round
-        </span>
-      </div>
+      {station ? (
+        <div>
+          <b><Glyph g={STATION_GLYPH} /> Space station</b>{' '}
+          <span className="muted" data-tip={`It has no bank: its ${PRODUCTION.station.perRound} Materials a round go to your nearest bank (the next nearest when full), and its building costs ${PRODUCTION.station.extra} Materials more, taken from your nearest banks.`}>
+            +{PRODUCTION.station.perRound} a round to your nearest bank · {banked} Materials banked across your sectors
+          </span>
+        </div>
+      ) : (
+        <div>
+          <b><Icon name="g:anvil" /> Production</b>{' '}
+          <span className="muted" data-tip={`Banks ${rate} Materials each round${trade ? ` (${trade} from its Trade Hub)` : ''}, up to ${cap}. Lost if the sector is taken.`}>
+            {s.bank ?? 0}/{cap} Materials banked · +{rate} a round
+          </span>
+        </div>
+      )}
       <div className="muted" style={{ marginTop: '0.25rem' }}>
         Buildings: {built.length + (k ? 1 : 0)} of {buildingSlots(s, c ?? undefined)} slots used{s.core && <> · <span className="tag gold" data-tip="Building Expansion: one more building slot"><Icon name="g:diamonds" /> Building Expansion</span></>}
       </div>
@@ -804,7 +820,7 @@ function ProductionBox({ s }: { s: Sector }) {
           </span>
           <button className="ghost" data-tip="Stop building for a full refund"
             onClick={() => confirmAction(`Stop building the ${going?.name ?? k.id}? The ${price({ cost: k.supply, shards: k.shards })} paid comes back.`)
-              && edit((y, _c, fs) => cancelBuilding(y, fs, today, uid))}>Cancel</button>
+              && edit((y, cc, fs) => cancelBuilding(y, fs, today, uid, cc))}>Cancel</button>
         </div>
       )}
       {!k && free > 0 && (
@@ -835,7 +851,7 @@ function ProductionBox({ s }: { s: Sector }) {
             </div>
           )}
           {b && <div className={block ? '' : 'muted'}>{block ? <span className="tag red">{block}</span>
-            : <>Costs {buildCost(b, s, c ?? undefined)} of {s.bank ?? 0} banked Materials{b.shards ? <> and {b.shards} of {payer?.name}'s {payer?.umbraShards} Umbra Shards</> : ''} now. Done when the round ends.</>}</div>}
+            : <>Costs {buildCost(b, s, c ?? undefined)} of {banked} banked Materials{station ? ` across your sectors (nearest first; ${PRODUCTION.station.extra} of it for building out here)` : ''}{b.shards ? <> and {b.shards} of {payer?.name}'s {payer?.umbraShards} Umbra Shards</> : ''} now. Done when the round ends.</>}</div>}
         </>
       )}
       {!k && free > 0 && locked > 0 && <div className="muted">{locked} more building{locked === 1 ? '' : 's'} to research in the tech tree.</div>}
@@ -870,7 +886,12 @@ function ProductionBox({ s }: { s: Sector }) {
           <li>The app doesn't apply buildings marked <i>at the table</i>: remember them when you play here.</li>
           <li>Cancel before the round ends for a full refund.</li>
           <li>If the sector is taken, its bank and any unfinished building are lost. Finished buildings stay for the new owner.</li>
-          <li>Produce new units here from the force page, paid from the same bank.</li>
+          {station
+            ? <li>A space station makes <b>{PRODUCTION.station.perRound} Materials a round</b>, sent to your nearest bank (the next nearest when full). It has <b>one slot</b> and no bank: its building costs <b>{PRODUCTION.station.extra} Materials more</b>, taken from your nearest banks (a cancel puts them back in the nearest). It makes no units, so buildings that need production can't go here.</li>
+            : <>
+              <li>Produce new units here from the force page, paid from the same bank.</li>
+              <li>Hold a stretch of empty space and it's a space station: +{PRODUCTION.station.perRound} Materials a round to your nearest bank, and one building for {PRODUCTION.station.extra} Materials more.</li>
+            </>}
         </ul>
       </details>
     </div>

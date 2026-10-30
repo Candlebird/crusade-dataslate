@@ -244,7 +244,7 @@ export function buildReport(c: Campaign, r: Omit<RoundEnd, 'report'>, x: ReportE
     const made = (x.production ?? []).filter((p) => p.sector.owner === f.id);
     if (made.length) {
       const gained = made.reduce((n, p) => n + p.gained, 0);
-      const sites = made.length === 1 ? made[0].sector.name : `${made.length} worlds`;
+      const sites = made.length === 1 ? made[0].sector.name : `${made.length} sectors`;
       lines.push({ icon: '⚒', text: say(rand, TEXT.production, { gained, sites }), factions: [f.id] });
     }
     const learnt = (x.research ?? []).find((y) => y.factionId === f.id);
