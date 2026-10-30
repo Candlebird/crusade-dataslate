@@ -7,6 +7,7 @@ import { forceTotals, relicCost as relicRp, relicHolders, relicTaken } from '../
 import { unitName } from '../rules/battle';
 import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_RELIC_US, NEXUS_ROUNDS, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
 import { isReinforced } from '../rules/production';
+import { attackTargets } from '../rules/orders';
 import { Modal, RelicOption, UsAbbr, toast, umbraShards } from './ui';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
@@ -38,8 +39,10 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
   const unit = units.find((u) => u.id === unitId);
   const rpCost = sel === 'relic' ? relicRp(tier) : 0;
 
+  // Forced Expansion only reaches unheld sectors the faction could attack: next to its own, or in a Warp Gate's reach.
+  const expansionFront = new Set(c && fid && sel === 'expansion' ? attackTargets(c, fid).map((s) => s.id) : []);
   const sectorChoices =
-    !c || !fid ? [] : sel === 'reinforce' ? ownedSectors(c, fid).filter((s) => !isReinforced(s)) : sel === 'expansion' ? c.sectors.filter((s) => !s.owner && s.type !== 'home') : [];
+    !c || !fid ? [] : sel === 'reinforce' ? ownedSectors(c, fid).filter((s) => !isReinforced(s)) : sel === 'expansion' ? c.sectors.filter((s) => !s.owner && s.type !== 'home' && expansionFront.has(s.id)) : [];
 
   const pick = (k: UmbraBuy) => {
     setSel(k);
@@ -55,6 +58,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
     if (item.key === 'revive' && !units.length) return 'No unit is comatose.';
     if (NEEDS_UNIT.has(item.key) && !unit) return 'Choose a unit.';
     if ((item.key === 'manipulation' || item.key === 'relic' || item.key === 'evolution') && !choice) return 'Make a choice.';
+    if (item.key === 'expansion' && c && fid && !sectorChoices.length) return 'No unheld sector borders your territory or lies in a Warp Gate’s reach.';
     if ((item.key === 'reinforce' || item.key === 'expansion') && !choice) return c && fid ? 'Choose a sector.' : 'Link this force to a campaign faction first.';
     // The sector may have been taken, reinforced or deleted since it was picked.
     if ((item.key === 'reinforce' || item.key === 'expansion') && !sectorChoices.some((s) => s.id === choice)) return "That sector isn't available now. Choose another.";
