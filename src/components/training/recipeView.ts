@@ -29,8 +29,14 @@ export function defaultProgress(d: DefaultRecipeDef, shards: ShardPiece[]): (Sha
   });
 }
 
-/** The Shards a recipe can count right now: kept ones, and this draft's (placed) ones too. */
+/** The Shards a recipe's slots can show: kept ones, and this draft's (placed) ones too, which pulse as new. */
 export const countable = (run: TrainingRun): ShardPiece[] => shardsOnMap(run, run.draft.step !== 'done');
+
+/** A slot met by a kept Shard: lit, and counted. A draft's Shard only pulses until it is kept. */
+export const kept = (p: ShardPiece | null): boolean => !!p && !p.draft;
+
+/** A slot's tooltip tail: whether its Shard is on the map, and if so whether it is kept yet. */
+export const slotNote = (p: ShardPiece | null): string => (!p ? '' : p.draft ? ' (placed this draft, not kept yet)' : ' (on the map)');
 
 /** Ids of the Shards that a ready recipe or default would use: these glow on the map. */
 export function glowIds(run: TrainingRun): Set<number> {

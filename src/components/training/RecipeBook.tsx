@@ -7,7 +7,7 @@ import { Icon } from '../Icon';
 import { act } from './act';
 import { DefaultsBook } from './DefaultsBook';
 import { gunLine } from './PieceInfo';
-import { countable, recipeProgress } from './recipeView';
+import { countable, kept, recipeProgress, slotNote } from './recipeView';
 import { RecordBadges } from './RecordBadges';
 import { ShardBadge } from './ShardBadge';
 
@@ -48,7 +48,7 @@ export function RecipeBook({ run, units, portraits, crafting, onCraft }: RecipeB
   const shards = countable(run);
   const open = run.recipes.filter((r) => !run.crafted.includes(r.unitId));
   // Ready ones first, then the closest (fewest Shards to go).
-  const toGo = (r: Recipe) => r.slots.length - recipeProgress(r, shards).filter(Boolean).length;
+  const toGo = (r: Recipe) => r.slots.length - recipeProgress(r, shards).filter(kept).length;
   const sorted = [...open].sort((a, b) => Number(ready.has(b.unitId)) - Number(ready.has(a.unitId)) || toGo(a) - toGo(b));
   const done = run.recipes.filter((r) => run.crafted.includes(r.unitId));
   return (
@@ -92,8 +92,8 @@ function RecipeRow({ run, recipe, portrait, progress, uses, active, onCraft, uni
   unit?: Unit;
 }) {
   const known = !!unit;
-  const met = progress.filter(Boolean).length;
-  const missing = recipe.slots.filter((_, i) => !progress[i]);
+  const met = progress.filter(kept).length;
+  const missing = recipe.slots.filter((_, i) => !kept(progress[i]));
   // A ready recipe may still be refused (draft not all placed): say why on the button.
   const why = uses ? craftProblem(run, recipe.unitId, uses, uses[0]) : 'Not all its Shards are on the map.';
   return (
@@ -103,8 +103,8 @@ function RecipeRow({ run, recipe, portrait, progress, uses, active, onCraft, uni
         <span className="training-recipe-name">{recipe.name} <span className="muted">· {recipe.points} pts · {met}/{recipe.slots.length}</span>{uses ? <span className="training-recipe-go"> · ready</span> : missing.length === 1 ? <span className="training-recipe-go"> · 1 to go</span> : null}</span>
         <span className="training-recipe-slots">
           {recipe.slots.map((s, i) => (
-            <span key={i} data-tip={`${gradeName(s.grade)} ${SHARD_TYPES[s.type].name}${progress[i] ? ' (on the map)' : ''}`}>
-              <ShardBadge type={s.type} grade={s.grade} size={18} faded={!progress[i]} glow={!!uses} />
+            <span key={i} data-tip={`${gradeName(s.grade)} ${SHARD_TYPES[s.type].name}${slotNote(progress[i])}`}>
+              <ShardBadge type={s.type} grade={s.grade} size={18} faded={!progress[i]} fresh={!!progress[i]?.draft} glow={!!uses && kept(progress[i])} />
             </span>
           ))}
         </span>

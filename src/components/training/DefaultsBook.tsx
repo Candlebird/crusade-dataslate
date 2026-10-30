@@ -2,7 +2,7 @@ import type { DefaultRecipeDef } from '../../rules/downtimeData';
 import { SHARD_TYPES } from '../../rules/downtimeData';
 import { craftDefaultProblem, defaultsFor, gradeName, readyDefaults, type TrainingRun } from '../../rules/training';
 import type { Crafting } from './RecipeBook';
-import { countable, defaultProgress } from './recipeView';
+import { countable, defaultProgress, kept, slotNote } from './recipeView';
 import { ShardBadge } from './ShardBadge';
 
 export interface DefaultsBookProps {
@@ -45,7 +45,7 @@ function DefaultRow({ run, d, progress, uses, active, onCraft }: {
   active: boolean;
   onCraft: (c: Crafting | null) => void;
 }) {
-  const met = progress.filter(Boolean).length;
+  const met = progress.filter(kept).length;
   const why = uses ? craftDefaultProblem(run, d.key, uses, uses[0]) : 'Not all its Shards are on the map.';
   return (
     <div className={`training-recipe${uses ? ' ready' : ''}${active ? ' active' : ''}`}>
@@ -53,8 +53,8 @@ function DefaultRow({ run, d, progress, uses, active, onCraft }: {
         <span className="training-recipe-name">{d.name} <span className="muted">· {met}/{d.slots.length}</span></span>
         <span className="training-recipe-slots">
           {d.slots.map(([type, grade], i) => (
-            <span key={i} data-tip={`${gradeName(grade as 1)} ${SHARD_TYPES[type].name}, exactly${progress[i] ? ' (on the map)' : ''}`}>
-              <ShardBadge type={type} grade={grade as 1} size={18} faded={!progress[i]} glow={!!progress[i]} />
+            <span key={i} data-tip={`${gradeName(grade as 1)} ${SHARD_TYPES[type].name}, exactly${slotNote(progress[i])}`}>
+              <ShardBadge type={type} grade={grade as 1} size={18} faded={!progress[i]} fresh={!!progress[i]?.draft} glow={kept(progress[i])} />
             </span>
           ))}
         </span>
