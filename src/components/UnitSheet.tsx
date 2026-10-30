@@ -38,6 +38,7 @@ import {
   ruleRating,
   upgradesUsed,
   validateUnit,
+  xpShown,
 } from '../rules/engine';
 import { nexusAccess } from '../rules/nexus';
 import { unitName } from '../rules/battle';
@@ -332,7 +333,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               {!edit && <> {u.battles} battle{u.battles === 1 ? '' : 's'} · {u.kills} kill{u.kills === 1 ? '' : 's'}.</>}
             </p>
             {edit && <div className="row" style={{ marginTop: '0.75rem' }}>
-              <Stepper value={u.xp} min={0} onChange={(n) => set((d) => void (d.xp = n))} />
+              <Stepper value={xpShown(u.xp)} min={0} onChange={(n) => set((d) => void (d.xp = n + d.xp - xpShown(d.xp)))} />
               {[1, 2, 3, 5].map((n) => (
                 <button key={n} onClick={() => set((d) => void (d.xp += n))}>+{n}</button>
               ))}

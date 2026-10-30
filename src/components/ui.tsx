@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { LEVEL_THRESHOLDS } from '../rules/data';
-import { xpProgress, type Issue } from '../rules/engine';
+import { xpProgress, xpShown, type Issue } from '../rules/engine';
 import { Icon, IconText } from './Icon';
 
 export function Modal({ title, onClose, children, footer, wide }: {
@@ -74,7 +74,7 @@ export function TextArea({ value, onCommit, rows = 3, placeholder }: { value: st
 
 export function XpBar({ xp, mini }: { xp: number; mini?: boolean }) {
   const p = xpProgress(xp);
-  const label = p.next == null ? `LVL ${p.level} · ${xp} XP · ${p.replacements} swap(s)` : `LVL ${p.level} · ${xp} / ${p.next} XP`;
+  const label = p.next == null ? `LVL ${p.level} · ${xpShown(xp)} XP · ${p.replacements} swap(s)` : `LVL ${p.level} · ${xpShown(xp)} / ${p.next} XP`;
   return (
     <div>
       <div className={`xpbar${mini ? ' mini' : ''}`} data-tip={label}>

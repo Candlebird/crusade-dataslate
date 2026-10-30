@@ -11,7 +11,7 @@ import {
   type RewardEntry,
   type RewardTableKey,
 } from './data';
-import { applyScar, levelForXp, rollDie, previousBracketXp, relicBearer, sufferingRolls, type DeathOutcome, type ScarResult } from './engine';
+import { applyScar, levelForXp, rollDie, previousBracketXp, relicBearer, sufferingRolls, xpShown, type DeathOutcome, type ScarResult } from './engine';
 import { grantRelic } from './relicVault';
 import { MANIPULATION_PREFIX, NEXUS_ROUNDS, RELIC_TAKEN, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
 import { ZONE_REWARDS, type ZoneMode } from './zone/rewards';
@@ -481,7 +481,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
   const summary: string[] = [];
   for (const o of outcomes) {
     const bits: string[] = [];
-    if (o.gain || o.played) bits.push(`+${o.gain} XP (${o.xpBefore} → ${o.xpAfter})`);
+    if (o.gain || o.played) bits.push(`+${xpShown(o.xpAfter) - xpShown(o.xpBefore)} XP (${xpShown(o.xpBefore)} → ${xpShown(o.xpAfter)})`);
     if (o.levelsGained > 0) bits.push(`level ${levelForXp(o.xpAfter)}!`);
     if (o.lostTrait) bits.push(`lost ${o.lostTrait} instead of a scar`);
     if (o.scarUndone) bits.push(`${o.scarName} scar undone`);

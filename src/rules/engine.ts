@@ -15,6 +15,9 @@ import {
   SUFFERING_BP_STEP,
 } from './data';
 
+/** XP as shown: whole points, rounded down (zone battles and kills can leave fractions). */
+export const xpShown = (xp: number) => Math.floor(xp + 1e-9);
+
 export function levelForXp(xp: number): number {
   return LEVEL_THRESHOLDS.filter((t) => xp >= t).length;
 }
@@ -242,7 +245,7 @@ export function validateUnit(u: Unit): Issue[] {
   if (u.relics.length > 0 && u.category !== 'Hero' && !u.heroicRise && u.bpAdjust <= 0)
     out.push({ level: 'warn', text: 'Relics are for Heroes only (or units with Heroic Rise).' });
   if (u.relics.length > slots)
-    out.push({ level: 'error', text: `${u.relics.length} relics but only ${slots} relic slot(s) at ${u.xp} XP; move one to the relic vault.` });
+    out.push({ level: 'error', text: `${u.relics.length} relics but only ${slots} relic slot(s) at ${xpShown(u.xp)} XP; move one to the relic vault.` });
   for (const r of u.relics)
     if (!relicTierAllowed(r.tier, u.xp))
       out.push({ level: 'warn', text: `${r.name} is ${r.tier}; needs ${RELIC_TIER_MIN_XP[r.tier]}+ XP.` });

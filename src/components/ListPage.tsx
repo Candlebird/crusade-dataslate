@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { ArmyList, CatalogBook, Force, RuleText, Settings, Unit } from '../model/types';
-import { battlePoints, hasRule, levelForXp, ruleRating } from '../rules/engine';
+import { battlePoints, hasRule, levelForXp, ruleRating, xpShown } from '../rules/engine';
 import { glossary, isHero, joinedTo, label, listIssues, listSpells, listTotals, listUnits, weaponColumns } from '../rules/lists';
 import { go, href } from '../route';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
@@ -269,7 +269,7 @@ function UnitCard({ u, joined, s }: { u: Unit; joined?: Unit; s: Settings }) {
       <div className="card-stats">
         <span><b>Qua</b> {u.quality}+</span>
         <span><b>Def</b> {u.defense}+</span>
-        <span><b>Lvl</b> {level} ({u.xp} XP)</span>
+        <span><b>Lvl</b> {level} ({xpShown(u.xp)} XP)</span>
         <span><b>Tough</b> {tough}</span>
         <span><b>BP</b> {battlePoints(u, s)}</span>
         {u.status === 'comatose' && <span className="card-flag">Comatose</span>}

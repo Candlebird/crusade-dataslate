@@ -4,7 +4,7 @@ import { nowIso, uid } from '../model/factory';
 import { localDate } from '../model/date';
 import type { Campaign, Force, UnitTaskKind } from '../model/types';
 import { unitName } from '../rules/battle';
-import { levelForXp } from '../rules/engine';
+import { levelForXp, xpShown } from '../rules/engine';
 import { currentRound } from '../rules/nexus';
 import { GARRISON, MENTORING, PROJECT_DIE, PROJECTS, RECON } from '../rules/downtimeData';
 import {
@@ -126,7 +126,7 @@ export default function UnitTaskModal({ force, c, onClose }: { force: Force; c: 
             Pupil ({unit.category}, below level {levelForXp(unit.xp)})
             <select value={pupilId} onChange={(e) => setPupilId(e.target.value)}>
               <option value="">{pupils.length ? '— choose —' : 'No free unit to teach'}</option>
-              {pupils.map((u) => <option key={u.id} value={u.id}>{unitName(u)} · level {levelForXp(u.xp)} · {u.xp} XP</option>)}
+              {pupils.map((u) => <option key={u.id} value={u.id}>{unitName(u)} · level {levelForXp(u.xp)} · {xpShown(u.xp)} XP</option>)}
             </select>
           </label>
         )}

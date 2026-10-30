@@ -3,7 +3,7 @@ import { useStore } from '../model/store';
 import { useCloud } from '../cloud/CloudSync';
 import { exportForce, readImageAsDataUrl } from '../model/io';
 import { uid } from '../model/factory';
-import { battlePoints, forceTotals, levelForXp, pendingLevels, relicBearer, validateUnit } from '../rules/engine';
+import { battlePoints, forceTotals, levelForXp, pendingLevels, relicBearer, validateUnit, xpShown } from '../rules/engine';
 import { carryProblem, equipRelic, sendRelic, vaultOf } from '../rules/relicVault';
 import { forceArmyUrl } from '../armyforge/book';
 import { go, href } from '../route';
@@ -238,7 +238,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                           </td>
                           <td className="cat s-end">{u.category}</td>
                           <td className="s-full"><UnitTags unit={u} /></td>
-                          <td className="s-full"><XpBar xp={u.xp} mini /><span className="small muted">{u.xp} XP</span></td>
+                          <td className="s-full"><XpBar xp={u.xp} mini /><span className="small muted">{xpShown(u.xp)} XP</span></td>
                           <td className="num" data-label="Lvl">{levelForXp(u.xp)}</td>
                           <td className="num" data-label="Pts">{u.points}</td>
                           <td className="num" data-label="BP">{battlePoints(u, s)}</td>

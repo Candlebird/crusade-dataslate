@@ -55,7 +55,7 @@ import { ECHOES, NEXUS_CRISIS, NEXUS_REINFORCE_BONUS } from '../rules/nexusData'
 import { aiDefended, ratingFor } from '../rules/difficulty';
 import { isReinforced } from '../rules/production';
 import SectorDanger from './SectorDanger';
-import { forceTotals } from '../rules/engine';
+import { forceTotals, xpShown } from '../rules/engine';
 import { SOLO_PATROL } from '../rules/downtimeData';
 import { MAX_PLAYERS, formatSlots, randomForces, randomFormat, type Format } from '../rules/randomBattle';
 import AiActivation from './AiActivation';
@@ -902,7 +902,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
                   </td>
                   <td data-label="Shaken"><input type="checkbox" checked={u.shaken} onChange={(e) => setUnit(u.id, (x) => void (x.shaken = e.target.checked))} /></td>
                   <td data-label="Activated"><input type="checkbox" checked={u.activated} onChange={(e) => setUnit(u.id, (x) => void (x.activated = e.target.checked))} /></td>
-                  <td className="num" data-label="XP"><Stepper value={u.xp ?? 0} min={0} onChange={(n) => setUnit(u.id, (x) => void (x.xp = n))} /></td>
+                  <td className="num" data-label="XP"><Stepper value={xpShown(u.xp ?? 0)} min={0} onChange={(n) => setUnit(u.id, (x) => void (x.xp = n + (x.xp ?? 0) - xpShown(x.xp ?? 0)))} /></td>
                   <td data-label="Destroyed"><input type="checkbox" checked={u.destroyed} onChange={(e) => setUnit(u.id, (x) => { x.destroyed = e.target.checked; if (!x.destroyed && x.wounds === 0) x.wounds = x.maxWounds; })} /></td>
                 </tr>
               ))}

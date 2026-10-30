@@ -4,6 +4,7 @@ import { describe } from '../../rules/abilities';
 import { defaultByKey, gradeName, levelDmg, reach, type Piece, type Tower, type TowerGun, type TrainingRun } from '../../rules/training';
 import { PieceActions, type MoveRule } from './PieceActions';
 import { HabitBadges, RecordBadges, RelicList } from './RecordBadges';
+import { xpShown } from '../../rules/engine';
 import { ShardBadge } from './ShardBadge';
 
 export interface PieceInfoProps {
@@ -55,7 +56,7 @@ export function PieceInfo({ run, piece, record, onClose, onChange, onMove }: Pie
       {unit && record && <RecordBadges unit={record} full />}
       {unit && <HabitBadges unit={unit} />}
       {unit?.relics?.length ? <RelicList relics={unit.relics} /> : null}
-      <div className="muted">Quality {piece.quality}+ · {piece.kills} kill{piece.kills === 1 ? '' : 's'} · {Math.round(piece.dealt)} damage{unit ? ` · ${unit.xp} XP` : ''}</div>
+      <div className="muted">Quality {piece.quality}+ · {piece.kills} kill{piece.kills === 1 ? '' : 's'} · {Math.round(piece.dealt)} damage{unit ? ` · ${xpShown(unit.xp)} XP` : ''}</div>
     </div>
   );
 }

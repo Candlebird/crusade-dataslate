@@ -8,7 +8,7 @@ import { AGENDAS, MARKED_XP, MAX_AGENDAS, REWARD_TABLES, SCAR_TABLE, type Reward
 import { matchBonusesEarned } from '../rules/detachments';
 import { ECHOES, currentRound, emptyNexusPick, markUnitsUsed, nexusEntry, nexusGeneration, recordSectorGame, unitsUsed, type NexusContext, type NexusPick } from '../rules/nexus';
 import { depositNearest, depositText, rewardOrigin } from '../rules/production';
-import { deathDiceCount, deathOutcome, forceTotals, levelForXp, rollDice, rollDie, type DeathOutcome } from '../rules/engine';
+import { deathDiceCount, deathOutcome, forceTotals, levelForXp, rollDice, rollDie, xpShown, type DeathOutcome } from '../rules/engine';
 import {
   RESULT_LABEL,
   battleScarUnits,
@@ -597,8 +597,8 @@ function SummaryStep({ outcome }: { outcome: BattleOutcome }) {
               {outcome.units.filter((o) => o.played || o.gain || o.wokeUp).map((o) => (
                 <tr key={o.unitId}>
                   <td className="s-2"><b>{o.name}</b>{!o.played && <div className="muted small">did not fight</div>}</td>
-                  <td className="small s-full" data-label="Breakdown">{o.parts.map((p) => `${p.label} +${p.xp}`).join(', ') || '—'}</td>
-                  <td className="num s-end" data-label="XP">{o.xpBefore} → <b>{o.xpAfter}</b></td>
+                  <td className="small s-full" data-label="Breakdown">{o.parts.map((p) => `${p.label} +${xpShown(p.xp)}`).join(', ') || '—'}</td>
+                  <td className="num s-end" data-label="XP">{xpShown(o.xpBefore)} → <b>{xpShown(o.xpAfter)}</b></td>
                   <td className="s-full">
                     {o.levelsGained > 0 && <span className="tag gold">Level {levelForXp(o.xpAfter)}!</span>}
                     {o.scarUndone && <span className="tag green">{o.scarName} undone</span>}

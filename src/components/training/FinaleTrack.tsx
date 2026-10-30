@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Campaign, Force } from '../../model/types';
 import { TRAINING } from '../../rules/downtimeData';
 import { finalBoss, finaleTrack, newFinale, nexusOf, pickNemesis } from '../../rules/training';
+import { xpShown } from '../../rules/engine';
 import { Icon } from '../Icon';
 
 /** The force's Final-wave ladder, like the Drill Honours track: the Final its runs meet now and its boss, and each step
@@ -15,7 +16,7 @@ export function FinaleTrack({ force, c }: { force: Force; c?: Campaign }) {
     <div className="sortie-choice small">
       <button className="ghost small sortie-recap-row" onClick={() => setOpen(!open)}>
         <b>Final wave {t.open}</b>{' '}
-        <span className="muted">· led by {boss} · veterancy {t.vet} XP{deep ? ` · Endless best +${deep}` : ''} <Icon name={open ? 'l:chevron-up' : 'l:chevron-down'} /></span>
+        <span className="muted">· led by {boss} · veterancy {xpShown(t.vet)} XP{deep ? ` · Endless best +${deep}` : ''} <Icon name={open ? 'l:chevron-up' : 'l:chevron-down'} /></span>
       </button>
       {open && (
         <div className="sortie-bestiary">
@@ -30,7 +31,7 @@ export function FinaleTrack({ force, c }: { force: Force; c?: Campaign }) {
                 <b>Win at {s.n}</b> <span aria-label={s.won ? 'won' : 'not won'}>{s.won ? '✓' : '✗'}</span>
                 <span className="muted small"> · {s.won ? `won ${force.finale?.wins[String(s.n)] ?? ''}`.trim() : s.open ? 'open' : 'locked'}</span>
               </div>
-              <div className="small muted">{s.bar ? `Veterancy ${Math.min(t.vet, s.bar)}/${s.bar} XP` : 'Open from the start'}</div>
+              <div className="small muted">{s.bar ? `Veterancy ${xpShown(Math.min(t.vet, s.bar))}/${s.bar} XP` : 'Open from the start'}</div>
             </div>
           ))}
         </div>

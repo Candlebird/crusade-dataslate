@@ -3,7 +3,7 @@ import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { Force, Unit } from '../model/types';
 import { RELICS, REQUISITIONS, SCAR_TABLE, type Requisition } from '../rules/data';
-import { applyScar, forceTotals, hasRule, relicHolders, relicSlots, relicTaken, relicTierAllowed, rollDice, rollDie } from '../rules/engine';
+import { applyScar, forceTotals, hasRule, relicHolders, relicSlots, relicTaken, relicTierAllowed, rollDice, rollDie, xpShown } from '../rules/engine';
 import { NEEDS_UNIT, RELIC_TIER, requisitionEligible, requisitionProblem } from '../rules/requisition';
 import { unitName } from '../rules/battle';
 import { Modal, RelicOption, toast } from './ui';
@@ -85,7 +85,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
       }
       case 'Elite Reinforcements':
         mutate = (u) => void (u.xp = Math.max(u.xp, 10));
-        outcome = `${unitName(unit!)} starts at ${Math.max(unit!.xp, 10)} XP.`;
+        outcome = `${unitName(unit!)} starts at ${xpShown(Math.max(unit!.xp, 10))} XP.`;
         break;
       case 'Heroic Rise':
         mutate = (u) => {
@@ -146,7 +146,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
                   Unit{NEEDS_UNIT.has(sel.name) ? '' : ' (optional)'}
                   <select value={unitId} onChange={(e) => { setUnitId(e.target.value); setChoice(''); }}>
                     <option value="">— choose —</option>
-                    {eligible.map((u) => <option key={u.id} value={u.id}>{unitName(u)} ({u.xp} XP)</option>)}
+                    {eligible.map((u) => <option key={u.id} value={u.id}>{unitName(u)} ({xpShown(u.xp)} XP)</option>)}
                   </select>
                 </label>
               )}

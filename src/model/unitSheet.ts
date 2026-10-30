@@ -30,7 +30,7 @@ export function weaponTraitDesc(name: string): string | undefined {
 export function xpNextText(xp: number): string {
   const p = xpProgress(xp);
   if (p.next == null) return 'Max level. More XP unlocks swapping an upgrade.';
-  return `${p.next - xp} XP to level ${p.level + 1}.`;
+  return `${Math.ceil(p.next - xp - 1e-9)} XP to level ${p.level + 1}.`;
 }
 
 /** How close the unit is to being removed by scars. */

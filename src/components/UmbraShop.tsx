@@ -3,7 +3,7 @@ import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { Force, Unit } from '../model/types';
 import { NEXUS_TRAITS, RELICS, type RelicTier } from '../rules/data';
-import { forceTotals, relicCost as relicRp, relicHolders, relicTaken } from '../rules/engine';
+import { forceTotals, relicCost as relicRp, relicHolders, relicTaken, xpShown } from '../rules/engine';
 import { unitName } from '../rules/battle';
 import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_RELIC_US, NEXUS_ROUNDS, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
 import { isReinforced } from '../rules/production';
@@ -170,7 +170,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
                   Unit
                   <select value={unitId} onChange={(e) => { setUnitId(e.target.value); if (item.key === 'evolution') setChoice(''); }}>
                     <option value="">— choose —</option>
-                    {units.map((u) => <option key={u.id} value={u.id}>{unitName(u)} ({u.xp} XP)</option>)}
+                    {units.map((u) => <option key={u.id} value={u.id}>{unitName(u)} ({xpShown(u.xp)} XP)</option>)}
                   </select>
                 </label>
               )}
