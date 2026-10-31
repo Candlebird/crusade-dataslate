@@ -75,6 +75,7 @@ const TABLE: Record<string, Effect[]> = {
   bleed: [onHit('bleed', 0.5)],
   counter: [thorns(1, 0.5)],
   'counter/rending': [thorns(1, 0.5)],
+  'counter in melee / rending when shooting': [thorns(1, 0.5)],
   thrust: [onHit('knock', 0.25, 'melee')],
   lance: [onHit('knock', 0.25, 'melee')],
   sniper: [onHit('mark', 0.5)],

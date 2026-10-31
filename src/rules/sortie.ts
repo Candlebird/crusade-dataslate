@@ -345,6 +345,8 @@ const d6 = (run: SortieRun) => coreD6(() => rand(run));
 const hitRoll = (run: SortieRun) => (SORTIE.hitTwice ? Math.max(d6(run), d6(run)) : d6(run));
 /** 2.3 → 2 or 3, 3 30% of the time. */
 const stoch = (run: SortieRun, n: number) => Math.floor(n) + (rand(run) < n - Math.floor(n) ? 1 : 0);
+/** A modifier as a whole number: a fraction is rounded up that share of the time (no die spent on whole numbers). */
+const whole = (run: SortieRun, n: number) => (Number.isInteger(n) ? n : stoch(run, n));
 const pickOf = <T,>(run: SortieRun, xs: readonly T[]): T => xs[Math.floor(rand(run) * xs.length)];
 
 /** Models still on their feet (routed or not), and those still in the fight. */
@@ -364,7 +366,9 @@ function modelsOf(u: Unit, f: Fighter, n: number, tough: number): SortieModel[] 
   const counts = [...u.weapons.map((w) => Math.max(1, w.count)), ...Array<number>(relics).fill(1)];
   f.guns.forEach((g, i) => {
     const c = counts[i] ?? f.size;
-    const per = { ...g, attacks: g.attacks / c };
+    // The +6" range weapon trait (fighter() leaves range as printed).
+    const longer = 6 * (u.weapons[i]?.traits.filter((t) => t.name === '+6" range').length ?? 0);
+    const per = { ...g, attacks: g.attacks / c, range: g.range && g.range + longer };
     if (i >= u.weapons.length && relics) return models[0].guns.push(per);
     if (c >= f.size) return models.forEach((m) => m.guns.push({ ...per }));
     for (let k = 0; k < c; k++) models.reduce((a, b) => (b.guns.length < a.guns.length ? b : a)).guns.push({ ...per });
@@ -393,7 +397,7 @@ export function squadOf(u: Unit, key: string, opts: { n?: number; extraTough?: n
     impact: (ruleRating(names, 'Impact') ?? 0) + (3 * countOf(upgrades, 'Impact +3') + 6 * countOf(upgrades, 'Impact +6')) / f.size + (has('Momentum') ? 1 : 0),
     // A big model acts once a round like any other, but strikes for a Tough of 3 in each blow: Tough 6 twice over, Tough 12 four times.
     hitShoot: f.hitShoot, hitMelee: f.hitMelee, atkBonus: f.atkBonus * Math.max(1, Math.floor((f.tough + extra) / 3)),
-    fast: has('Fast') || has('Flying') || has('Aura of Swiftness'), slow: has('Slow'),
+    fast: ['Fast', 'Swift', 'Flying', 'Flying + Fast', 'Aura of Swiftness'].some(has), slow: has('Slow'),
     fearless: has('Fearless'), hero: has('Hero'),
     abilities: f.abilities, points: Math.round((u.points * n) / f.size),
     status: {}, cooldowns: {}, engaged: -9, shield: 0, revived: false,
@@ -403,6 +407,8 @@ export function squadOf(u: Unit, key: string, opts: { n?: number; extraTough?: n
     if (e.stat === 'hit') { s.hitShoot += e.n; s.hitMelee += e.n; }
     if (e.stat === 'save') s.defMod += e.n;
     if (e.stat === 'rate') s.atkBonus *= 1 + e.n;
+    // Sensor Array: +6" on its guns for each tile of reach.
+    if (e.stat === 'range') for (const m of s.models) for (const g of m.guns) if (!g.melee) g.range += 6 * e.n;
   }
   return s;
 }
@@ -1915,7 +1921,8 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
     const pin = mine && !a.melee && def.echo ? lv(run, 'pinning') : 0;
     for (let i = 0; i < n; i++) {
       if (!standing(def)) break;
-      const need = g.reliable ? 2 : clamp(att.quality - mod, 2, 6);
+      // A fractional bonus (Elite, Surge, Faulty Aim…) counts as a whole +1 that often, so it neither vanishes nor rounds up.
+      const need = g.reliable ? 2 : clamp(att.quality - whole(run, mod), 2, 6);
       let r = hitRoll(run);
       if (r === 1 && again) r = hitRoll(run);
       if (r < need) continue;
@@ -1931,7 +1938,7 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
         hits++;
         const ap = apOf(run, att, def, g, a.melee) + (rend ? 4 : 0);
         const cover = -(target.shaken ? 1 : 0) + (def.echo ? 0 : boonCover(run, def, target) + (quirkHere(run, def, 'native') ? 1 : 0));
-        const save = clamp(def.defense + Math.max(0, ap) - def.defMod - cover, 2, 7);
+        const save = clamp(def.defense + whole(run, Math.max(0, ap) - def.defMod) - cover, 2, 7);
         if (save < 7) {
           let roll = d6(run);
           if (roll === 1 && !def.echo && rerollSave(run, def, target)) roll = d6(run);
