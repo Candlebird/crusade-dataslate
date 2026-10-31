@@ -9,6 +9,8 @@ export const SOLO_PATROL = {
   enemyStep: 50,
   /** XP each unit gets for spotting the enemy, when the patrol turns the fight down. */
   declineXp: 1,
+  /** The share of a battle's XP a patrol pays (participation, kills, death roll): half, so farming patrols risks more deaths per XP. */
+  xp: 0.5,
 };
 
 /** How hard a choice is. Each tier rolls its dice, adds the squad bonus, and needs the target or more. */

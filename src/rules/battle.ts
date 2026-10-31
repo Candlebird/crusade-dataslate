@@ -15,6 +15,7 @@ import { applyScar, levelForXp, rollDie, previousBracketXp, relicBearer, sufferi
 import { grantRelic } from './relicVault';
 import { MANIPULATION_PREFIX, NEXUS_ROUNDS, RELIC_TAKEN, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
 import { ZONE_REWARDS, type ZoneMode } from './zone/rewards';
+import { SOLO_PATROL } from './downtimeData';
 
 // Post-battle resolution ("Gaining Experience", "Gaining RP", "Deaths").
 // resolveBattle() mutates a force draft, so the wizard can preview on a clone and apply the same code for real.
@@ -432,6 +433,8 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
     }
     // A zone battle earns a share of the XP a table game would (what its reward rolls give comes on top, in full).
     if (input.zone) for (const p of parts) p.xp = Math.round(p.xp * ZONE_REWARDS[input.zone].xp * 10) / 10;
+    // A solo patrol pays half the battle's XP.
+    if (input.patrol) for (const p of parts) p.xp = Math.round(p.xp * SOLO_PATROL.xp * 10) / 10;
     // Glory Seekers: every unit that fought and lived earns a little more, in full however the battle was fought.
     if (r.in && !r.destroyed && input.nexus?.glory && !input.patrol) parts.push({ label: 'Glory Seekers', xp: input.nexus.glory });
     parts.push(...(extra[u.id] ?? []));

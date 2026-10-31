@@ -67,7 +67,7 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
       <>
         <p className="muted small">
           Take up to {SOLO_PATROL.points} pts out to find a {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts force of the {ECHOES.name}.
-          Fight it against the AI for participation and kill XP (no RP or reward rolls), or turn back for +{SOLO_PATROL.declineXp} XP per unit.
+          Fight it against the AI for half the usual participation and kill XP (no RP or reward rolls), or turn back for +{SOLO_PATROL.declineXp} XP per unit.
           {linked ? ' Either way, the units have gone out for this round.' : ''}
         </p>
         {done && <p className="small"><span className="tag gold">{force.name} already recorded a patrol this round.</span></p>}

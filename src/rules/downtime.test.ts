@@ -259,7 +259,7 @@ describe('solo patrols', () => {
     expect(participationXp(input)).toBe(PARTICIPATION_XP);
     let n = 0;
     const out = resolveBattle(f, input, () => `id${n++}`);
-    expect(f.units[0].xp).toBe(PARTICIPATION_XP + 2);
+    expect(f.units[0].xp).toBe((PARTICIPATION_XP + 2) / 2); // a patrol pays half
     expect(out.rp).toBe(0);
     expect(f.ledger[0].label).toMatch(/^Solo patrol vs/);
     expect(f.units[1].status).toBe('comatose'); // a patrol doesn't count as the battle a comatose unit sits out

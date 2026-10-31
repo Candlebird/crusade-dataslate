@@ -573,7 +573,7 @@ function SoloPatrol({ mission }: { mission?: MissionDef }) {
     <Panel id="battle.patrol" title="Solo patrol" extra={<span className="tag cyan">Downtime</span>}>
       <p className="muted small">
         No group tonight? Send up to {SOLO_PATROL.points} pts of one force on patrol ({mission?.name ?? 'the mission picked above'}). It meets {SOLO_PATROL.enemyMin}–{SOLO_PATROL.enemyMax} pts
-        of the {ECHOES.name}: fight them vs the AI, or turn back for +{SOLO_PATROL.declineXp} XP each. Units earn participation and kill XP only, no RP or reward rolls.
+        of the {ECHOES.name}: fight them vs the AI, or turn back for +{SOLO_PATROL.declineXp} XP each. Units earn half the usual participation and kill XP, no RP or reward rolls.
         In a campaign, a win counts as a patrol against the {ECHOES.name} and earns a Strategic Asset. Each force can record 1 patrol per campaign round.
         You can also send one from the force's page.
       </p>

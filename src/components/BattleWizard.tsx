@@ -202,7 +202,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       )}
       {input.patrol && (
         <p className="panel notice small">
-          <span className="tag cyan">Solo patrol</span> A downtime game of up to {SOLO_PATROL.points} pts vs the AI. Units earn participation and kill XP only: no RP, reward rolls or Marked for Greatness.
+          <span className="tag cyan">Solo patrol</span> A downtime game of up to {SOLO_PATROL.points} pts vs the AI. Units earn half the usual participation and kill XP: no RP, reward rolls or Marked for Greatness.
           {linked && ' A win still counts as a patrol against the Echoes and earns a Strategic Asset.'}
           {linked && f.nexus?.patrolRound === currentRound(campaign!) && <b> {f.name} already recorded a patrol this round.</b>}
         </p>
@@ -307,7 +307,7 @@ function SetupStep({ input, set, campaign }: { input: BattleInput; set: (p: Part
       {input.patrol ? (
         <div className="panel">
           <div className="panel-title"><h2>Solo patrol</h2></div>
-          <p className="muted small">No agendas on a patrol. Each unit that fought gains {participationXp(input)} XP, plus its kill XP.</p>
+          <p className="muted small">No agendas on a patrol. Each unit that fought gains half the usual XP: {participationXp(input) * SOLO_PATROL.xp} XP, plus half its kill XP.</p>
         </div>
       ) : <div className="panel">
         <div className="panel-title">
@@ -355,7 +355,7 @@ function UnitsStep({ units, input, setUnit, worn }: { units: Unit[]; input: Batt
             {units.map((u) => {
               const r = input.units[u.id];
               const comatose = u.status === 'comatose';
-              const total = r.in ? part + (input.patrol ? r.killXp : (r.marked ? MARKED_XP : 0) + r.killXp + r.bonusXp) : 0;
+              const total = r.in ? (input.patrol ? (part + r.killXp) * SOLO_PATROL.xp : part + (r.marked ? MARKED_XP : 0) + r.killXp + r.bonusXp) : 0;
               return (
                 <tr key={u.id} className={r.in ? '' : 'removed'}>
                   <td data-label="Fought"><input type="checkbox" checked={r.in} onChange={(e) => setUnit(u.id, { in: e.target.checked })} /></td>
@@ -468,7 +468,7 @@ function RewardsStep({ units, input, set, setPick, warnings, inNexus }: {
         <h2>Rewards</h2>
         {!input.patrol && <label className="row small">Agenda RP <Stepper value={input.agendaRp} min={0} onChange={(n) => set({ agendaRp: n })} /></label>}
       </div>
-      <p className="muted small">{input.patrol ? 'Solo patrol: participation and kill XP only, no RP or reward rolls.' : 'Every battle earns 1 RP, plus any Agenda RP you set above.'}</p>
+      <p className="muted small">{input.patrol ? 'Solo patrol: half the usual participation and kill XP, no RP or reward rolls.' : 'Every battle earns 1 RP, plus any Agenda RP you set above.'}</p>
       {rows.map((row) => {
         // What still needs doing on this table (a result this force can't take, a unit to pick), shown where it's fixed.
         const todo = warnings.filter((w) => w.startsWith(`${row.source}: `) && !w.endsWith('not rolled yet.')).map((w) => w.slice(row.source.length + 2));
