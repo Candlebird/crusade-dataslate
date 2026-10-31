@@ -4,7 +4,7 @@ import { useCloud } from '../cloud/CloudSync';
 import { forceTotals } from '../rules/engine';
 import { href } from '../route';
 import type { Force } from '../model/types';
-import { Panel, TextField, UsAbbr } from './ui';
+import { NumberField, Panel, TextField, UsAbbr } from './ui';
 import { EditModeButton, EditModeNotice, useEditMode } from './editMode';
 import { Icon } from './Icon';
 
@@ -52,8 +52,8 @@ export function LedgerTable({ f, edit, set, limit }: { f: Force; edit: boolean; 
             <tr key={e.id}>
               <td className="s-2" data-label="Date"><input type="date" value={e.date} onChange={(ev) => set((d) => void (d.ledger[i].date = ev.target.value))} /></td>
               <td className="s-full ledger-entry" data-label="Entry"><TextField className="wide" value={e.label} onCommit={(v) => set((d) => void (d.ledger[i].label = v))} /></td>
-              <td className="num" data-label="RP"><input type="number" value={e.rp} onChange={(ev) => set((d) => void (d.ledger[i].rp = Number(ev.target.value) || 0))} /></td>
-              <td className="num" data-label="Supply"><input type="number" step={50} value={e.supply} onChange={(ev) => set((d) => void (d.ledger[i].supply = Number(ev.target.value) || 0))} /></td>
+              <td className="num" data-label="RP"><NumberField value={e.rp} onCommit={(n) => set((d) => void (d.ledger[i].rp = n))} /></td>
+              <td className="num" data-label="Supply"><NumberField step={50} value={e.supply} onCommit={(n) => set((d) => void (d.ledger[i].supply = n))} /></td>
               <td className="num small" data-label="US" data-tip="Umbra Shards (history only; set the balance in Force details)">{us(e.us)}</td>
               <td className="s-end"><button className="ghost icon" onClick={() => set((d) => void d.ledger.splice(i, 1))} aria-label="Delete entry"><Icon name="l:x" /></button></td>
             </tr>

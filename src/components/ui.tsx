@@ -66,6 +66,33 @@ export function TextField({ value, onCommit, placeholder, className }: {
   );
 }
 
+/** A number box that keeps what's typed (a lone "-", "1.") until it reads as a number, so negatives can be entered. Empty commits 0 on blur. */
+export function NumberField({ value, onCommit, step }: { value: number; onCommit: (n: number) => void; step?: number }) {
+  const [v, setV] = useState(String(value));
+  useEffect(() => setV((cur) => (Number(cur) === value && cur.trim() !== '' ? cur : String(value))), [value]);
+  return (
+    <input
+      type="number"
+      step={step}
+      value={v}
+      onChange={(e) => {
+        const raw = e.target.value;
+        setV(raw);
+        const n = Number(raw);
+        if (raw.trim() !== '' && Number.isFinite(n) && n !== value) onCommit(n);
+      }}
+      onBlur={() => {
+        const n = Number(v);
+        if (v.trim() === '' || !Number.isFinite(n)) {
+          if (value !== 0) onCommit(0);
+          setV('0');
+        }
+      }}
+      onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+    />
+  );
+}
+
 export function TextArea({ value, onCommit, rows = 3, placeholder }: { value: string; onCommit: (s: string) => void; rows?: number; placeholder?: string }) {
   const [v, setV] = useState(value);
   useEffect(() => setV(value), [value]);
