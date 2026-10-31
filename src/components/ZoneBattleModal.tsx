@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { aiTurn } from '../rules/zone/ai';
 import { xy, zoneOf } from '../rules/zone/board';
-import { castable, act, attackNow, actions, hasGuns, arriveSquares, autoDeploy, autoJoin, chargeTargets, deploy, deployHint, deploySquares, endNow, isHeroUnit, joinHero, joinTargets, moves, onActivation, ready, startDeploy, toDeploy, vpOf, type Action, type Order } from '../rules/zone/engine';
+import { castable, act, attackNow, actions, hasGuns, arriveSquares, autoDeploy, autoJoin, chargeTargets, meleeTargets, deploy, deployHint, deploySquares, endNow, isHeroUnit, joinHero, joinTargets, moves, onActivation, ready, startDeploy, toDeploy, vpOf, type Action, type Order } from '../rules/zone/engine';
 import { shootable, woundsLeft } from '../rules/zone/combat';
 import { forecastSims, type ZForecast } from '../rules/zone/forecast';
 import { alive, maxWoundsOf } from '../rules/zone/profile';
@@ -27,9 +27,9 @@ export const ACTION_PAUSE = 600;
 
 const ACTION_TIP: Record<Action, string> = {
   hold: 'Stay put, then shoot with every gun that reaches',
-  advance: 'Move 1 square (6"), then shoot',
+  advance: 'Move 1 square (6"), then shoot, or fight an enemy beside it',
   rush: 'Move 2 squares (12"), no shooting',
-  charge: 'Move up to 2 squares into an enemy and fight in melee',
+  charge: 'Move up to 2 squares to beside an enemy (pick the side) and fight in melee',
   idle: 'Shaken: spend the activation recovering',
   arrive: 'Come on from Ambush, over 9" from every enemy; it then activates this round as usual',
   wait: 'Stay in Ambush and come on in a later round',
@@ -51,7 +51,10 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const [mode, setMode] = useState<ZoneMode>(mode0);
   const [sel, setSel] = useState<string>();
   // In the shooting step: Shoot was pressed, and a tap on an enemy in reach fires at it.
-  const [aiming, setAiming] = useState(false);
+  // Fight was pressed instead (after an Advance): a tap on an enemy beside it fights it.
+  const [aiming, setAiming] = useState<false | 'shoot' | 'melee'>(false);
+  // Charge: the enemy tapped, waiting for the square to strike from.
+  const [chargeAt, setChargeAt] = useState<string>();
   // The picked unit's orders are open over the board.
   const [menu, setMenu] = useState(false);
   // The order picked in them that waits for a square (a move, Arrive) or an enemy (Charge).
@@ -81,7 +84,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     onSave(next, mode);
     return next;
   };
-  const clearPick = () => { setAiming(false); setMenu(false); setOrder(undefined); setCast(''); setAid(''); };
+  const clearPick = () => { setAiming(false); setChargeAt(undefined); setMenu(false); setOrder(undefined); setCast(''); setAid(''); };
 
   // The AI's turns (and the join step when nobody needs to pick), one at a time with a pause between.
   const aiDue = z.phase === 'join' ? !anyMine : (z.phase === 'deploy' || z.phase === 'battle') && !mine(z.turn);
@@ -128,15 +131,19 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const shots = useMemo(() => {
     return attacking ? shootable({ b: z }, pend!) : [];
   }, [z, attacking]);
+  const brawls = useMemo(() => (attacking && z.pending?.melee ? meleeTargets(z, pend!) : []), [z, attacking]);
+  // The squares the picked charge can strike from.
+  const chargeFroms = charges.find((c) => c.target.id === chargeAt)?.froms ?? [];
   const spells = useMemo(() => (canAct ? castable(z, unit!) : []), [z, sel, canAct]);
   const usable = useMemo(() => (canAct ? onActivation(z, unit!) : []), [z, sel, canAct]);
   const lit = useMemo(() => {
     if (canDeploy) return new Set(deploySquares(z, unit!));
     if (canAct && order === 'arrive') return new Set(arriveSquares(z, unit!));
+    if (canAct && order === 'charge') return new Set(chargeFroms);
     return reach;
-  }, [z, sel, canDeploy, canAct, reach, order]);
+  }, [z, sel, canDeploy, canAct, reach, order, chargeAt]);
   // The enemies ringed in red: the ones the picked unit can charge, or once Shoot is pressed the ones in reach.
-  const targetable = new Set(attacking ? (aiming ? shots.map((t) => t.id) : []) : charges.map((c) => c.target.id));
+  const targetable = new Set(attacking ? (aiming === 'shoot' ? shots.map((t) => t.id) : aiming === 'melee' ? brawls.map((t) => t.id) : []) : charges.map((c) => c.target.id));
 
   // Picks the unit to deploy when it's the player's turn and nothing is picked, and the unit that's to shoot. In the
   // battle the player picks the unit to activate (a tap on it once picked holds it, so it isn't picked for them).
@@ -167,9 +174,15 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     step((b) => act(b, order, 'always'));
     clearPick();
   };
-  const attackGo = (target?: string) => {
-    step((b) => attackNow(b, target, !target));
+  const attackGo = (target?: string, melee = false) => {
+    step((b) => attackNow(b, target, !target, melee));
     clearPick();
+  };
+  // Charge an enemy: straight away when there's only one square to strike from, else light them up to pick one.
+  const chargeGo = (id: string) => {
+    const froms = charges.find((c) => c.target.id === id)?.froms ?? [];
+    if (froms.length === 1) go('charge', { target: id, to: froms[0] });
+    else setChargeAt(id);
   };
   // Picks a unit: one of the player's still to act opens its orders, any other only shows.
   const pick = (u: ZUnit) => {
@@ -190,14 +203,15 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const clickSquare = (sq: number) => {
     if (canDeploy && lit.has(sq)) { step((b) => deploy(b, unit!.id, sq)); return; }
     if (attacking || menu) return;
-    if (canAct && order && order !== 'charge') { if (lit.has(sq)) go(order, { to: sq }); return; }
+    if (canAct && order === 'charge') { if (chargeAt && lit.has(sq)) go('charge', { target: chargeAt, to: sq }); return; }
+    if (canAct && order) { if (lit.has(sq)) go(order, { to: sq }); return; }
     if (!order && z.phase === 'battle') cancel();
   };
   const clickUnit = (u: ZUnit) => {
-    if (attacking) { if (targetable.has(u.id)) attackGo(u.id); return; }
+    if (attacking) { if (targetable.has(u.id)) attackGo(u.id, aiming === 'melee'); return; }
     if (menu) return;
     if (canAct && order) {
-      if (targetable.has(u.id)) go('charge', { target: u.id });
+      if (order === 'charge' && targetable.has(u.id) && !lit.has(u.sq)) chargeGo(u.id);
       // A unit already on a square the move reaches: the tap is for the square.
       else if (lit.has(u.sq)) clickSquare(u.sq);
       return;
@@ -262,12 +276,13 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     pop = (
       <div className="zb-pop-back">
         <div className="zb-pop" role="dialog">
-          <h3>{pend!.name}: shoot</h3>
-          <p className="small muted">{shots.length ? `${shots.length} enem${shots.length === 1 ? 'y' : 'ies'} in reach.` : 'No enemy in reach from here.'}</p>
+          <h3>{pend!.name}: {brawls.length ? 'attack' : 'shoot'}</h3>
+          <p className="small muted">{shots.length ? `${shots.length} enem${shots.length === 1 ? 'y' : 'ies'} in reach.` : 'No enemy in reach of its guns from here.'}{brawls.length ? ` It can fight ${brawls.length === 1 ? 'the enemy' : 'an enemy'} beside it in melee instead (not a charge).` : ''}</p>
           <div className="row wrap">
             <span className="grow" />
-            {shots.length > 0 && <button className="primary" onClick={() => setAiming(true)}>Shoot</button>}
-            <button className={shots.length ? '' : 'primary'} onClick={() => attackGo()}>{shots.length ? 'Hold fire' : 'End activation'}</button>
+            {brawls.length > 0 && <button className={shots.length ? '' : 'primary'} onClick={() => setAiming('melee')}>Fight in melee</button>}
+            {shots.length > 0 && <button className="primary" onClick={() => setAiming('shoot')}>Shoot</button>}
+            <button className={shots.length || brawls.length ? '' : 'primary'} onClick={() => attackGo()}>{shots.length ? 'Hold fire' : 'End activation'}</button>
           </div>
         </div>
       </div>
@@ -278,7 +293,9 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   const waiting = (attacking && aiming) || (canAct && !!order);
   const hint = z.phase === 'battle' && (
     <div className={`zb-pop-hint small${waiting || (myTurn && z.placing) ? '' : ' idle'}`}>
-      <span className="grow">{attacking && aiming ? "Tap an enemy ringed in red to shoot it. Guns that can't reach it fire at the nearest they can."
+      <span className="grow">{attacking && aiming === 'melee' ? 'Tap an enemy ringed in red, beside it, to fight it in melee (not a charge: no Impact or charge bonuses).'
+        : attacking && aiming ? "Tap an enemy ringed in red to shoot it. Guns that can't reach it fire at the nearest they can."
+        : canAct && order === 'charge' && chargeAt ? `${unit!.name}: tap a lit square beside ${unitById(z, chargeAt)?.name ?? 'the enemy'} to strike from there.`
         : canAct && order === 'charge' ? `${unit!.name}: tap an enemy ringed in red to charge it.`
         : canAct && order === 'arrive' ? `${unit!.name}: tap a lit square to come on from Ambush.`
         : canAct && order ? `${unit!.name}: tap a lit square to ${order === 'rush' ? 'Rush' : 'Advance'} there.`
@@ -286,7 +303,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
         : myTurn && z.placing ? 'Start of the round: your units in Ambush wait above the board, marked in gold. Tap one to bring it on or keep it waiting.'
         : myTurn ? 'Tap a unit marked in gold to give it orders.'
         : `${sideName(z.turn)} is acting…`}</span>
-      {waiting && <button className="small" onClick={() => (attacking ? setAiming(false) : back())}>Back</button>}
+      {waiting && <button className="small" onClick={() => (attacking ? setAiming(false) : chargeAt ? setChargeAt(undefined) : back())}>Back</button>}
     </div>
   );
 

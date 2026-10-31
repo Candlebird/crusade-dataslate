@@ -441,24 +441,35 @@ export function moves(b: ZBattle, u: ZUnit, action: 'advance' | 'rush'): Map<num
   return reachable(b.board, u.sq, action === 'advance' ? s.advance : s.rush, moveOpts(b, u));
 }
 
-/** Enemies it can charge, each with the square it would strike from. */
-export function chargeTargets(b: ZBattle, u: ZUnit): { target: ZUnit; from: number }[] {
+/**
+ * Enemies it can charge: its full Rush move, ending on a square beside the enemy. `froms` are the squares it may strike
+ * from (any side of the enemy it can get to within that move, going round enemies and terrain, never through them);
+ * `from` is the nearest, the one taken when none is picked.
+ */
+export function chargeTargets(b: ZBattle, u: ZUnit): { target: ZUnit; from: number; froms: number[] }[] {
   if (u.sq < 0) return [];
   const steps = speed(b, u).rush;
   if (!steps) return [];
   const opts = moveOpts(b, u);
-  const out: { target: ZUnit; from: number }[] = [];
+  const enemyOn = (sq: number) => onTable(b).some((x) => x.side !== u.side && x.sq === sq);
+  const out: { target: ZUnit; from: number; froms: number[] }[] = [];
   for (const t of onTable(b)) {
     if (t.side === u.side) continue;
     const sh = rulesOf(b, t).find((h) => h.k === 'shroud') as { charge: number } | undefined;
     const reach = sh ? Math.min(steps, moveSquares(Math.max(0, 12 + (steps - 2) * 6 - sh.charge))) : steps;
-    if (dist(b.board, u.sq, t.sq) > reach) continue;
-    const near = reachable(b.board, u.sq, reach - 1, { ...opts, blocked: (sq) => sq !== u.sq && !canStand(b, u, sq) });
-    let best = -1, bestS = 99;
-    for (const [sq, s] of near) if (dist(b.board, sq, t.sq) === 1 && (sq === u.sq ? -1 : s) < bestS) { best = sq; bestS = sq === u.sq ? -1 : s; }
-    if (best >= 0) out.push({ target: t, from: best });
+    if (dist(b.board, u.sq, t.sq) > reach + 1) continue;
+    const near = reachable(b.board, u.sq, reach, { ...opts, noPass: enemyOn, blocked: (sq) => sq !== u.sq && !canStand(b, u, sq) });
+    const cost = ([sq, s]: [number, number]) => (sq === u.sq ? -1 : s);
+    const froms = [...near].filter(([sq]) => dist(b.board, sq, t.sq) === 1).sort((x, y) => cost(x) - cost(y) || x[0] - y[0]).map(([sq]) => sq);
+    if (froms.length) out.push({ target: t, from: froms[0], froms });
   }
   return out;
+}
+
+/** Enemies beside it that it can fight in melee (it has a melee weapon), as after an Advance. */
+export function meleeTargets(b: ZBattle, u: ZUnit): ZUnit[] {
+  if (u.sq < 0 || !alive(u.p).some((m) => m.guns.some((g) => u.p.guns[g].range === 0))) return [];
+  return onTable(b).filter((t) => t.side !== u.side && dist(b.board, u.sq, t.sq) <= 1);
 }
 
 /** Squares an Ambush unit can arrive on: over 9" (2 squares) from every enemy. */
@@ -494,21 +505,33 @@ export function act(b: ZBattle, o: Order, split: boolean | 'always' = false): Lo
   return withDice(b, (c) => {
     const next = activate(c, u, o);
     if (next === 'shoot' && fighting(u) && u.sq >= 0) {
-      if (split && hasGuns(u) && (split === 'always' || shootable(c, u).length)) { b.pending = { unit: u.id, target: unitById(b, o.target ?? '')?.side === u.side ? undefined : o.target }; sweep(c); return; }
+      // After an Advance it may fight an enemy beside it instead of shooting.
+      const melee = o.action === 'advance' && !u.held && meleeTargets(b, u).length > 0;
+      if (split && (melee || (hasGuns(u) && (split === 'always' || shootable(c, u).length)))) {
+        b.pending = { unit: u.id, target: unitById(b, o.target ?? '')?.side === u.side ? undefined : o.target, ...(melee ? { melee } : {}) };
+        sweep(c);
+        return;
+      }
       shootOrHold(c, u, o.target);
     }
     wrapUp(c, u, next !== 'quiet');
   }).out;
 }
 
-/** The second stage of a split activation: the moved unit shoots (at `target`, or as it planned), unless it holds its fire. */
-export function attackNow(b: ZBattle, target?: string, holdFire = false): LogLine[] {
+/**
+ * The second stage of a split activation: the moved unit shoots (at `target`, or as it planned), unless it holds its
+ * fire. With `melee`, a unit that advanced fights `target`, an enemy beside it, instead: not a charge, so no Impact
+ * and no charge bonuses, and it stays where it is.
+ */
+export function attackNow(b: ZBattle, target?: string, holdFire = false, melee = false): LogLine[] {
   const p = b.pending;
   const u = p && unitById(b, p.unit);
   delete b.pending;
   if (!u || b.phase !== 'battle') return [];
   return withDice(b, (c) => {
-    if (!holdFire && fighting(u) && u.sq >= 0) shootOrHold(c, u, target ?? p!.target);
+    const foe = melee && p!.melee && fighting(u) ? meleeTargets(b, u).find((t) => t.id === target) : undefined;
+    if (foe) fight(c, u, foe, u.sq, false);
+    else if (!holdFire && fighting(u) && u.sq >= 0) shootOrHold(c, u, target ?? p!.target);
     else if (holdFire) line(c, { side: u.side, unit: u.id, kind: 'move', text: `${u.name} holds its fire.` });
     wrapUp(c, u);
   }).out;
@@ -569,7 +592,7 @@ function activate(c: Ctx, u: ZUnit, o: Order): 'shoot' | 'done' | 'quiet' {
   if (action === 'charge') {
     const ct = chargeTargets(b, u);
     const pick = ct.find((x) => x.target.id === o.target) ?? ct[0];
-    if (pick) { charge(c, u, pick.target, pick.from); }
+    if (pick) charge(c, u, pick.target, o.to !== undefined && pick.froms.includes(o.to) ? o.to : pick.from);
   } else if (action === 'advance' || action === 'rush') {
     const opts = moves(b, u, action);
     const to = o.to !== undefined && opts.has(o.to) ? o.to : u.sq;
@@ -663,10 +686,20 @@ function charge(c: Ctx, u: ZUnit, t: ZUnit, from: number) {
   line(c, { side: u.side, unit: u.id, target: t.id, kind: 'move', text: `${u.name} charges ${t.name}.`, path: [start, t.sq] });
   fire(c, u, 'charge', t.id);
   fire(c, t, 'charged', u.id);
+  fight(c, u, t, from, true);
+}
+
+/**
+ * Melee between `u` and `t`: Impact (on a charge), strike-first weapons, the attacker, the rest; then the loser tests
+ * morale, and the attacker takes the ground if the defender is gone, otherwise stands at `from`.
+ */
+function fight(c: Ctx, u: ZUnit, t: ZUnit, from: number, charging: boolean) {
+  const b = c.b;
   if (u.destroyed || u.routed || t.destroyed || t.routed) { settle(c); return; }
+  if (!charging) line(c, { side: u.side, unit: u.id, target: t.id, kind: 'move', text: `${u.name} attacks ${t.name} in melee.` });
   const dealt = [0, 0];
   // Impact: hits on 2+, less one for each model with Counter.
-  const imp = impactOf(u) - alive(t.p).filter((m) => modelHooks(t.p, m).some((h) => h.k === 'counter') || m.guns.some((g) => t.p.guns[g].hooks.some((h) => h.k === 'counter'))).length;
+  const imp = !charging ? 0 : impactOf(u) - alive(t.p).filter((m) => modelHooks(t.p, m).some((h) => h.k === 'counter') || m.guns.some((g) => t.p.guns[g].hooks.some((h) => h.k === 'counter'))).length;
   if (imp > 0) {
     const rolls = Array.from({ length: imp }, () => d6(c.rng));
     const hits = rolls.filter((r) => r >= 2).length;
@@ -679,7 +712,7 @@ function charge(c: Ctx, u: ZUnit, t: ZUnit, from: number) {
     const models = alive(a.p).filter((m) => m.guns.some((g) => a.p.guns[g].range === 0 && guns(g)));
     if (!models.length) return;
     const sixes = a.fought || (who !== 'charge' && a.shaken);
-    const r = attack(c, a, d, models, { kind: 'melee', charging: who === 'charge', sixesOnly: sixes, guns: (_g, i) => guns(i) });
+    const r = attack(c, a, d, models, { kind: 'melee', charging: charging && who === 'charge', sixesOnly: sixes, guns: (_g, i) => guns(i) });
     // Ravage: dice of its own, each 6 a wound.
     const rav = rulesOf(b, a).reduce((n, h) => (h.k === 'ravage' ? n + h.n : n), 0);
     let ravW = 0;

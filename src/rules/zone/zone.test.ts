@@ -9,7 +9,7 @@ import { mulberry32 } from './dice';
 import { join, maxWoundsOf, profileOf, unitHooks, woundsOf } from './profile';
 import { woundsLeft } from './combat';
 import { playOut, quickBattle, randomArmy, simSetup } from './sim';
-import { act, actions, arriveSquares, attackNow, autoDeploy, createBattle, deploySquares, isHeroUnit, onActivation, ready, deploy, pickDeploy, startDeploy, toDeploy } from './engine';
+import { act, actions, arriveSquares, attackNow, autoDeploy, chargeTargets, createBattle, speed, deploySquares, isHeroUnit, onActivation, ready, deploy, pickDeploy, startDeploy, toDeploy } from './engine';
 import { onTable } from './state';
 import { aiTurn } from './ai';
 import type { ZBattle, ZUnit } from './state';
@@ -327,5 +327,69 @@ describe('ambush and fortifications', () => {
       playOut(b);
       expect(b.phase, m.id).toBe('ended');
     }
+  });
+});
+
+describe('charges and melee', () => {
+  /** A cleared board with one unit a side that can fight: everyone else is gone but a spare each, in far corners. */
+  function duel() {
+    const rng = mulberry32(11);
+    const a = { book: DOTHEA, units: randomArmy(DOTHEA, 1500, rng, 'd') };
+    const d = { book: ECHOES, units: randomArmy(ECHOES, 1500, rng, 'e') };
+    const b = playOut(createBattle(simSetup(STANDARD_MISSION, a, d, 11)), [0, 1], 0);
+    b.board.terrain = b.board.terrain.map(() => null);
+    const plain = (u: ZUnit) => speed(b, u).rush === 2 && !unitHooks(u.p).some((h) => h.k === 'flying');
+    const brawler = (u: ZUnit) => plain(u) && u.p.guns.some((g) => g.range === 0);
+    const me = b.units.find((u) => u.side === 1 && !u.joinedTo && brawler(u) && !unitHooks(u.p).some((h) => h.k === 'impact'))!;
+    const foe = b.units.find((u) => u.side === 0 && !unitHooks(u.p).some((h) => h.k === 'shroud'))!;
+    const spares = [b.units.find((u) => u.side === 0 && u !== foe)!, b.units.find((u) => u.side === 1 && !u.joinedTo && u !== me)!];
+    for (const u of b.units) if (![me, foe, ...spares].includes(u)) u.destroyed = true;
+    const { w, h } = b.board;
+    spares[0].sq = 0;
+    spares[1].sq = w * h - 1;
+    for (const u of b.units) { u.activated = false; u.shaken = false; u.joinedTo = undefined; }
+    b.phase = 'battle';
+    b.placing = undefined;
+    b.pending = undefined;
+    b.turn = me.side;
+    const at = (x: number, y: number) => y * w + x;
+    return { b, me, foe, at };
+  }
+
+  it('reaches an enemy a full move away, ending beside it', () => {
+    const { b, me, foe, at } = duel();
+    me.sq = at(1, 3);
+    foe.sq = at(4, 3);
+    const c = chargeTargets(b, me).find((x) => x.target === foe)!;
+    expect(c, 'two squares of movement reach beside an enemy three squares off').toBeDefined();
+    expect(c.froms.sort((x, y) => x - y)).toEqual([at(3, 2), at(3, 3), at(3, 4)]);
+    act(b, { unit: me.id, action: 'charge', target: foe.id });
+    expect(b.log.some((l) => l.kind === 'melee' && l.unit === me.id)).toBe(true);
+  });
+
+  it('picks the side it strikes from, but never one past its move or through the enemy', () => {
+    const { b, me, foe, at } = duel();
+    me.sq = at(1, 3);
+    foe.sq = at(3, 3);
+    const c = chargeTargets(b, me).find((x) => x.target === foe)!;
+    expect(c.froms).toContain(at(3, 2));
+    expect(c.froms).toContain(at(3, 4));
+    expect(c.froms, 'behind it is three squares round').not.toContain(at(4, 3));
+    act(b, { unit: me.id, action: 'charge', target: foe.id, to: at(3, 2) });
+    expect([at(3, 2), foe.sq]).toContain(me.sq);
+    expect(b.log.some((l) => l.kind === 'move' && l.text.includes('charges'))).toBe(true);
+  });
+
+  it('can Advance next to an enemy and fight it in melee instead of shooting', () => {
+    const { b, me, foe, at } = duel();
+    me.sq = at(1, 3);
+    foe.sq = at(3, 3);
+    act(b, { unit: me.id, action: 'advance', to: at(2, 3) }, 'always');
+    expect(b.pending?.melee).toBe(true);
+    const out = attackNow(b, foe.id, false, true);
+    expect(out.some((l) => l.text.includes('in melee'))).toBe(true);
+    expect(out.some((l) => l.kind === 'melee' && l.unit === me.id)).toBe(true);
+    expect(out.some((l) => l.kind === 'melee' && l.text.includes('Impact')), 'no Impact without a charge').toBe(false);
+    expect(b.pending).toBeUndefined();
   });
 });

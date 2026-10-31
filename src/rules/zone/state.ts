@@ -140,7 +140,8 @@ export interface ZBattle {
   smart: [boolean, boolean];
   result?: { winner: SideIx | 'draw'; vp: [number, number]; lost: [number, number]; share: [number, number]; why: string };
   /** A unit that has moved and has its shooting still to come (the second stage of an Advance, or a Rush that can shoot). */
-  pending?: { unit: string; target?: string };
+  /** A unit between its move and its shooting; `melee`: it advanced, so it may fight an enemy beside it instead. */
+  pending?: { unit: string; target?: string; melee?: boolean };
   /** Practice battles don't write anything back. */
   practice?: boolean;
   /** Added to every casting roll (a Nexus Resonance). */

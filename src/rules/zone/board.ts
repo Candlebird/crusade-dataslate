@@ -94,6 +94,8 @@ export interface MoveOpts {
   flying?: boolean;
   /** Squares it can't enter (crowded), or can't end on. */
   blocked?: (sq: number) => boolean;
+  /** Squares it can't move through at all (enemies, for a charge); flyers pass over them. */
+  noPass?: (sq: number) => boolean;
 }
 
 /**
@@ -112,6 +114,7 @@ export function reachable(b: Board, from: number, steps: number, o: MoveOpts = {
         if (out.has(n)) continue;
         const tn = b.terrain[n];
         if (tn?.blocking && !o.flying) continue;
+        if (o.noPass?.(n) && !o.flying) continue;
         out.set(n, s);
         next.push(n);
       }
