@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyDef } from '../../rules/downtimeData';
-import { finalBoss, finalOf, inEndless, isBossWave, isNemesisWave, lordIndex, lordLine, nemesisTricks, previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
+import { checkWaves, finalBoss, finalOf, hasChecks, inEndless, isBossWave, isNemesisWave, lordIndex, lordLine, nemesisTricks, previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
 import { enemyShape } from './drawLive';
 
 export interface WavePreviewProps {
@@ -30,6 +30,11 @@ export function WaveStatus({ run }: WavePreviewProps) {
           </span>
         )}
         {run.nexus && <RealLordTag run={run} w={n} />}
+        {hasChecks(run.siege) && checkWaves(run.siege).includes(n) && (
+          <span className="tag gold" data-tip={`${finalBoss(run)} comes alone and cannot fall: hurt it all you can${n === finalOf(run) ? ' before it reaches the base (the siege ends there)' : '; it walks off the map at the base, costing it nothing, and the siege goes on'}. Each check's damage has its own board.`}>
+            Damage check {checkWaves(run.siege).indexOf(n) + 1}/{checkWaves(run.siege).length}
+          </span>
+        )}
         {run.finale && n === finalOf(run) && !inEndless(run) && (
           <span className="tag gold" data-tip={run.siege ? 'It comes alone and cannot fall: hurt it all you can before it reaches the base.' : 'Slay it with the base standing for a Victory; if it reaches the base the run ends.'}>
             Final: {finalBoss(run)}

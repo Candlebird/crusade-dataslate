@@ -2,7 +2,8 @@ import type { DrillStats, Force } from '../../model/types';
 import { bankBeasts } from './bestiary';
 import { DRILL_GOALS, drillEarned, drillStats, unlockText } from './drill';
 import { runHonours } from './records';
-import { siegeDmg, siegeScore } from './siege';
+import { checkDmg, siegeDmg, siegeScore } from './siege';
+import { bestChecks } from './siegeBoard';
 import type { TrainingRun } from './types';
 import { finaleAfter } from './veterancy';
 
@@ -19,7 +20,8 @@ export const bossesOf = (run: TrainingRun) =>
 /** Real lords and the nemesis slain this run. */
 const lordsOf = (run: TrainingRun) => (run.nexus?.lords ?? []).filter((l) => l.slain).length + (run.nemesis?.slain ? 1 : 0);
 
-/** The counts with one more run in them (a copy). A siege counts once a week, and keeps the week's best. */
+/** The counts with one more run in them (a copy). A siege counts once a week, and keeps the week's best (Normal's: a
+ *  Hard or Insane siege counts as a siege, its damage is on its own board). */
 export function statsAfter(st: DrillStats, run: TrainingRun): DrillStats {
   const out: DrillStats = {
     ...st,
@@ -30,11 +32,17 @@ export function statsAfter(st: DrillStats, run: TrainingRun): DrillStats {
     clean: Math.max(st.clean, run.clean ?? 0),
     crafted: Math.max(st.crafted, run.crafted.length),
   };
-  if (run.siege) {
+  if (run.siege && run.mode) {
+    if (st.siege?.week !== run.siege) {
+      out.sieges = st.sieges + 1;
+      out.siege = { week: run.siege, best: 0 };
+    }
+  } else if (run.siege) {
     const fresh = st.siege?.week !== run.siege;
     out.sieges = st.sieges + (fresh ? 1 : 0);
     const dmg = Math.max(fresh ? -1 : st.siege!.dmg ?? -1, siegeDmg(run) ?? -1);
-    out.siege = { week: run.siege, best: Math.max(fresh ? 0 : st.siege!.best, siegeScore(run)), ...(dmg >= 0 ? { dmg } : {}) };
+    const checks = bestChecks(fresh ? [] : st.siege!.checks, checkDmg(run));
+    out.siege = { week: run.siege, best: Math.max(fresh ? 0 : st.siege!.best, siegeScore(run)), ...(dmg >= 0 ? { dmg } : {}), ...(checks.length ? { checks } : {}) };
   }
   return out;
 }

@@ -28,6 +28,8 @@ export function tallyHarm(run: TrainingRun, by: Tower | undefined, e: Enemy, dea
     }
   }
   if (e.final && run.finale) run.finale.dealt += Math.max(0, dealt);
+  // A damage-check siege: the colossus on the field is the latest check's (finale.ts finalePlan starts its tally).
+  if (e.final && run.checks?.length) run.checks[run.checks.length - 1] += Math.max(0, dealt);
   if (!killed) return;
   beast(run, beastOf(e)).slain += 1;
   const killer = by?.kind === 'unit' ? by.unitId : undefined;

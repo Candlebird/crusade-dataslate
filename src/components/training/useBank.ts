@@ -7,7 +7,7 @@ import { bankOffTableXp, offTableKey } from '../../rules/downtime';
 import { awardFeats, featFaction, trainingFeats, trainingRepeats } from '../../rules/feats';
 import { weekKey } from '../../rules/sortie';
 import {
-  bankDrill, bankFinale, bankHonours, bankShared, drillNews, featFacts, lordsSlain, mvp, postSiege, settleSieges, siegeDmg, siegeScore, takeXp, type TrainingRun,
+  bankDrill, bankFinale, checkDmg, bankHonours, bankShared, drillNews, featFacts, lordsSlain, modeName, mvp, payMilestones, postSiege, settleSieges, siegeDmg, siegeScore, takeXp, type TrainingRun,
 } from '../../rules/training';
 import { toast } from '../ui';
 import { siegeWinLine } from './useSiegeSettle';
@@ -67,6 +67,7 @@ export function useBank(force: Force, c?: Campaign, onBanked?: (news: BankNews) 
     let honours: string[] = [];
     let drill: string[] = [];
     let finale: string[] = [];
+    let miles: string[] = [];
     update((d) => {
       const f = d.forces.find((x) => x.id === force.id);
       if (!f) return;
@@ -86,10 +87,13 @@ export function useBank(force: Force, c?: Campaign, onBanked?: (news: BankNews) 
       const ids = [...trainingFeats(run.cleared, lordsSlain(run), facts), ...trainingRepeats(run.cleared, lordsSlain(run), facts)];
       feats = awardFeats(f, ids, run.crafted, localDate(), uid, featFaction(f, d.forces, !!c), offTableKey(c, localDate()));
       drill = [...finale, ...drillNews(f, run, before)];
+      // A damage-check siege's milestones, paid once a week in each mode.
+      miles = payMilestones(f, run, localDate(), uid);
       f.updatedAt = nowIso();
     });
     const dmg = siegeDmg(run);
-    if (run.siege) drill = [`Weekly Siege ${run.siege}: ${dmg !== undefined ? `${dmg.toLocaleString()} damage to the colossus` : `wave ${siegeScore(run)}`}`, ...drill];
+    const checks = checkDmg(run);
+    if (run.siege) drill = [`Weekly Siege ${run.siege}${run.mode ? ` (${modeName(run.mode)})` : ''}: ${checks.length ? `damage checks ${checks.map((n) => n.toLocaleString()).join(' / ')}` : dmg !== undefined ? `${dmg.toLocaleString()} damage to the colossus` : `wave ${siegeScore(run)}`}`, ...miles, ...drill];
     if (c && run.siege) {
       update((s) => {
         const cc = s.campaign;

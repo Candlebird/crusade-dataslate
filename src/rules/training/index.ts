@@ -30,6 +30,7 @@ export * from './drill';
 export * from './drillBank';
 export * from './siege';
 export * from './siegeBoard';
+export * from './modes';
 export * from './dps';
 export * from './clock';
 export * from './emplacements';

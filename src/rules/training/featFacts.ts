@@ -2,7 +2,8 @@ import type { Force } from '../../model/types';
 import type { TrainingFeatFacts } from '../feats';
 import { bossesOf } from './drillBank';
 import { endlessDepth } from './finaleCore';
-import { siegeDmg } from './siege';
+import { TRAINING } from '../downtimeData';
+import { checkDmg, siegeDmg } from './siege';
 import type { TrainingRun } from './types';
 import { finaleOpen, runWon } from './veterancy';
 
@@ -20,5 +21,7 @@ export function featFacts(f: Force, run: TrainingRun): TrainingFeatFacts {
     open: finaleOpen(f),
     wins: Object.keys(f.finale?.wins ?? {}).map(Number),
     ...(dmg !== undefined ? { siege: dmg } : {}),
+    ...(run.mode ? { mode: run.mode } : {}),
+    ...(run.checks?.length ? { checks: run.checks.length, lastCheck: checkDmg(run)[TRAINING.siege.checks.length - 1] ?? 0 } : {}),
   };
 }

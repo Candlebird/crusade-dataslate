@@ -8,6 +8,8 @@ export type FeatId =
   | 'sortieTop' | 'sortieFlawless' | 'sortieAsc4' | 'sortieAsc8' | 'sortieHeat' | 'sortieNemesis'
   | 'train20' | 'train25' | 'train30' | 'trainLord' | 'trainWin' | 'trainBosses' | 'trainEndless' | 'trainFinal40'
   | 'trainFinal50' | 'trainAllLords' | 'siege6' | 'siege10' | 'siege15' | 'siege20' | 'siege25'
+  | 'hardCheck10' | 'hardCheck20' | 'hardCheck30' | 'hardDmg' | 'hardWin'
+  | 'insaneCheck10' | 'insaneCheck20' | 'insaneCheck30' | 'insaneDmg' | 'insaneWin'
   | 'sortieRepTop' | 'sortieRepWhole' | 'trainRep20' | 'trainRepLord' | 'trainRepWin' | 'siegeRep';
 
 /** What a feat pays: Requisition, Supply and Umbra Shards to the force, XP to each unit that took part, and a relic
@@ -39,6 +41,16 @@ export const FEATS: Feat[] = [
   { id: 'siege15', where: 'training', name: 'Felling Blow', text: 'Deal 15,000 damage to the Weekly Siege’s colossus.', reward: { us: 6 }, hard: true },
   { id: 'siege20', where: 'training', name: 'Mountain Breaker', text: 'Deal 20,000 damage to the Weekly Siege’s colossus.', reward: { rp: 3, supply: 500 }, hard: true },
   { id: 'siege25', where: 'training', name: 'Colossus Slayer', text: 'Deal 25,000 damage to the Weekly Siege’s colossus.', reward: { relic: 'Colossus Splinter' }, hard: true },
+  { id: 'hardCheck10', where: 'training', name: 'Hard Going', text: 'Reach the first damage check (wave 10) of a Weekly Siege on Hard.', reward: { us: 3 }, hard: true },
+  { id: 'hardCheck20', where: 'training', name: 'Hard Ground', text: 'Reach the second damage check (wave 20) of a Weekly Siege on Hard.', reward: { rp: 2, us: 2 }, hard: true },
+  { id: 'hardCheck30', where: 'training', name: 'Hardened', text: 'Reach the last damage check (wave 30) of a Weekly Siege on Hard.', reward: { rp: 4, supply: 300 }, hard: true },
+  { id: 'hardDmg', where: 'training', name: 'Hard Hitter', text: 'Deal 40,000 damage at the last damage check of a Weekly Siege on Hard.', reward: { rp: 3, us: 6 }, hard: true },
+  { id: 'hardWin', where: 'training', name: 'Hard Victory', text: 'Win a Final wave in a Training run on Hard.', reward: { rp: 3, us: 3 }, hard: true },
+  { id: 'insaneCheck10', where: 'training', name: 'Madness Begins', text: 'Reach the first damage check (wave 10) of a Weekly Siege on Insane.', reward: { rp: 2, us: 3 }, hard: true },
+  { id: 'insaneCheck20', where: 'training', name: 'Deep Madness', text: 'Reach the second damage check (wave 20) of a Weekly Siege on Insane.', reward: { rp: 4, us: 4 }, hard: true },
+  { id: 'insaneCheck30', where: 'training', name: 'Beyond Reason', text: 'Reach the last damage check (wave 30) of a Weekly Siege on Insane.', reward: { rp: 10, supply: 1000, us: 10, xp: 2 }, hard: true },
+  { id: 'insaneDmg', where: 'training', name: 'Unthinkable', text: 'Deal 60,000 damage at the last damage check of a Weekly Siege on Insane.', reward: { rp: 6, us: 8 }, hard: true },
+  { id: 'insaneWin', where: 'training', name: 'Insane Victory', text: 'Win a Final wave in a Training run on Insane.', reward: { rp: 8, supply: 500, us: 6 }, hard: true },
   { id: 'sortieRepTop', where: 'sortie', name: 'Glory Road', text: 'Win a Sortie at the top tier.', reward: { us: 2 }, repeat: true },
   { id: 'sortieRepWhole', where: 'sortie', name: 'All Come Home', text: 'Win a Sortie with no unit wiped out.', reward: { us: 1 }, repeat: true },
   { id: 'trainRep20', where: 'training', name: 'Hold Fast', text: 'Clear 20 waves in one training run.', reward: { us: 1 }, repeat: true },
@@ -91,6 +103,26 @@ export interface TrainingFeatFacts {
   wins?: number[];
   /** A siege's damage to the colossus. */
   siege?: number;
+  /** The run's mode (Hard or Insane), the damage checks it reached, and its damage at the last one. */
+  mode?: 'hard' | 'insane';
+  checks?: number;
+  lastCheck?: number;
+}
+
+/** Hard's and Insane's feats: a siege's damage checks reached (by wave), its damage at the last, and a Final won. */
+const MODE_FEATS = {
+  hard: { checks: ['hardCheck10', 'hardCheck20', 'hardCheck30'], dmg: ['hardDmg', 40000], win: 'hardWin' },
+  insane: { checks: ['insaneCheck10', 'insaneCheck20', 'insaneCheck30'], dmg: ['insaneDmg', 60000], win: 'insaneWin' },
+} as const;
+
+function modeFeats(more: TrainingFeatFacts): FeatId[] {
+  if (!more.mode) return [];
+  const m = MODE_FEATS[more.mode];
+  return [
+    ...m.checks.slice(0, more.checks ?? 0),
+    ...((more.lastCheck ?? 0) >= m.dmg[1] ? [m.dmg[0]] : []),
+    ...(more.won ? [m.win] : []),
+  ];
 }
 
 const SIEGE_FEATS: [FeatId, number][] = [['siege6', 6000], ['siege10', 10000], ['siege15', 15000], ['siege20', 20000], ['siege25', 25000]];
@@ -108,6 +140,7 @@ export const trainingFeats = (cleared: number, lords = 0, more: TrainingFeatFact
   ...((more.open ?? 0) >= 50 ? ['trainFinal50' as const] : []),
   ...(ALL_FINALS.every((n) => more.wins?.includes(n)) ? ['trainAllLords' as const] : []),
   ...SIEGE_FEATS.filter(([, n]) => (more.siege ?? 0) >= n).map(([id]) => id),
+  ...modeFeats(more),
 ];
 
 /** The repeatable training feats the same run earns (see trainingFeats). */

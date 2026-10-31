@@ -3,13 +3,14 @@ import type { Campaign, Force } from '../../model/types';
 import { unitPortrait } from '../../model/emblem';
 import {
   ackStale, bankVictory, continueEndless, finalBoss, clearRubble, defaultByKey, clearSave, loadRun, pickCard, rerollCards, pieceAt, pieceById, placeDraft, quitRun, ambushSwap, scoutMove, scoutMoveProblem, saveRun, staleSave, startWave,
-  type Phase, type SavedRun, type Tile, type TrainingRun,
+  type Phase, type RunMode, type SavedRun, type Tile, type TrainingRun,
 } from '../../rules/training';
 import { TRAINING } from '../../rules/downtimeData';
 import { BOT_CARD } from '../../rules/training/bot';
 import { Modal, confirmAction, toast } from '../ui';
 import { act } from './act';
 import { CardOffer } from './CardOffer';
+import { DamageMeter } from './DamageMeter';
 import { HudBar, type Speed } from './HudBar';
 import { MapView } from './MapView';
 import type { MoveRule } from './PieceActions';
@@ -40,6 +41,8 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   const [saved, setSaved] = useState<SavedRun | null>(() => loadRun(force.id));
   // The next run is this week's Weekly Siege; the campaign's finished weeks are settled on opening.
   const [siege, setSiege] = useState(false);
+  // Normal (none), Hard or Insane, for the next run.
+  const [mode, setMode] = useState<RunMode | undefined>(undefined);
   useSiegeSettle(c);
   const [run, setRun] = useState<TrainingRun | null>(null);
   const [, setTick] = useState(0);
@@ -102,7 +105,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
       bank.reset();
       end(saved.run);
     }
-    begin(freshRun(force, c, siege));
+    begin(freshRun(force, c, siege, mode));
   };
 
   const onPhase = (r: TrainingRun, _was: Phase) => {
@@ -161,7 +164,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
         {saved && <button className="primary" onClick={() => begin(saved.run)}>Resume</button>}
         <button className={saved ? '' : 'primary'} disabled={!force.units.length} data-tip={saved ? 'Starts over: the saved run ends here' : undefined} onClick={newRun}>{siege ? 'Start the siege' : 'New run'}</button>
       </>}>
-        <StartScreen force={force} c={c} saved={saved} cleared={cleared} siege={siege} onSiege={setSiege} week={thisWeek()} />
+        <StartScreen force={force} c={c} saved={saved} cleared={cleared} siege={siege} onSiege={setSiege} mode={mode} onMode={setMode} week={thisWeek()} />
       </Modal>
     );
   }
@@ -232,7 +235,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     act(() => pickCard(run, i), refresh);
     setPeek(false);
   };
-  const again = () => begin(freshRun(force, c, !!run.siege));
+  const again = () => begin(freshRun(force, c, !!run.siege, run.mode));
   /** Start (or cancel) a craft; the floating piece card makes way for the craft banner. */
   const craftMode = (cr: Crafting | null) => {
     setCrafting(cr);
@@ -260,6 +263,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
           />
           <div className="training-board">
             <MapView run={run} portraits={portraits} glow={glow} selected={sel ?? undefined} placing={placing} placeWhy={scoutWhy} paused={paused} onCell={onCell} />
+            <DamageMeter run={run} />
             {selPiece && !over && !moveNow && <PieceInfo run={run} piece={selPiece} record={selPiece.kind === 'unit' ? force.units.find((u) => u.id === selPiece.unitId) : undefined} onClose={() => setSel(null)} onChange={refresh} onMove={(rule) => setMoving({ id: selPiece.id, rule })} />}
             {craftNow && (
               <div className="training-map-banner small" role="status">

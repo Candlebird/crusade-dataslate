@@ -708,8 +708,45 @@ export const TRAINING = {
    * nemesis or Nexus. Score: the wave reached. A campaign's board keeps each force's best for the last `weeks` weeks;
    * the week's top score wins its faction one Strategic Asset (within NEXUS_ROUNDS.assetsMax) in the round it is
    * settled, and the last `keep` winners are kept.
+   * From week `checksFrom` on (ISO week keys compare as strings) a siege runs to wave `checks`' last and meets the
+   * lone colossus at each of `checks`: a damage check. Each check's damage is tracked and has its own board; the one
+   * at the last wave ends the attempt, an earlier one walks off the map at the base (costing it nothing) and the run
+   * goes on. Once the week is over each check's top force wins its `rewards` (by check wave): Umbra Shards and RP
+   * to the force, and `asset` Strategic Assets to its faction. Weeks before `checksFrom` keep the one wave-25 check.
    */
-  siege: { weeks: 4, keep: 12 },
+  siege: {
+    weeks: 4,
+    keep: 36,
+    checksFrom: '2026-W45',
+    checks: [10, 20, 30],
+    rewards: {
+      10: { us: 2, rp: 0, asset: 0 },
+      20: { us: 3, rp: 1, asset: 0 },
+      30: { us: 5, rp: 2, asset: 1 },
+    } as Record<number, { us: number; rp: number; asset: number }>,
+    /** Damage milestones: a force's best damage at the last check (wave 30) of a week, in each mode, pays each one it
+     *  passes once (times the mode's `reward`), straight to the force when the run is banked. */
+    milestones: [
+      { dmg: 10_000, us: 1, rp: 0 },
+      { dmg: 25_000, us: 2, rp: 0 },
+      { dmg: 50_000, us: 3, rp: 1 },
+      { dmg: 100_000, us: 5, rp: 2 },
+    ],
+  },
+  /**
+   * Hard and Insane (training/modes.ts): the waves' wounds times `siege` (a Weekly Siege) or `train` (any other run),
+   * rising from 1 at wave 1 to the whole of it by wave `rampTo` (the first waves stay a Shard's to hold). Tuned from a
+   * force that dealt 60,000 to the W44 colossus (the bot, its waves eased to play as that force, gets through half the
+   * time at about x14, x8 to x20 by force, a little more at the Final): on Hard it reaches the siege's last check, or wins the Final at 25, only
+   * some of the time; Insane asks twice that strength and next to never falls that way (modes.balance.test.ts). `reward`: the damage checks' and milestones'
+   * rewards times this, rounded up. A siege's modes start with the damage checks (siege.checksFrom); the colossus is the
+   * same in every mode, and each mode has its own boards.
+   */
+  modes: {
+    rampTo: 10,
+    hard: { name: 'Hard', siege: 12, train: 14, reward: 1.5 },
+    insane: { name: 'Insane', siege: 24, train: 28, reward: 2 },
+  },
   /**
    * Final waves (training/finale.ts, veterancy.ts). A run has a Final wave: `from` at first, `step` more for each step
    * the force has opened, up to `to`; the run always uses the highest one open. Step N + step opens once the force has
@@ -728,7 +765,8 @@ export const TRAINING = {
    * much as the waves round it and the one after is no cliff. The Final boss: the nemesis at `from`, the Nexus Crisis
    * lord at `to` (in a campaign), else `lords[N]` (ECHO_LORDS ids, its trick by TRAINING.nexus.tricks.byLord), with
    * `bossHp[N]` times the wounds a boss of its wave has; a ward or mending that goes by its wounds (Shield, Regeneration) is
-   * `trick` as much, or the Crisis lord would be a wall. A Weekly Siege's Final is `from`: a lone Echo Lord of
+   * `trick` as much, or the Crisis lord would be a wall. A Weekly Siege's Final is `from` (siege.checks' last from
+   * siege.checksFrom, each check wave meeting the same colossus): a lone Echo Lord of
    * `siegeHp` wounds and no escorts, the attempt over when it reaches the base; its score is the damage dealt to it.
    * It walks `siegeSpeed` as fast as a lord, and dangerous terrain never slows it.
    */
@@ -879,6 +917,7 @@ export const TRAINING_WAVE_BLURBS = {
   elite: `Elites (gold rim): ×${TRAINING.wave.eliteHp} wounds, cost the base more.`,
   final: 'The Final wave: slay its boss with the base standing for a Victory; if it gets through the run ends.',
   siege: 'The Siege Final: a lone colossus that cannot fall. Hurt it all you can.',
+  check: 'A damage check: a lone colossus that cannot fall. Hurt it all you can; your damage here has its own board.',
   endless: 'Endless: every wave climbs steeper.',
 };
 

@@ -4,6 +4,7 @@ import { finalBoss } from './finale';
 import { GENERIC_LORD, lordIndex, TRICK_NAMES, trickText } from './lordPick';
 import { isNemesisWave, nemesisTricks } from './nemesis';
 import { affixInfo } from './nexus';
+import { hasChecks, isColossusWave } from './siege';
 import type { SpawnPlan, TrainingRun } from './types';
 
 // The HUD's next-round icon: what the next wave is (its one kind, flying or not, elites, its boss) and one line each on
@@ -27,7 +28,7 @@ const isBoss = (s: SpawnPlan) => TRAINING_ENEMIES[s.kind].spawn === 'boss';
 /** The boss of wave `w` and its tricks in words. */
 function bossLines(run: TrainingRun, w: number, plan: SpawnPlan): { name: string; lines: string[] } {
   const final = !!run.finale && w === finalOf(run) && !inEndless(run);
-  if (final && run.siege) return { name: finalBoss(run), lines: [TRAINING_WAVE_BLURBS.siege] };
+  if (isColossusWave(run, w)) return { name: finalBoss(run), lines: [hasChecks(run.siege) ? TRAINING_WAVE_BLURBS.check : TRAINING_WAVE_BLURBS.siege] };
   if (run.nemesis && (plan.nemesis || isNemesisWave(run, w))) {
     return { name: run.nemesis.name, lines: nemesisTricks(run.nemesis).map((t) => `${t.name}: ${t.text}`) };
   }
@@ -42,7 +43,7 @@ export function nextRound(run: TrainingRun, plans: SpawnPlan[]): NextRound | und
   const w = run.wave + 1;
   const boss = plans.find(isBoss);
   const final = !!run.finale && w === finalOf(run) && !inEndless(run);
-  const lone = final && !!run.siege;
+  const lone = isColossusWave(run, w);
   const main = lone ? undefined : plans.find((s) => !isBoss(s));
   const lead = main ?? boss;
   if (!lead) return undefined;

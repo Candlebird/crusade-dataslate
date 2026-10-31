@@ -6,6 +6,7 @@ import { budgetMul } from './nexus';
 import { pick, rand, randInt, type Rng } from './rng';
 import { finalOf } from './finaleCore';
 import { waveDice } from './siege';
+import { modePlan } from './modes';
 import { noteMet } from './tally';
 import type { Enemy, SpawnPlan, Tile, TrainingRun } from './types';
 import { costOf, countFor, isElite, waveKind } from './waveKinds';
@@ -132,9 +133,9 @@ export const wideMul = (run: Pick<TrainingRun, 'recipes'>, w: number) =>
   w < W.wide.fromWave ? 1 : 1 + W.wide.per * Math.min(W.wide.max, Math.max(0, run.recipes.length - W.wide.from));
 
 /** Wave `w`'s spawns, sorted by time, rolling `r`: the force's width, the Nexus's budget and affixes on them (nexus.ts,
- *  affixes.ts). */
+ *  affixes.ts), and a Hard or Insane mode's wounds (modes.ts). */
 const nexusWave = (r: Rng, run: TrainingRun, w: number) =>
-  affixPlan(r, run, planFor(r, wavePoints(run.power) * wideMul(run, w) * budgetMul(run), w, finalOf(run)));
+  modePlan(run, w, affixPlan(r, run, planFor(r, wavePoints(run.power) * wideMul(run, w) * budgetMul(run), w, finalOf(run))));
 
 /** Wave `w`'s spawns, sorted by time (rolls the run's dice; a siege's own for the wave). */
 export const planWave = (run: TrainingRun, w: number): SpawnPlan[] => nexusWave(waveDice(run, w, run), run, w);
@@ -273,7 +274,8 @@ export function move(m: MapState | undefined, e: Enemy, step: number): void {
 }
 
 /** Walk every enemy not held or stunned (flyers straight pad to pad); ambush jumps; leaks cost run.baseHp, count
- *  run.leaked; the Final boss getting through marks run.finale.through (run.ts ends the run). */
+ *  run.leaked; the Final boss getting through marks run.finale.through (run.ts ends the run). A siege's colossus at an
+ *  earlier damage check walks off the map at the base instead: no cost, no leak, and the run goes on. */
 export function walk(run: TrainingRun, dt: number): void {
   let m: MapState | undefined;
   const gone = new Set<number>();
@@ -282,6 +284,11 @@ export function walk(run: TrainingRun, dt: number): void {
     if (!e.flies) m ??= mapOf(run);
     move(m, e, speedOf(run, e) * dt);
     if (atBase(e)) {
+      if (e.final && run.siege && run.finale && run.wave < run.finale.final) {
+        run.log.push(`The colossus walks on past the base: ${Math.round(run.checks?.[run.checks.length - 1] ?? 0).toLocaleString()} damage at damage check ${run.checks?.length ?? 1}.`);
+        gone.add(e.id);
+        continue;
+      }
       run.baseHp = Math.max(0, run.baseHp - leakCost(e));
       run.leaked += 1;
       if (e.final && run.finale) run.finale.through = true;

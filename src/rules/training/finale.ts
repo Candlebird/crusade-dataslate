@@ -3,6 +3,7 @@ import { ECHO_LORDS } from '../nexusData';
 import { finalOf } from './finaleCore';
 import { lordIndex } from './lordPick';
 import { isNemesisWave } from './nemesis';
+import { colossusDealt, hasChecks, isColossusWave, siegeFinal } from './siege';
 import type { LordTrick, RunFinale, RunLord, SpawnPlan, TrainingRun } from './types';
 
 // The Final wave (TRAINING.finale): which it is, its boss (the nemesis, the Nexus Crisis lord or a named Echo Lord),
@@ -27,9 +28,10 @@ export function finalLord(final: number): RunLord | undefined {
   return l && { key: `nexus:${l.id}`, name: l.name, tier: 'Legendary', trick: (TRAINING.nexus.tricks.byLord[l.id] ?? 'summon') as LordTrick, from: 'final' };
 }
 
-/** A new run's finale: Final wave `final` (a Weekly Siege's is always finale.from) and its named lord. */
-export function newFinale(final: number, siege = false): RunFinale {
-  const n = siege ? F.from : Math.min(F.to, Math.max(F.from, final));
+/** A new run's finale: Final wave `final` and its named lord. A Weekly Siege's (`siege`: its week, or true for an
+ *  old-style one) is its last colossus wave (siege.ts siegeFinal): finale.from, or the last damage check. */
+export function newFinale(final: number, siege: boolean | string = false): RunFinale {
+  const n = siege ? siegeFinal(typeof siege === 'string' ? siege : undefined) : Math.min(F.to, Math.max(F.from, final));
   const lord = siege ? undefined : finalLord(n);
   return { final: n, dealt: 0, ...(lord ? { lord } : {}) };
 }
@@ -49,18 +51,26 @@ export function finalBoss(run: Pick<TrainingRun, 'siege' | 'nemesis' | 'nexus' |
 }
 
 /** The Final wave's plans with its boss marked final, finale.bossHp[final] times as tough (a named lord also lords.hp
- *  by tier, as a campaign lord is). A siege's Final is its boss alone, siegeHp wounds, coming at once. */
+ *  by tier, as a campaign lord is). A siege's colossus waves (its Final, and each damage check) are its boss alone,
+ *  siegeHp wounds, coming at once; a damage check starts its tally on run.checks. */
 export function finalePlan(run: TrainingRun, plans: SpawnPlan[]): SpawnPlan[] {
   const fin = run.finale;
+  if (run.siege && isColossusWave(run, run.wave)) {
+    const boss = plans.find((s) => TRAINING_ENEMIES[s.kind].spawn === 'boss');
+    if (!boss) return plans;
+    const { nemesis: _n, lord: _l, ...lone } = boss;
+    const last = !fin || run.wave === fin.final;
+    if (hasChecks(run.siege)) {
+      run.checks = [...(run.checks ?? []), 0];
+      const n = run.checks.length;
+      run.log.push(`Damage check ${n} of ${TRAINING.siege.checks.length}: ${SIEGE_BOSS} comes alone. Hurt it all you can${last ? ' before it reaches the base' : ' before it walks off the map'}.`);
+    } else run.log.push(`The Final wave: ${SIEGE_BOSS} comes alone. Hurt it all you can before it reaches the base.`);
+    return [{ ...lone, final: true, at: 0, hp: F.siegeHp }];
+  }
   if (!fin || run.wave !== fin.final) return plans;
   const boss = plans.find((s) => TRAINING_ENEMIES[s.kind].spawn === 'boss');
   if (!boss) return plans;
   boss.final = true;
-  if (run.siege) {
-    const { nemesis: _n, lord: _l, ...lone } = boss;
-    run.log.push(`The Final wave: ${SIEGE_BOSS} comes alone. Hurt it all you can before it reaches the base.`);
-    return [{ ...lone, at: 0, hp: F.siegeHp }];
-  }
   boss.hp *= F.bossHp[fin.final] ?? 1;
   if (!boss.nemesis && boss.lord === undefined && fin.lord) {
     boss.lord = -1;
@@ -72,4 +82,4 @@ export function finalePlan(run: TrainingRun, plans: SpawnPlan[]): SpawnPlan[] {
 
 /** The Final boss got through: what the log says as the run ends. */
 export const throughText = (run: TrainingRun) =>
-  run.siege ? `${SIEGE_BOSS} reaches the base: ${Math.round(run.finale?.dealt ?? 0)} damage dealt.` : `${finalBoss(run)} breaks through. No Victory.`;
+  run.siege ? `${SIEGE_BOSS} reaches the base: ${Math.round(colossusDealt(run)).toLocaleString()} damage dealt.` : `${finalBoss(run)} breaks through. No Victory.`;

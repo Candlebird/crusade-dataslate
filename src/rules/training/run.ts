@@ -14,7 +14,9 @@ import { nexusStart } from './nexus';
 import { rollGains, watchBosses } from './quirks';
 import { mainKind, planWave, runCover, spawnDue, walk } from './waves';
 import { purseOf } from './drill';
-import type { RunDrill, RunNexus, ShardPiece, TrainingRun, UnitTower } from './types';
+import { colossusDealt } from './siege';
+import { modeHpOf, modesOpen } from './modes';
+import type { RunDrill, RunMode, RunNexus, ShardPiece, TrainingRun, UnitTower } from './types';
 
 // A run's life: create, build-phase actions, waves, step(), XP, the end.
 
@@ -24,17 +26,22 @@ import type { RunDrill, RunNexus, ShardPiece, TrainingRun, UnitTower } from './t
  *  drillOf; none = everything); `opts.siege`: the Weekly Siege's week (siege.ts), whose seed gives the cover and drafts;
  *  `opts.final`: the force's Final wave (veterancy.ts finaleOpen; default finale.from, a siege's always that). */
 export function createRun(forceId: string, units: Unit[], seed: number, story?: ForceSortie, nexus?: RunNexus,
-  opts: { drill?: RunDrill; siege?: string; final?: number } = {}): TrainingRun {
+  opts: { drill?: RunDrill; siege?: string; final?: number; mode?: RunMode; modeHp?: number; hpFlat?: number } = {}): TrainingRun {
   const force = units.filter(canTrain);
   const run: TrainingRun = {
     v: 10, forceId, seed, rng: seed | 0, phase: 'build', wave: 0, cleared: 0, t: 0,
     power: force.reduce((n, u) => n + trainPoints(u), 0), baseHp: TRAINING.baseHp, credits: TRAINING.credits.start, luck: 0,
     mends: 0, leaked: 0, nextId: 1, pieces: [], draft: { step: 'done', hand: [], placed: [] }, recipes: recipesFor(force),
     crafted: [], enemies: [], queue: [], cover: [], cards: [], mods: { bounty: 1, holdMul: 1, regrabAdd: 0 }, banked: {},
-    fx: [], log: [], finale: newFinale(opts.final ?? TRAINING.finale.from, !!opts.siege),
+    fx: [], log: [], finale: newFinale(opts.final ?? TRAINING.finale.from, opts.siege ?? false),
   };
   if (opts.drill) run.drill = JSON.parse(JSON.stringify(opts.drill)) as RunDrill;
   if (opts.siege) run.siege = opts.siege;
+  if (opts.mode && modesOpen(opts.siege)) run.mode = opts.mode;
+  // The mode's multiplier is fixed on the run (a test may set its own), so a saved run keeps its waves.
+  const hp = opts.modeHp ?? modeHpOf(run.mode, !!run.siege);
+  if (hp !== 1) run.modeHp = hp;
+  if (opts.hpFlat) run.hpFlat = opts.hpFlat;
   run.credits += purseOf(run);
   const nemesis = pickNemesis(story);
   if (nemesis) run.nemesis = nemesis;
@@ -119,7 +126,7 @@ function waveCleared(run: TrainingRun): void {
   run.log.push(`Wave ${run.wave} cleared${run.leaked ? `, ${run.leaked} got through` : ''}: +${pay} credits.`);
   awardXp(run);
   const fin = run.finale;
-  if (fin && run.wave === fin.final && run.siege) return endRun(run, `${SIEGE_BOSS} falls: ${Math.round(fin.dealt)} damage dealt.`);
+  if (fin && run.wave === fin.final && run.siege) return endRun(run, `${SIEGE_BOSS} falls: ${Math.round(colossusDealt(run)).toLocaleString()} damage dealt.`);
   if (fin && run.wave === fin.final && fin.slain && !fin.victory) {
     fin.victory = 'pending';
     run.log.push(`Victory! The Final wave ${fin.final} is beaten. Bank it and end, or go on into Endless.`);

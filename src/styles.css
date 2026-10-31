@@ -804,6 +804,35 @@ fieldset.fields:disabled { opacity: 0.6; }
 .training-map { position: relative; width: 100%; height: 100%; min-height: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 4px; background: #0c0d0f; }
 .training-map canvas { display: block; width: 100%; height: 100%; cursor: crosshair; touch-action: none; user-select: none; }
 .training-map-fit { position: absolute; top: 6px; right: 6px; padding: 2px 10px; }
+/* The Weekly Siege damage meter (top right, below the zoom button while it shows): a pulse at each 1,000, a burst at each 10,000. */
+.training-damage { position: absolute; top: 6px; right: 6px; z-index: 3; pointer-events: none; min-width: 120px; padding: 4px 10px 5px; text-align: right;
+  border: 1px solid color-mix(in srgb, var(--gold) 60%, transparent); border-radius: 6px; background: rgba(12, 13, 15, 0.82); }
+.training-board:has(.training-map-fit) .training-damage { top: 38px; }
+.training-damage-label { font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--gold); opacity: 0.85; }
+.training-damage-value { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; color: #fff; line-height: 1.1; transform-origin: right center; }
+.training-damage-value.pulse { animation: training-damage-pulse 0.45s ease-out; }
+@keyframes training-damage-pulse {
+  0% { transform: scale(1); color: #fff; }
+  35% { transform: scale(1.22); color: var(--gold); text-shadow: 0 0 10px var(--gold); }
+  100% { transform: scale(1); color: #fff; text-shadow: none; }
+}
+.training-damage-burst { position: absolute; inset: 0; pointer-events: none; }
+.training-damage-burst .ring { position: absolute; top: 50%; right: 50%; width: 40px; height: 40px; margin: -20px -20px 0 0; border-radius: 50%;
+  border: 3px solid var(--gold); box-shadow: 0 0 18px var(--gold); animation: training-damage-ring 0.9s ease-out forwards; }
+.training-damage-burst .ring.two { animation-delay: 0.15s; border-color: #fff4d0; opacity: 0; }
+.training-damage-burst .text { position: absolute; top: 100%; right: 0; font-size: 20px; font-weight: 800; color: var(--gold); white-space: nowrap;
+  text-shadow: 0 0 8px #000, 0 0 14px var(--gold); animation: training-damage-rise 1.4s ease-out forwards; }
+.training-damage:has(.training-damage-burst) { animation: training-damage-shake 0.5s ease-in-out, training-damage-glow 1.4s ease-out; }
+@keyframes training-damage-ring { 0% { transform: scale(0.4); opacity: 1; } 100% { transform: scale(4.5); opacity: 0; } }
+@keyframes training-damage-rise { 0% { transform: translateY(0) scale(0.6); opacity: 0; } 15% { transform: translateY(2px) scale(1.25); opacity: 1; } 100% { transform: translateY(28px) scale(1); opacity: 0; } }
+@keyframes training-damage-shake { 0%, 100% { translate: 0 0; } 20% { translate: -4px 1px; } 40% { translate: 4px -1px; } 60% { translate: -3px 0; } 80% { translate: 2px 1px; } }
+@keyframes training-damage-glow { 0% { box-shadow: 0 0 0 transparent; } 20% { box-shadow: 0 0 26px var(--gold); } 100% { box-shadow: 0 0 0 transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .training-damage-value.pulse, .training-damage:has(.training-damage-burst) { animation: none; }
+  .training-damage-burst .ring { display: none; }
+  .training-damage-burst .text { animation: training-damage-fade 1.4s ease-out forwards; }
+  @keyframes training-damage-fade { 0%, 60% { opacity: 1; } 100% { opacity: 0; } }
+}
 /* The side panel takes the stage's height (contain: size keeps it from setting it) and scrolls on its own. */
 .training-side { contain: size; overflow-y: auto; scrollbar-gutter: stable; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 8px; min-width: 0; padding-right: 4px; }
 .training-side > * { flex-shrink: 0; }
@@ -997,13 +1026,43 @@ fieldset.fields:disabled { opacity: 0.6; }
 .shard-pips i { width: max(4px, 0.17em); height: max(4px, 0.17em); border-radius: 50%; background: var(--line); }
 .shard-pips i.on { background: var(--shard); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); }
 /* Training start screen: three steps beside a sketch of the route, then the units. */
+/* The start screen: the launch strip, then tabs. */
+.training-start { display: flex; flex-direction: column; min-height: 0; }
+.training-launch { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; margin-bottom: 6px; border: 1px solid var(--line); border-radius: 6px; background: rgba(255, 255, 255, 0.025); }
+.training-launch .seg { display: flex; }
+.training-launch .seg button { flex: 1 1 0; justify-content: center; text-align: center; }
+.training-mode { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); align-items: center; gap: 6px 12px; }
+.training-mode .seg button.training-mode-insane.on { color: var(--red); border-color: var(--red); background: rgba(192, 57, 43, 0.12); }
+.training-launch-facts { color: var(--muted); }
+.training-saved { padding: 6px 8px; border-left: 3px solid var(--gold); background: rgba(201, 162, 74, 0.08); }
+.training-start-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); margin-bottom: 10px; overflow-x: auto; scrollbar-width: none; }
+.training-start-tabs::-webkit-scrollbar { display: none; }
+.training-start-tabs button { flex: 0 0 auto; background: none; border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: 8px 14px; color: var(--muted); box-shadow: none; }
+.training-start-tabs button:hover:not(:disabled) { color: var(--text); background: none; }
+.training-start-tabs button.on { color: var(--gold); border-bottom-color: var(--gold); }
+.training-tabpanel { min-height: 300px; }
+.training-progress { display: flex; flex-direction: column; gap: 4px; }
+.training-boards { display: flex; flex-direction: column; gap: 8px; }
+.training-rules-siege { padding-bottom: 10px; margin-bottom: 10px; border-bottom: 1px solid var(--line); }
+.training-miles { margin: 2px 0 0; padding-left: 1.2rem; }
+.training-check-head { flex-wrap: wrap; }
+.training-check-head > b { white-space: nowrap; flex: 1 0 auto; }
+.training-check-head > span { margin-left: auto; text-align: right; }
+@media (max-width: 700px) {
+  .modal:has(> .modal-body > .training-start) { display: flex; flex-direction: column; }
+  .modal-body:has(> .training-start) { flex: 1; }
+  .training-mode { grid-template-columns: minmax(0, 1fr); }
+  .training-launch .seg button { padding: 0.55rem 0.25rem; }
+  .training-start-tabs { gap: 0; }
+  .training-start-tabs button { flex: 1 0 auto; padding: 8px 8px; font-size: 0.74rem; letter-spacing: 0.04em; }
+  .training-tabpanel { min-height: 0; }
+}
 .training-intro { display: grid; grid-template-columns: minmax(0, 1fr) 150px; gap: 14px; align-items: start; margin-bottom: 10px; }
 .training-steps { margin: 0; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 3px; }
 .training-thumb { display: block; width: 150px; height: 150px; }
 .training-roster { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 6px 12px; }
 .training-roster-unit { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .training-roster-xp { display: block; }
-.training-nexus { margin-bottom: 10px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; }
 .training-nexus ul { margin: 2px 0 0; padding-left: 1.2rem; }
 @media (max-width: 700px) {
   .training-intro { grid-template-columns: minmax(0, 1fr) 96px; gap: 10px; }

@@ -4,6 +4,7 @@ import { SORTIE_BOSSES } from '../sortieStory';
 import { centreOf, dist, mapOf, pieceById, towers } from './board';
 import { regrabTime } from './holds';
 import { finalOf } from './finaleCore';
+import { modeHpAt } from './modes';
 import { climbHp, move, spawnOne } from './waves';
 import type { Enemy, RunNemesis, SpawnPlan, TrainingRun } from './types';
 
@@ -89,7 +90,7 @@ function act(run: TrainingRun, e: Enemy, sig: string) {
   } else if (sig === 'tremor') {
     run.baseHp = Math.max(0, run.baseHp - N.tremor.dmg);
   } else if (sig === 'brood') {
-    const hp = TRAINING_ENEMIES.swarm.hp * TRAINING.enemyHp * climbHp(run.wave, finalOf(run)) * N.brood.hp;
+    const hp = TRAINING_ENEMIES.swarm.hp * TRAINING.enemyHp * climbHp(run.wave, finalOf(run)) * N.brood.hp * modeHpAt(run, run.wave);
     for (let i = 0; i < N.brood.n; i++) {
       spawnOne(run, { kind: 'swarm', at: run.t, leg: e.leg, x: e.x + (i - (N.brood.n - 1) / 2) * N.brood.spread, y: e.y, hp, flies: e.flies });
     }

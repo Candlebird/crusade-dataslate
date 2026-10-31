@@ -327,7 +327,7 @@ export interface DrillStats {
   crafted: number;
   /** Weekly Sieges entered (weeks), and this week's best (the wave reached; `dmg`, damage to the colossus if it got there). */
   sieges: number;
-  siege?: { week: string; best: number; dmg?: number };
+  siege?: { week: string; best: number; dmg?: number; checks?: number[] };
 }
 
 /** A force's best Weekly Siege of a week, on the campaign's board (rules/training/siegeBoard.ts postSiege). */
@@ -340,13 +340,28 @@ export interface SiegeBoardEntry {
   /** The wave reached, and waves cleared. */
   score: number;
   cleared: number;
-  /** Damage dealt to the wave-25 colossus (it reached the boss); entries without it rank below every one with it. */
+  /** Damage dealt to the wave-25 colossus (it reached the boss); entries without it rank below every one with it.
+   *  A damage-check siege: the total over the checks of its best run. */
   dmg?: number;
+  /** A damage-check siege (training/siege.ts hasChecks): the force's best damage at each check this week, from
+   *  whichever attempts did best there (index = TRAINING.siege.checks). Each check is ranked on its own. */
+  checks?: number[];
+  /** Hard or Insane (training/modes.ts): each mode has its own board. None: Normal. */
+  mode?: 'hard' | 'insane';
   date: string;
 }
 
-/** A settled week's Weekly Siege winner: one Strategic Asset for its faction in `round` (siegeBoard.ts settleSieges). */
+/** A settled week's Weekly Siege winner: one Strategic Asset for its faction in `round` (siegeBoard.ts settleSieges).
+ *  A damage-check week has a winner for each check (`tier`: its wave), paid TRAINING.siege.rewards[tier]. */
 export interface SiegeWin {
+  /** The damage check won (its wave); none for an old-style week's single winner. */
+  tier?: number;
+  /** The mode's board it was won on (none: Normal); its Umbra Shards and RP are that mode's (modes.ts scaleReward). */
+  mode?: 'hard' | 'insane';
+  /** Strategic Assets it gives the faction (none: 1, an old-style win), and the Umbra Shards and RP paid to the force. */
+  assets?: number;
+  us?: number;
+  rp?: number;
   week: string;
   forceId: string;
   force: string;
@@ -386,6 +401,9 @@ export interface Force {
   battles: number;
   wins: number;
   ledger: RpEntry[];
+  /** Weekly Siege damage-check wins whose Umbra Shards and RP this force has collected ('week:wave';
+   *  rules/training/siegeBoard.ts collectSiege). */
+  siegePaid?: string[];
   units: Unit[];
   /** Umbra Shards (Nexus Wars). */
   umbraShards: number;

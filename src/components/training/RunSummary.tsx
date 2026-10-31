@@ -1,5 +1,5 @@
 import {
-  DRILL_GOALS, drillPreview, endlessDepth, finalBoss, mvp, runWon, runXp, sharedPreview, siegeDmg, siegeScore, towers, unlockText, unitTowers, type TrainingRun,
+  checkDmg, checkWaves, DRILL_GOALS, drillPreview, hasChecks, modeName, endlessDepth, finalBoss, mvp, runWon, runXp, sharedPreview, siegeDmg, siegeScore, towers, unlockText, unitTowers, type TrainingRun,
 } from '../../rules/training';
 import type { Force } from '../../model/types';
 import { OFF_TABLE_XP } from '../../rules/downtimeData';
@@ -40,6 +40,7 @@ export function RunSummary({ run, best, force, news }: RunSummaryProps) {
       {why && <div className="training-summary-why">{why}</div>}
       <div style={{ marginBottom: 4 }}>
         <b>{run.cleared} wave{run.cleared === 1 ? '' : 's'} cleared</b>
+        {run.mode && <span style={{ color: run.mode === 'insane' ? 'var(--red)' : 'var(--gold)' }}> · {modeName(run.mode)}</span>}
         {total > 0 && <span> · <b style={{ color: 'var(--gold)' }}>+{total} XP</b> to your units</span>}
         {record && <span style={{ color: 'var(--gold)' }}> · a new best</span>}
         {lead && lead.kills > 0 && <span className="muted"> · {lead.name} led the defence</span>}
@@ -51,7 +52,18 @@ export function RunSummary({ run, best, force, news }: RunSummaryProps) {
           {endlessDepth(run) > 0 ? <span> · Endless: {endlessDepth(run)} wave{endlessDepth(run) === 1 ? '' : 's'} past it</span> : null}
         </div>
       )}
-      {banks && run.siege && (
+      {banks && hasChecks(run.siege) && (
+        <div style={{ marginBottom: 4 }}>
+          Weekly Siege {run.siege}{run.mode ? ` (${modeName(run.mode)})` : ''} damage checks:{' '}
+          {checkWaves(run.siege).map((w, i) => (
+            <span key={w}>
+              {i > 0 && ' · '}wave {w} <b style={{ color: checkDmg(run)[i] !== undefined ? 'var(--gold)' : undefined }}>{checkDmg(run)[i] !== undefined ? checkDmg(run)[i].toLocaleString() : '—'}</b>
+            </span>
+          ))}{' '}
+          <span className="muted">· your best at each check counts on its own board</span>
+        </div>
+      )}
+      {banks && run.siege && !hasChecks(run.siege) && (
         <div style={{ marginBottom: 4 }}>
           Weekly Siege {run.siege}: <b>{siegeDmg(run) !== undefined ? `${siegeDmg(run)!.toLocaleString()} damage` : `wave ${siegeScore(run)}`}</b>{' '}
           <span className="muted">· your best this week counts</span>

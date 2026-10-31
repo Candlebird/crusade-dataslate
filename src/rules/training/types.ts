@@ -258,6 +258,9 @@ export interface CardDraw {
 }
 
 /** Run-wide modifiers cards give. */
+/** A Training difficulty past Normal. */
+export type RunMode = 'hard' | 'insane';
+
 export interface RunMods {
   /** Kills pay this many times their credits. */
   bounty: number;
@@ -351,6 +354,15 @@ export interface TrainingRun {
   drill?: RunDrill;
   /** The Weekly Siege it is (an ISO week, siege.ts): the week's seeded cover, drafts and waves. */
   siege?: string;
+  /** A damage-check siege (siege.ts hasChecks): the damage dealt to the colossus at each check wave met, in order
+   *  (the last is the one under way during its wave). */
+  checks?: number[];
+  /** Hard or Insane (modes.ts); none = Normal. */
+  mode?: RunMode;
+  /** The mode's wave-wounds multiplier at full ramp, fixed when the run starts (modes.ts modeHpAt). */
+  modeHp?: number;
+  /** Test-only: a flat multiplier on every wave's wounds (the balance bot's stand-in for a stronger force). */
+  hpFlat?: number;
   /** Card offers re-drawn this run (cards.ts rerollCards). */
   rerolls?: number;
   /** The Drill Honours this run earned, banked into the force once (drillBank.ts bankDrill). */

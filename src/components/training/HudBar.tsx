@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { TRAINING } from '../../rules/downtimeData';
-import { endlessDepth, eventInfo, finalBoss, finalOf, inEndless, lordLine, luckCap, nemesisTricks, nexusLines, nextLord, startProblem, type TrainingRun } from '../../rules/training';
+import { checkWaves, endlessDepth, eventInfo, finalBoss, finalOf, hasChecks, inEndless, lordLine, luckCap, modeHpAt, modeName, nemesisTricks, nexusLines, nextLord, startProblem, type TrainingRun } from '../../rules/training';
 import { Icon } from '../Icon';
 import { NextRoundIcon } from './NextRound';
 
@@ -63,6 +63,11 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
           <Icon name="g:castle" /> Siege <span className="muted">· {run.siege}</span>
         </span>
       )}
+      {run.mode && (
+        <span className="training-hud-stat" data-tip={`${modeName(run.mode)}: the waves have ${run.modeHp ?? 1} times their wounds once it ramps in by wave ${TRAINING.modes.rampTo} (×${modeHpAt(run, run.wave || 1).toFixed(1)} now)${run.siege ? '; its own siege boards and bigger rewards' : ''}, and its own feats`}>
+          <Icon name="g:death-skull" /> <b style={{ color: run.mode === 'insane' ? 'var(--red)' : 'var(--gold)' }}>{modeName(run.mode)}</b>
+        </span>
+      )}
       {run.finale && <FinalStat run={run} />}
       {run.nexus && <NexusStat run={run} />}
       {run.nemesis && !run.nemesis.slain && run.wave <= TRAINING.shared.nemesis.wave && (
@@ -107,7 +112,7 @@ function FinalStat({ run }: { run: TrainingRun }) {
     );
   }
   return (
-    <span className="training-hud-stat" data-tip={`Slay ${finalBoss(run)} on wave ${fin} with the base standing for a Victory${run.siege ? '; in the Siege it cannot fall: hurt it all you can' : ''}`}>
+    <span className="training-hud-stat" data-tip={`Slay ${finalBoss(run)} on wave ${fin} with the base standing for a Victory${run.siege ? (hasChecks(run.siege) ? `; in the Siege it cannot fall: waves ${checkWaves(run.siege).join(', ')} are damage checks, hurt it all you can` : '; in the Siege it cannot fall: hurt it all you can') : ''}`}>
       <Icon name="g:crown" /> Final wave <b>{fin}</b>
     </span>
   );

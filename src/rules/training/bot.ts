@@ -235,9 +235,9 @@ export function botBuild(run: TrainingRun, units: Unit[], maze: MazeSpot[], curs
 /** Play a run to its end (or `maxWaves` cleared), stepping `dt` (default 0.05) at a time; `nexus`: a campaign's;
  *  `drill`, `siege`: createRun's opts; `watch` is called after every step of a wave (the balance tests' probes). */
 export function playRun(units: Unit[], seed: number,
-  opts: { maze?: MazeSpot[]; maxWaves?: number; dt?: number; nexus?: RunNexus; drill?: RunDrill; siege?: string; final?: number; watch?: (run: TrainingRun) => void } = {}): TrainingRun {
+  opts: { maze?: MazeSpot[]; maxWaves?: number; dt?: number; nexus?: RunNexus; drill?: RunDrill; siege?: string; final?: number; modeHp?: number; hpFlat?: number; watch?: (run: TrainingRun) => void } = {}): TrainingRun {
   const { maze = [], maxWaves = 60, dt = 0.05 } = opts;
-  const run = createRun('bot', units, seed, undefined, opts.nexus, { drill: opts.drill, siege: opts.siege, final: opts.final });
+  const run = createRun('bot', units, seed, undefined, opts.nexus, { drill: opts.drill, siege: opts.siege, final: opts.final, modeHp: opts.modeHp, hpFlat: opts.hpFlat });
   let cursor = 0;
   while (run.phase !== 'over' && run.cleared < maxWaves) {
     // A Victory: the bot always goes on into Endless.
