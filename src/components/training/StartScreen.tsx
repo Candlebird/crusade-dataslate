@@ -66,7 +66,7 @@ export function StartScreen({ force, c, saved, cleared, siege, onSiege, week = '
         <FinaleTrack force={force} c={c} />
         <DrillTrack force={force} />
       </>}
-      <FeatList force={force} where="training" />
+      <FeatList force={force} where="training" c={c} />
       <div className="small" style={{ marginBottom: 4 }}><b>Units</b> <span className="muted">· each has a recipe</span></div>
       {!units.length && <p className="muted small">No active units to train.</p>}
       <div className="training-roster">

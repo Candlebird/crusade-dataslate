@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_SETTINGS, type Campaign } from '../model/types';
 import { newForce, newUnit } from '../model/factory';
-import { applyExpedition, checkOdds, declinePatrol, rollPatrolEnemy, chooseOption, currentEncounter, headHome, pressOn, scaledReward, squadBonus, startExpedition } from './downtime';
+import { applyExpedition, broughtHome, checkOdds, declinePatrol, scanSite, rollPatrolEnemy, chooseOption, currentEncounter, DEFAULT_NAMES, expeditionNames, fillNames, headHome, pressOn, scaledReward, squadBonus, startExpedition } from './downtime';
 import { EXPEDITION, EXPEDITION_SITES, SOLO_PATROL } from './downtimeData';
 import { emptyUnitBattle, participationXp, resolveBattle, rewardRows, type BattleInput } from './battle';
 import { STANDARD_MISSION } from './missions';
@@ -30,26 +30,72 @@ describe('expeditions', () => {
     expect(() => startExpedition('nope', [])).toThrow();
   });
 
-  it('has six encounters a site, each in three variants with a way through', () => {
+  it('has ten encounters a site, each in four variants with a way through, using only known name tokens', () => {
     for (const site of EXPEDITION_SITES) {
-      expect(site.encounters).toHaveLength(6);
+      expect(site.encounters).toHaveLength(10);
+      expect(new Set(site.encounters.map((x) => x.id)).size).toBe(10);
+      const tokens = [site.finish.text];
       for (const enc of site.encounters) {
-        expect(enc.variants).toHaveLength(3);
+        expect(enc.variants).toHaveLength(4);
         for (const v of enc.variants) {
           expect(v.choices.length).toBeGreaterThanOrEqual(2);
-          for (const c of v.choices) if (c.check) expect(c.lose).not.toBe('');
+          tokens.push(v.title, v.text);
+          for (const c of v.choices) {
+            if (c.check) expect(c.lose).not.toBe('');
+            tokens.push(c.label, c.win, c.lose);
+          }
         }
       }
+      for (const t of tokens) for (const [, k] of t.matchAll(/\{(\w+)\}/g)) expect(Object.keys(DEFAULT_NAMES)).toContain(k);
     }
+  });
+
+  it("fills an expedition's text with the force's own names, or plain words without a campaign", () => {
+    const f = newForce('1st Warhost');
+    f.faction = 'Battle Brothers';
+    f.units.push(newUnit({ id: 'a', name: 'Magnus', xp: 9 }), newUnit({ id: 'b', name: 'Iron-Wake Guard' }), newUnit({ id: 'z', name: 'Old Kal', status: 'removed' }));
+    const solo = expeditionNames(f, undefined, ['a'], () => 0);
+    expect(solo).toMatchObject({ force: '1st Warhost', faction: 'Battle Brothers', unit: 'Magnus', other: 'Magnus', hero: 'Magnus', fallen: 'Old Kal', home: 'home', rival: 'a rival warband' });
+    f.nexus = { factionId: 'f1', permanentTables: [], tempTables: [], traitTokens: 0, pending: [] };
+    const c = {
+      id: 'c', name: 'Nexus War', updatedAt: '', log: [],
+      factions: [{ id: 'f1', name: "Emperor's Spears", warlord: { name: 'Lord Vex' } }, { id: 'f2', name: 'Red Maw' }],
+      sectors: [
+        { id: 'h', name: 'Bastion', type: 'home', owner: 'f1', q: 0, r: 0 },
+        { id: 'p', name: 'Kethra', type: 'planet', owner: 'f1', q: 5, r: 0 },
+        { id: 'n', name: 'Gloam', type: 'void', q: 1, r: 0 },
+        { id: 'x', name: 'Far Reach', type: 'void', q: 6, r: 0 },
+        { id: 'r', name: 'Maw Prime', type: 'home', owner: 'f2', q: 9, r: 0 },
+      ],
+    } as unknown as Campaign;
+    const n = expeditionNames(f, c, ['a', 'b'], () => 0);
+    expect(n).toMatchObject({ faction: "Emperor's Spears", army: 'Battle Brothers', home: 'Bastion', world: 'Kethra', near: 'Gloam', rival: 'Red Maw', rivalWorld: 'Maw Prime', unit: 'Magnus', other: 'Iron-Wake Guard', hero: 'Lord Vex', campaign: 'Nexus War' });
+    expect(fillNames('A beacon from {world} points to {near}, past {nobody}.', n)).toBe('A beacon from Kethra points to Gloam, past {nobody}.');
+    expect(fillNames('Word from {home}.')).toBe('Word from home.');
+    const e = startExpedition('hulk', ['a'], () => 0, n);
+    expect(e.names?.home).toBe('Bastion');
+  });
+
+  it('scans one of the six sites at random, and recording an Expedition there uses the scan up', () => {
+    expect(EXPEDITION_SITES).toHaveLength(6);
+    expect(new Set(EXPEDITION_SITES.map((x) => x.id)).size).toBe(6);
+    expect(EXPEDITION_SITES.map((_, i) => scanSite(() => (i + 0.5) / 6))).toEqual(EXPEDITION_SITES.map((x) => x.id));
+    const f = newForce('Test');
+    f.units.push(newUnit({ id: 'a', name: 'Alpha' }));
+    f.nexus = { factionId: 'f', permanentTables: [], tempTables: [], traitTokens: 0, pending: [], expeditionScan: 'forge' };
+    const e = startExpedition('forge', ['a']);
+    e.phase = 'done';
+    applyExpedition(f, e, '2026-10-30', () => 'x');
+    expect(f.nexus.expeditionScan).toBeUndefined();
   });
 
   it('draws a variant for each encounter', () => {
     const e = hulk(() => 0.99);
-    expect(e.variants).toEqual([2, 2, 2]);
+    expect(e.variants).toEqual([3, 3, 3]);
     const enc = EXPEDITION_SITES[0].encounters.find((x) => x.id === e.deck[0])!;
-    expect(currentEncounter(e)?.title).toBe(enc.variants[2].title);
+    expect(currentEncounter(e)?.title).toBe(fillNames(enc.variants[3].title));
     delete e.variants; // an expedition saved before variants meets the first
-    expect(currentEncounter(e)?.title).toBe(enc.variants[0].title);
+    expect(currentEncounter(e)?.title).toBe(fillNames(enc.variants[0].title));
   });
 
   it('gives bigger and more experienced squads a bonus, up to the cap', () => {
@@ -154,28 +200,43 @@ describe('expeditions', () => {
     const f = newForce('Test');
     f.units.push(newUnit({ id: 'a', name: 'Alpha', xp: 0 }), newUnit({ id: 'b', name: 'Bravo', xp: 5 }), newUnit({ id: 'x', name: 'Home', xp: 0 }));
     const e = startExpedition('hulk', ['a', 'b']);
-    e.haul = { xp: 2, supply: 40, rp: 1, us: 1, materials: 0 };
+    e.squad = ['a', 'b', 'x'];
+    e.haul = { xp: 2, supply: 45, rp: 2, us: 3, materials: 0 };
     e.injuries = [{ unitId: 'a', scar: 'Weakened Armor' }, { unitId: 'b' }];
     e.phase = 'done';
     let n = 0;
     const summary = applyExpedition(f, e, '2026-10-20', () => `id${n++}`);
-    expect(f.units.map((u) => u.xp)).toEqual([2, 7, 0]);
+    expect(f.units.map((u) => u.xp)).toEqual([2, 7, 2]);
     expect(f.units[0].scars.map((s) => s.name)).toEqual(['Weakened Armor']);
     expect(f.units[1].status).toBe('comatose');
+    // Only Home came back unhurt, so a third of the haul comes home.
     expect(f.umbraShards).toBe(1);
-    expect(f.ledger[f.ledger.length - 1]).toMatchObject({ rp: 1, supply: 40, us: 1, date: '2026-10-20' });
-    expect(summary).toMatch(/^Expedition — Derelict Space Hulk: \+2 XP each/);
+    expect(f.ledger[f.ledger.length - 1]).toMatchObject({ rp: 1, supply: 15, us: 1, date: '2026-10-20' });
+    expect(summary).toMatch(/^Expedition — Derelict Space Hulk: \+2 XP each.*\(1 of 3 units brought the haul home: 1\/3 of the \+45 Supply, \+2 RP, \+3 Umbra Shards found\)/);
     expect(summary).toMatch(/Bravo: Lost/);
+  });
+
+  it('shares the haul out by the squad that comes home unhurt', () => {
+    const e = startExpedition('hulk', ['a', 'b', 'c']);
+    e.haul = { xp: 2, supply: 60, rp: 1, us: 3, materials: 100 };
+    expect(broughtHome(e)).toEqual(e.haul);
+    e.injuries = [{ unitId: 'c' }, { unitId: 'c', scar: 'Weakened Armor' }];
+    expect(broughtHome(e)).toEqual({ xp: 2, supply: 40, rp: 1, us: 2, materials: 65 });
+    const solo = startExpedition('hulk', ['a']);
+    solo.haul = { ...e.haul };
+    expect(broughtHome(solo)).toEqual({ xp: 2, supply: 20, rp: 0, us: 1, materials: 35 });
+    solo.injuries = [{ unitId: 'a' }];
+    expect(broughtHome(solo)).toEqual({ xp: 2, supply: 0, rp: 0, us: 0, materials: 0 });
   });
 
   it('names the bank its Materials went to instead of the bare amount', () => {
     const f = newForce('Test');
     f.units.push(newUnit({ id: 'a', name: 'Alpha', xp: 0 }));
     const e = startExpedition('hulk', ['a']);
-    e.haul = { xp: 0, supply: 0, rp: 0, us: 0, materials: 100 };
+    e.haul = { xp: 0, supply: 0, rp: 0, us: 0, materials: 300 };
     e.phase = 'done';
-    expect(applyExpedition(structuredClone(f), e, '2026-10-20', () => 'x')).toMatch(/\+100 Materials$/);
-    expect(applyExpedition(f, e, '2026-10-20', () => 'x', '+100 Materials to Vesta')).toBe('Expedition — Derelict Space Hulk: +100 Materials to Vesta');
+    expect(applyExpedition(structuredClone(f), e, '2026-10-20', () => 'x')).toMatch(/\+100 Materials \(1 of 3 units brought the haul home: 1\/3 of the \+300 Materials found\)$/);
+    expect(applyExpedition(f, e, '2026-10-20', () => 'x', '+100 Materials to Vesta')).toBe('Expedition — Derelict Space Hulk: +100 Materials to Vesta (1 of 3 units brought the haul home: 1/3 of the +300 Materials found)');
   });
 });
 

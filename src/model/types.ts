@@ -153,6 +153,8 @@ export interface ForceNexus {
   patrolRound?: number;
   /** Units that went on a Solo patrol or Expedition (or a task) this round: each unit gets one a round. Games at the table don't count. */
   usedUnits?: { round: number; ids: string[] };
+  /** The Expedition site the force's last Scan found (rules/downtime.ts scanSite): locked in until an Expedition there is recorded. */
+  expeditionScan?: string;
   /** Settled Nexus Duels whose Umbra Shards and relics this force has paid or collected. */
   duelsPaid?: string[];
   /** Crossroads Journals whose Warlord rewards (or costs) this force has taken. */
@@ -396,8 +398,10 @@ export interface Force {
   drill?: DrillStats;
   /** The Final-wave ladder in Training: veterancy, the Final open, Victories, Endless depth. */
   finale?: ForceFinale;
-  /** Feats earned, by id, with the date (rules/feats.ts): each pays once. */
+  /** Unique feats earned, by id, with the date (rules/feats.ts): each pays once for the faction (the force outside a campaign). */
   feats?: Record<string, string>;
+  /** Repeatable feats, by id: the round or week (offTableKey) last done, how many times, and the date. */
+  featRepeats?: Record<string, { key: string; n: number; last: string }>;
   /** Which feat rewards the force's feats were paid at (rules/feats.ts FEATS_VERSION; unset: the first). */
   featsV?: number;
   /** Relics no unit carries, ready to give to one with room (rules/relicVault.ts). */

@@ -1,18 +1,21 @@
-// Feats: the hardest Sortie and Training challenges, each paying a real reward once per force.
+// Feats: the hardest Sortie and Training challenges. A unique feat pays a real reward once, for the whole faction in a
+// campaign (once per force outside one); a repeatable feat pays a smaller one, once a round for the faction (once a week
+// for the force outside a campaign).
 
 import type { Force } from '../model/types';
 
 export type FeatId =
   | 'sortieTop' | 'sortieFlawless' | 'sortieAsc4' | 'sortieAsc8' | 'sortieHeat' | 'sortieNemesis'
   | 'train20' | 'train25' | 'train30' | 'trainLord' | 'trainWin' | 'trainBosses' | 'trainEndless' | 'trainFinal40'
-  | 'trainFinal50' | 'trainAllLords' | 'siege6' | 'siege10' | 'siege15' | 'siege20' | 'siege25';
+  | 'trainFinal50' | 'trainAllLords' | 'siege6' | 'siege10' | 'siege15' | 'siege20' | 'siege25'
+  | 'sortieRepTop' | 'sortieRepWhole' | 'trainRep20' | 'trainRepLord' | 'trainRepWin' | 'siegeRep';
 
 /** What a feat pays: Requisition, Supply and Umbra Shards to the force, XP to each unit that took part, and a relic
  *  (by name: a Training-only one, RelicDef.training) any unit of the force may then take for free. */
 export interface FeatReward { rp?: number; supply?: number; us?: number; xp?: number; relic?: string }
 
-/** `hard`: listed under the hard feats. */
-export interface Feat { id: FeatId; where: 'sortie' | 'training'; name: string; text: string; reward: FeatReward; hard?: boolean }
+/** `hard`: listed under the hard feats. `repeat`: repeatable, once a round (rewards stay small: Umbra Shards only). */
+export interface Feat { id: FeatId; where: 'sortie' | 'training'; name: string; text: string; reward: FeatReward; hard?: boolean; repeat?: boolean }
 
 export const FEATS: Feat[] = [
   { id: 'sortieTop', where: 'sortie', name: 'Peak of the Road', text: 'Win a Sortie at the top tier.', reward: { rp: 5, supply: 100 } },
@@ -36,11 +39,30 @@ export const FEATS: Feat[] = [
   { id: 'siege15', where: 'training', name: 'Felling Blow', text: 'Deal 15,000 damage to the Weekly Siege’s colossus.', reward: { us: 6 }, hard: true },
   { id: 'siege20', where: 'training', name: 'Mountain Breaker', text: 'Deal 20,000 damage to the Weekly Siege’s colossus.', reward: { rp: 3, supply: 500 }, hard: true },
   { id: 'siege25', where: 'training', name: 'Colossus Slayer', text: 'Deal 25,000 damage to the Weekly Siege’s colossus.', reward: { relic: 'Colossus Splinter' }, hard: true },
+  { id: 'sortieRepTop', where: 'sortie', name: 'Glory Road', text: 'Win a Sortie at the top tier.', reward: { us: 2 }, repeat: true },
+  { id: 'sortieRepWhole', where: 'sortie', name: 'All Come Home', text: 'Win a Sortie with no unit wiped out.', reward: { us: 1 }, repeat: true },
+  { id: 'trainRep20', where: 'training', name: 'Hold Fast', text: 'Clear 20 waves in one training run.', reward: { us: 1 }, repeat: true },
+  { id: 'trainRepLord', where: 'training', name: 'Crownbreaker', text: 'Slay an Echo Lord in a training run.', reward: { us: 1 }, repeat: true },
+  { id: 'trainRepWin', where: 'training', name: 'Final Honours', text: 'Win a Final wave.', reward: { us: 1 }, repeat: true },
+  { id: 'siegeRep', where: 'training', name: 'Siege Breaker', text: 'Deal 10,000 damage to the Weekly Siege’s colossus.', reward: { us: 2 }, repeat: true },
 ];
 
 export const featInfo = (id: string) => FEATS.find((f) => f.id === id);
 
 export const hasFeat = (force: Force, id: FeatId) => !!force.feats?.[id];
+
+/** The forces a feat is counted across: the force's faction in a campaign (`forces`: every force there is), else the
+ *  force alone. */
+export const featFaction = (force: Force, forces?: Force[], inCampaign = true): Force[] =>
+  inCampaign && force.nexus?.factionId && forces
+    ? [force, ...forces.filter((f) => f.id !== force.id && f.nexus?.factionId === force.nexus!.factionId)]
+    : [force];
+
+/** Who earned the unique feat: the force or another of its faction (`faction` from featFaction). */
+export const featHolder = (faction: Force[], id: string) => faction.find((f) => f.feats?.[id]);
+
+/** Who did the repeatable feat this round or week (`key`, from offTableKey), if any of the faction did. */
+export const repeatHolder = (faction: Force[], id: string, key: string) => faction.find((f) => f.featRepeats?.[id]?.key === key);
 
 export function rewardText(r: FeatReward): string {
   return [
@@ -88,21 +110,38 @@ export const trainingFeats = (cleared: number, lords = 0, more: TrainingFeatFact
   ...SIEGE_FEATS.filter(([, n]) => (more.siege ?? 0) >= n).map(([id]) => id),
 ];
 
+/** The repeatable training feats the same run earns (see trainingFeats). */
+export const trainingRepeats = (cleared: number, lords = 0, more: TrainingFeatFacts = {}): FeatId[] => [
+  ...(cleared >= 20 ? ['trainRep20' as const] : []),
+  ...(lords > 0 || more.finalLord ? ['trainRepLord' as const] : []),
+  ...(more.won ? ['trainRepWin' as const] : []),
+  ...((more.siege ?? 0) >= 10000 ? ['siegeRep' as const] : []),
+];
+
 /**
- * Pay the feats the force hasn't earned before: Umbra Shards and XP straight away, RP and Supply on the ledger.
- * Returns a line for each feat paid.
+ * Pay the feats: a unique one only if no force of `faction` (featFaction; the force alone if left out) has earned it,
+ * a repeatable one only if none did it this round or week (`key`, from offTableKey; without a key none is paid). Umbra
+ * Shards and XP straight away, RP and Supply on the ledger. Returns a line for each feat paid.
  */
-export function awardFeats(force: Force, ids: FeatId[], unitIds: string[], date: string, newId: () => string): string[] {
+export function awardFeats(force: Force, ids: FeatId[], unitIds: string[], date: string, newId: () => string, faction: Force[] = [force], key?: string): string[] {
   const out: string[] = [];
+  const all = faction.includes(force) ? faction : [force, ...faction];
   for (const id of ids) {
     const feat = featInfo(id);
-    if (!feat || hasFeat(force, id)) continue;
-    (force.feats ??= {})[id] = date;
+    if (!feat) continue;
+    if (feat.repeat) {
+      if (!key || repeatHolder(all, id, key)) continue;
+      const rec = (force.featRepeats ??= {})[id];
+      force.featRepeats[id] = { key, n: (rec?.n ?? 0) + 1, last: date };
+    } else {
+      if (featHolder(all, id)) continue;
+      (force.feats ??= {})[id] = date;
+    }
     const r = feat.reward;
     if (r.us) force.umbraShards += r.us;
     if (r.xp) for (const u of force.units) if (unitIds.includes(u.id) && u.status !== 'removed') u.xp += r.xp;
     if (r.relic && !force.trainingRelics?.includes(r.relic)) (force.trainingRelics ??= []).push(r.relic);
-    const line = `Feat — ${feat.name}: ${rewardText(r)}`;
+    const line = `${feat.repeat ? 'Repeatable feat' : 'Feat'} — ${feat.name}: ${rewardText(r)}`;
     force.ledger.push({ id: newId(), date, label: line, rp: r.rp ?? 0, supply: r.supply ?? 0, ...(r.us ? { us: r.us } : {}) });
     out.push(line);
   }

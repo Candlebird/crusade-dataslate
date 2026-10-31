@@ -447,7 +447,8 @@ describe('sortie', () => {
     Object.assign(won, { over: 'won', xp: 9, haul: { supply: 20, rp: 1, us: 1 } });
     applySortie(f, won, '2026-01-01', id);
     for (const u of party) expect(u.xp).toBe(SORTIE.caps.shard.short);
-    expect(f.umbraShards).toBe(1);
+    // The haul's Shard, and one more for All Come Home (no unit wiped out).
+    expect(f.umbraShards).toBe(2);
     expect(f.ledger[f.ledger.length - 1]).toMatchObject({ supply: 20, rp: 1 });
 
     // Only the units wiped out pay for it.
@@ -1242,7 +1243,9 @@ describe('feats', () => {
     expect(text).toContain('Feat — Peak of the Road');
     expect(text).toContain('Feat — Ascendant');
     expect(Object.keys(f.feats!).sort()).toEqual(['sortieAsc4', 'sortieFlawless', 'sortieTop']);
-    expect(f.umbraShards - shards).toBe(3);
+    // The repeatable Glory Road and All Come Home pay too, once this week.
+    expect(Object.keys(f.featRepeats!).sort()).toEqual(['sortieRepTop', 'sortieRepWhole']);
+    expect(f.umbraShards - shards).toBe(3 + 3);
     expect(f.units[0].xp - xp).toBeGreaterThanOrEqual(2);
     expect(applySortie(f, run(), '2026-10-23', () => `id${n++}`, () => 0.99)).not.toContain('Feat');
   });

@@ -4,6 +4,7 @@ import { SCAR_TABLE } from './data';
 import { EXPEDITION, EXPEDITION_SITES, OFF_TABLE_XP, SOLO_PATROL, SORTIE, SORTIE_BOONS, SORTIE_QUIRKS, type ExpeditionCheck, type ExpeditionReward, type ExpeditionSite, type ExpeditionVariant } from './downtimeData';
 import { applyScar, levelForXp } from './engine';
 import { awardFeats, type FeatId } from './feats';
+import { hexDistance } from './hexmap';
 import { currentRound } from './nexus';
 import { earnTitles, heldTitles, sortieTitles, titleInfo } from './training/titles';
 import { addQuirk, beastInfo, bossOf, bountyOf, fallenUnits, keepsHaul, memberName, memberUp, memberXp, quirkInfo, regionName, regionOf, relicsOf, runXp, threadDone, tierOf, unlockedBoons, markHeat, weekKey, weeklyScore, type SortieRun } from './sortie';
@@ -29,6 +30,8 @@ export interface Expedition {
   variants?: number[];
   /** Index of the current encounter in the deck. */
   stage: number;
+  /** What the site's {tokens} stand for on this run (expeditionNames), fixed when the squad sets out. */
+  names?: ExpeditionNames;
   phase: ExpeditionPhase;
   haul: Required<ExpeditionReward>;
   danger: number;
@@ -40,11 +43,101 @@ export interface Expedition {
 
 export const expeditionSite = (id: string): ExpeditionSite | undefined => EXPEDITION_SITES.find((s) => s.id === id);
 
+/** Scan for an Expedition: picks a site at random. The force is locked into it until it records an Expedition there. */
+export const scanSite = (rand: Rand = Math.random): string => EXPEDITION_SITES[Math.floor(rand() * EXPEDITION_SITES.length)].id;
+
 /** The encounter the squad is at, in the variant it drew. */
 export function currentEncounter(e: Expedition): (ExpeditionVariant & { id: string }) | undefined {
   const enc = expeditionSite(e.site)?.encounters.find((x) => x.id === e.deck[e.stage]);
   if (!enc) return undefined;
-  return { id: enc.id, ...(enc.variants[e.variants?.[e.stage] ?? 0] ?? enc.variants[0]) };
+  const v = enc.variants[e.variants?.[e.stage] ?? 0] ?? enc.variants[0];
+  const f = (t: string) => fillNames(t, e.names);
+  return { id: enc.id, title: f(v.title), text: f(v.text), choices: v.choices.map((c) => ({ ...c, label: f(c.label), win: f(c.win), lose: f(c.lose) })) };
+}
+
+/**
+ * The names an Expedition's text can use as {tokens}, drawn from the force and its campaign so each run feels like
+ * the player's own: its faction, worlds, rivals, squad and dead.
+ */
+export interface ExpeditionNames {
+  /** The force, e.g. "1st Warhost". */
+  force: string;
+  /** Its campaign faction, or outside a campaign its army. */
+  faction: string;
+  /** Its army book faction, e.g. "Battle Brothers". */
+  army: string;
+  /** The faction's home sector. */
+  home: string;
+  /** One of the faction's planets (its home when it has none). */
+  world: string;
+  /** A sector near the force that the faction doesn't hold. */
+  near: string;
+  /** Another faction in the campaign, and one of its sectors. */
+  rival: string;
+  rivalWorld: string;
+  /** A unit in the squad, and a second one (the first again in a squad of one). */
+  unit: string;
+  other: string;
+  /** The faction's Warlord, or the force's most seasoned unit. */
+  hero: string;
+  /** A unit the force has lost for good. */
+  fallen: string;
+  /** The campaign. */
+  campaign: string;
+}
+
+/** Put a run's names into a site's text: `{home}` becomes the faction's home world. Unknown tokens stay as written. */
+export const fillNames = (text: string, names: Partial<ExpeditionNames> = {}) =>
+  text.replace(/\{(\w+)\}/g, (m, k: string) => names[k as keyof ExpeditionNames] ?? DEFAULT_NAMES[k as keyof ExpeditionNames] ?? m);
+
+/** What the tokens say with no campaign to draw on (and for runs started before names were kept). */
+export const DEFAULT_NAMES: ExpeditionNames = {
+  force: 'the force', faction: 'your faction', army: 'your army', home: 'home', world: 'home', near: 'the next sector over',
+  rival: 'a rival warband', rivalWorld: 'rival space', unit: 'the squad leader', other: 'a squadmate', hero: 'your commander',
+  fallen: 'an old comrade', campaign: 'the war',
+};
+
+export function expeditionNames(force: Force, c: Campaign | undefined, squad: string[], rand: Rand = Math.random): ExpeditionNames {
+  const pick = <T>(xs: T[]) => (xs.length ? xs[Math.floor(rand() * xs.length)] : undefined);
+  const unit = (id: string) => force.units.find((u) => u.id === id);
+  const label = (u: Unit) => u.name || u.unitType;
+  const members = squad.map(unit).filter((u): u is Unit => !!u);
+  const first = pick(members);
+  const second = pick(members.filter((u) => u !== first)) ?? first;
+  const seasoned = [...force.units].filter((u) => u.status !== 'removed').sort((a, b) => b.xp - a.xp)[0];
+  const fallen = pick(force.units.filter((u) => u.status === 'removed'));
+  // The army book most of its units come from.
+  const books = force.units.map((u) => u.bookName).filter((b): b is string => !!b);
+  const book = books.sort((a, b) => books.filter((x) => x === b).length - books.filter((x) => x === a).length)[0];
+  const n: ExpeditionNames = {
+    ...DEFAULT_NAMES, force: force.name || DEFAULT_NAMES.force, faction: force.faction || DEFAULT_NAMES.faction, army: book || force.faction || DEFAULT_NAMES.army,
+    ...(first ? { unit: label(first), other: label(second!) } : {}),
+    ...(seasoned ? { hero: label(seasoned) } : {}),
+    ...(fallen ? { fallen: label(fallen) } : {}),
+  };
+  const fid = force.nexus?.factionId;
+  const fac = c?.factions.find((f) => f.id === fid);
+  if (!c || !fac) return n;
+  n.campaign = c.name || n.campaign;
+  n.faction = fac.name;
+  if (fac.warlord?.name) n.hero = fac.warlord.name;
+  const named = c.sectors.filter((s) => s.name);
+  const home = named.find((s) => s.type === 'home' && s.owner === fac.id);
+  if (home) n.home = n.world = home.name;
+  const world = pick(named.filter((s) => s.type === 'planet' && s.owner === fac.id));
+  if (world) n.world = world.name;
+  // Near the force's detachment (its home when it has none): within 2 hexes, not the faction's own.
+  const pos = c.positions?.[force.id];
+  const at = (pos?.factionId === fac.id && c.sectors.find((s) => s.id === pos.sectorId)) || home;
+  const placed = (s: { q?: number; r?: number }): s is { q: number; r: number } => s.q !== undefined && s.r !== undefined;
+  const near = at && placed(at) ? pick(named.filter((s) => placed(s) && s.owner !== fac.id && s !== at && hexDistance(at, s) <= 2)) : undefined;
+  if (near) n.near = near.name;
+  const rival = pick(c.factions.filter((f) => f.id !== fac.id));
+  if (rival) {
+    n.rival = rival.name;
+    n.rivalWorld = pick(named.filter((s) => s.owner === rival.id && (s.type === 'planet' || s.type === 'home')))?.name ?? n.rivalWorld;
+  }
+  return n;
 }
 
 /** Added to the squad's rolls: +1 for each unit after the first, and +1 for every few levels across the squad. */
@@ -99,7 +192,7 @@ const addReward = (a: Required<ExpeditionReward>, b: ExpeditionReward) => {
   a.materials = (a.materials ?? 0) + (b.materials ?? 0);
 };
 
-export function startExpedition(siteId: string, squad: string[], rand: Rand = Math.random): Expedition {
+export function startExpedition(siteId: string, squad: string[], rand: Rand = Math.random, names?: ExpeditionNames): Expedition {
   const site = expeditionSite(siteId);
   if (!site) throw new Error(`Unknown expedition site ${siteId}`);
   const all = site.encounters.map((x) => x.id);
@@ -110,7 +203,7 @@ export function startExpedition(siteId: string, squad: string[], rand: Rand = Ma
   const deck = all.slice(0, EXPEDITION.encounters);
   const variants = deck.map((id) => Math.floor(rand() * site.encounters.find((x) => x.id === id)!.variants.length));
   return {
-    site: siteId, squad: squad.slice(0, EXPEDITION.squadMax), deck, variants, stage: 0, phase: 'encounter',
+    site: siteId, squad: squad.slice(0, EXPEDITION.squadMax), deck, variants, stage: 0, phase: 'encounter', ...(names ? { names } : {}),
     haul: { xp: 0, supply: 0, rp: 0, us: 0, materials: 0 }, danger: 0, injuries: [], log: [], finished: false,
   };
 }
@@ -150,7 +243,7 @@ export function chooseOption(e: Expedition, index: number, bonus = 0, rand: Rand
 function finish(e: Expedition) {
   const site = expeditionSite(e.site)!;
   addReward(e.haul, site.finish.reward);
-  e.log.push(`${site.finish.text} ${rewardText(site.finish.reward)}.`);
+  e.log.push(`${fillNames(site.finish.text, e.names)} ${rewardText(site.finish.reward)}.`);
   e.finished = true;
   e.phase = 'done';
 }
@@ -186,12 +279,33 @@ export function pressOn(e: Expedition, rand: Rand = Math.random): PressOnResult 
   return { roll, ambush };
 }
 
+/** Units of the squad that come home unhurt: not scarred or Lost on the way. */
+export const unhurt = (e: Expedition) => e.squad.filter((id) => !e.injuries.some((x) => x.unitId === id));
+
+/** A reward cut to what `carriers` unhurt units bring home: 1 of EXPEDITION.squadMax each. XP isn't cut. */
+export function shareOf(carriers: number, r: ExpeditionReward): Required<ExpeditionReward> {
+  const share = Math.min(1, carriers / EXPEDITION.squadMax);
+  const by5 = (n = 0) => Math.round((n * share) / 5) * 5;
+  return { xp: r.xp ?? 0, supply: by5(r.supply), rp: Math.round((r.rp ?? 0) * share), us: Math.round((r.us ?? 0) * share), materials: by5(r.materials) };
+}
+
+/** A reward cut to the share the squad's unhurt units carry home. */
+export const carried = (e: Expedition, r: ExpeditionReward) => shareOf(unhurt(e).length, r);
+
 /**
- * Pay the haul and the injuries to the force. Its Materials are banked by the caller (depositNearest), which passes
- * where they went as `banked` for the summary. Returns a one-line summary.
+ * What the squad brings home: each unhurt unit carries back its share of a full squad's haul (1 of EXPEDITION.squadMax),
+ * so a lone unit brings home a third and an injured one nothing. XP isn't shared: each unit of the squad gets it all.
+ */
+export const broughtHome = (e: Expedition) => carried(e, e.haul);
+
+/**
+ * Pay the haul (the share brought home, broughtHome) and the injuries to the force. Its Materials are banked by the
+ * caller (depositNearest), which passes where they went as `banked` for the summary. Returns a one-line summary.
  */
 export function applyExpedition(force: Force, e: Expedition, date: string, newId: () => string, banked?: string): string {
   const site = expeditionSite(e.site)!;
+  // The Scan is used up: the next Expedition scans again.
+  if (force.nexus?.expeditionScan === e.site) delete force.nexus.expeditionScan;
   const squad = force.units.filter((u) => e.squad.includes(u.id) && u.status !== 'removed');
   for (const u of squad) u.xp += e.haul.xp;
   const hurt: string[] = [];
@@ -206,11 +320,15 @@ export function applyExpedition(force: Force, e: Expedition, date: string, newId
       hurt.push(`${u.name}: Lost, sits out the next battle`);
     }
   }
-  force.umbraShards += e.haul.us;
-  const got = rewardText(banked ? { ...e.haul, materials: 0 } : e.haul);
+  const home = broughtHome(e);
+  force.umbraShards += home.us;
+  const got = rewardText(banked ? { ...home, materials: 0 } : home);
   const haul = banked ? (got === 'nothing' ? banked : `${got}, ${banked}`) : got;
-  const summary = [`Expedition — ${site.name}${e.finished ? ' (completed)' : ''}: ${haul}`, ...hurt].join('; ');
-  force.ledger.push({ id: newId(), date, label: summary, rp: e.haul.rp, supply: e.haul.supply, ...(e.haul.us ? { us: e.haul.us } : {}) });
+  const carried = unhurt(e).length;
+  const found = rewardText({ ...e.haul, xp: 0 });
+  const share = carried < EXPEDITION.squadMax ? ` (${carried} of ${EXPEDITION.squadMax} units brought the haul home: ${carried}/${EXPEDITION.squadMax} of the ${found} found)` : '';
+  const summary = [`Expedition — ${site.name}${e.finished ? ' (completed)' : ''}: ${haul}${share}`, ...hurt].join('; ');
+  force.ledger.push({ id: newId(), date, label: summary, rp: home.rp, supply: home.supply, ...(home.us ? { us: home.us } : {}) });
   return summary;
 }
 
@@ -233,9 +351,10 @@ export function bankOffTableXp(u: Unit, n: number, key: string): number {
 /**
  * Pay a finished Sortie to the force: the XP (up to the run's cap) to each unit of the party, a Shard run's haul if it
  * got home, and on a Shard run each unit wiped out takes a battle scar or is Lost. A free run's XP counts toward the
- * off-table limit for the round (`key`, from offTableKey). Returns a one-line summary.
+ * off-table limit for the round (`key`, from offTableKey), as do its repeatable feats. `faction`: the forces its feats
+ * count across (feats.ts featFaction). Returns a one-line summary.
  */
-export function applySortie(force: Force, run: SortieRun, date: string, newId: () => string, rand: Rand = Math.random, key = weekKey(date)): string {
+export function applySortie(force: Force, run: SortieRun, date: string, newId: () => string, rand: Rand = Math.random, key = weekKey(date), faction: Force[] = [force]): string {
   const units = run.party.map((m) => force.units.find((x) => x.id === m.unit.id)).filter((u): u is Unit => !!u && u.status !== 'removed');
   if (!units.length) return '';
   const xp = runXp(run);
@@ -382,7 +501,7 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
   // Boons unlocked by what the force has done, this run and before.
   const boonsNew = unlockedBoons(story).filter((id) => !boonsBefore.includes(id));
   if (boonsNew.length) bits.push(`unlocked the boon${boonsNew.length === 1 ? '' : 's'} ${boonsNew.map((id) => SORTIE_BOONS[id].name).join(', ')}`);
-  // Feats: the hardest runs pay a real reward, once per force.
+  // Feats: the hardest runs pay a real reward, once for the faction; the repeatable ones a small one, once a round.
   const won = run.over === 'won';
   const top = won && tierOf(run) === SORTIE.tiers.length - 1;
   const feats: FeatId[] = [
@@ -392,8 +511,10 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
     ...(top && asc >= SORTIE.ascension.curses.length ? ['sortieAsc8' as const] : []),
     ...(run.bossDown && heat >= 6 ? ['sortieHeat' as const] : []),
     ...(run.bossDown && grudgeBefore >= SORTIE.nemesis.max ? ['sortieNemesis' as const] : []),
+    ...(top ? ['sortieRepTop' as const] : []),
+    ...(won && run.party.every(memberUp) ? ['sortieRepWhole' as const] : []),
   ];
-  bits.push(...awardFeats(force, feats, run.party.map((m) => m.unit.id), date, newId));
+  bits.push(...awardFeats(force, feats, run.party.map((m) => m.unit.id), date, newId, faction, key));
   const summary = bits.join('; ');
   // A recap of the run, to look back on from the force.
   story.recaps = [{

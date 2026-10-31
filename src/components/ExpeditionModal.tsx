@@ -6,19 +6,23 @@ import { unitName } from '../rules/battle';
 import { markUnitsUsed, unitsUsed } from '../rules/nexus';
 import { EXPEDITION, EXPEDITION_SITES } from '../rules/downtimeData';
 import {
-  applyExpedition, checkOdds, checkText, chooseOption, currentEncounter, expeditionSite, headHome, pressOn, rewardText, scaledReward, squadBonus, startExpedition,
+  applyExpedition, broughtHome, carried, checkOdds, checkText, chooseOption, currentEncounter, expeditionNames, expeditionSite, headHome, pressOn, rewardText, scaledReward, scanSite, shareOf, squadBonus, startExpedition, unhurt,
   type Expedition,
 } from '../rules/downtime';
 import { bankRoom, depositNearest, depositText, rewardOrigin } from '../rules/production';
 import { Modal, toast } from './ui';
 import { localDate } from '../model/date';
 
-/** Send up to three units on a short dice-story into the Nexus. Any number a round, but each unit goes once. */
+/**
+ * Send up to three units on a short dice-story into the Nexus. Any number a round, but each unit goes once. A Scan picks
+ * the site at random, and the force is locked into it until it records an Expedition there.
+ */
 export default function ExpeditionModal({ force, c, onClose }: { force: Force; c: Campaign; onClose: () => void }) {
   const { update, updateForce } = useStore();
   const units = force.units.filter((u) => u.status === 'active');
   const used = unitsUsed(force, c);
-  const [site, setSite] = useState(EXPEDITION_SITES[0].id);
+  const scan = force.nexus?.expeditionScan;
+  const site = scan && expeditionSite(scan) ? scan : undefined;
   const [squad, setSquad] = useState<string[]>([]);
   const [e, setE] = useState<Expedition | null>(null);
   const [done, setDone] = useState<string | null>(null);
@@ -34,7 +38,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
     let summary = '';
     // The haul's Materials go to the faction's bank nearest this force.
     let banked = '';
-    const materials = x.haul.materials ?? 0;
+    const materials = broughtHome(x).materials;
     if (materials)
       update((s) => {
         const cc = s.campaign;
@@ -70,31 +74,46 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
 
   let body;
   let footer;
-  if (!e) {
-    const s = expeditionSite(site)!;
+  if (!e && !site) {
     body = (
       <>
         <p className="small" style={{ marginTop: 0 }}>
           Up to {EXPEDITION.squadMax} units face {EXPEDITION.encounters} encounters in the Nexus. After each, head home with the haul or press on.
         </p>
         <p className="muted small">
-          Deeper pays more, but each failed roll raises the ambush danger.
+          Scan the Nexus to find where to go: one of {EXPEDITION_SITES.length} sites, at random. The site stays locked in until an Expedition there comes home, so you can't scan again to pick another.
+        </p>
+      </>
+    );
+    footer = (
+      <>
+        <button onClick={onClose}>Cancel</button>
+        <button className="primary" onClick={() => updateForce(force.id, (d) => { if (d.nexus) d.nexus.expeditionScan ??= scanSite(); })}>Scan</button>
+      </>
+    );
+  } else if (!e) {
+    const s = expeditionSite(site!)!;
+    body = (
+      <>
+        <p className="small" style={{ marginTop: 0 }}>
+          Up to {EXPEDITION.squadMax} units face {EXPEDITION.encounters} encounters in the Nexus. After each, head home with the haul or press on.
+        </p>
+        <p className="muted small">
+          Deeper pays more, but each failed roll raises the ambush danger. Each unit that comes home unhurt carries back 1/{EXPEDITION.squadMax} of what the squad finds, so a smaller squad, or one with hurt units, leaves the rest behind (XP goes to every unit in full).
           {' '}Checks roll 1–4 dice. Every roll gets +1 per unit after the first and +1 per {EXPEDITION.levelsPerBonus} squad levels (max +{EXPEDITION.bonusCap}).
         </p>
         <div className="fields">
-          <label className="field span-all">
-            Destination
-            <select value={site} onChange={(ev) => setSite(ev.target.value)}>
-              {EXPEDITION_SITES.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
-            </select>
-          </label>
-          <p className="span-all small" style={{ margin: 0 }}>{s.desc} <span className="muted">Make it all the way: {rewardText(s.finish.reward)}.</span></p>
+          <p className="span-all small" style={{ margin: 0 }}>
+            <span className="muted">The scan found:</span> <b>{s.name}</b> <span className="tag gold" data-tip="Locked in until an Expedition there comes home.">Locked</span>
+          </p>
+          <p className="span-all small" style={{ margin: 0 }}>{s.desc} <span className="muted">Make it all the way: {rewardText(s.finish.reward)} for a full squad.</span></p>
           {/* Same test as depositNearest: Materials only bank where there's room, so with none they're lost. */}
           {(!force.nexus || bankRoom(c, force.nexus.factionId) <= 0) && (
             <p className="span-all small" style={{ margin: 0, color: 'var(--warn)' }}>No bank: any Materials found are lost.</p>
           )}
           <div className="span-all small">
             <div className="muted">Squad ({squad.length}/{EXPEDITION.squadMax}){squad.length > 0 && <> · <b>+{bonus}</b> to every roll</>}</div>
+            {squad.length > 0 && <CarryNote carrying={squad.length} why={squad.length < EXPEDITION.squadMax ? `only ${squad.length} unit${squad.length > 1 ? 's' : ''} picked` : ''} example={`making it all the way brings home ${rewardText(shareOf(squad.length, s.finish.reward))}`} />}
             {units.length === 0 && <span className="muted">No active units.</span>}
             {used.length > 0 && <div className="muted">Units that already went on a Solo patrol, Expedition or task this round stay home. Games at the table don't count.</div>}
             <div className="mission-pick">
@@ -121,7 +140,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
     footer = (
       <>
         <button onClick={onClose}>Cancel</button>
-        <button className="primary" disabled={!squad.length} data-tip={squad.length ? undefined : 'Pick at least one unit'} onClick={() => setE(startExpedition(site, squad))}>Set out</button>
+        <button className="primary" disabled={!squad.length} data-tip={squad.length ? undefined : 'Pick at least one unit'} onClick={() => setE(startExpedition(site!, squad, Math.random, expeditionNames(force, c, squad)))}>Set out</button>
       </>
     );
   } else {
@@ -138,7 +157,11 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
             Bonus <b>+{bonus}</b> · Danger <b>{e.danger}</b>
           </span>
         </div>
-        <p className="small" style={{ margin: '0.5rem 0' }}><span className="muted">Haul so far:</span> {rewardText(e.haul)}</p>
+        <p className="small" style={{ margin: '0.5rem 0' }}>
+          <span className="muted">Bringing home:</span> <b>{rewardText(broughtHome(e))}</b>
+          {unhurt(e).length < EXPEDITION.squadMax && rewardText({ ...e.haul, xp: 0 }) !== 'nothing' && <span className="muted"> · found {rewardText({ ...e.haul, xp: 0 })}</span>}
+        </p>
+        {unhurt(e).length < EXPEDITION.squadMax && <CarryNote carrying={unhurt(e).length} why={carryWhy(e, name)} />}
         {e.log.length > 0 && (
           <ol className="small" style={{ paddingLeft: '1.2rem' }}>
             {e.log.map((l, i) => <li key={i}>{l}</li>)}
@@ -158,7 +181,8 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
                 <button onClick={() => step((x) => void chooseOption(x, i, bonus))}>{ch.label}</button>
                 <span className="muted small grow">
                   {ch.check ? `${checkText(ch.check)} · ${Math.round(checkOdds(ch.check, bonus) * 100)}%` : 'no roll'}
-                  {rewardText(scaledReward(ch.reward, e.stage)) !== 'nothing' ? ` · ${rewardText(scaledReward(ch.reward, e.stage))}` : ''}
+                  {/* What it adds to the haul brought home, at the squad's share, and what the squad finds when that's more. */}
+                  {choiceGain(e, scaledReward(ch.reward, e.stage))}
                 </span>
               </div>
             ))}
@@ -202,4 +226,34 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
   }
 
   return <Modal title="Expedition" onClose={done ? onClose : close} footer={footer} wide>{body}</Modal>;
+}
+
+/** Why fewer than a full squad's worth of units can carry: empty places in the squad, and who's hurt. */
+function carryWhy(e: Expedition, name: (id: string) => string) {
+  const empty = EXPEDITION.squadMax - e.squad.length;
+  const hurt = e.squad.filter((id) => !unhurt(e).includes(id)).map(name);
+  return [
+    empty > 0 && `${e.squad.length} unit${e.squad.length > 1 ? 's' : ''} sent`,
+    hurt.length > 0 && `${hurt.join(' and ')} ${hurt.length > 1 ? 'are' : 'is'} hurt and can't carry`,
+  ].filter(Boolean).join('; ');
+}
+
+/** The carrying share spelled out: how many units carry, why not all, and (optionally) what that means for the finish. */
+function CarryNote({ carrying, why, example }: { carrying: number; why: string; example?: string }) {
+  const full = carrying >= EXPEDITION.squadMax;
+  return (
+    <p className="small" style={{ margin: '0.25rem 0', ...(full ? {} : { color: 'var(--warn)' }) }}>
+      {full
+        ? <>Full squad: carries home everything found.</>
+        : <>Carrying {carrying} of {EXPEDITION.squadMax} ({why}): only <b>{carrying}/{EXPEDITION.squadMax}</b> of the Supply, Materials, RP and Shards found comes home; the rest is left behind. XP isn't cut.{example ? ` So ${example}.` : ''}</>}
+    </p>
+  );
+}
+
+/** A choice's reward as it comes home, plus what's found when the squad can't carry it all. */
+function choiceGain(e: Expedition, r: Parameters<typeof carried>[1]) {
+  const home = rewardText(carried(e, r));
+  if (home === 'nothing') return '';
+  const found = rewardText({ ...r, xp: 0 });
+  return unhurt(e).length < EXPEDITION.squadMax && found !== 'nothing' ? ` · ${home} home (of ${found} found)` : ` · ${home}`;
 }

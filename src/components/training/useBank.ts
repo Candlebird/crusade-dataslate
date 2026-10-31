@@ -4,7 +4,7 @@ import type { Campaign, Force } from '../../model/types';
 import { localDate } from '../../model/date';
 import { nowIso, uid } from '../../model/factory';
 import { bankOffTableXp, offTableKey } from '../../rules/downtime';
-import { awardFeats, trainingFeats } from '../../rules/feats';
+import { awardFeats, featFaction, trainingFeats, trainingRepeats } from '../../rules/feats';
 import { weekKey } from '../../rules/sortie';
 import {
   bankDrill, bankFinale, bankHonours, bankShared, drillNews, featFacts, lordsSlain, mvp, postSiege, settleSieges, siegeDmg, siegeScore, takeXp, type TrainingRun,
@@ -67,7 +67,9 @@ export function useBank(force: Force, c?: Campaign, onBanked?: (news: BankNews) 
     let honours: string[] = [];
     let drill: string[] = [];
     let finale: string[] = [];
-    updateForce(force.id, (f) => {
+    update((d) => {
+      const f = d.forces.find((x) => x.id === force.id);
+      if (!f) return;
       // The Drill counts first: an old force's start from its units' records, before this run joins them.
       const before = bankDrill(f, run);
       // Before the best moves: a new best is a highlight. Tales carry the campaign round, for the chronicle.
@@ -79,8 +81,12 @@ export function useBank(force: Force, c?: Campaign, onBanked?: (news: BankNews) 
       // The Victory, Endless depth and the Final it opens, before the Drill's news (Win at N goals read it).
       if (!run.siege) finale = bankFinale(f, run, localDate());
       // Feats after the ladder: opening a Final or winning every one counts this run.
-      feats = awardFeats(f, trainingFeats(run.cleared, lordsSlain(run), featFacts(f, run)), run.crafted, localDate(), uid);
+      // Unique feats count across the faction in a campaign; the repeatable ones once a round (a week outside one).
+      const facts = featFacts(f, run);
+      const ids = [...trainingFeats(run.cleared, lordsSlain(run), facts), ...trainingRepeats(run.cleared, lordsSlain(run), facts)];
+      feats = awardFeats(f, ids, run.crafted, localDate(), uid, featFaction(f, d.forces, !!c), offTableKey(c, localDate()));
       drill = [...finale, ...drillNews(f, run, before)];
+      f.updatedAt = nowIso();
     });
     const dmg = siegeDmg(run);
     if (run.siege) drill = [`Weekly Siege ${run.siege}: ${dmg !== undefined ? `${dmg.toLocaleString()} damage to the colossus` : `wave ${siegeScore(run)}`}`, ...drill];

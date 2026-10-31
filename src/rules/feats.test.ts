@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
-import { awardFeats, clawbackFeats, FEATS_VERSION, trainingFeats } from './feats';
+import { awardFeats, clawbackFeats, featFaction, FEATS_VERSION, trainingFeats, trainingRepeats } from './feats';
 
 // Training feats from what a run did, the feat relics, and the one-time clawback of the old, dearer feats.
 
@@ -28,6 +28,51 @@ describe('training feats from a run', () => {
     expect(f.ledger.reduce((s, l) => s + l.rp, 0)).toBe(3);
     expect(awardFeats(f, ['trainFinal50'], [], '2026-10-24', id)).toEqual([]);
     expect(f.trainingRelics).toHaveLength(2);
+  });
+});
+
+describe('feats across a faction', () => {
+  const faction = () => {
+    const a = newForce();
+    const b = newForce();
+    const rival = newForce();
+    a.nexus = { factionId: 'f1' } as typeof a.nexus;
+    b.nexus = { factionId: 'f1' } as typeof b.nexus;
+    rival.nexus = { factionId: 'f2' } as typeof rival.nexus;
+    return { a, b, rival, all: [a, b, rival] };
+  };
+
+  it('a unique feat pays once for the faction, but each faction earns its own', () => {
+    const { a, b, rival, all } = faction();
+    expect(awardFeats(a, ['train20'], [], '2026-10-30', id, featFaction(a, all))).toHaveLength(1);
+    expect(awardFeats(b, ['train20'], [], '2026-10-30', id, featFaction(b, all))).toEqual([]);
+    expect(b.feats?.train20).toBeUndefined();
+    expect(awardFeats(rival, ['train20'], [], '2026-10-30', id, featFaction(rival, all))).toHaveLength(1);
+  });
+
+  it('outside a campaign a feat stays per force', () => {
+    const { a, b, all } = faction();
+    awardFeats(a, ['train20'], [], '2026-10-30', id, featFaction(a, all, false));
+    expect(awardFeats(b, ['train20'], [], '2026-10-30', id, featFaction(b, all, false))).toHaveLength(1);
+  });
+
+  it('a repeatable feat pays once a round for the faction, and again the next round', () => {
+    const { a, b, all } = faction();
+    const ids = trainingRepeats(20);
+    expect(ids).toEqual(['trainRep20']);
+    expect(awardFeats(a, ids, [], '2026-10-30', id, featFaction(a, all), 'round-3')).toEqual(['Repeatable feat — Hold Fast: 1 Umbra Shard']);
+    expect(awardFeats(a, ids, [], '2026-10-30', id, featFaction(a, all), 'round-3')).toEqual([]);
+    expect(awardFeats(b, ids, [], '2026-10-30', id, featFaction(b, all), 'round-3')).toEqual([]);
+    expect(awardFeats(a, ids, [], '2026-11-02', id, featFaction(a, all), 'round-4')).toHaveLength(1);
+    expect(a.featRepeats?.trainRep20).toEqual({ key: 'round-4', n: 2, last: '2026-11-02' });
+    expect(a.umbraShards).toBe(newForce().umbraShards + 2);
+    // Without a round or week to count it against, a repeatable feat isn't paid.
+    expect(awardFeats(a, ids, [], '2026-11-05', id, featFaction(a, all))).toEqual([]);
+  });
+
+  it('a run earns the repeatable training feats alongside the unique ones', () => {
+    expect(trainingRepeats(30, 1, { won: true, siege: 12000 })).toEqual(['trainRep20', 'trainRepLord', 'trainRepWin', 'siegeRep']);
+    expect(trainingRepeats(19, 0, { siege: 9999 })).toEqual([]);
   });
 });
 

@@ -406,7 +406,7 @@ export function RelicRules({ initial = 'rules' }: { initial?: RelicPage }) {
         </Section>
       ) : page === 'training' ? (
         <Section id="x-training" title="Training relics">
-          <p className="small">Won by the hardest Training feats, each once per force. Any unit of the force that can carry a relic takes it for free. In Training, a relic on a crafted unit goes off by itself, as every relic does.</p>
+          <p className="small">Won by the hardest Training feats, each once per faction (per force outside a campaign). Any unit of the force that can carry a relic takes it for free. In Training, a relic on a crafted unit goes off by itself, as every relic does.</p>
           <RelicCase relics={RELICS.filter((r) => r.training)} source={(r) => `Feat: ${featInfo(r.training!)?.name ?? r.training} (${featInfo(r.training!)?.text.replace(/\.$/, '') ?? ''}).`} />
         </Section>
       ) : <RelicBasics />}

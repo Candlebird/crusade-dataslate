@@ -3,6 +3,7 @@ import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import { localDate } from '../model/date';
 import { FeatList } from './Feats';
+import { featFaction } from '../rules/feats';
 import type { Campaign, Force, SortieRecap, Unit } from '../model/types';
 import { echoPortrait } from '../model/emblem';
 import { unitName } from '../rules/battle';
@@ -253,7 +254,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
     update((s) => {
       const f = s.forces.find((x) => x.id === force.id);
       if (!f) return;
-      text = applySortie(f, r, localDate(), uid, Math.random, offTableKey(c, localDate()));
+      text = applySortie(f, r, localDate(), uid, Math.random, offTableKey(c, localDate()), featFaction(f, s.forces, !!c));
       if (r.depth > (f.sortieBest ?? 0)) f.sortieBest = r.depth;
       f.updatedAt = nowIso();
       // A won Shard run in a campaign scouts a sector on the way home.
@@ -571,7 +572,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
             </div>
           )}
         </div>
-        <FeatList force={force} where="sortie" />
+        <FeatList force={force} where="sortie" c={c} />
         {story?.bestiary && Object.keys(story.bestiary).length ? (
           <div className="sortie-choice">
             <button className="ghost small sortie-recap-row" onClick={() => setBestiaryOpen(!bestiaryOpen)}>
