@@ -36,6 +36,7 @@ import { Stepper, UsAbbr, confirmAction, toast, umbraShards } from './ui';
 import { SOLO_PATROL } from '../rules/downtimeData';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
+import { WornTag } from './Tags';
 
 const STEPS = ['Setup', 'Units', 'Deaths', 'Rewards', 'Summary'] as const;
 const OUTCOME_LABEL: Record<DeathOutcome, string> = { scar: 'Battle scar', xp: '+1 XP', none: 'Nothing' };
@@ -362,7 +363,7 @@ function UnitsStep({ units, input, setUnit, worn }: { units: Unit[]; input: Batt
                   <td className="s-2">
                     <b>{unitName(u)}</b>
                     <div className="muted small">{u.name && u.unitType} {comatose && <span className="tag cyan" data-tip="Sits this battle out; recovers afterwards">Comatose</span>}
-                      {worn.includes(u.id) && <span className="tag gold" data-tip="Already fought this round: -1 Quality and -1 Defense">Battle-Worn</span>}</div>
+                      {worn.includes(u.id) && <WornTag />}</div>
                   </td>
                   <td data-label="Destroyed"><input type="checkbox" disabled={!r.in} checked={r.destroyed} onChange={(e) => setUnit(u.id, { destroyed: e.target.checked, death: e.target.checked ? r.death : null })} /></td>
                   <td data-label="Marked"><input type="radio" name="marked" disabled={!r.in || input.patrol} checked={r.marked} onChange={() => setUnit(u.id, { marked: true })} onClick={() => r.marked && setUnit(u.id, { marked: false })} /></td>

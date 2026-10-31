@@ -4,6 +4,14 @@ import { allTags, bookOf, datasheetTags, normalizeTag, setDatasheetTags, tagsIn 
 import type { CatalogBook, Unit } from '../model/types';
 import { Icon } from './Icon';
 
+/** What Battle-Worn means, everywhere it's shown. */
+export const WORN_TIP = 'Already fought this round (a Solo patrol, an Expedition or a task): -1 Quality and -1 Defense in any battle until the GM ends the round';
+
+/** The Battle-Worn mark: the same gold tag wherever a unit that already fought this round is listed. */
+export function WornTag() {
+  return <span className="tag gold" data-tip={WORN_TIP}>Battle-Worn</span>;
+}
+
 export function TagChips({ tags }: { tags: string[] }) {
   return <>{tags.map((t) => <span key={t} className="tag utag">{t}</span>)}</>;
 }

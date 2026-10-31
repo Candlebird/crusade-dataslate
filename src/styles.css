@@ -1592,3 +1592,6 @@ abbr.us-abbr { text-decoration: underline dotted; text-underline-offset: 2px; cu
   position: sticky; bottom: 0; z-index: 5; margin: 0.8rem -0.25rem 0; padding: 0.6rem 0.75rem;
   background: var(--panel-2); border: 1px solid var(--gold-dim); box-shadow: 0 -6px 16px rgba(0, 0, 0, 0.5);
 }
+/* Battle-Worn: a small dark "-1" badge on the token's lower right (already fought this round: -1 Quality and -1 Defense). */
+.zb-worn { position: absolute; right: -8%; bottom: -8%; z-index: 2; pointer-events: none; min-width: 1.35em; padding: 0 0.15em; border-radius: 0.7em;
+  font-size: clamp(0.5rem, 0.8vw, 0.65rem); font-weight: 800; line-height: 1.35em; text-align: center; background: #1a1408; color: #e8a49b; border: 1px solid #e8a49b; }

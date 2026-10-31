@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { WornTag } from './Tags';
 import { aiTurn } from '../rules/zone/ai';
 import { xy, zoneOf } from '../rules/zone/board';
 import { castable, act, attackNow, actions, hasGuns, arriveSquares, autoDeploy, autoJoin, chargeTargets, meleeTargets, deploy, deployHint, deploySquares, endNow, isHeroUnit, joinHero, joinTargets, moves, onActivation, ready, startDeploy, toDeploy, vpOf, type Action, type Order } from '../rules/zone/engine';
@@ -508,10 +509,11 @@ function Token({ u, fu, tone, sel, can, cue, done, onClick }: { u: ZUnit; fu?: U
   return (
     <span className="zb-tok">
       <button data-zu={u.id} className={`zb-unit ${tone}${sel ? ' sel' : ''}${can ? ' can' : ''}${cue ? ' cue' : ''}${done ? ' done' : ''}${u.shaken ? ' shaken' : ''}`} onClick={onClick}
-        data-tip={`${u.name}: ${alive(u.p).length} model${alive(u.p).length === 1 ? '' : 's'}, ${left}/${max} wounds${u.shaken ? ', Shaken' : ''}${done ? ', has acted' : ''}`}>
+        data-tip={`${u.name}: ${alive(u.p).length} model${alive(u.p).length === 1 ? '' : 's'}, ${left}/${max} wounds${u.shaken ? ', Shaken' : ''}${u.worn ? ', Battle-Worn (-1 Quality, -1 Defense)' : ''}${done ? ', has acted' : ''}`}>
         {fu ? <Portrait unit={fu} title={u.name} /> : <EmblemBadge emblem={echoPortrait(u.name)} title={u.name} />}
         <span className="zb-hp" style={{ width: `${Math.round((left / Math.max(1, max)) * 100)}%` }} />
       </button>
+      {u.worn && <span className="zb-worn" aria-label="Battle-Worn">−1</span>}
       {(can || cue) && <svg className={`zb-aim${can ? '' : ' cue'}`} viewBox="0 0 12 8" aria-hidden="true"><path d="M1.5 1.5 6 6l4.5-4.5" /></svg>}
     </span>
   );
@@ -522,6 +524,7 @@ function UnitCard({ z, u }: { z: ZBattle; u: ZUnit }) {
   return (
     <div className="zb-panel small">
       <b>{u.name}</b> <span className="muted">· {u.points} pts · {alive(u.p).length} model{alive(u.p).length === 1 ? '' : 's'} · {woundsLeft(u)}/{maxWoundsOf(u.p)} wounds{u.shaken ? ' · Shaken' : ''}{u.tokens ? ` · ${u.tokens} spell tokens` : ''}</span>
+      {u.worn && <div><WornTag /></div>}
       {kits.map((k) => <div key={k.src + k.name} className="muted">{k.name}: Quality {k.quality}+, Defense {k.defense}+{k.tough > 1 ? `, Tough(${k.tough})` : ''}</div>)}
       <div className="muted">{[...new Set(u.p.guns.map((g) => g.label ? `${g.name} (${g.label})` : g.name))].join(' · ')}</div>
       {u.p.notes.length > 0 && <div className="muted" data-tip={u.p.notes.join('\n')}>Not played in full: {u.p.notes.length} rule{u.p.notes.length === 1 ? '' : 's'}</div>}

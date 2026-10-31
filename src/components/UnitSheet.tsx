@@ -40,7 +40,7 @@ import {
   validateUnit,
   xpShown,
 } from '../rules/engine';
-import { nexusAccess } from '../rules/nexus';
+import { nexusAccess, unitsUsed } from '../rules/nexus';
 import { unitName } from '../rules/battle';
 import { quirkInfo } from '../rules/sortie';
 import { pickTitle } from '../rules/training/titles';
@@ -57,6 +57,7 @@ import { EditModeButton, EditModeNotice, Fixed, useEditMode } from './editMode';
 import { localDate } from '../model/date';
 import { scarText, statusNote, traitDesc, weaponTraitDesc, xpNextText } from '../model/unitSheet';
 import { Icon } from './Icon';
+import { WornTag } from './Tags';
 import { carryProblem, equipRelic, stowRelic, vaultOf } from '../rules/relicVault';
 
 type Picker =
@@ -256,6 +257,7 @@ export default function UnitSheet({ forceId, unitId }: { forceId: string; unitId
               {u.heroicRise && <span className="tag gold">Heroic Rise</span>}
               {u.status === 'comatose' && <span className="tag cyan">Comatose</span>}
               {u.status === 'removed' && <span className="tag red">Fallen</span>}
+              {u.status === 'active' && unitsUsed(f, state.campaign).includes(u.id) && <WornTag />}
             </>
           )}
           <EditModeButton f={f} />

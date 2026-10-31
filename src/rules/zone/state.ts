@@ -44,6 +44,8 @@ export interface ZUnit {
   /** Deploys after everyone else and may go 2 squares out of its zone (Scout), or waits off the table (Ambush). */
   scout?: boolean;
   ambush?: boolean;
+  /** Battle-Worn: it already fought this round, so it plays at -1 Quality and -1 Defense (already in its profile). */
+  worn?: boolean;
   /** Joined to another unit: its models are in that unit's profile, and this entry only remembers it. */
   joinedTo?: string;
   activated: boolean;

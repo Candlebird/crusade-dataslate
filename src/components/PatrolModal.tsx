@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { WornTag } from './Tags';
 import { useStore } from '../model/store';
 import { nowIso, uid } from '../model/factory';
 import type { Force, Unit } from '../model/types';
@@ -85,7 +86,7 @@ export default function PatrolModal({ force, mission, onClose }: { force: Force;
                 <input type="checkbox" checked={on} disabled={over} onChange={() => setPicked(on ? picked.filter((x) => x !== u.id) : [...picked, u.id])} />
                 <div className="grow">
                   <b>{unitName(u)}</b> <span className="muted small">{u.points} pts{bp ? ` · ${bp} BP` : ''}</span>
-                  {spent && <> <span className="tag gold" data-tip="Already fought this round: -1 Quality and -1 Defense">Battle-Worn</span></>}
+                  {spent && <> <WornTag /></>}
                 </div>
               </label>
             );

@@ -70,6 +70,7 @@ import { overrunBlock } from '../rules/overrun';
 import { Panel, Stepper, TextArea, TextField, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
+import { WornTag } from './Tags';
 
 /** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
 export default function BattleTracker({ sectorId, attacker, forceId, crisis, past }: { sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean; past?: boolean }) {
@@ -896,7 +897,7 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
                 <tr key={u.id} className={u.destroyed ? 'dead' : u.activated ? 'done' : ''}>
                   <td className="s-2">
                     <b>{u.name}</b>
-                    {u.worn && <> <span className="tag gold" data-tip="Already fought this round: -1 Quality and -1 Defense">Battle-Worn</span></>}
+                    {u.worn && <> <WornTag /></>}
                     {side.ai && !u.destroyed && (
                       <div className="row small">
                         <span className="muted">{AI_TREES[u.aiStyle ?? 'hybrid'].label}</span>

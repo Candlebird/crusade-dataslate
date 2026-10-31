@@ -27,6 +27,8 @@ export interface ZSetupUnit {
   points: number;
   ai: AiStyle;
   spells: SpellDef[];
+  /** Battle-Worn: it already fought this round (its Quality and Defense already carry the -1). */
+  worn?: boolean;
 }
 
 export interface ZSetup {
@@ -56,7 +58,7 @@ export function createBattle(s: ZSetup): ZBattle {
       startModels: alive(u.p).length, startWounds: woundsLeft0(u.p), points: u.points, ai: u.ai,
       ...(has(hooks, 'scout') ? { scout: true } : {}), ...(has(hooks, 'ambush') ? { ambush: true } : {}),
       activated: false, shaken: false, routed: false, destroyed: has(hooks, 'absent') || !alive(u.p).length, fought: false, held: false, charging: false,
-      tokens: 0, spells: u.spells, used: {}, effects: [], xp: {},
+      tokens: 0, spells: u.spells, used: {}, effects: [], xp: {}, ...(u.worn ? { worn: true } : {}),
     };
   });
   // two units of the same name on a side are told apart in the log: "Scourges", "Scourges 2"

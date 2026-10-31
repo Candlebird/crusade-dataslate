@@ -18,7 +18,7 @@ import type { TrackedBattle } from '../rules/tracker';
 import { LEDGER_RECENT, LedgerTable } from './Ledger';
 import type { Campaign, Force } from '../model/types';
 import { CATEGORIES, type Category } from '../rules/data';
-import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, currentRound, emptyNexus, factionName, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
+import { NEXUS_DETACHMENTS, SECTOR_TYPES, benefitOf, currentRound, unitsUsed, emptyNexus, factionName, homeOf, ownedSectors, unlockedTables } from '../rules/nexus';
 import { factionClaimedRound, factionForces } from '../rules/detachments';
 import { isReinforced, produce, produceCost, produceDiscount, productionSites } from '../rules/production';
 import { hireBlock, hireHero, offerEnds, openOffers } from '../rules/heroes';
@@ -28,7 +28,7 @@ import { claimableRounds } from '../rules/rounds';
 import { RESULT_LABEL, unitName } from '../rules/battle';
 import { listTotals, newList } from '../rules/lists';
 import { matchesTags, tagsIn, unitTags } from '../model/tags';
-import { TagFilter, UnitTags } from './Tags';
+import { TagFilter, UnitTags, WornTag } from './Tags';
 import { Panel, Stepper, TextArea, TextField, XpBar, confirmAction, toast, umbraShards } from './ui';
 import { EditModeButton, EditModeNotice, Fixed, isTheirs, useEditMode } from './editMode';
 import { localDate } from '../model/date';
@@ -104,6 +104,9 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const c = state.campaign;
   const n = f.nexus;
   const inCampaign = !!c && !!n && c.factions.some((x) => x.id === n.factionId);
+  // Units that already fought this round (patrol, Expedition, task): they fight Battle-Worn until the round ends.
+  const worn = new Set(unitsUsed(f, c));
+  const wornActive = f.units.filter((u) => u.status === 'active' && worn.has(u.id)).length;
   const toClaim = !theirs && c && n && inCampaign ? claimableRounds(c, n, state.forces) : [];
 
   const addLedger = (label: string, rp: number, supply: number) =>
@@ -130,7 +133,8 @@ export default function ForceView({ forceId }: { forceId: string }) {
           {edit && <button onClick={() => setAdding(true)}>+ Add unit</button>}
           {zoneOn && !theirs && (
             <button disabled={!f.units.some((u) => u.status === 'active')} onClick={() => setPractice(practiceBattle(f, state.books, s, state.campaign))}
-              data-tip="A zone battle against Void Echoes of about the same points. Nothing is lost and nothing is earned">
+              data-tip={`A zone battle against Void Echoes of about the same points. Nothing is lost and nothing is earned${wornActive ? `
+${wornActive} unit${wornActive === 1 ? '' : 's'} will fight Battle-Worn (-1 Quality and -1 Defense)` : ''}`}>
               <Icon name="g:archery-target" /> {practiceSave ? 'Resume practice' : 'Practice'}</button>
           )}
           <button className="primary" onClick={() => go(href.battle(f.id))}><Icon name="g:crossed-swords" /> Record battle</button>
@@ -246,6 +250,7 @@ export default function ForceView({ forceId }: { forceId: string }) {
                             {pendingLevels(u) > 0 && <span className="tag gold" data-tip="Level-ups waiting to be picked"><Icon name="g:upgrade" /> Level up</span>}
                             {u.status === 'comatose' && <span className="tag cyan">Comatose</span>}
                             {u.status === 'removed' && <span className="tag red">Fallen</span>}
+                            {u.status === 'active' && worn.has(u.id) && <WornTag />}
                             {u.scars.length > 0 && <span className="tag red">{u.scars.length} scar{u.scars.length > 1 ? 's' : ''}</span>}
                             {issues.length > 0 && <span className="tag gold" data-tip={issues.map((i) => i.text).join('\n')}><Icon name="g:hazard-sign" /> {issues.length}</span>}
                           </td>
