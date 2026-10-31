@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newForce, newUnit } from '../model/factory';
-import { awardFeats, clawbackFeats, featFaction, FEATS_VERSION, trainingFeats, trainingRepeats } from './feats';
+import { awardFeats, clawbackDuplicateFeats, clawbackFeats, featFaction, FEATS_VERSION, trainingFeats, trainingRepeats } from './feats';
 
 // Training feats from what a run did, the feat relics, and the one-time clawback of the old, dearer feats.
 
@@ -108,5 +108,30 @@ describe('clawing back the old feat pay', () => {
     awardFeats(paidNew, ['train20'], [], '2026-10-24', id);
     expect(clawbackFeats(paidNew, '2026-10-24', id)).toBeNull();
     expect(paidNew.ledger).toHaveLength(1);
+  });
+});
+
+describe('feats a second force of the faction earned again', () => {
+  const nexus = (factionId: string) => ({ factionId, permanentTables: [], tempTables: [], traitTokens: 0, pending: [] });
+  it('go back to the first force, and the later one gives back what its ledger shows', () => {
+    const a = newForce('First');
+    const b = newForce('Second');
+    const c = newForce('Rival');
+    a.nexus = nexus('A');
+    b.nexus = nexus('A');
+    c.nexus = nexus('B');
+    awardFeats(a, ['train25', 'trainBosses'], [], '2026-10-25', id);
+    awardFeats(b, ['train25', 'trainBosses', 'train20'], [], '2026-10-30', id);
+    awardFeats(c, ['train25'], [], '2026-10-20', id);
+    const shards = b.umbraShards;
+    const forces = [a, b, c];
+    expect(clawbackDuplicateFeats(a, forces, '2026-10-31', id)).toBeNull();
+    expect(clawbackDuplicateFeats(b, forces, '2026-10-31', id)).toMatch(/Unbroken/);
+    expect(Object.keys(b.feats!)).toEqual(['train20']);
+    const last = b.ledger[b.ledger.length - 1];
+    expect([last.rp, last.supply, last.us]).toEqual([-1, -50, -2]);
+    expect(b.umbraShards).toBe(shards - 2);
+    expect(clawbackDuplicateFeats(b, forces, '2026-11-01', id)).toBeNull();
+    expect(a.feats!.train25).toBe('2026-10-25');
   });
 });

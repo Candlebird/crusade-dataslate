@@ -6,6 +6,7 @@ import { RELICS, REQUISITIONS, SCAR_TABLE, type Requisition } from '../rules/dat
 import { applyScar, forceTotals, hasRule, relicHolders, relicSlots, relicTaken, relicTierAllowed, rollDice, rollDie, xpShown } from '../rules/engine';
 import { NEEDS_UNIT, RELIC_TIER, requisitionEligible, requisitionProblem } from '../rules/requisition';
 import { unitName } from '../rules/battle';
+import { isRunaway, supplyRpCost } from '../rules/runaway';
 import { Modal, RelicOption, toast } from './ui';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
@@ -28,7 +29,10 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
   const forged = force.nexus?.forged ?? [];
   const credits = (t: string | undefined) => forged.filter((x) => x === t).length;
   const free = !!tier && credits(tier) > 0;
-  const cost = free ? 0 : sel?.cost ?? 0;
+  // A faction far ahead pays more RP for Supply (rules/runaway.ts).
+  const priceOf = (r: Requisition) => (r.name === 'Increase Supply' ? supplyRpCost(state.campaign, force.nexus?.factionId, r.cost) : r.cost);
+  const dearer = isRunaway(state.campaign, force.nexus?.factionId);
+  const cost = free ? 0 : sel ? priceOf(sel) : 0;
 
   const pick = (r: Requisition) => {
     setSel(r);
@@ -118,15 +122,15 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
 
   return (
     <Modal title={`Requisition — ${rp} RP available`} onClose={onClose} wide
-      footer={<><span className="muted small grow">{why ?? warning}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>{free ? 'Pick your free relic' : `Buy${sel ? ` (${sel.cost} RP)` : ''}`}</button></>}>
+      footer={<><span className="muted small grow">{why ?? warning}</span><button onClick={onClose}>Close</button><button className="primary" disabled={!!why} onClick={buy}>{free ? 'Pick your free relic' : `Buy${sel ? ` (${cost} RP)` : ''}`}</button></>}>
       <div className="cols-2">
         <div>
           {REQUISITIONS.map((r) => (
-            <div key={r.name} className={`shop-item${sel === r ? ' selected' : ''}${r.cost > rp && !credits(RELIC_TIER[r.name]) ? ' disabled' : ''}`} onClick={() => pick(r)}>
-              <span className="cost">{credits(RELIC_TIER[r.name]) ? `${credits(RELIC_TIER[r.name])} forged` : `${r.cost} RP`}</span>
+            <div key={r.name} className={`shop-item${sel === r ? ' selected' : ''}${priceOf(r) > rp && !credits(RELIC_TIER[r.name]) ? ' disabled' : ''}`} onClick={() => pick(r)}>
+              <span className="cost">{credits(RELIC_TIER[r.name]) ? `${credits(RELIC_TIER[r.name])} forged` : `${priceOf(r)} RP`}</span>
               <div className="grow">
                 <b>{r.name}</b>
-                <div className="muted small">{r.name === 'Increase Supply' ? `+${s.supplyPerRp} Supply Limit.` : r.desc}</div>
+                <div className="muted small">{r.name === 'Increase Supply' ? `+${s.supplyPerRp} Supply Limit.${dearer ? ' Your faction is far ahead, so it costs more.' : ''}` : r.desc}</div>
               </div>
             </div>
           ))}

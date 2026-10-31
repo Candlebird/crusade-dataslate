@@ -18,6 +18,7 @@ import { Panel, confirmAction, toast, umbraShards } from './ui';
 import { localDate } from '../model/date';
 import { breaksLeft, echoMarks, holders } from '../rules/voidspawn';
 import { Icon } from './Icon';
+import { runaways } from '../rules/runaway';
 import { useSiegeSettle } from './training/useSiegeSettle';
 
 /** End the current round on a copy of the campaign (the spread is random, so it's rolled once, here) and store the result. */
@@ -70,6 +71,7 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
   const counts = sectorCounts(c);
   const ahead = new Set(leaders(c));
   const behind = underdogBonus(c);
+  const far = new Set(runaways(c));
   const grace = inGrace(c);
   const { patrols } = echoWins(c, round);
   const unspent = c.factions.reduce((n, f) => n + assetsOf(c, f.id).left, 0);
@@ -171,8 +173,10 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
           {c.factions.map((f) => (
             <span key={f.id} className="tag" style={{ borderColor: factionColor(c, f.id) }}>
               {f.name}: {counts[f.id] ?? 0} sector{counts[f.id] === 1 ? '' : 's'}
-              {ahead.has(f.id) && ' · leading'}
-              {(behind[f.id] ?? 0) > 0 && ` · catch-up +${umbraShards(behind[f.id])}`}
+              {ahead.has(f.id) && (far.has(f.id)
+                ? <span data-tip="Far ahead: Increase Supply and Forced Expansion cost more, the Echoes mark one more of its sectors and Marauders go for its worlds first."> · far ahead</span>
+                : ' · leading')}
+              {(behind[f.id] ?? 0) > 0 && ` · catch-up +${umbraShards(behind[f.id])}, +${Math.round(behind[f.id] / NEXUS_ROUNDS.underdogUs) * NEXUS_ROUNDS.underdogSupply} Supply`}
             </span>
           ))}
         </div>

@@ -7,6 +7,7 @@ import { positionOf } from './movement';
 import { rollGuardianLoot } from './nexus';
 import { MARAUDERS, NEXUS_ROUNDS, WARLORDS } from './nexusData';
 import { depositBanked, hasBuilding, isReinforced, produces, productionRate, withdrawBanked } from './production';
+import { runaways } from './runaway';
 import { hasPerk } from './warlords';
 
 // Marauders (Nexus Wars): raider bands that belong to no one. Once the opening rounds are over, a band can turn up at a
@@ -104,15 +105,17 @@ function paths(c: Campaign, from: Sector & Hex) {
 const raidable = (c: Campaign, s: Sector, d: number | undefined): s is Sector & Hex =>
   !!d && isPlaced(s) && produces(s) && c.factions.some((f) => f.id === s.owner) && !isRaided(c, s);
 
-/** Where a band is heading: the faction world scoring highest for its bank and weakness, against how far off it is. */
+/** Where a band is heading: the faction world scoring highest for its bank and weakness (and its owner far ahead), against how far off it is. */
 function targetOf(c: Campaign, dist: Map<string, number>, forces?: Force[]) {
+  // A faction far ahead (runaways) tempts them more.
+  const ahead = runaways(c);
   let best: { s: Sector & Hex; score: number } | undefined;
   for (const s of c.sectors) {
     const d = dist.get(s.id);
     if (!d || !raidable(c, s, d)) continue;
     // A Shadow Warlord's worlds (Unseen) draw them less.
     const score = ((s.bank ?? 0) + productionRate(s, c)) * (repels(c, s, forces) ? MARAUDERS.defendedWeight : 1)
-      * (hasPerk(c, s.owner, 'unseen') ? WARLORDS.unseenWeight : 1) / (1 + d);
+      * (hasPerk(c, s.owner, 'unseen') ? WARLORDS.unseenWeight : 1) * (ahead.includes(s.owner!) ? NEXUS_ROUNDS.runaway.marauderWeight : 1) / (1 + d);
     if (!best || score > best.score) best = { s, score };
   }
   return best?.s;

@@ -22,6 +22,7 @@ import { buildReport } from './report';
 import { hasPerk, syncWarlords } from './warlords';
 import { localDate } from '../model/date';
 import { siegeAssets } from './training/siegeBoard';
+import { runaways } from './runaway';
 
 // Nexus Wars rounds. During a round players fight as many skirmishes as they like (no sector changes hands; a win earns
 // a Strategic Asset, and one against the Echoes is a patrol). The round closes with the Battle: the sealed-order attacks.
@@ -139,7 +140,8 @@ export function refundAsset(c: Campaign, id: string) {
 /**
  * Mark where the Echoes will spread when the current round ends: as many sectors as the threat (and the Galactic Event)
  * says, picked from their frontier. They go for whoever is ahead and are drawn to an Umbral Spire; an Echo Ward keeps
- * them out, and while the campaign is young they only mark unclaimed space.
+ * them out, and while the campaign is young they only mark unclaimed space. After that, a faction far ahead (runaways)
+ * gets NEXUS_ROUNDS.runaway.echoMarks more marks on its own sectors.
  */
 export function placeEchoMarks(c: Campaign, rand: Rand = Math.random, threat = threatOf(c)): EchoMark[] {
   const ahead = new Set(leaders(c));
@@ -151,6 +153,15 @@ export function placeEchoMarks(c: Campaign, rand: Rand = Math.random, threat = t
     const target = pickSpread(c, rand, weight, only);
     if (!target) break;
     marks.push({ sectorId: target.id });
+  }
+  // A faction far ahead draws more of them: so many more marks, on its own sectors only.
+  if (!inGrace(c)) {
+    for (const id of runaways(c)) {
+      for (let i = 0; i < NEXUS_ROUNDS.runaway.echoMarks; i++) {
+        const target = pickSpread(c, rand, weight, (s) => s.owner === id && only(s));
+        if (target) marks.push({ sectorId: target.id });
+      }
+    }
   }
   c.echoMarks = { round: currentRound(c), marks };
   return marks;
@@ -319,7 +330,11 @@ export function roundIncomeItems(c: Campaign, factionId: string, snap: RoundSnap
     if (s) items.push(...incomeItems(s, `r${snap.round}:`));
   }
   const behind = snap.underdog[factionId] ?? 0;
-  if (behind > 0) items.push({ key: `r${snap.round}:underdog`, kind: 'us', source: 'Catch-up bonus', us: behind });
+  if (behind > 0) {
+    items.push({ key: `r${snap.round}:underdog`, kind: 'us', source: 'Catch-up bonus', us: behind });
+    const supply = Math.round(behind / NEXUS_ROUNDS.underdogUs) * NEXUS_ROUNDS.underdogSupply;
+    if (supply) items.push({ key: `r${snap.round}:underdogSupply`, kind: 'supply', source: 'Catch-up bonus', supply });
+  }
   const event = eventById(snap.event);
   if (event?.income?.us) items.push({ key: `r${snap.round}:eventUs`, kind: 'us', source: event.name, us: event.income.us });
   if (event?.income?.supply) items.push({ key: `r${snap.round}:eventSupply`, kind: 'supply', source: event.name, supply: event.income.supply });

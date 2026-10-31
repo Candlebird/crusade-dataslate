@@ -146,7 +146,7 @@ export const NEXUS_TEXT = {
     `Still standing when its last round ends (lost, drawn or never fought): the threat goes to ${R.threatMax}, and the ${ECHOES.name} take each faction's sector nearest the Lord (not its home or a stronghold).`,
   ],
   downtime: [
-    'Between games, each force linked to the campaign can go on any number of Expeditions and fight one Solo patrol per round, as long as each unit goes only once (below). Both refresh when the GM ends the round. They are worth about a quarter of a battle: something to do when the group cannot meet, never a substitute for playing.',
+    `Between games, each force linked to the campaign can fight one Solo patrol per round, and its faction can run ${EXPEDITION.perFaction} Expeditions a round, shared by all its forces (a second detachment doesn't double them), as long as each unit goes only once (below). Both refresh when the GM ends the round. They are worth about a quarter of a battle: something to do when the group cannot meet, never a substitute for playing.`,
     "One outing per unit per round: each unit goes on one Solo patrol or Expedition a round. A unit that already has is greyed out on the Expedition and Solo patrol pickers. Games played at the table (skirmishes, the round's main Battle, a Nexus Crisis battle) don't count: every unit can fight in them for full rewards without being used up, even after an outing. The exception is a unit on a task (below): it is busy all round and fights in no battle, the main Battle included. Every unit is free again when the GM ends the round.",
     `Unit tasks (Unit task… on your force page): instead of fighting, a unit can spend the round on one task. It is busy until the GM ends the round: it fights in no battle (the main Battle and Nexus Crisis included), and can't go on a Solo patrol or Expedition. You're warned before you set one. A unit that has already fought this round can't take a task.`,
     `Mentoring: a unit teaches a lower-level unit of the same category (Infantry with Infantry, and so on). The pupil gains +${MENTORING.xpPerLevel} XP for each of the mentor's levels, straight away. Both units are busy.`,
@@ -257,7 +257,8 @@ export const NEXUS_TEXT = {
     "Records come from each force's battle log (patrols aside); VP, missions and unit lines come from games played on the battle tracker.",
   ],
   catchUp: [
-    `Factions that fall behind get help: at each round's end, a faction gains +${R.underdogUs} Umbra Shards for every ${R.underdogStep} sectors it's behind the faction holding the most (up to +${R.underdogMax * R.underdogUs}), paid with its round income.`,
+    `Factions that fall behind get help: at each round's end, a faction gains +${R.underdogUs} Umbra Shards and +${R.underdogSupply} Supply for every ${R.underdogStep === 1 ? 'sector' : `${R.underdogStep} sectors`} it's behind the faction holding the most (up to +${R.underdogMax * R.underdogUs} and +${R.underdogMax * R.underdogSupply}), paid with its round income.`,
+    `A faction far ahead (${R.runaway.lead} or more sectors more than the faction holding the fewest, homes not counted) pays for it: Increase Supply costs ${R.runaway.supplyRp}× the RP and Forced Expansion ${R.runaway.expansion}× the Umbra Shards (rounded up), the ${ECHOES.name} mark ${R.runaway.echoMarks === 1 ? 'one more' : `${R.runaway.echoMarks} more`} of its sectors each round once the opening rounds are over, and Marauders find its worlds ${R.runaway.marauderWeight}× as tempting. The round panel shows who is far ahead.`,
   ],
   shop: [
     'Umbra Shards (US) come from sector income, match bonuses and rewards. Spend them on the Umbra Shard shop on your force page.',

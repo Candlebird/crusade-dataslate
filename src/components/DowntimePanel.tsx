@@ -4,7 +4,7 @@ import { uid, nowIso } from '../model/factory';
 import { localDate } from '../model/date';
 import type { Force } from '../model/types';
 import { downtimeBlocks } from '../model/downtime';
-import { GARRISON, OFF_TABLE_XP, SOLO_PATROL, SORTIE, TRAINING } from '../rules/downtimeData';
+import { EXPEDITION, GARRISON, OFF_TABLE_XP, SOLO_PATROL, SORTIE, TRAINING } from '../rules/downtimeData';
 import { TASK_NAMES, claimGarrisons, garrisonClaims, tasksOf } from '../rules/tasks';
 import { finalWon } from '../rules/training';
 import { unitName } from '../rules/battle';
@@ -49,7 +49,7 @@ export default function DowntimePanel({ f }: { f: Force }) {
   const faction = c && f.nexus && c.factions.find((x) => x.id === f.nexus!.factionId);
   const nexus = faction ? c : undefined;
   const [open, setOpen] = useState<'expedition' | 'task' | 'patrol' | 'training' | 'sortie' | null>(null);
-  const blocks = downtimeBlocks(f, nexus);
+  const blocks = downtimeBlocks(f, nexus, state.forces);
   const tasks = nexus ? tasksOf(f, nexus) : {};
   const busy = Object.entries(tasks).flatMap(([id, t]) => {
     const u = f.units.find((x) => x.id === id);
@@ -77,7 +77,7 @@ export default function DowntimePanel({ f }: { f: Force }) {
     <Panel id="force.downtime" title="Between games" h={3} className="downtime">
       {nexus && (
         <Mode icon="g:telescope" name="Expedition" button="Expedition…" blocked={blocks.expedition} onOpen={() => setOpen('expedition')}>
-          Send up to 3 units on an Expedition. Each unit takes part in one a round.
+          Send up to 3 units on an Expedition. Each unit takes part in one a round, and your faction runs {EXPEDITION.perFaction} a round across all its forces.
         </Mode>
       )}
       {/* Always listed, so a player outside Nexus Wars sees it exists and what it needs. */}

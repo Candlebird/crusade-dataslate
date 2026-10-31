@@ -155,6 +155,8 @@ export interface ForceNexus {
   usedUnits?: { round: number; ids: string[] };
   /** The Expedition site the force's last Scan found (rules/downtime.ts scanSite): locked in until an Expedition there is recorded. */
   expeditionScan?: string;
+  /** Expeditions this force recorded in a round: the faction shares EXPEDITION.perFaction a round (rules/downtime.ts expeditionsLeft). */
+  expeditions?: { round: number; n: number };
   /** Settled Nexus Duels whose Umbra Shards and relics this force has paid or collected. */
   duelsPaid?: string[];
   /** Crossroads Journals whose Warlord rewards (or costs) this force has taken. */

@@ -6,7 +6,7 @@ import { unitName } from '../rules/battle';
 import { markUnitsUsed, unitsUsed } from '../rules/nexus';
 import { EXPEDITION, EXPEDITION_SITES } from '../rules/downtimeData';
 import {
-  applyExpedition, broughtHome, carried, checkOdds, checkText, chooseOption, currentEncounter, expeditionNames, expeditionSite, headHome, pressOn, rewardText, scaledReward, scanSite, shareOf, squadBonus, startExpedition, unhurt,
+  applyExpedition, broughtHome, expeditionsLeft, carried, checkOdds, checkText, chooseOption, currentEncounter, expeditionNames, expeditionSite, headHome, pressOn, rewardText, scaledReward, scanSite, shareOf, squadBonus, startExpedition, unhurt,
   type Expedition,
 } from '../rules/downtime';
 import { bankRoom, depositNearest, depositText, rewardOrigin } from '../rules/production';
@@ -14,11 +14,13 @@ import { Modal, toast } from './ui';
 import { localDate } from '../model/date';
 
 /**
- * Send up to three units on a short dice-story into the Nexus. Any number a round, but each unit goes once. A Scan picks
+ * Send up to three units on a short dice-story into the Nexus. Each unit goes once a round, and the faction's forces
+ * share EXPEDITION.perFaction a round. A Scan picks
  * the site at random, and the force is locked into it until it records an Expedition there.
  */
 export default function ExpeditionModal({ force, c, onClose }: { force: Force; c: Campaign; onClose: () => void }) {
-  const { update, updateForce } = useStore();
+  const { state, update, updateForce } = useStore();
+  const left = expeditionsLeft(force, state.forces, c);
   const units = force.units.filter((u) => u.status === 'active');
   const used = unitsUsed(force, c);
   const scan = force.nexus?.expeditionScan;
@@ -47,7 +49,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
         cc.updatedAt = new Date().toISOString();
       });
     updateForce(force.id, (d) => {
-      summary = applyExpedition(d, x, localDate(), uid, banked || undefined);
+      summary = applyExpedition(d, x, localDate(), uid, banked || undefined, c);
       markUnitsUsed(d, c, x.squad);
     });
     setDone(summary);
@@ -104,6 +106,9 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
         </p>
         <div className="fields">
           <p className="span-all small" style={{ margin: 0 }}>
+            <span className="muted">{left} of {EXPEDITION.perFaction} Expeditions left for your faction this round.</span>
+          </p>
+          <p className="span-all small" style={{ margin: 0 }}>
             <span className="muted">The scan found:</span> <b>{s.name}</b> <span className="tag gold" data-tip="Locked in until an Expedition there comes home.">Locked</span>
           </p>
           <p className="span-all small" style={{ margin: 0 }}>{s.desc} <span className="muted">Make it all the way: {rewardText(s.finish.reward)} for a full squad.</span></p>
@@ -140,7 +145,7 @@ export default function ExpeditionModal({ force, c, onClose }: { force: Force; c
     footer = (
       <>
         <button onClick={onClose}>Cancel</button>
-        <button className="primary" disabled={!squad.length} data-tip={squad.length ? undefined : 'Pick at least one unit'} onClick={() => setE(startExpedition(site!, squad, Math.random, expeditionNames(force, c, squad)))}>Set out</button>
+        <button className="primary" disabled={!squad.length || !left} data-tip={!left ? 'Your faction has no Expeditions left this round' : squad.length ? undefined : 'Pick at least one unit'} onClick={() => setE(startExpedition(site!, squad, Math.random, expeditionNames(force, c, squad)))}>Set out</button>
       </>
     );
   } else {

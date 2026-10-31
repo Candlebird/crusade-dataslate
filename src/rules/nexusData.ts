@@ -54,10 +54,17 @@ export const NEXUS_ROUNDS = {
   /** Umbra Shards for each match a force plays, at most `matchBonusMax` per round. */
   matchBonusUs: 3,
   matchBonusMax: 2,
-  /** Catch-up: +`underdogUs` Umbra Shards per this many sectors behind the faction holding the most, up to `underdogMax` times. */
-  underdogStep: 2,
-  underdogMax: 3,
+  /** Catch-up: +`underdogUs` Umbra Shards and +`underdogSupply` Supply per this many sectors behind the faction holding the most, up to `underdogMax` times. */
+  underdogStep: 1,
+  underdogMax: 4,
   underdogUs: 3,
+  underdogSupply: 50,
+  /**
+   * A faction far ahead (rules/runaway.ts): `lead` or more sectors over the faction holding the fewest. Its Increase
+   * Supply costs `supplyRp` times the RP, its Forced Expansion `expansion` times the Umbra Shards, the Echoes mark
+   * `echoMarks` more of its sectors each round, and Marauders find its worlds `marauderWeight` times as tempting.
+   */
+  runaway: { lead: 3, supplyRp: 2, expansion: 1.5, echoMarks: 1, marauderWeight: 2 },
   /** Rounds 1 to this: no home-sector challenges, and the Echoes only spread into unclaimed sectors. */
   graceRounds: 3,
   /** Threat starts here and stays between 0 and `threatMax`. */

@@ -8,6 +8,7 @@ import { unitName } from '../rules/battle';
 import { COMBAT_MANIPULATIONS, EXPANSION_US, MANIPULATION_PREFIX, NEXUS_RELIC_US, NEXUS_ROUNDS, SECTOR_TYPES, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
 import { isReinforced } from '../rules/production';
 import { attackTargets } from '../rules/orders';
+import { expansionCost, isRunaway } from '../rules/runaway';
 import { Modal, RelicOption, UsAbbr, toast, umbraShards } from './ui';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
@@ -34,7 +35,8 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
   const picked = c?.sectors.find((s) => s.id === choice);
   const costOf = (x: (typeof UMBRA_SHOP)[number]) =>
     x.key === 'relic' ? relicUs(x.key === sel ? tier : 'Common')
-      : x.key === 'expansion' && x.key === sel && picked ? EXPANSION_US[picked.type] ?? x.cost
+      : x.key === 'expansion' && x.key === sel && picked ? expansionCost(c, fid, picked.type) ?? x.cost
+        : x.key === 'expansion' ? expansionCost(c, fid, 'empty') ?? x.cost
         : x.cost;
   // A price that is only the cheapest so far ("9+"): a relic not picked, an expansion with no sector chosen.
   const from = (x: (typeof UMBRA_SHOP)[number]) => (x.key === 'relic' && x.key !== sel) || (x.key === 'expansion' && !(x.key === sel && picked));
@@ -173,6 +175,9 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
             <div className="fields">
               <h3 className="span-all" style={{ margin: 0 }}>{item.name}</h3>
               <p className="span-all muted small" style={{ margin: 0 }}>{item.desc}</p>
+              {item.key === 'expansion' && isRunaway(c, fid) && (
+                <p className="span-all small" style={{ margin: 0, color: 'var(--warn)' }}>Your faction is far ahead: Forced Expansion costs {NEXUS_ROUNDS.runaway.expansion}× as much.</p>
+              )}
               {NEEDS_UNIT.has(item.key) && (
                 <label className="field span-all">
                   Unit
@@ -222,7 +227,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
                   Sector
                   <select value={choice} onChange={(e) => setChoice(e.target.value)} disabled={!c || !fid}>
                     <option value="">— choose —</option>
-                    {sectorChoices.map((s) => <option key={s.id} value={s.id}>{s.name}{item.key === 'expansion' ? ` (${SECTOR_TYPES[s.type].label}, ${umbraShards(EXPANSION_US[s.type]!)})` : ''}</option>)}
+                    {sectorChoices.map((s) => <option key={s.id} value={s.id}>{s.name}{item.key === 'expansion' ? ` (${SECTOR_TYPES[s.type].label}, ${umbraShards(expansionCost(c, fid, s.type)!)})` : ''}</option>)}
                   </select>
                   <span className="muted small">Changes only your copy of the campaign. Tell the GM.</span>
                 </label>

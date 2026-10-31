@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Campaign } from './types';
 import { newForce, newUnit } from './factory';
 import { markUnitsUsed } from '../rules/nexus';
+import { EXPEDITION } from '../rules/downtimeData';
 import { NO_FACTION, downtimeBlocks } from './downtime';
 
 const campaign = () => ({ id: 'c', name: 'C', updatedAt: '', round: 2, threat: 0, factions: [], sectors: [], log: [] }) as unknown as Campaign;
@@ -44,5 +45,27 @@ describe('downtimeBlocks', () => {
     expect(b.patrol).toBeUndefined();
     c.round = 3;
     expect(downtimeBlocks(f, c).expedition).toBeUndefined();
+  });
+
+  it("shares the faction's Expeditions a round across all its forces", () => {
+    const c = campaign();
+    const make = (id: string, factionId: string) => {
+      const f = newForce(id);
+      f.units = [newUnit({ id: `${id}u` })];
+      f.nexus = { factionId, permanentTables: [], tempTables: [], traitTokens: 0, pending: [] };
+      return f;
+    };
+    const a = make('a', 'A');
+    const b = make('b', 'A');
+    const rival = make('r', 'B');
+    const forces = [a, b, rival];
+    a.nexus!.expeditions = { round: 2, n: EXPEDITION.perFaction - 1 };
+    expect(downtimeBlocks(b, c, forces).expedition).toBeUndefined();
+    b.nexus!.expeditions = { round: 2, n: 1 };
+    expect(downtimeBlocks(a, c, forces).expedition).toMatch(/across all its forces/);
+    expect(downtimeBlocks(b, c, forces).task).toBeUndefined();
+    expect(downtimeBlocks(rival, c, forces).expedition).toBeUndefined();
+    c.round = 3;
+    expect(downtimeBlocks(a, c, forces).expedition).toBeUndefined();
   });
 });

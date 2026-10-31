@@ -180,3 +180,38 @@ export function clawbackFeats(force: Force, date: string, newId: () => string): 
   force.ledger.push({ id: newId(), date, label: line, rp: -rp, supply: -supply });
   return line;
 }
+
+/**
+ * A unique feat a second force of the faction earned again, before feats counted once for the whole faction: it goes
+ * back to the force that earned it first (the earlier date; on the same day, the force listed first in `forces`), and
+ * the later one gives back the RP, Supply and Umbra Shards its ledger line shows. XP stays. Runs each time the store
+ * tidies a force this device may change; once a duplicate is gone there's nothing more to do. Returns the ledger line it adds, or null.
+ */
+export function clawbackDuplicateFeats(force: Force, forces: Force[], date: string, newId: () => string): string | null {
+  if (!force.feats || !force.nexus?.factionId) return null;
+  const mine = forces.indexOf(force);
+  const others = featFaction(force, forces).filter((f) => f !== force);
+  let rp = 0;
+  let supply = 0;
+  let us = 0;
+  const names: string[] = [];
+  for (const [id, on] of Object.entries(force.feats) as [FeatId, string][]) {
+    const first = others.some((f) => {
+      const at = f.feats?.[id];
+      return at && (at < on || (at === on && forces.indexOf(f) < mine));
+    });
+    const feat = featInfo(id);
+    if (!first || !feat || feat.repeat) continue;
+    delete force.feats[id];
+    const paid = [...force.ledger].reverse().find((l) => l.label.startsWith(`Feat — ${feat.name}:`));
+    rp += paid?.rp ?? 0;
+    supply += paid?.supply ?? 0;
+    us += paid?.us ?? 0;
+    names.push(feat.name);
+  }
+  if (!names.length) return null;
+  force.umbraShards -= us;
+  const line = `Feats already earned by your faction — ${names.join(', ')}: each pays once for the faction, so this force gives them back`;
+  force.ledger.push({ id: newId(), date, label: line, rp: -rp, supply: -supply, ...(us ? { us: -us } : {}) });
+  return line;
+}

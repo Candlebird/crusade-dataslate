@@ -17,6 +17,8 @@ export type ExpeditionCheck = 'safe' | 'easy' | 'medium' | 'hard' | 'heroic';
 export const EXPEDITION = {
   /** Units in an expedition squad. Each unit that comes home unhurt brings back 1/squadMax of the haul (downtime.ts broughtHome). */
   squadMax: 3,
+  /** Expeditions a faction can record a round, across all its forces: a second detachment doesn't double them. */
+  perFaction: 3,
   /** Encounters before the squad comes home on its own. */
   encounters: 3,
   /** Rewards grow the deeper the squad goes: encounter 1, 2, 3. */

@@ -30,11 +30,11 @@ const win = (sectorId: string, winner: string) => ({ id: sectorId, date: '', sec
 describe('campaign rounds', () => {
   it('knows who is ahead and who gets a catch-up bonus', () => {
     expect(leaders(campaign())).toEqual(['A']);
-    expect(underdogBonus(campaign())).toEqual({ A: 0, B: 3 });
+    expect(underdogBonus(campaign())).toEqual({ A: 0, B: 6 });
     const c = campaign();
     sector(c, 'b1').owner = 'A';
     sector(c, 'hB').owner = 'B';
-    expect(underdogBonus(c)).toEqual({ A: 0, B: 6 });
+    expect(underdogBonus(c)).toEqual({ A: 0, B: 12 });
   });
 
   it('ends a round: notes holdings, raises the threat and spreads only into unclaimed space early on', () => {
@@ -44,7 +44,7 @@ describe('campaign rounds', () => {
     expect(r.spread.map((s) => s.id)).toEqual(['u']);
     expect(c).toMatchObject({ round: 2, threat: 2 });
     expect(c.rounds).toEqual([{
-      round: 1, date: '2026-10-19', underdog: { A: 0, B: 3 },
+      round: 1, date: '2026-10-19', underdog: { A: 0, B: 6 },
       holdings: { A: ['hA', 'p1', 'p2', 'an'], B: ['b1', 'hB'] },
     }]);
     expect(sector(c, 'u').owner).toBe(ECHOES.id);
@@ -124,7 +124,7 @@ describe('campaign rounds', () => {
     const snap = c.rounds![0];
     expect(roundIncomeItems(c, 'A', snap).map((i) => `${i.key}:${i.kind}`)).toEqual(['r1:hA:us', 'r1:p1:shardRoll', 'r1:p2:manipulation', 'r1:an:anomaly']);
     const b = roundIncomeItems(c, 'B', snap);
-    expect(b.map((i) => [i.kind, i.us ?? i.supply])).toEqual([['supply', 50], ['supply', 100], ['us', 3]]);
+    expect(b.map((i) => [i.kind, i.us ?? i.supply])).toEqual([['supply', 50], ['supply', 100], ['us', 6], ['supply', 100]]);
     expect(b[2].source).toBe('Round 1 — Catch-up bonus');
   });
 
@@ -138,10 +138,10 @@ describe('campaign rounds', () => {
     const items = rounds.flatMap((r) => roundIncomeItems(c, 'B', r));
     let n = 0;
     const out = resolveRoundIncome(f, c, rounds, items, {}, '2026-10-19', () => `id${n++}`);
-    expect(out).toMatchObject({ us: 6, supply: 300, warnings: [] });
-    expect(out.lines[0]).toBe('Bravo income for rounds 1–2: +6 Umbra Shards, +300 Supply.');
-    expect(f.umbraShards).toBe(6);
-    expect(f.ledger).toHaveLength(6);
+    expect(out).toMatchObject({ us: 12, supply: 500, warnings: [] });
+    expect(out.lines[0]).toBe('Bravo income for rounds 1–2: +12 Umbra Shards, +500 Supply.');
+    expect(f.umbraShards).toBe(12);
+    expect(f.ledger).toHaveLength(8);
     expect(f.nexus).toMatchObject({ claimedRound: 2, tempTables: [] });
     expect(claimableRounds(c, f.nexus)).toEqual([]);
   });

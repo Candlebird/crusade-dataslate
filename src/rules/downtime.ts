@@ -298,14 +298,28 @@ export const carried = (e: Expedition, r: ExpeditionReward) => shareOf(unhurt(e)
  */
 export const broughtHome = (e: Expedition) => carried(e, e.haul);
 
+/** Expeditions the force's faction recorded this round, across all its forces. */
+export const factionExpeditions = (force: Force, forces: Force[], c: Campaign) =>
+  forces
+    .filter((f) => f.id === force.id || (!!force.nexus && f.nexus?.factionId === force.nexus.factionId))
+    .reduce((n, f) => n + (f.nexus?.expeditions?.round === currentRound(c) ? f.nexus.expeditions.n : 0), 0);
+
+/** Expeditions the force's faction can still record this round (EXPEDITION.perFaction, shared by all its forces). */
+export const expeditionsLeft = (force: Force, forces: Force[], c: Campaign) =>
+  Math.max(0, EXPEDITION.perFaction - factionExpeditions(force, forces, c));
+
 /**
  * Pay the haul (the share brought home, broughtHome) and the injuries to the force. Its Materials are banked by the
  * caller (depositNearest), which passes where they went as `banked` for the summary. Returns a one-line summary.
  */
-export function applyExpedition(force: Force, e: Expedition, date: string, newId: () => string, banked?: string): string {
+export function applyExpedition(force: Force, e: Expedition, date: string, newId: () => string, banked?: string, c?: Campaign): string {
   const site = expeditionSite(e.site)!;
   // The Scan is used up: the next Expedition scans again.
   if (force.nexus?.expeditionScan === e.site) delete force.nexus.expeditionScan;
+  if (c && force.nexus) {
+    const round = currentRound(c);
+    force.nexus.expeditions = { round, n: (force.nexus.expeditions?.round === round ? force.nexus.expeditions.n : 0) + 1 };
+  }
   const squad = force.units.filter((u) => e.squad.includes(u.id) && u.status !== 'removed');
   for (const u of squad) u.xp += e.haul.xp;
   const hurt: string[] = [];
