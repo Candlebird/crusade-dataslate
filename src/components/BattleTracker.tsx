@@ -703,6 +703,8 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
   const teams = teamsOf(b);
   const title = resultTitle(b);
   const toRecord = b.sides.filter((s) => s.forceId && !b.recorded.includes(s.id) && state.forces.some((f) => f.id === s.forceId));
+  const logs = !!c && !!game && !('problem' in game);
+  const finishLabel = logs ? 'Finish & log to Nexus Wars' : 'Finish & save result';
   return (
     <div className="panel result-panel">
       <div className="panel-title">
@@ -710,6 +712,12 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
         <button className="ghost" onClick={() => set((d) => { d.ended = false; delete d.auto; delete d.zoneMode; })}
           data-tip={b.auto ? 'Back to the tracker. Drops the battle result, but its losses and kill XP stay on the units.' : undefined}>Resume</button>
       </div>
+      <p className="save-nudge">
+        <b>Not saved yet.</b>{' '}
+        {logs
+          ? <>Recording it for each force only updates that force. The battle reaches the Nexus Wars campaign log when someone presses <b>{finishLabel}</b> in step 2.</>
+          : <>Recording it for each force only updates that force. Press <b>{finishLabel}</b> in step 2 to close the battle and save the result.</>}
+      </p>
       <h3>1. Record it for each force{toRecord.length > 0 && <span className="muted small"> · {toRecord.length} to go</span>}</h3>
       <p className="muted small">Each crusade force records the battle in its own log: the wizard is filled in from this battle, so check it, add rewards, then apply. A player can also do it later from Past battles.</p>
       <div className="row">
@@ -741,17 +749,17 @@ function Result({ b, set, onFinish, game, crisis }: { b: TrackedBattle; set: Set
               : `A loss leaves the Lord standing: it can be fought again until the end of round ${crisisUntil(c.crisis!)}. Still standing then, the ${ECHOES.name} take a sector from each faction.`}
         </p>
       )}
-      <h3>2. Finish</h3>
+      <h3>2. Finish and save{logs ? ' to Nexus Wars' : ''} <span className="muted small">· required</span></h3>
       <div className="row">
-        <span className="muted small">Finishing closes the battle and shares it under Past battles, where anyone who hasn't recorded it yet can claim their rewards.</span>
+        <span className="muted small">{logs ? 'Logs the result to the Nexus Wars campaign, then ' : ''}closes the battle and shares it under Past battles, where anyone who hasn't recorded it yet can claim their rewards.</span>
         <span className="spacer" />
         <button
-          className={toRecord.length ? '' : 'primary'}
+          className="primary finish-save"
           onClick={() => {
             if (toRecord.length && !confirmAction(`${toRecord.length} force${toRecord.length === 1 ? " hasn't" : "s haven't"} recorded yet (${toRecord.map((s) => s.name).join(', ')}). Finish anyway? ${toRecord.length === 1 ? 'It' : 'They'} can still claim it from Past battles.`)) return;
             onFinish();
           }}
-        ><Icon name="l:check" /> Finish & save result</button>
+        ><Icon name="l:check" /> {finishLabel}</button>
       </div>
     </div>
   );

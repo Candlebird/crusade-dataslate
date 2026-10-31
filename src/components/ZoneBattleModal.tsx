@@ -149,6 +149,16 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   }, [z, myTurn]);
   // Each of the player's turns in the battle starts with nothing picked.
   useEffect(() => { if (myTurn && z.phase === 'battle' && !z.pending) { setSel(undefined); clearPick(); } }, [myTurn, z.phase]);
+  // At the start of a round the player's units in Ambush aren't on the board to tap: open the first one's orders for them.
+  // Keyed on the battle, so Cancel leaves it shut until something changes (the next one placed or kept waiting).
+  useEffect(() => {
+    if (!myTurn || z.phase !== 'battle' || !z.placing || z.pending) return;
+    const first = ready(z, z.turn)[0];
+    if (!first) return;
+    setSel(first.id);
+    clearPick();
+    setMenu(true);
+  }, [z, myTurn]);
 
   const go = (action: Action, o: Partial<Order> = {}) => {
     if (!canAct) return;
@@ -267,13 +277,13 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
   // board doesn't jump when an order starts waiting for a square or an enemy.
   const waiting = (attacking && aiming) || (canAct && !!order);
   const hint = z.phase === 'battle' && (
-    <div className={`zb-pop-hint small${waiting ? '' : ' idle'}`}>
+    <div className={`zb-pop-hint small${waiting || (myTurn && z.placing) ? '' : ' idle'}`}>
       <span className="grow">{attacking && aiming ? "Tap an enemy ringed in red to shoot it. Guns that can't reach it fire at the nearest they can."
         : canAct && order === 'charge' ? `${unit!.name}: tap an enemy ringed in red to charge it.`
         : canAct && order === 'arrive' ? `${unit!.name}: tap a lit square to come on from Ambush.`
         : canAct && order ? `${unit!.name}: tap a lit square to ${order === 'rush' ? 'Rush' : 'Advance'} there.`
         : attacking ? `${pend!.name} is shooting.`
-        : myTurn && z.placing ? 'Start of the round: tap a unit waiting in Ambush to bring it on or keep it waiting.'
+        : myTurn && z.placing ? 'Start of the round: your units in Ambush wait above the board, marked in gold. Tap one to bring it on or keep it waiting.'
         : myTurn ? 'Tap a unit marked in gold to give it orders.'
         : `${sideName(z.turn)} is acting…`}</span>
       {waiting && <button className="small" onClick={() => (attacking ? setAiming(false) : back())}>Back</button>}
@@ -325,6 +335,22 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
     </div>
     <ZoneFx z={z} field={field} mine={(s) => tone(s) === 'mine'} />
     {pop}
+    </div>
+  );
+
+  // At the start of a round the player's units in Ambush sit off the board: show them right above it, marked in gold.
+  const ambushers = z.phase === 'battle' && z.placing && myTurn && !attacking ? mineReady.filter((u) => u.sq < 0) : [];
+  const ambushStrip = ambushers.length > 0 && (
+    <div className="zb-ambush small">
+      <span><b>Waiting in Ambush.</b> <span className="muted">Tap one to bring it on or keep it waiting.</span></span>
+      <div className="zb-ambush-row">
+        {ambushers.map((u) => (
+          <span key={u.id} className="zb-ambush-unit">
+            <Token u={u} fu={forceUnits.get(u.id.slice(u.id.indexOf('|') + 1))} tone={tone(u.side)} sel={u.id === sel} can={false} cue={cueReady} done={false} onClick={() => pick(u)} />
+            <span className="small">{u.name}</span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 
@@ -441,6 +467,7 @@ export default function ZoneBattleModal({ battle, mode: mode0, effects = [], tit
         <div className="zb-main">
           {head}
           {hint}
+          {ambushStrip}
           {board}
           <p className="zb-key small muted">A letter marks terrain and ◆ an objective: hover or tap a square for its rules.</p>
           {effects.length > 0 && <ul className="zb-effects small muted">{effects.map((e) => <li key={e}>{e}</li>)}</ul>}

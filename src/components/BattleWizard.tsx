@@ -226,7 +226,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
       {step === 3 && linked && <NexusRewards units={units} input={input} nexus={nexus} setPick={setNexusPick} />}
       {step === 4 && <SummaryStep outcome={preview} />}
 
-      <div className="row">
+      <div className="row wizard-nav">
         {step > 0 && <button onClick={() => setStep(step - 1)}><Icon name="l:arrow-left" /> Back</button>}
         <span className="spacer" />
         {step < STEPS.length - 1 && <button className="primary" onClick={() => setStep(step + 1)}>Next: {STEPS[step + 1]} <Icon name="l:arrow-right" /></button>}
@@ -655,10 +655,11 @@ function Applied({ force, outcome, back, waiting }: { force: Force; outcome: Bat
         </div>
       </div>
       {waiting && (
-        <p className="wizard-lead small">
+        <p className="save-nudge">
+          <b>Not saved to the campaign yet.</b>{' '}
           {waiting.length
-            ? `${waiting.join(' and ')} still ${waiting.length === 1 ? 'has' : 'have'} to record this battle. Go back to the battle to record it, then Finish.`
-            : 'Every force has recorded it. Go back to the battle and press Finish to close it.'}
+            ? `${waiting.join(' and ')} still ${waiting.length === 1 ? 'has' : 'have'} to record this battle. Then go back to the battle and press Finish: until then it isn't in the Nexus Wars log.`
+            : 'Last step: go back to the battle and press Finish. That logs it to Nexus Wars and closes it.'}
         </p>
       )}
       <div className="panel">
