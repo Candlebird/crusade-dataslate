@@ -196,7 +196,16 @@ export const ORGANIZED_STRIKE = 'Organized Strike';
  */
 export const NEXUS_RELIC_US: Record<RelicTier, number> = { Common: 9, Rare: 15, Legendary: 24 };
 
-export type UmbraBuy = 'rp' | 'knowledge' | 'revive' | 'manipulation' | 'strike' | 'reinforce' | 'expansion' | 'relic' | 'evolution';
+/**
+ * Forced Expansion's price by the sector taken: empty space cheapest, a planet (a benefit and production) dearest. A
+ * type left out can't be taken this way (home sectors, the Voidspawn, the guarded Lost Archive); nor can a sector
+ * with a guardian.
+ */
+export const EXPANSION_US: Partial<Record<SectorType, number>> = { empty: 12, void: 14, anomaly: 15, research: 16, planet: 18 };
+const EXPANSION_MIN = Math.min(...Object.values(EXPANSION_US));
+const EXPANSION_MAX = Math.max(...Object.values(EXPANSION_US));
+
+export type UmbraBuy ='rp' | 'knowledge' | 'revive' | 'manipulation' | 'strike' | 'reinforce' | 'expansion' | 'relic' | 'evolution';
 /**
  * Priced against a faction's income, about 8–14 US a round (2 match bonuses, sectors, reward rolls): small tactical
  * buys cost 3, lasting ones a round's income or more. 9 US is 1 RP, so 1 US is worth about 1 XP or 22 Supply.
@@ -208,7 +217,7 @@ export const UMBRA_SHOP: { key: UmbraBuy; name: string; cost: number; desc: stri
   { key: 'manipulation', name: 'Combat Manipulation', cost: 3, desc: 'One tactical advantage for your next match.' },
   { key: 'strike', name: ORGANIZED_STRIKE, cost: 6, desc: '+200 Supply Limit once, when attacking a sector.' },
   { key: 'reinforce', name: 'Reinforce Sector', cost: 9, desc: '+200 Supply Limit when defending that sector. One per sector; lost if the sector changes hands.' },
-  { key: 'expansion', name: 'Forced Expansion', cost: 15, desc: 'Take an uncontrolled sector next to your territory (or in a Warp Gate’s reach) without a match (no match rewards).' },
+  { key: 'expansion', name: 'Forced Expansion', cost: EXPANSION_MIN, desc: `Take an uncontrolled sector next to your territory (or in a Warp Gate’s reach) without a match (no match rewards). ${EXPANSION_MIN}–${EXPANSION_MAX} Umbra Shards by the sector: ${(Object.entries(EXPANSION_US) as [SectorType, number][]).map(([t, n]) => `${SECTOR_TYPES[t].label} ${n}`).join(', ')}. Not a sector with a guardian, nor the Lost Archive.` },
   { key: 'relic', name: 'Nexus Relic', cost: NEXUS_RELIC_US.Common, desc: `${NEXUS_RELIC_US.Common} / ${NEXUS_RELIC_US.Rare} / ${NEXUS_RELIC_US.Legendary} Umbra Shards for a Common / Rare / Legendary, bought together with the normal Crusade relic requisition (its RP cost too).` },
   { key: 'evolution', name: 'Umbral Evolution', cost: 36, desc: 'A free unique Nexus trait: BP goes up, but it does not use a level.' },
 ];

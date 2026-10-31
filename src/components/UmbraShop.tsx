@@ -5,7 +5,7 @@ import type { Force, Unit } from '../model/types';
 import { NEXUS_TRAITS, RELICS, type RelicTier } from '../rules/data';
 import { forceTotals, relicCost as relicRp, relicHolders, relicTaken, xpShown } from '../rules/engine';
 import { unitName } from '../rules/battle';
-import { COMBAT_MANIPULATIONS, MANIPULATION_PREFIX, NEXUS_RELIC_US, NEXUS_ROUNDS, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
+import { COMBAT_MANIPULATIONS, EXPANSION_US, MANIPULATION_PREFIX, NEXUS_RELIC_US, NEXUS_ROUNDS, SECTOR_TYPES, UMBRA_SHOP, homeOf, ownedSectors, type UmbraBuy } from '../rules/nexus';
 import { isReinforced } from '../rules/production';
 import { attackTargets } from '../rules/orders';
 import { Modal, RelicOption, UsAbbr, toast, umbraShards } from './ui';
@@ -30,8 +30,14 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
   // A Relic Collector home world makes Nexus relics cheaper.
   const collector = !!c && !!fid && homeOf(c, fid)?.benefit === 'relicCollector';
   const relicUs = (t: RelicTier) => Math.max(0, NEXUS_RELIC_US[t] - (collector ? NEXUS_ROUNDS.relicCollectorDiscount : 0));
-  // A relic's price is its tier's; the list shows the cheapest.
-  const costOf = (x: (typeof UMBRA_SHOP)[number]) => (x.key === 'relic' ? relicUs(x.key === sel ? tier : 'Common') : x.cost);
+  // A relic's price is its tier's, a Forced Expansion's its sector's; the list shows the cheapest.
+  const picked = c?.sectors.find((s) => s.id === choice);
+  const costOf = (x: (typeof UMBRA_SHOP)[number]) =>
+    x.key === 'relic' ? relicUs(x.key === sel ? tier : 'Common')
+      : x.key === 'expansion' && x.key === sel && picked ? EXPANSION_US[picked.type] ?? x.cost
+        : x.cost;
+  // A price that is only the cheapest so far ("9+"): a relic not picked, an expansion with no sector chosen.
+  const from = (x: (typeof UMBRA_SHOP)[number]) => (x.key === 'relic' && x.key !== sel) || (x.key === 'expansion' && !(x.key === sel && picked));
   const item = UMBRA_SHOP.find((x) => x.key === sel);
   const cost = item ? costOf(item) : 0;
   const held = relicHolders(state.forces, state.campaign);
@@ -39,10 +45,12 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
   const unit = units.find((u) => u.id === unitId);
   const rpCost = sel === 'relic' ? relicRp(tier) : 0;
 
-  // Forced Expansion only reaches unheld sectors the faction could attack: next to its own, or in a Warp Gate's reach.
+  // Forced Expansion only reaches unheld sectors the faction could attack (next to its own, or in a Warp Gate's reach),
+  // of a type it has a price for, and never one with a guardian.
   const expansionFront = new Set(c && fid && sel === 'expansion' ? attackTargets(c, fid).map((s) => s.id) : []);
   const sectorChoices =
-    !c || !fid ? [] : sel === 'reinforce' ? ownedSectors(c, fid).filter((s) => !isReinforced(s)) : sel === 'expansion' ? c.sectors.filter((s) => !s.owner && s.type !== 'home' && expansionFront.has(s.id)) : [];
+    !c || !fid ? [] : sel === 'reinforce' ? ownedSectors(c, fid).filter((s) => !isReinforced(s))
+      : sel === 'expansion' ? c.sectors.filter((s) => !s.owner && !s.guardian && EXPANSION_US[s.type] !== undefined && expansionFront.has(s.id)) : [];
 
   const pick = (k: UmbraBuy) => {
     setSel(k);
@@ -58,7 +66,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
     if (item.key === 'revive' && !units.length) return 'No unit is comatose.';
     if (NEEDS_UNIT.has(item.key) && !unit) return 'Choose a unit.';
     if ((item.key === 'manipulation' || item.key === 'relic' || item.key === 'evolution') && !choice) return 'Make a choice.';
-    if (item.key === 'expansion' && c && fid && !sectorChoices.length) return 'No unheld sector borders your territory or lies in a Warp Gate’s reach.';
+    if (item.key === 'expansion' && c && fid && !sectorChoices.length) return 'No unguarded, unheld sector borders your territory or lies in a Warp Gate’s reach.';
     if ((item.key === 'reinforce' || item.key === 'expansion') && !choice) return c && fid ? 'Choose a sector.' : 'Link this force to a campaign faction first.';
     // The sector may have been taken, reinforced or deleted since it was picked.
     if ((item.key === 'reinforce' || item.key === 'expansion') && !sectorChoices.some((s) => s.id === choice)) return "That sector isn't available now. Choose another.";
@@ -154,7 +162,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
           {UMBRA_SHOP.map((x) => (
             <div key={x.key} className={`shop-item${sel === x.key ? ' selected' : ''}${costOf(x) > us ? ' disabled' : ''}`} onClick={() => pick(x.key)}
               data-tip={costOf(x) > us ? `Needs ${costOf(x)} Umbra Shards (this force has ${us})` : undefined}>
-              <span className="cost" data-tip={x.key === 'relic' && collector ? 'Relic Collector discount' : undefined}>{costOf(x)}{x.key === 'relic' && x.key !== sel ? '+' : ''} <UsAbbr /></span>
+              <span className="cost" data-tip={x.key === 'relic' && collector ? 'Relic Collector discount' : undefined}>{costOf(x)}{from(x) ? '+' : ''} <UsAbbr /></span>
               <div className="grow"><b>{x.name}</b><div className="muted small">{x.desc}</div></div>
             </div>
           ))}
@@ -214,7 +222,7 @@ export default function UmbraShop({ force, onClose }: { force: Force; onClose: (
                   Sector
                   <select value={choice} onChange={(e) => setChoice(e.target.value)} disabled={!c || !fid}>
                     <option value="">— choose —</option>
-                    {sectorChoices.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    {sectorChoices.map((s) => <option key={s.id} value={s.id}>{s.name}{item.key === 'expansion' ? ` (${SECTOR_TYPES[s.type].label}, ${umbraShards(EXPANSION_US[s.type]!)})` : ''}</option>)}
                   </select>
                   <span className="muted small">Changes only your copy of the campaign. Tell the GM.</span>
                 </label>

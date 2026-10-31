@@ -604,7 +604,7 @@ function NexusRules() {
         <table className="compact small">
           <tbody>
             {UMBRA_SHOP.map((s) => (
-              <tr key={s.key} id={entryId('n-shop', s.name)}><td><b>{s.name}</b></td><td className="muted">{s.cost}{s.key === 'relic' ? '+' : ''} <UsAbbr /></td><td>{s.desc}</td></tr>
+              <tr key={s.key} id={entryId('n-shop', s.name)}><td><b>{s.name}</b></td><td className="muted">{s.cost}{s.key === 'relic' || s.key === 'expansion' ? '+' : ''} <UsAbbr /></td><td>{s.desc}</td></tr>
             ))}
           </tbody>
         </table>
