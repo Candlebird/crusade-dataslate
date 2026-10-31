@@ -51,6 +51,8 @@ const TURN_PAUSE = 600;
 /** How long a blow's trail and number stay up, and the gap between blows that land together (ms). */
 const BLOW_MS = 950;
 const BLOW_GAP = 120;
+/** How long a "Routed!" stamp stays over a squad that broke (ms). */
+const ROUT_MS = 1800;
 
 interface Blow extends SortieFx { x1: number; y1: number; x2: number; y2: number; delay: number; stack: number }
 
@@ -92,7 +94,8 @@ function Blows({ fx, field }: { fx?: SortieFx[]; field: React.RefObject<HTMLDivE
     if (!add.length) return;
     setShown((xs) => [...xs, ...add]);
     const done = new Set(add.map((x) => x.n));
-    timers.current.push(window.setTimeout(() => setShown((xs) => xs.filter((x) => !done.has(x.n))), BLOW_MS + add[add.length - 1].delay));
+    const ms = add.some((x) => x.routed) ? ROUT_MS + BLOW_MS / 3 : BLOW_MS;
+    timers.current.push(window.setTimeout(() => setShown((xs) => xs.filter((x) => !done.has(x.n))), ms + add[add.length - 1].delay));
   });
   if (!shown.length) return null;
   return (
@@ -115,6 +118,17 @@ function Blows({ fx, field }: { fx?: SortieFx[]; field: React.RefObject<HTMLDivE
           aria-hidden="true"
         >
           {f.dmg ? `-${f.dmg}` : f.hits ? 'saved' : 'miss'}
+        </span>
+      ))}
+      {/* A squad that broke: a stamp over where it stood, after its wounds land. */}
+      {shown.filter((f) => f.routed).map((f) => (
+        <span
+          key={`r${f.n}`}
+          className={`sortie-rout${f.mine ? ' mine' : ' foe'}`}
+          style={{ left: f.x2, top: f.y2, animationDelay: `${f.delay + BLOW_MS / 3}ms` }}
+          aria-hidden="true"
+        >
+          Routed!
         </span>
       ))}
     </>
