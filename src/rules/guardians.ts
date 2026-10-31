@@ -93,3 +93,9 @@ export function garrison(s: Sector, book: CatalogBook, target: number, rand: Ran
   const lead: Unit = structuredClone(s.guardian.unit);
   return [lead, ...roleEchoes(book, Math.max(0, target - lead.points), rand)];
 }
+
+/** The GM takes a sector's guardian (and its relic) away; it counts as rolled, so round end doesn't give it a new one. */
+export function removeGuardian(s: Sector) {
+  delete s.guardian;
+  s.unguarded = true;
+}

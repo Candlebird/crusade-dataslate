@@ -5,7 +5,7 @@ import { newForce, newUnit } from '../model/factory';
 import type { Campaign, CatalogBook, Force, Sector } from '../model/types';
 import { ruleRating, hasRule } from './engine';
 import { sectorThreat } from './difficulty';
-import { empower, guardable, guardianTier, placeGuardians, rerollGuardians } from './guardians';
+import { empower, guardable, guardianTier, placeGuardians, removeGuardian, rerollGuardians } from './guardians';
 import { ECHOES } from './nexus';
 import { GUARDIANS } from './nexusData';
 
@@ -72,6 +72,16 @@ describe('empower', () => {
 });
 
 describe('placeGuardians', () => {
+  it('a guardian the GM removes stays gone at the next round end', () => {
+    const c = campaign();
+    placeGuardians(c, [book], [], () => 0, ids());
+    const s = sector(c, GUARDED[0]);
+    removeGuardian(s);
+    expect(s.guardian).toBeUndefined();
+    expect(placeGuardians(c, [book], [], () => 0, ids()).map((x) => x.id)).not.toContain(s.id);
+    expect(s.guardian).toBeUndefined();
+  });
+
   it('guards every guardable sector, and only those', () => {
     const c = campaign();
     const placed = placeGuardians(c, [book], [], () => 0, ids());

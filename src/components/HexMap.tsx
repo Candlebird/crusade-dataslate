@@ -29,6 +29,7 @@ import ZoneFight, { useZoneBattles } from './ZoneFight';
 import type { TrackedBattle } from '../rules/tracker';
 import AutoBattleModal from './AutoBattleModal';
 import { BUILDINGS, GUARDIANS, MARAUDERS, PRODUCTION } from '../rules/nexusData';
+import { removeGuardian } from '../rules/guardians';
 import { href } from '../route';
 import { Modal, Panel, Stepper, TextArea, TextField, confirmAction, toast, umbraShards } from './ui';
 import SectorDanger from './SectorDanger';
@@ -559,6 +560,13 @@ function SectorView({ c, s, sight, gm, viewer, setC, onEdit, onRecord }: {
           <span className={`tag${g.tier === 'Legendary' ? ' gold' : g.tier === 'Rare' ? ' red' : ''}`}><Icon name="g:warlord-helmet" /> {g.tier} guardian</span>{' '}
           <b>{g.name}</b>, a {g.unit.unitType} ({g.unit.points} pts) with doubled Tough{g.unit.relics[0] ? <>, carrying <b>{g.unit.relics[0].name}</b></> : ''}.
           {' '}It leads the garrison{ratingFor(s, viewer, c) !== undefined ? <>: <b>{ratingFor(s, viewer, c)} Supply</b> in all</> : ''}. Slay it with a Hero and roll {GUARDIANS.stealRoll}+ to take its relic.
+          {gm && (
+            <>{' '}<button className="small" data-tip="GM: take the guardian (and its relic) off this sector. It won't get a new one at round end" onClick={() => {
+              if (!confirmAction(`Remove ${g.name} from ${s.name}? Its relic goes with it, and the sector won't roll for a new guardian.`)) return;
+              setC((d) => { const x = d.sectors.find((y) => y.id === s.id); if (x) removeGuardian(x); });
+              toast(`${g.name} removed from ${s.name}.`);
+            }}><Icon name="l:x" /> Remove guardian</button></>
+          )}
         </p>
       )}
       {manage && <ProductionBox s={s} />}
