@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { EmblemLayer } from '../../model/types';
-import { N, placeProblem, type DrawnShard, type Tile, type TrainingRun } from '../../rules/training';
-import { drawBoard, drawVeil, type Overlay } from './draw';
+import { ghostSpots, N, placeProblem, type DrawnShard, type Tile, type TrainingRun } from '../../rules/training';
+import { drawBoard, drawVeil, type BlueprintMark, type Overlay } from './draw';
 import { drawEnemies, drawFx } from './drawLive';
 import { burstsLive, drawBursts, trackBursts } from './fxBursts';
 
@@ -29,6 +29,11 @@ export interface MapViewProps {
   onHover?: (cell: Tile | null, place: Tile | null) => void;
   /** The wave is paused: the map dims with "Paused". Left out, a wave whose clock stops for a moment counts as paused. */
   paused?: boolean;
+  /** A maze blueprint to show: its spots as a ghost of where pieces are to go (filled ones fade out), or with `plan`,
+   *  as the planned pieces themselves (the editor). */
+  blueprint?: { spots: Tile[]; plan?: boolean };
+  /** A touch tap on this cell acts at once, without the two-tap place (the editor taking a planned piece away). */
+  tapNow?: (cell: Tile) => boolean;
   className?: string;
 }
 
@@ -130,6 +135,16 @@ export function MapView(props: MapViewProps) {
     let ghostKey = '';
     let ghostOk = false;
     let clock = { t: -1, at: 0 };
+    // The blueprint's marks, worked out again only when the plan or the pieces change (each spot walks the maze).
+    let marks: { spots?: Tile[]; key: string; out?: BlueprintMark[] } = { key: '' };
+    const blueprintMarks = (p: MapViewProps): BlueprintMark[] | undefined => {
+      const bp = p.blueprint;
+      if (!bp?.spots.length) return undefined;
+      if (bp.plan) return bp.spots.map((at, i) => ({ at, state: 'plan', n: i + 1 }));
+      const key = p.run.pieces.map((q) => `${q.x},${q.y}`).join(';');
+      if (marks.spots !== bp.spots || marks.key !== key) marks = { spots: bp.spots, key, out: ghostSpots(p.run, bp.spots) };
+      return marks.out;
+    };
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
       const p = live.current;
@@ -157,7 +172,7 @@ export function MapView(props: MapViewProps) {
         ghost = { at: at.place, ok: ghostOk, shard: p.placing === true ? undefined : p.placing };
       }
       const s = v.k;
-      drawBoard(ctx, run, s, { portraits: p.portraits, glow, selected: p.selected, ghost, time: sec });
+      drawBoard(ctx, run, s, { portraits: p.portraits, glow, selected: p.selected, ghost, time: sec, blueprint: run.phase === 'over' ? undefined : blueprintMarks(p) });
       drawEnemies(ctx, run, s, sec);
       drawFx(ctx, run, s);
       drawBursts(ctx, run, s, sec);
@@ -251,7 +266,7 @@ export function MapView(props: MapViewProps) {
     const hit = cellsAt(m.x, m.y);
     if (!hit) return;
     const p = live.current;
-    if (p.placing && e.pointerType !== 'mouse' && p.run.phase !== 'over') {
+    if (p.placing && e.pointerType !== 'mouse' && p.run.phase !== 'over' && !p.tapNow?.(hit.cell)) {
       const was = pendingRef.current;
       // A second tap on the waiting ghost confirms it; anywhere else moves it there.
       if (was && hit.cell.x >= was.place.x && hit.cell.x <= was.place.x + 1 && hit.cell.y >= was.place.y && hit.cell.y <= was.place.y + 1) {

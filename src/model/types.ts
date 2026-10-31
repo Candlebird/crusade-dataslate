@@ -3,6 +3,7 @@ import type { MissionDef } from '../rules/missions';
 import type { FinishedBattle, TrackedBattle } from '../rules/tracker';
 import type { SymbolShape } from './emblemSymbols';
 import type { ZoneSave } from '../rules/zone/save';
+import type { Blueprint } from '../rules/training/blueprint';
 
 export interface WeaponTrait {
   id: string;
@@ -996,6 +997,8 @@ export interface AppState {
   battleHistory?: FinishedBattle[];
   /** Zone battles in progress, saved after every step (synced, so they can be picked up on another device). */
   zoneSaves?: ZoneSave[];
+  /** Training maze blueprints, each its player's (synced with their account). */
+  blueprints?: Blueprint[];
 }
 
 /** A side's pick when its detachment runs into another faction's on the map. */

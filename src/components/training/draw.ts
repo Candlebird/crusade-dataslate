@@ -1,6 +1,6 @@
 import type { EmblemLayer } from '../../model/types';
 import { SHARD_TYPES, TRAINING } from '../../rules/downtimeData';
-import { centreOf, pieceById, rangeCells, reach, type DrawnShard, type Piece, type Tile, type TrainingRun } from '../../rules/training';
+import { centreOf, pieceById, rangeCells, reach, type DrawnShard, type Piece, type SpotState, type Tile, type TrainingRun } from '../../rules/training';
 import { label, roundRect } from './art';
 import { drawCrystal, drawDefault, drawRubble, drawShard, drawUnit } from './drawPieces';
 import { drawCover, drawGround, drawPads, drawRoute } from './drawTerrain';
@@ -22,6 +22,15 @@ export interface Overlay {
   ghost?: { shard?: DrawnShard; at: Tile; ok: boolean };
   /** Seconds, for pulsing glows. */
   time: number;
+  /** A maze blueprint's spots (rules/training/blueprint.ts), numbered in the order drawn: in a run, an outline where a
+   *  piece is still to go (red where something is in the way); in the editor ('plan'), each planned piece. */
+  blueprint?: BlueprintMark[];
+}
+
+export interface BlueprintMark {
+  at: Tile;
+  state: SpotState | 'plan';
+  n: number;
 }
 
 /** `num`: a draft Shard's number in the keep table (1 up), or 0. */
@@ -89,8 +98,33 @@ export function drawBoard(ctx: CanvasRenderingContext2D, run: TrainingRun, s: nu
   drawCover(ctx, run, s);
   drawPads(ctx, run, s);
   for (const p of run.pieces) drawPiece(ctx, p, s, o, run.draft.placed.indexOf(p.id) + 1);
+  drawBlueprint(ctx, s, o.blueprint);
   drawSelection(ctx, run, s, o.selected);
   drawGhost(ctx, s, o.ghost);
+}
+
+/** A blueprint over the board: planned pieces solid (the editor), or dashed outlines where pieces are still to go,
+ *  red where something stands in the way; spots already filled show nothing. Each carries its number once a cell is
+ *  big enough to read it. */
+export function drawBlueprint(ctx: CanvasRenderingContext2D, s: number, marks: BlueprintMark[] | undefined) {
+  if (!marks?.length) return;
+  ctx.save();
+  for (const { at, state, n } of marks) {
+    if (state === 'filled') continue;
+    const plan = state === 'plan';
+    const red = state === 'blocked';
+    const pad = s * 0.12;
+    roundRect(ctx, at.x * s + pad, at.y * s + pad, 2 * s - 2 * pad, 2 * s - 2 * pad, s * 0.3);
+    ctx.fillStyle = plan ? 'rgba(201,162,74,0.55)' : red ? 'rgba(220,60,50,0.14)' : 'rgba(120,200,255,0.12)';
+    ctx.fill();
+    ctx.setLineDash(plan ? [] : [Math.max(2, s * 0.35), Math.max(2, s * 0.25)]);
+    ctx.lineWidth = Math.max(1, s * 0.12);
+    ctx.strokeStyle = plan ? '#e8c46a' : red ? 'rgba(235,90,80,0.9)' : 'rgba(140,210,255,0.85)';
+    ctx.stroke();
+    if (s >= 7) label(ctx, String(n), (at.x + 1) * s, (at.y + 1) * s, Math.min(14, s * 0.8), plan ? '#1a1408' : red ? '#ffb3ab' : '#cfeeff');
+  }
+  ctx.setLineDash([]);
+  ctx.restore();
 }
 
 /** A dim layer over the whole view, `w` × `h` pixels, with a word in the middle (paused, run over). Screen frame. */

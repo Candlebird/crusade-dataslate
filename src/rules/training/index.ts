@@ -42,3 +42,4 @@ export * from './finale';
 export * from './veterancy';
 export * from './featFacts';
 export * from './nextRound';
+export * from './blueprint';

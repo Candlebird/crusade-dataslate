@@ -25,6 +25,10 @@ import { useRunLoop } from './useRunLoop';
 import { useAuto } from './useAuto';
 import { freshRun } from './freshRun';
 import { thisWeek, useSiegeSettle } from './useSiegeSettle';
+import { useStore } from '../../model/store';
+import { useCloud } from '../../cloud/CloudSync';
+import { myBlueprints } from '../../rules/training';
+import { useBlueprintHidden, useBlueprintPick } from './blueprintPick';
 
 /**
  * The Training sim: draft Shards into a maze, craft units from them and hold the base against endless waves. The run
@@ -32,6 +36,12 @@ import { thisWeek, useSiegeSettle } from './useSiegeSettle';
  */
 export default function TrainingModal({ force, c, onClose }: { force: Force; c?: Campaign; onClose: () => void }) {
   const portraits = useMemo(() => Object.fromEntries(force.units.map((u) => [u.id, unitPortrait(u, force)])), [force]);
+  // The maze blueprint picked on the start screen shows as a ghost on the map (hidden at a press).
+  const { state } = useStore();
+  const cloud = useCloud();
+  const [bpId] = useBlueprintPick();
+  const [bpHidden, setBpHidden] = useBlueprintHidden();
+  const blueprint = myBlueprints(state.blueprints, cloud.email ?? undefined).find((b) => b.id === bpId);
   // What the run's end banked into the force, for its summary (the toast fades); null until then.
   const [news, setNews] = useState<BankNews | null>(null);
   const bank = useBank(force, c, setNews);
@@ -262,8 +272,16 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
             auto={TRAINING.debugAuto ? auto : undefined} onAuto={toggleAuto}
           />
           <div className="training-board">
-            <MapView run={run} portraits={portraits} glow={glow} selected={sel ?? undefined} placing={placing} placeWhy={scoutWhy} paused={paused} onCell={onCell} />
+            <MapView run={run} portraits={portraits} glow={glow} selected={sel ?? undefined} placing={placing} placeWhy={scoutWhy} paused={paused} onCell={onCell}
+              blueprint={blueprint && !bpHidden && run.phase === 'build' ? { spots: blueprint.spots } : undefined} />
             <DamageMeter run={run} />
+            {blueprint && run.phase === 'build' && (
+              <button type="button" className={`training-bp-toggle small${bpHidden ? '' : ' on'}`} aria-pressed={!bpHidden}
+                data-tip={`${bpHidden ? 'Show' : 'Hide'} your blueprint, ${blueprint.name} (pick another on the start screen's Blueprints tab)`}
+                onClick={() => setBpHidden(!bpHidden)}>
+                Blueprint {bpHidden ? 'off' : 'on'}
+              </button>
+            )}
             {selPiece && !over && !moveNow && <PieceInfo run={run} piece={selPiece} record={selPiece.kind === 'unit' ? force.units.find((u) => u.id === selPiece.unitId) : undefined} onClose={() => setSel(null)} onChange={refresh} onMove={(rule) => setMoving({ id: selPiece.id, rule })} />}
             {craftNow && (
               <div className="training-map-banner small" role="status">

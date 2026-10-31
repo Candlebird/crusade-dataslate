@@ -150,4 +150,16 @@ describe('cloud docs', () => {
     expect(images.size).toBe(0);
     expect(JSON.parse(json)).toEqual({ image: 'https://example.com/x.png', name: 'image' });
   });
+
+  it('syncs blueprints with an owner, each writable only by its player, and applies them by id', () => {
+    const s = buildSeedState();
+    const bp = (id: string, owner: string) => ({ id, owner, name: id, updatedAt: '2026-10-31', spots: [{ x: 14, y: 12 }] });
+    s.blueprints = [bp('a', 'me@x'), bp('b', 'them@x'), bp('c', '')];
+    const docs = localDocs(s, { email: 'me@x', isGm: false }, new Map()).filter((d) => d.path.startsWith('shared/blueprint-'));
+    expect(docs.map((d) => [d.path, d.canWrite])).toEqual([['shared/blueprint-a', true], ['shared/blueprint-b', false]]);
+    applyDoc(s, 'shared/blueprint-a', { ...bp('a', 'me@x'), name: 'Renamed' });
+    expect(s.blueprints.find((b) => b.id === 'a')?.name).toBe('Renamed');
+    applyDoc(s, 'shared/blueprint-b', null);
+    expect(s.blueprints.map((b) => b.id).sort()).toEqual(['a', 'c']);
+  });
 });

@@ -12,6 +12,7 @@ import { FinaleTrack } from './FinaleTrack';
 import { SiegeBoards, SiegeRules } from './SiegePanel';
 import { WeekCountdown } from '../WeekCountdown';
 import { Portrait } from '../Emblem';
+import { BlueprintEditor } from './BlueprintEditor';
 
 export interface StartScreenProps {
   force: Force;
@@ -29,7 +30,7 @@ export interface StartScreenProps {
   week?: string;
 }
 
-type Tab = 'nexus' | 'boards' | 'progress' | 'units' | 'rules';
+type Tab = 'nexus' | 'boards' | 'progress' | 'units' | 'blueprints' | 'rules';
 const TAB_KEY = 'training-start-tab';
 const readTab = (): Tab | null => {
   try { return localStorage.getItem(TAB_KEY) as Tab | null; } catch { return null; }
@@ -40,7 +41,7 @@ const saveTab = (t: Tab) => {
 
 /** Before a run: a launch strip (your own run or the Weekly Siege, the difficulty, the record so far and any saved run),
  *  then tabs: the campaign's Nexus or the siege boards, progress (Final ladder, Drill Honours, feats), the units that
- *  can be crafted, and how to play. */
+ *  can be crafted, maze blueprints, and how to play. */
 export function StartScreen({ force, c, saved, cleared, siege, onSiege, mode, onMode, week = '' }: StartScreenProps) {
   const key = offTableKey(c, localDate());
   const units = force.units.filter(canTrain);
@@ -50,6 +51,7 @@ export function StartScreen({ force, c, saved, cleared, siege, onSiege, mode, on
     ...(siege ? [['boards', 'Boards'] as [Tab, string]] : nexus ? [['nexus', 'Nexus'] as [Tab, string]] : []),
     ['progress', siege ? 'Feats' : 'Progress'],
     ['units', `Units (${units.length})`],
+    ['blueprints', 'Blueprints'],
     ['rules', 'Rules'],
   ];
   const [picked, setPicked] = useState<Tab | null>(readTab);
@@ -115,6 +117,7 @@ export function StartScreen({ force, c, saved, cleared, siege, onSiege, mode, on
             </div>
           </>
         )}
+        {tab === 'blueprints' && <BlueprintEditor />}
         {tab === 'rules' && (
           <>
             {siege && (

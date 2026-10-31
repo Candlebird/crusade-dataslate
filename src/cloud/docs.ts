@@ -8,6 +8,7 @@ import type { FinishedBattle } from '../rules/tracker';
 import type { LocalDoc } from './sync';
 import { canWriteForce } from '../model/owner';
 import { ZONE_SAVE_PREFIX, type ZoneSave } from '../rules/zone/save';
+import { BLUEPRINT_PREFIX, type Blueprint } from '../rules/training/blueprint';
 
 export const IMG_PREFIX = 'img:';
 
@@ -98,6 +99,11 @@ export function localDocs(state: AppState, who: Who, images: Map<string, string>
     if (!z.owner) continue;
     docs.push({ path: `${ZONE_SAVE_PREFIX}${z.id}`, json: toCloudJson(z, images), updatedAt: z.updatedAt, canWrite: who.isGm || z.owner === who.email });
   }
+  // Maze blueprints, so a player has theirs on every device (one made before signing in stays on that device).
+  for (const b of state.blueprints ?? []) {
+    if (!b.owner) continue;
+    docs.push({ path: `${BLUEPRINT_PREFIX}${b.id}`, json: JSON.stringify(b), updatedAt: b.updatedAt, canWrite: who.isGm || b.owner === who.email });
+  }
   return docs;
 }
 
@@ -124,6 +130,11 @@ export function applyDoc(d: AppState, path: string, value: unknown): void {
     const rest = (d.zoneSaves ?? []).filter((z) => z.id !== zid);
     if (value !== null) rest.push(value as ZoneSave);
     d.zoneSaves = rest;
+  } else if (path.startsWith(BLUEPRINT_PREFIX)) {
+    const bid = path.slice(BLUEPRINT_PREFIX.length);
+    const rest = (d.blueprints ?? []).filter((b) => b.id !== bid);
+    if (value !== null) rest.push(value as Blueprint);
+    d.blueprints = rest;
   } else if (path === SETTINGS_PATH) {
     if (value !== null) d.settings = { ...d.settings, ...(value as ReturnType<typeof sharedSettings>) };
   } else if (path === CORE_RULES_PATH) {
