@@ -1,4 +1,4 @@
-import type { Campaign, CampaignEvent, Force } from '../model/types';
+import type { Campaign, CampaignEvent, Force, ForcePosition } from '../model/types';
 import { frontier, hexDistance, isPlaced } from './hexmap';
 import { PRODUCTION, homeChallengeBlock, stormed } from './nexus';
 import { hasBuilding } from './production';
@@ -182,4 +182,42 @@ export function applyMoves(c: Campaign, moves: Move[], forces: Force[], round?: 
 /** The game already recorded for a revealed attack this round, if it has been fought. */
 export function foughtFor(c: Campaign, a: Pick<Attack, 'factionId' | 'sectorId'>, round: number): CampaignEvent | undefined {
   return [...c.log].reverse().find((e) => e.round === round && e.sectorId === a.sectorId && e.attacker === a.factionId && !e.spread && !e.skirmish && !e.crisis && !e.marauder);
+}
+
+/** Before the GM moves a round's detachments: note where each mover stands, so an order can be changed afterwards. */
+export function noteMoveOrigins(c: Campaign, moves: Move[], round: number) {
+  const positions: Record<string, ForcePosition | null> = {};
+  for (const m of moves) positions[m.forceId] = c.positions?.[m.forceId] ?? null;
+  c.movedFrom = { round, positions };
+}
+
+/** Where a detachment stood before this round's moves were made: undefined if it wasn't moved by them. */
+export function moveOrigin(c: Campaign, forceId: string, round: number): ForcePosition | null | undefined {
+  if (c.movedOrders !== round || c.movedFrom?.round !== round || !(forceId in c.movedFrom.positions)) return undefined;
+  return c.movedFrom.positions[forceId];
+}
+
+/** The campaign as it was for this detachment's order: put back where it stood if this round's moves already moved it. */
+export function beforeMoves(c: Campaign, force: Force, round: number): Campaign {
+  const from = moveOrigin(c, force.id, round);
+  if (from === undefined) return c;
+  const positions = { ...(c.positions ?? {}) };
+  if (from) positions[force.id] = from;
+  else delete positions[force.id];
+  return { ...c, positions };
+}
+
+/**
+ * The GM changed a detachment's order after this round's moves were made: put it back where it started, then, if the
+ * new order is a move still in reach from there, make that move. Before the moves are made the map needs nothing.
+ */
+export function replaceMovedOrder(c: Campaign, force: Force, pick: string, round: number) {
+  if (c.movedOrders !== round || !force.nexus) return;
+  let from = moveOrigin(c, force.id, round);
+  if (from === undefined) {
+    from = c.positions?.[force.id] ?? null;
+    c.movedFrom = { round, positions: { ...(c.movedFrom?.round === round ? c.movedFrom.positions : {}), [force.id]: from } };
+  }
+  setPosition(c, force.id, from);
+  if (pick && pick !== HOLD && reach(c, force).get(pick)?.kind === 'move') setPosition(c, force.id, { sectorId: pick, factionId: force.nexus.factionId });
 }

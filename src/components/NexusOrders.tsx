@@ -6,7 +6,7 @@ import { detachmentName } from '../rules/detachments';
 import { aiDefended, ratingFor } from '../rules/difficulty';
 import { ECHOES, currentRound, factionName } from '../rules/nexus';
 import { moveOf, moveTargets, positionOf } from '../rules/movement';
-import { HOLD, applyMoves, digsIn, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
+import { HOLD, applyMoves, beforeMoves, digsIn, noteMoveOrigins, replaceMovedOrder, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
 import { nowIso } from '../model/factory';
 import { spreadsAt, nextThreat } from '../rules/rounds';
 import { echoMarks, holders } from '../rules/voidspawn';
@@ -203,36 +203,24 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
             const target = attacks.find((s) => s.id === picked) ?? moves.find((s) => s.id === picked);
             const isAttack = !!target && attacks.includes(target);
             const rating = isAttack && aiDefended(target!) ? ratingFor(target!, f.nexus!.factionId, c) : undefined;
-            const means = !picked ? <>Not declared yet: pick before the GM reveals, or it just stays where it is.</>
+            const means = (kind: OrderKind) => !picked ? (
+                kind === 'move' ? <>Pick where to move. Until you do, nothing is declared and it stays where it is.</>
+                : kind === 'attack' ? <>Pick which sector to attack. Until you do, nothing is declared and it stays where it is.</>
+                : <>Not declared yet: pick an order before the GM reveals, or it just stays where it is.</>)
               : picked === HOLD ? <>Stays at {at?.name ?? 'its sector'}.{digsIn(c, f) && ' Dug in: if attacked it fights and picks the deployment.'}{fx(at?.id)}</>
               : !target ? <>That sector is out of reach now: pick again.</>
-              : isAttack ? <>Attacks {target.name}: a battle against {rating !== undefined ? `its ${rating} Supply AI garrison` : factionName(c, target.owner)}, at the table
+              : isAttack ? <><span className="tag red">Attack</span> Fights for {target.name}: a battle against {rating !== undefined ? `its ${rating} Supply AI garrison` : factionName(c, target.owner)}, at the table
                 {zoneOn ? ' or as a zone battle' : !overrunBlock(target, f, c) ? ' or overrun (an auto-battle)' : ''}, from this panel after the reveal. Win and it moves in.</>
-              : <>Moves to {target.name} when the GM moves detachments after the reveal.{fx(target.id)}</>;
+              : <><span className="tag">Move</span> Moves to {target.name} with no battle, when the GM moves detachments after the reveal.{fx(target.id)}</>;
             return (
-              <label key={f.id} className="field">
-                <span>{label(f)} <span className="muted small" data-tip={why.join(', ')}>at {at?.name ?? '—'}, moves {move}</span></span>
-                <select value={own?.picks[f.id] ?? own?.picks[f.nexus!.factionId] ?? ''} onChange={(e) => pick(f.id, e.target.value)}>
-                  <option value="">— Not declared —</option>
-                  <option value={HOLD}>Hold: stay put, no attack{digsIn(c, f) ? ' · ⛊ digs in if attacked' : ''}{fx(at?.id)}</option>
-                  {moves.length > 0 && (
-                    <optgroup label="Move">
-                      {moves.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.owner ? factionName(c, s.owner) : 'empty space'}){fx(s.id)}</option>)}
-                    </optgroup>
-                  )}
-                  {attacks.length > 0 && (
-                    <optgroup label="Attack">
-                      {attacks.map((s) => {
-                        const rating = aiDefended(s) ? ratingFor(s, f.nexus!.factionId, c) : undefined;
-                        return <option key={s.id} value={s.id}>{s.name} ({factionName(c, s.owner)}){rating !== undefined ? ` — ${rating} Supply` : ''}{overrunBlock(s, f, c) ? '' : ' · ⚡ can overrun'}</option>;
-                      })}
-                    </optgroup>
-                  )}
-                </select>
-                <span className={`order-means${picked ? '' : ' muted'}`}>
-                  {picked && <span className="tag green" data-tip="Saved and sealed: you can change it until the GM reveals"><Icon name="l:lock" /> Locked in</span>} {means}
-                </span>
-              </label>
+              <OrderPicker
+                key={f.id}
+                head={<span>{label(f)} <span className="muted small" data-tip={why.join(', ')}>at {at?.name ?? '—'}, moves {move}</span></span>}
+                picked={picked}
+                onPick={(v) => pick(f.id, v)}
+                {...targetOptions(c, f)}
+                means={means}
+              />
             );
           })}
           <h3>Who has locked in</h3>
@@ -248,7 +236,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
           )}
         </>
       )}
-      {revealed && <RevealedOrders c={c} orders={orders} round={current.round} gm={cloud.isGm} />}
+      {revealed && <RevealedOrders c={c} orders={orders} round={current.round} gm={cloud.isGm} fb={fb} />}
       {revealed && cloud.isGm && (
         <div className="row" style={{ marginTop: 8 }}>
           <button onClick={openNext}>Open orders for the next game</button>
@@ -258,7 +246,79 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
   );
 }
 
-function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerOrders[]; round: number; gm: boolean }) {
+type OrderKind = '' | 'hold' | 'move' | 'attack';
+type OrderTarget = { id: string; text: string };
+
+/** A detachment's move and attack targets as dropdown entries (`at`: the campaign as it stood for the order). */
+function targetOptions(c: Campaign, f: Force, at: Campaign = c): { moves: OrderTarget[]; attacks: OrderTarget[] } {
+  const { moves, attacks } = moveTargets(at, f);
+  const fx = (id: string) => {
+    const t = standingEffects(c, id, f.nexus!.factionId);
+    return t.length ? ` · ${t.join(' · ')}` : '';
+  };
+  return {
+    moves: moves.map((s) => ({ id: s.id, text: `${s.name} (${s.owner ? factionName(c, s.owner) : 'empty space'})${fx(s.id)}` })),
+    attacks: attacks.map((s) => {
+      const r = aiDefended(s) ? ratingFor(s, f.nexus!.factionId, c) : undefined;
+      return { id: s.id, text: `${s.name} (${factionName(c, s.owner)})${r !== undefined ? ` — ${r} Supply` : ''}${overrunBlock(s, f, c) ? '' : ' · ⚡ can overrun'}` };
+    }),
+  };
+}
+
+/** One detachment's sealed order: first the kind of order, then (for a move or an attack) where. Two boxes so a move can't be picked by mistake for an attack. */
+function OrderPicker({ head, picked, onPick, moves, attacks, means, lockTip = 'Saved and sealed: you can change it until the GM reveals' }: {
+  head: ReactNode;
+  lockTip?: string;
+  picked: string;
+  onPick: (target: string) => void;
+  moves: OrderTarget[];
+  attacks: OrderTarget[];
+  means: (kind: OrderKind) => ReactNode;
+}) {
+  const kindOf = (p: string): OrderKind => p === HOLD ? 'hold' : attacks.some((s) => s.id === p) ? 'attack' : moves.some((s) => s.id === p) ? 'move' : '';
+  const [kind, setKind] = useState<OrderKind>(kindOf(picked));
+  // A saved pick (here or from another device) sets the kind; an empty one leaves a half-made choice alone.
+  useEffect(() => {
+    const k = kindOf(picked);
+    if (k) setKind(k);
+  }, [picked]);
+  const chooseKind = (k: OrderKind) => {
+    setKind(k);
+    if (k === 'hold') onPick(HOLD);
+    else if (kindOf(picked) !== k && picked) onPick('');
+  };
+  const targets = kind === 'move' ? moves : kind === 'attack' ? attacks : [];
+  return (
+    <div className="order-field">
+      {head}
+      <div className="order-picks">
+        <label>
+          <span>Order</span>
+          <select value={kind} onChange={(e) => chooseKind(e.target.value as OrderKind)}>
+            <option value="">— Not declared —</option>
+            <option value="hold">Hold: stay put, no battle</option>
+            <option value="move" disabled={!moves.length}>Move: go to a free or friendly sector, no battle{moves.length ? '' : ' (none in reach)'}</option>
+            <option value="attack" disabled={!attacks.length}>Attack: fight a battle for an enemy sector{attacks.length ? '' : ' (none in reach)'}</option>
+          </select>
+        </label>
+        {(kind === 'move' || kind === 'attack') && (
+          <label>
+            <span>{kind === 'move' ? 'Move to' : 'Attack'}</span>
+            <select className={kind === 'attack' ? 'order-attack' : undefined} value={kindOf(picked) === kind ? picked : ''} onChange={(e) => onPick(e.target.value)}>
+              <option value="">{kind === 'move' ? '— Pick where to move —' : '— Pick a sector to attack —'}</option>
+              {targets.map((s) => <option key={s.id} value={s.id}>{s.text}</option>)}
+            </select>
+          </label>
+        )}
+      </div>
+      <span className={`order-means${picked ? '' : ' muted'}`}>
+        {picked && <span className="tag green" data-tip={lockTip}><Icon name="l:lock" /> Locked in</span>} {means(kind)}
+      </span>
+    </div>
+  );
+}
+
+function RevealedOrders({ c, orders, round, gm, fb }: { c: Campaign; orders: PlayerOrders[]; round: number; gm: boolean; fb: Firebase }) {
   const { state, update } = useStore();
   const cloud = useCloud();
   const { attacks, moves, holds } = revealOrders(c, orders, round, state.forces);
@@ -281,6 +341,7 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
     let n = 0;
     update((s) => {
       if (!s.campaign) return;
+      noteMoveOrigins(s.campaign, moves, round);
       n = applyMoves(s.campaign, moves, s.forces, round);
       s.campaign.movedOrders = round;
       s.campaign.updatedAt = nowIso();
@@ -311,7 +372,8 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
     go(href.tracker());
     toast('On the tracker: press ⚡ Auto-battle, then finish to log it.');
   };
-  if (!attacks.length && !moves.length && !holds.length) return <p className="muted small">Nobody declared this round.</p>;
+  const adjust = gm && <AdjustOrders c={c} orders={orders} round={round} fb={fb} />;
+  if (!attacks.length && !moves.length && !holds.length) return <><p className="muted small">Nobody declared this round.</p>{adjust}</>;
   return (
     <>
       {moves.map((m) => (
@@ -377,7 +439,90 @@ function RevealedOrders({ c, orders, round, gm }: { c: Campaign; orders: PlayerO
       {holds.map((h) => (
         <div key={h.forceId ?? h.factionId} className="list-item small"><span className="grow"><b>{who(h.factionId, h.forceId)}</b> holds{dug(h.forceId) && <span className="tag" style={{ marginLeft: 6 }} data-tip="If its sector is attacked this round, it fights and picks the deployment"><Icon name="g:trench-spade" /> Dug in</span>}</span></div>
       ))}
+      {adjust}
     </>
+  );
+}
+
+/**
+ * GM only, after the reveal: change any detachment's order (a player picked a move meaning an attack, say). It's saved
+ * over the player's order; if the detachments were already moved, the changed one goes back to where it started first.
+ */
+function AdjustOrders({ c, orders, round, fb }: { c: Campaign; orders: PlayerOrders[]; round: number; fb: Firebase }) {
+  const { state, update } = useStore();
+  const cloud = useCloud();
+  const [open, setOpen] = useState(false);
+  const sectorName = (id: string) => c.sectors.find((s) => s.id === id)?.name ?? 'Deleted sector';
+  if (!open) return (
+    <div className="row" style={{ marginTop: 8 }}>
+      <button className="small" onClick={() => setOpen(true)} data-tip="Change a detachment's order after the reveal"><Icon name="l:pencil" /> Adjust orders</button>
+    </div>
+  );
+  const forces = state.forces
+    .filter((f) => f.nexus && c.factions.some((x) => x.id === f.nexus!.factionId))
+    .sort((a, b) => factionName(c, a.nexus!.factionId).localeCompare(factionName(c, b.nexus!.factionId)) || a.name.localeCompare(b.name));
+  return (
+    <div className="order-adjust">
+      <div className="row">
+        <h3 className="grow">Adjust orders</h3>
+        <button className="small" onClick={() => setOpen(false)}>Done</button>
+      </div>
+      <p className="muted small">
+        GM only: change what a detachment was ordered to do this round. It's saved over the player's order.
+        {c.movedOrders === round && ' The detachments have already moved: a changed one goes back to where it started, and a new move is made straight away.'}
+      </p>
+      {forces.map((f) => {
+        const fid = f.nexus!.factionId;
+        // Whose orders hold this detachment's pick: the player who declared it, else its owner (or the GM's own).
+        const doc = orders.find((o) => o.round === round && (f.id in o.picks || fid in o.picks))
+          ?? orders.find((o) => o.round === round && o.email === (f.owner ?? cloud.email));
+        const email = doc?.email ?? f.owner ?? cloud.email;
+        const picks = doc?.picks ?? {};
+        const picked = picks[f.id] ?? picks[fid] ?? '';
+        const label = detachmentName(c, state.forces, f);
+        const siege = siegeOf(c, f.id);
+        if (siege) return (
+          <div key={f.id} className="order-field">
+            <span>{label}</span>
+            <span className="muted small"><Icon name="g:camping-tent" /> Besieging {sectorName(siege.sectorId)}: lift the siege above to give it another order.</span>
+          </div>
+        );
+        const at = beforeMoves(c, f, round);
+        const from = positionOf(at, f);
+        const save = (v: string) => {
+          if (!email) return void toast('Nobody to save this order for: give the force an owner.', 'error');
+          const next = { ...picks };
+          delete next[fid];
+          if (v) next[f.id] = v;
+          else delete next[f.id];
+          fb.saveOrders(email, round, next).then(() => {
+            update((s) => {
+              if (!s.campaign) return;
+              const before = JSON.stringify([s.campaign.positions, s.campaign.movedFrom]);
+              replaceMovedOrder(s.campaign, f, v, round);
+              if (JSON.stringify([s.campaign.positions, s.campaign.movedFrom]) !== before) s.campaign.updatedAt = nowIso();
+            });
+            toast(`${label}'s order changed.`);
+          }, (err: unknown) => toast(`Couldn't change the order: ${errorText(err)}`, 'error'));
+        };
+        const means = (kind: OrderKind) => !picked
+          ? (kind === 'move' || kind === 'attack' ? <>Pick a sector.</> : <>No order: it stays where it is.</>)
+          : picked === HOLD ? <>Holds at {from?.name ?? 'its sector'}.</>
+          : kind === 'attack' ? <><span className="tag red">Attack</span> Attacks {sectorName(picked)}.</>
+          : <><span className="tag">Move</span> Moves to {sectorName(picked)}.</>;
+        return (
+          <OrderPicker
+            key={f.id}
+            head={<span>{label} <span className="muted small">{email && email !== f.owner ? `declared by ${email}, ` : ''}from {from?.name ?? '—'}</span></span>}
+            picked={picked}
+            onPick={save}
+            {...targetOptions(c, f, at)}
+            means={means}
+            lockTip="The order as it stands now"
+          />
+        );
+      })}
+    </div>
   );
 }
 

@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { newForce } from '../model/factory';
 import type { Campaign } from '../model/types';
 import { emptyNexus } from './nexus';
-import { HOLD, applyMoves, attackTargets, foughtFor, myDetachments, playedDetachments, revealOrders } from './orders';
+import { HOLD, applyMoves, attackTargets, beforeMoves, foughtFor, myDetachments, noteMoveOrigins, playedDetachments, replaceMovedOrder, revealOrders } from './orders';
+import { positionOf } from './movement';
 import { callMeeting, meetingState, meetings, settleMeeting } from './meetings';
 
 // A row of hexes: A's home and planet, then B's planet and home, with an unclaimed sector under the border.
@@ -35,6 +36,31 @@ const force = (owner: string | undefined, factionId: string, name = 'F') => {
 };
 
 describe('sealed orders', () => {
+  it('lets the GM change an order after the moves were made, putting the detachment back first', () => {
+    const c = campaign();
+    const a = force('me@x', 'A');
+    c.positions = { [a.id]: { sectorId: 'p1', factionId: 'A' } };
+    const r = revealOrders(c, [{ email: 'me@x', round: 1, picks: { [a.id]: 'hA' } }], 1, [a]);
+    expect(r.moves.map((m) => m.sectorId)).toEqual(['hA']);
+    noteMoveOrigins(c, r.moves, 1);
+    applyMoves(c, r.moves, [a], 1);
+    c.movedOrders = 1;
+    expect(positionOf(c, a)?.id).toBe('hA');
+    expect(positionOf(beforeMoves(c, a, 1), a)?.id).toBe('p1');
+    // It meant to attack: back to where it started.
+    replaceMovedOrder(c, a, 'p2', 1);
+    expect(positionOf(c, a)?.id).toBe('p1');
+    // Changed back to the move: made straight away.
+    replaceMovedOrder(c, a, 'hA', 1);
+    expect(positionOf(c, a)?.id).toBe('hA');
+    // A detachment that held, now given a move after the moves were made: it moves, and its start is remembered.
+    const b = force('you@x', 'A', 'G');
+    c.positions![b.id] = { sectorId: 'p1', factionId: 'A' };
+    replaceMovedOrder(c, b, 'hA', 1);
+    expect(positionOf(c, b)?.id).toBe('hA');
+    expect(positionOf(beforeMoves(c, b, 1), b)?.id).toBe('p1');
+  });
+
   it('offers only sectors next to the faction', () => {
     expect(attackTargets(campaign(), 'A').map((s) => s.id)).toEqual(['x', 'p2']);
     expect(attackTargets(campaign(), 'B').map((s) => s.id)).toEqual(['x', 'p1']);

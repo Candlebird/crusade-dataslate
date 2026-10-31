@@ -761,6 +761,8 @@ export interface Campaign {
   marauders?: Marauder[];
   /** The last round whose revealed moves the GM has applied. */
   movedOrders?: number;
+  /** Where the detachments moved by that round's orders stood before (null: at their faction's home), so the GM can change an order afterwards. */
+  movedFrom?: { round: number; positions: Record<string, ForcePosition | null> };
   /** Meeting engagements for one orders round (rules/meetings.ts): each side's call and each fight's winner ('' a draw), by meeting key. */
   meetings?: { round: number; calls: Record<string, Record<string, MeetingCall>>; results: Record<string, string>;
     /** Auto-battled fights' war stories, by meeting key. */

@@ -50,13 +50,15 @@ service cloud.firestore {
       allow read: if player();
       allow write: if gm();
     }
+    // The GM can also correct anyone's orders for the current round (after the reveal, say).
+    function gmFixing() { return gm() && exists(/databases/$(database)/documents/orderRound/current) && request.resource.data.round == round().round; }
     match /orders/{id} {
       allow read: if own(id) || (player() && round().revealed == true);
-      allow create, update: if own(id) && player() && sealing();
+      allow create, update: if (own(id) && player() && sealing()) || gmFixing();
     }
     match /declared/{id} {
       allow read: if player();
-      allow create, update: if own(id) && player() && sealing();
+      allow create, update: if (own(id) && player() && sealing()) || gmFixing();
     }
 
     // Painting Backlog (candlebird.github.io/painting-backlog): paint progress, keyed by unit id, or "x-…" for models
