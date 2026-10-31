@@ -23,12 +23,13 @@ const ran = (checks: number[], mode?: RunMode): TrainingRun =>
   Object.assign(blankRun(), { siege: NEW, wave: checks.length * 10, cleared: checks.length * 10 - 1, phase: 'over', checks, finale: newFinale(TRAINING.finale.from, NEW), ...(mode ? { mode } : {}) });
 
 describe('mode multipliers', () => {
-  it('ramp from 1 at wave 1 to the whole multiplier at rampTo', () => {
+  it('ramp from 1 at wave 1 to the whole multiplier at rampTo, by the same factor each wave', () => {
     const run = { modeHp: 13 };
     expect(modeHpAt(run, 1)).toBe(1);
     expect(modeHpAt(run, M.rampTo)).toBe(13);
     expect(modeHpAt(run, 40)).toBe(13);
-    expect(modeHpAt(run, 1 + (M.rampTo - 1) / 2)).toBeCloseTo(7);
+    expect(modeHpAt(run, 1 + (M.rampTo - 1) / 2)).toBeCloseTo(Math.sqrt(13));
+    expect(modeHpAt(run, 2) / modeHpAt(run, 1)).toBeCloseTo(modeHpAt(run, 3) / modeHpAt(run, 2));
     expect(modeHpAt({}, 20)).toBe(1);
   });
 

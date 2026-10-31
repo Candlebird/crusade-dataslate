@@ -8,8 +8,9 @@ import { FORCES, seasoned } from './testForces';
 // Balance: Hard and Insane, tuned from a real force that dealt 60,000 to the W44 colossus. The bot stands in for that
 // force: each sample force (seasoned to veterancy 700) has its waves' wounds divided by its "strength", 60,000 over its
 // own damage to the old wave-25 colossus, so the bot plays as a force that would deal 60,000 there. Hard (the mode's
-// multiplier on top) should leave it reaching the siege's last check, or winning the Final at 25, only some of the time;
-// Insane (twice Hard's) next to never.
+// multiplier on top) should leave it reaching the siege's last check, or winning the Final at 25, most of the time;
+// Insane (twice Hard's) less than half the time. (Eased from the first tuning, x12/x14 and x24/x28 on an even ramp,
+// which players found too much: Insane leaked on wave 2.)
 
 const TARGET = 60_000;
 const OLD_WEEKS = ['2026-W40', '2026-W41', '2026-W42'];
@@ -25,7 +26,7 @@ const median = (xs: number[]) => {
 };
 
 describe('Hard and Insane (bot)', () => {
-  it('Hard is a hard win for a 60,000 force; Insane next to impossible', async () => {
+  it('a 60,000 force mostly beats Hard and mostly falls to Insane', async () => {
     const forces = FORCES.map((f) => ({ ...f, units: seasoned(f.units, VET) }));
     // Each force's strength: 60,000 over its median damage to the old colossus.
     const old = await runBots(forces.flatMap((f) => OLD_WEEKS.map((w) => ({ units: f.units, seed: weekSeed(w), siege: w, maxWaves: 30 }))));
@@ -57,12 +58,11 @@ describe('Hard and Insane (bot)', () => {
     const train = await sweep('train', grid('train'), (units, k) => ({ units, seed: SEEDS[k], final: TRAINING.finale.from, maxWaves: TRAINING.finale.from }), SEEDS.map((_, k) => k), (o) => !!o.won);
     console.log(rows.join('\n'));
     if (SWEEP) return;
-    // Hard: a 60,000 force gets through some of the time, not always; Insane: next to never.
+    // Hard: a 60,000 force gets through most of the time; Insane: less than half the time.
     const M = TRAINING.modes;
     for (const [r, m] of [[siege, 'siege'], [train, 'train']] as const) {
-      expect(median(r.all(M.hard[m])), `${m} on Hard`).toBeGreaterThanOrEqual(0.25);
-      expect(median(r.all(M.hard[m])), `${m} on Hard`).toBeLessThanOrEqual(0.9);
-      expect(median(r.all(M.insane[m])), `${m} on Insane`).toBeLessThanOrEqual(0.25);
+      expect(median(r.all(M.hard[m])), `${m} on Hard`).toBeGreaterThanOrEqual(0.5);
+      expect(median(r.all(M.insane[m])), `${m} on Insane`).toBeLessThan(0.5);
     }
   }, 1_200_000);
 });

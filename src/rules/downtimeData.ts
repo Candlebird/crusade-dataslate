@@ -735,17 +735,18 @@ export const TRAINING = {
   },
   /**
    * Hard and Insane (training/modes.ts): the waves' wounds times `siege` (a Weekly Siege) or `train` (any other run),
-   * rising from 1 at wave 1 to the whole of it by wave `rampTo` (the first waves stay a Shard's to hold). Tuned from a
-   * force that dealt 60,000 to the W44 colossus (the bot, its waves eased to play as that force, gets through half the
-   * time at about x14, x8 to x20 by force, a little more at the Final): on Hard it reaches the siege's last check, or wins the Final at 25, only
-   * some of the time; Insane asks twice that strength and next to never falls that way (modes.balance.test.ts). `reward`: the damage checks' and milestones'
+   * rising from 1 at wave 1 by the same factor each wave to the whole of it by wave `rampTo` (the first waves stay a
+   * Shard's to hold). Tuned from a force that dealt 60,000 to the W44 colossus (the bot, its waves eased to play as that
+   * force): on Hard it reaches the siege's last check, or wins the Final at 25, most of the time; on Insane (twice Hard)
+   * less than half the time (modes.balance.test.ts). 20% under the first tuning (x12/x14, x24/x28 on an even ramp,
+   * which leaked on wave 2 on Insane). `reward`: the damage checks' and milestones'
    * rewards times this, rounded up. A siege's modes start with the damage checks (siege.checksFrom); the colossus is the
    * same in every mode, and each mode has its own boards.
    */
   modes: {
     rampTo: 10,
-    hard: { name: 'Hard', siege: 12, train: 14, reward: 1.5 },
-    insane: { name: 'Insane', siege: 24, train: 28, reward: 2 },
+    hard: { name: 'Hard', siege: 9.5, train: 11, reward: 1.5 },
+    insane: { name: 'Insane', siege: 19, train: 22, reward: 2 },
   },
   /**
    * Final waves (training/finale.ts, veterancy.ts). A run has a Final wave: `from` at first, `step` more for each step
