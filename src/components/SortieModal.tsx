@@ -24,6 +24,7 @@ import {
 import { SORTIE_BOSSES, SORTIE_REGIONS, type SortieSignature } from '../rules/sortieStory';
 import { Modal, confirmAction, toast } from './ui';
 import { EmblemBadge, Portrait } from './Emblem';
+import { WeekCountdown } from './WeekCountdown';
 import { Glyph, Icon, IconText, SvgIcon, type IconName } from './Icon';
 
 const NODE_ICON: Record<SortieNodeKind, IconName> = {
@@ -438,6 +439,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                 Same region, Echo lord and map for every force this week: a long run at {SORTIE.tiers[SORTIE.weekly.tier].name}, no grudges or deep regions.
                 Score: {SORTIE.weekly.depth} per node, {SORTIE.weekly.won} per fight won, {SORTIE.weekly.boss} for the lord, {SORTIE.weekly.alive} per unit standing.
               </p>
+              <div className="small" style={{ marginTop: 4 }}><WeekCountdown /></div>
               <WeekBoard c={c} week={week} forceId={force.id} recaps={story?.recaps} />
             </>
           ) : <>

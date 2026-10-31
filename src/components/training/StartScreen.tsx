@@ -10,6 +10,7 @@ import { FeatList } from '../Feats';
 import { DrillTrack } from './DrillTrack';
 import { FinaleTrack } from './FinaleTrack';
 import { SiegeBoards, SiegeRules } from './SiegePanel';
+import { WeekCountdown } from '../WeekCountdown';
 import { Portrait } from '../Emblem';
 
 export interface StartScreenProps {
@@ -69,6 +70,7 @@ export function StartScreen({ force, c, saved, cleared, siege, onSiege, mode, on
         )}
         {onMode && modes && <ModePicker mode={mode} onMode={onMode} siege={!!siege} />}
         <div className="training-launch-facts small">{launchFacts(force, siege)}</div>
+        {siege && <div className="small"><WeekCountdown /></div>}
         {cleared && !saved && <div className="small training-cleared">Training was updated; your saved run was cleared.</div>}
         {saved && (
           <div className="small training-saved">
