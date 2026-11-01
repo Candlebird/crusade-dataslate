@@ -65,6 +65,11 @@ export const NEXUS_ROUNDS = {
    * `echoMarks` more of its sectors each round, and Marauders find its worlds `marauderWeight` times as tempting.
    */
   runaway: { lead: 3, supplyRp: 2, expansion: 1.5, echoMarks: 1, marauderWeight: 2 },
+  /**
+   * Notoriety, a handicap the GM sets per faction (0 to this): each level, the Echoes mark one more of its own sectors
+   * each round once the opening rounds are over, on top of everything else. Nobody else's marks change.
+   */
+  notorietyMax: 3,
   /** Rounds 1 to this: no home-sector challenges, and the Echoes only spread into unclaimed sectors. */
   graceRounds: 3,
   /** Threat starts here and stays between 0 and `threatMax`. */

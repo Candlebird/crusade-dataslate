@@ -20,7 +20,8 @@ import GameNightPanel from './GameNight';
 import WarRoomPanel from './WarRoom';
 import type { Focus } from './HexMap';
 import { useImporter } from './importer';
-import { Dropzone, Loading, Panel, TextField, confirmAction, toast } from './ui';
+import { Dropzone, Loading, Panel, Stepper, TextField, confirmAction, toast } from './ui';
+import { NEXUS_ROUNDS } from '../rules/nexusData';
 import { localDate } from '../model/date';
 import { Glyph, Icon } from './Icon';
 import { lazyPage } from './lazyPage';
@@ -382,7 +383,7 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
       {c.factions.length === 0 ? <p className="muted small">No factions yet. Each one gets a home sector.</p> : (
         <div className="table-wrap">
           <table className="compact stack">
-            <thead><tr><th /><th>Faction</th><th>Player</th><th>Sectors</th><th>Linked forces here</th><th /></tr></thead>
+            <thead><tr><th /><th>Faction</th><th>Player</th><th data-tip="A handicap: the Echoes mark this many more of the faction's own sectors each round.">Notoriety</th><th>Sectors</th><th>Linked forces here</th><th /></tr></thead>
             <tbody>
               {c.factions.map((fa) => {
                 const owned = ownedSectors(c, fa.id);
@@ -398,6 +399,9 @@ function FactionsPanel({ c, setC }: { c: Campaign; setC: SetC }) {
                       x.name = v;
                     })} /></td>
                     <td className="s-full" data-label="Player"><TextField value={fa.player} placeholder="Player" onCommit={(v) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.player = v; })} /></td>
+                    <td className="s-end" data-label="Notoriety" data-tip="A handicap: the Echoes mark this many more of the faction's own sectors each round (after the opening rounds).">
+                      <Stepper value={fa.notoriety ?? 0} min={0} onChange={(n) => setC((d) => { const x = d.factions.find((y) => y.id === fa.id); if (x) x.notoriety = Math.min(n, NEXUS_ROUNDS.notorietyMax) || undefined; })} />
+                    </td>
                     <td className="small s-full" data-label="Sectors">
                       {owned.map((s) => <span key={s.id} className={`tag${s.type === 'home' ? ' gold' : ''}`} data-tip={benefitOf(s)?.desc ?? SECTOR_TYPES[s.type].desc}>{s.name}</span>)}
                     </td>

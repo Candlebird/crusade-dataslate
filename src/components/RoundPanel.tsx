@@ -176,6 +176,7 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
               {ahead.has(f.id) && (far.has(f.id)
                 ? <span data-tip="Far ahead: Increase Supply and Forced Expansion cost more, the Echoes mark one more of its sectors and Marauders go for its worlds first."> · far ahead</span>
                 : ' · leading')}
+              {(f.notoriety ?? 0) > 0 && <span data-tip={`Notoriety ${f.notoriety}: the Echoes mark ${f.notoriety} more of its own sectors each round.`}> · notorious {f.notoriety}</span>}
               {(behind[f.id] ?? 0) > 0 && ` · catch-up +${umbraShards(behind[f.id])}, +${Math.round(behind[f.id] / NEXUS_ROUNDS.underdogUs) * NEXUS_ROUNDS.underdogSupply} Supply`}
             </span>
           ))}

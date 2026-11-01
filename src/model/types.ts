@@ -617,6 +617,8 @@ export interface CampaignFaction {
   name: string;
   player: string;
   color: string;
+  /** Notoriety the GM sets (0 to NEXUS_ROUNDS.notorietyMax): the Echoes mark this many more of its own sectors each round. */
+  notoriety?: number;
   /** Research points not spent yet (the tech tree, rules/tech.ts). */
   research?: number;
   /** BUILDINGS ids researched (tier 1 is known without being listed). */

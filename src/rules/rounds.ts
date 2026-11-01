@@ -162,6 +162,13 @@ export function placeEchoMarks(c: Campaign, rand: Rand = Math.random, threat = t
         if (target) marks.push({ sectorId: target.id });
       }
     }
+    // Notoriety (a handicap the GM sets): so many more marks, on the faction's own sectors only.
+    for (const f of c.factions) {
+      for (let i = 0; i < Math.min(f.notoriety ?? 0, NEXUS_ROUNDS.notorietyMax); i++) {
+        const target = pickSpread(c, rand, weight, (s) => s.owner === f.id && only(s));
+        if (target) marks.push({ sectorId: target.id });
+      }
+    }
   }
   c.echoMarks = { round: currentRound(c), marks };
   return marks;

@@ -40,6 +40,18 @@ describe('Echo marks', () => {
     expect(echoMarks(c)).toBe(marks);
   });
 
+  it('mark so many more of a notorious faction’s own sectors, and nobody else’s more', () => {
+    const plain = placeEchoMarks(campaign(), () => 0, 0);
+    const c = campaign();
+    c.factions[0].notoriety = 2;
+    const marks = placeEchoMarks(c, () => 0, 0);
+    expect(marks.slice(0, plain.length)).toEqual(plain);
+    const extra = marks.slice(plain.length).map((m) => owner(c, m.sectorId));
+    expect(extra).toHaveLength(2);
+    expect(extra.every((o) => o === 'A')).toBe(true);
+    expect(placeEchoMarks({ ...campaign(), round: 2, factions: c.factions }, () => 0.5).map((m) => m.sectorId)).toEqual(['u']);
+  });
+
   it('mark only unclaimed space in the opening rounds', () => {
     const c = { ...campaign(), round: 2 };
     expect(placeEchoMarks(c, () => 0.5).map((m) => m.sectorId)).toEqual(['u']);
