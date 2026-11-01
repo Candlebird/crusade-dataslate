@@ -745,6 +745,8 @@ export const TRAINING = {
    */
   modes: {
     rampTo: 15,
+    /** A boss's wounds take the multiplier to this power (Hard x11 is x3.3 on the boss); its escorts take all of it. */
+    bossShare: 0.5,
     hard: { name: 'Hard', siege: 9.5, train: 11, reward: 1.5 },
     insane: { name: 'Insane', siege: 19, train: 22, reward: 2 },
   },

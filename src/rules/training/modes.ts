@@ -1,4 +1,4 @@
-import { TRAINING } from '../downtimeData';
+import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { hasChecks } from './siege';
 import type { RunMode, SpawnPlan, TrainingRun } from './types';
 
@@ -28,8 +28,13 @@ export function modeHpAt(run: Pick<TrainingRun, 'modeHp'>, w: number): number {
 
 /** A wave's plans with the mode's wounds on them (the siege colossus is set afterwards, the same in every mode). */
 export function modePlan(run: Pick<TrainingRun, 'modeHp' | 'hpFlat'>, w: number, plans: SpawnPlan[]): SpawnPlan[] {
-  const mul = modeHpAt(run, w) * (run.hpFlat ?? 1);
-  if (mul !== 1) for (const p of plans) p.hp *= mul;
+  const mode = modeHpAt(run, w);
+  const flat = run.hpFlat ?? 1;
+  if (mode === 1 && flat === 1) return plans;
+  // A boss takes only the mode's multiplier to the power bossShare (its escorts the whole of it): one Echo the maze must
+  // bring down in one pass, and the boss offer of cards rides on slaying it.
+  const boss = mode ** M.bossShare * flat;
+  for (const p of plans) p.hp *= TRAINING_ENEMIES[p.kind].spawn === 'boss' ? boss : mode * flat;
   return plans;
 }
 
