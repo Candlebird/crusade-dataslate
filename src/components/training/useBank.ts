@@ -7,7 +7,7 @@ import { bankOffTableXp, offTableKey } from '../../rules/downtime';
 import { awardFeats, featFaction, trainingFeats, trainingRepeats } from '../../rules/feats';
 import { weekKey } from '../../rules/sortie';
 import {
-  bankDrill, bankFinale, checkDmg, bankHonours, bankShared, drillNews, featFacts, lordsSlain, modeName, mvp, payMilestones, postSiege, settleSieges, siegeDmg, siegeScore, takeXp, type TrainingRun,
+  bestAfter, bankDrill, bankFinale, checkDmg, bankHonours, bankShared, drillNews, featFacts, lordsSlain, modeName, mvp, payMilestones, postSiege, settleSieges, siegeDmg, siegeScore, takeXp, type TrainingRun,
 } from '../../rules/training';
 import { toast } from '../ui';
 import { siegeWinLine } from './useSiegeSettle';
@@ -76,7 +76,7 @@ export function useBank(force: Force, c?: Campaign, onBanked?: (news: BankNews) 
       // Before the best moves: a new best is a highlight. Tales carry the campaign round, for the chronicle.
       const round = f.nexus?.factionId && c ? c.round ?? 1 : undefined;
       honours = bankHonours(f, run, localDate(), uid, round);
-      if (run.cleared > (f.trainingBest ?? 0)) f.trainingBest = run.cleared;
+      Object.assign(f, bestAfter(f, run));
       // Quirks, the bestiary and a slain nemesis go to the Sortie side with the XP.
       shared = bankShared(f, run);
       // The Victory, Endless depth and the Final it opens, before the Drill's news (Win at N goals read it).

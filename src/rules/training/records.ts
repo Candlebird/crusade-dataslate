@@ -1,4 +1,5 @@
 import type { Force, ForceTale, TrainingRecord, Unit } from '../../model/types';
+import type { RunMode } from './types';
 import { TRAINING } from '../downtimeData';
 import { unitTowers } from './board';
 import { finalBoss } from './finale';
@@ -11,6 +12,21 @@ import type { RunHonours, TitleGain, TrainingRun, UnitTower } from './types';
 // Training records (F4): what each crafted unit did over every run it stood in (Unit.trainingRecord), the titles a
 // run earns, and the tales it tells. runHonours works it out without touching the force (the summary shows it);
 // bankHonours hands it over once, beside the XP and the Sortie layer (useBank.finish).
+
+/** A force's most waves cleared in one run of a difficulty. Before they were kept apart, the force's best counts as Normal's
+ *  (Hard and Insane came later, and seldom go as far). */
+export function bestOf(f: Pick<Force, 'trainingBest' | 'trainingBests'>, mode?: RunMode): number {
+  const key = mode ?? 'normal';
+  return f.trainingBests?.[key] ?? (key === 'normal' ? f.trainingBest ?? 0 : 0);
+}
+
+/** The force's bests after a run: overall and its difficulty's. */
+export function bestAfter(f: Pick<Force, 'trainingBest' | 'trainingBests'>, run: Pick<TrainingRun, 'cleared' | 'mode'>): Pick<Force, 'trainingBest' | 'trainingBests'> {
+  const bests = { normal: bestOf(f), ...f.trainingBests };
+  const key = run.mode ?? 'normal';
+  bests[key] = Math.max(bests[key] ?? 0, run.cleared);
+  return { trainingBest: Math.max(f.trainingBest ?? 0, run.cleared), trainingBests: bests };
+}
 
 export const blankRecord = (): TrainingRecord => ({ best: 0, kills: 0, lords: 0, runs: 0, mvps: 0 });
 

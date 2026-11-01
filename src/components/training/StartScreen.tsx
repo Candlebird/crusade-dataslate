@@ -5,7 +5,7 @@ import { levelForXp } from '../../rules/engine';
 import { unitName } from '../../rules/battle';
 import { OFF_TABLE_XP, TRAINING } from '../../rules/downtimeData';
 import { offTableKey, offTableLeft } from '../../rules/downtime';
-import { canTrain, finaleOpen, finalWon, nexusLines, MODES, modeName, modesOpen, nexusOf, pickNemesis, type RunMode, type SavedRun } from '../../rules/training';
+import { bestOf, canTrain, finaleOpen, finalWon, nexusLines, MODES, modeName, modesOpen, nexusOf, pickNemesis, type RunMode, type SavedRun } from '../../rules/training';
 import { FeatList } from '../Feats';
 import { DrillTrack } from './DrillTrack';
 import { FinaleTrack } from './FinaleTrack';
@@ -155,7 +155,10 @@ function launchFacts(force: Force, siege?: boolean): string {
   if (siege) return 'The same map and waves for every force this week. Try as often as you like; your best counts.';
   const won = finalWon(force);
   const deep = force.finale?.endless ?? 0;
-  const bits = [force.trainingBest ? `${force.trainingBest} waves` : '', won ? `Victory at ${won}` : '', deep ? `Endless +${deep}` : ''].filter(Boolean);
+  const hard = MODES.map((m) => [modeName(m), bestOf(force, m)] as const).filter(([, n]) => n);
+  const best = bestOf(force);
+  const waves = best || hard.length ? [`${best} waves`, ...hard.map(([name, n]) => `${name} ${n}`)].join(' · ') : '';
+  const bits = [waves, won ? `Victory at ${won}` : '', deep ? `Endless +${deep}` : ''].filter(Boolean);
   return `Final wave ${finaleOpen(force)}${bits.length ? ` · Best: ${bits.join(', ')}` : ''}`;
 }
 

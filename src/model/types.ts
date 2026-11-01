@@ -5,6 +5,7 @@ import type { SymbolShape } from './emblemSymbols';
 import type { ZoneSave } from '../rules/zone/save';
 import type { Blueprint } from '../rules/training/blueprint';
 import type { CloudRun } from '../rules/training/cloudRun';
+import type { RunMode } from '../rules/training/types';
 
 export interface WeaponTrait {
   id: string;
@@ -414,6 +415,8 @@ export interface Force {
   lists?: ArmyList[];
   /** Most waves cleared in one training run (rules/training.ts). */
   trainingBest?: number;
+  /** Most waves cleared in one training run of each difficulty (rules/training/records.ts bestAfter). */
+  trainingBests?: Partial<Record<'normal' | RunMode, number>>;
   /** Training highlights, newest first (rules/training/tales.ts; TRAINING.records.keep). */
   tales?: ForceTale[];
   /** Drill Honour counts (rules/training/drillBank.ts): what unlocks luck, cards and perks in Training. */

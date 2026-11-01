@@ -747,6 +747,8 @@ export const TRAINING = {
     rampTo: 15,
     /** A boss's wounds take the multiplier to this power (Hard x11 is x3.3 on the boss); its escorts take all of it. */
     bossShare: 0.5,
+    /** A boss on these waves has this share of its wounds besides (Hard and Insane only): the wave-15 Lord, Normal's toughest, lands as the ramp tops out. */
+    bossWave: { 15: 0.9 } as Record<number, number>,
     hard: { name: 'Hard', siege: 9.5, train: 11, reward: 1.5 },
     insane: { name: 'Insane', siege: 19, train: 22, reward: 2 },
   },

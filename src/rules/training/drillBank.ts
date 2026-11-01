@@ -1,7 +1,7 @@
 import type { DrillStats, Force } from '../../model/types';
 import { bankBeasts } from './bestiary';
 import { DRILL_GOALS, drillEarned, drillStats, unlockText } from './drill';
-import { runHonours } from './records';
+import { bestAfter, runHonours } from './records';
 import { checkDmg, siegeDmg, siegeScore } from './siege';
 import { bestChecks } from './siegeBoard';
 import type { TrainingRun } from './types';
@@ -60,7 +60,7 @@ export function drillPreview(f: Force, run: TrainingRun): number[] {
   const sortie = structuredClone(f.sortie ?? {});
   bankBeasts(sortie, run);
   const after: Force = {
-    ...f, units, sortie, drill: statsAfter(drillStats(f), run), trainingBest: Math.max(f.trainingBest ?? 0, run.cleared),
+    ...f, units, sortie, drill: statsAfter(drillStats(f), run), ...bestAfter(f, run),
     finale: finaleAfter(f, run, ''),
   };
   const before = drillEarned(f);

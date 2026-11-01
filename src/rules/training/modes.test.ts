@@ -35,9 +35,17 @@ describe('mode multipliers', () => {
 
   it('multiply the wave plans, a boss by only the square root', () => {
     const plans = [{ kind: 'lord', hp: 10 }, { kind: 'drone', hp: 4 }] as SpawnPlan[];
-    modePlan({ modeHp: 16 }, M.rampTo, plans);
+    modePlan({ modeHp: 16 }, M.rampTo + 1, plans);
     expect(plans.map((p) => p.hp)).toEqual([10 * 16 ** M.bossShare, 64]);
     expect(M.bossShare).toBe(0.5);
+  });
+
+  it('ease the wave-15 boss by a tenth on Hard and Insane, not on Normal', () => {
+    const at15 = (modeHp: number) => modePlan({ modeHp }, 15, [{ kind: 'lord', hp: 100 }, { kind: 'drone', hp: 10 }] as SpawnPlan[]);
+    const hard = at15(M.hard.train);
+    expect(hard[0].hp).toBeCloseTo(100 * M.hard.train ** M.bossShare * 0.9);
+    expect(hard[1].hp).toBeCloseTo(10 * M.hard.train);
+    expect(at15(1)[0].hp).toBe(100);
   });
 
   it('are tuned apart for the siege and other runs, Insane twice Hard', () => {

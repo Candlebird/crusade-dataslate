@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Force } from '../../model/types';
 import { newUnit } from '../../model/factory';
 import { TRAINING } from '../downtimeData';
-import { bankHonours, blankRecord, deedOf, recordAfter, recordLine, runHonours, talesFor } from './records';
+import { bankHonours, bestAfter, bestOf, blankRecord, deedOf, recordAfter, recordLine, runHonours, talesFor } from './records';
 import { blankRun, testUnit } from './testRun';
 import type { TrainingRun } from './types';
 
@@ -80,5 +80,21 @@ describe('training records', () => {
     }
     expect(f.tales).toHaveLength(TRAINING.records.keep);
     expect(f.tales![0].date).toBe(String(TRAINING.records.keep - 1));
+  });
+});
+
+describe('bests by difficulty', () => {
+  it('keep each mode apart, the old best standing as Normal\'s', () => {
+    const f = { trainingBest: 23 };
+    expect(bestOf(f)).toBe(23);
+    expect(bestOf(f, 'hard')).toBe(0);
+    const a = bestAfter(f, { cleared: 14, mode: 'hard' });
+    expect(a).toEqual({ trainingBest: 23, trainingBests: { normal: 23, hard: 14 } });
+    const b = bestAfter(a, { cleared: 9, mode: 'hard' });
+    expect(bestOf(b, 'hard')).toBe(14);
+    const c = bestAfter(b, { cleared: 30 });
+    expect(c.trainingBest).toBe(30);
+    expect(c.trainingBests).toEqual({ normal: 30, hard: 14 });
+    expect(bestOf(bestAfter(c, { cleared: 6, mode: 'insane' }), 'insane')).toBe(6);
   });
 });

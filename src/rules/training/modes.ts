@@ -33,7 +33,7 @@ export function modePlan(run: Pick<TrainingRun, 'modeHp' | 'hpFlat'>, w: number,
   if (mode === 1 && flat === 1) return plans;
   // A boss takes only the mode's multiplier to the power bossShare (its escorts the whole of it): one Echo the maze must
   // bring down in one pass, and the boss offer of cards rides on slaying it.
-  const boss = mode ** M.bossShare * flat;
+  const boss = mode ** M.bossShare * (mode === 1 ? 1 : M.bossWave[w] ?? 1) * flat;
   for (const p of plans) p.hp *= TRAINING_ENEMIES[p.kind].spawn === 'boss' ? boss : mode * flat;
   return plans;
 }
