@@ -739,12 +739,12 @@ export const TRAINING = {
    * Shard's to hold). Tuned from a force that dealt 60,000 to the W44 colossus (the bot, its waves eased to play as that
    * force): on Hard it reaches the siege's last check, or wins the Final at 25, most of the time; on Insane (twice Hard)
    * less than half the time (modes.balance.test.ts). 20% under the first tuning (x12/x14, x24/x28 on an even ramp,
-   * which leaked on wave 2 on Insane). `reward`: the damage checks' and milestones'
+   * which leaked on wave 2 on Insane), then ramped in to wave 15, not 10 (players couldn't finish Hard: the early waves outgrew a young maze). `reward`: the damage checks' and milestones'
    * rewards times this, rounded up. A siege's modes start with the damage checks (siege.checksFrom); the colossus is the
    * same in every mode, and each mode has its own boards.
    */
   modes: {
-    rampTo: 10,
+    rampTo: 15,
     hard: { name: 'Hard', siege: 9.5, train: 11, reward: 1.5 },
     insane: { name: 'Insane', siege: 19, train: 22, reward: 2 },
   },
