@@ -133,7 +133,7 @@ export interface ProjectDef {
 export const PROJECT_DIE = 3;
 export const PROJECTS: ProjectDef[] = [
   { id: 'fortify', name: 'Fortify', goal: 6, needsUnfortified: true, desc: 'Dig in: the world is Reinforced (+200 Supply defending it, and Marauders are thrown back).', reward: { reinforce: true } },
-  { id: 'salvage', name: 'Salvage', goal: 4, desc: 'Strip wrecks and old works: +150 Materials into the world\'s bank.', reward: { materials: 150 } },
+  { id: 'salvage', name: 'Salvage', goal: 4, desc: 'Strip wrecks and old works: +100 Materials into the world\'s bank.', reward: { materials: 100 } },
   { id: 'research', name: 'Research', goal: 6, desc: 'Study what the world holds: +2 Research for the faction.', reward: { research: 2 } },
   { id: 'relic', name: 'Forge a relic', goal: 8, desc: 'A free Common relic, taken in the Requisition shop by the force that finishes it.', reward: { relic: 'Common' } },
   { id: 'rareRelic', name: 'Forge a rare relic', goal: 18, desc: 'A free Rare relic, taken in the Requisition shop by the force that finishes it.', reward: { relic: 'Rare' } },

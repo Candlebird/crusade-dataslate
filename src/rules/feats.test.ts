@@ -94,7 +94,7 @@ describe('clawing back the old feat pay', () => {
     const line = clawbackFeats(f, '2026-10-24', id);
     expect(line).toContain('Iron Line');
     const last = f.ledger[f.ledger.length - 1];
-    expect([last.rp, last.supply]).toEqual([-6, -50]);
+    expect([last.rp, last.supply]).toEqual([-6, -60]);
     expect(f.featsV).toBe(FEATS_VERSION);
     expect(clawbackFeats(f, '2026-10-25', id)).toBeNull();
     expect(f.ledger).toHaveLength(4);
@@ -129,7 +129,7 @@ describe('feats a second force of the faction earned again', () => {
     expect(clawbackDuplicateFeats(b, forces, '2026-10-31', id)).toMatch(/Unbroken/);
     expect(Object.keys(b.feats!)).toEqual(['train20']);
     const last = b.ledger[b.ledger.length - 1];
-    expect([last.rp, last.supply, last.us]).toEqual([-1, -50, -2]);
+    expect([last.rp, last.supply, last.us]).toEqual([-1, -40, -2]);
     expect(b.umbraShards).toBe(shards - 2);
     expect(clawbackDuplicateFeats(b, forces, '2026-11-01', id)).toBeNull();
     expect(a.feats!.train25).toBe('2026-10-25');

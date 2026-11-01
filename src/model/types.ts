@@ -109,6 +109,8 @@ export interface RpEntry {
   supply: number;
   /** Umbra Shards gained or spent (history only — the force's umbraShards is the balance). */
   us?: number;
+  /** Nexus round it was logged in (set on Increase Supply buys, for their diminishing returns). */
+  round?: number;
 }
 
 export type BattleResult = 'win' | 'loss' | 'draw';

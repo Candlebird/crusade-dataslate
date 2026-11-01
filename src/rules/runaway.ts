@@ -1,5 +1,7 @@
-import type { Campaign, SectorType } from '../model/types';
+import type { Campaign, Force, SectorType } from '../model/types';
 import { EXPANSION_US, NEXUS_ROUNDS } from './nexusData';
+import { SUPPLY_BUY } from './data';
+import { currentRound } from './nexus';
 
 // Snowball brakes (Nexus Wars): a faction far ahead on sectors pays more for Supply and Forced Expansion, and the Void
 // Echoes and Marauders come for it first. Factions behind get the catch-up bonus instead (rounds.ts underdogBonus).
@@ -22,6 +24,20 @@ export const isRunaway = (c: Campaign | undefined, factionId: string | undefined
 /** RP for one Increase Supply: dearer for a faction far ahead. */
 export const supplyRpCost = (c: Campaign | undefined, factionId: string | undefined, base: number) =>
   base * (isRunaway(c, factionId) ? NEXUS_ROUNDS.runaway.supplyRp : 1);
+
+/** Increase Supply buys the force's faction (or the force alone, outside a campaign) has made this round. */
+export function supplyBuysThisRound(c: Campaign | undefined, forces: Force[], force: Force): number {
+  const factionId = force.nexus?.factionId;
+  if (!c || !factionId) return 0;
+  const round = currentRound(c);
+  return forces
+    .filter((f) => f.nexus?.factionId === factionId)
+    .flatMap((f) => (f.id === force.id ? force : f).ledger)
+    .filter((e) => e.round === round && e.label.startsWith('Increase Supply') && e.supply > 0).length;
+}
+
+/** Supply Limit the next Increase Supply gives: `base` for the round's first buy, then SUPPLY_BUY.step less each, at least SUPPLY_BUY.min. */
+export const supplyGain = (base: number, bought: number) => Math.max(Math.min(base, SUPPLY_BUY.min), base - SUPPLY_BUY.step * bought);
 
 /** Umbra Shards for a Forced Expansion into a sector of this type, or undefined if it can't be taken: dearer for a faction far ahead. */
 export function expansionCost(c: Campaign | undefined, factionId: string | undefined, type: SectorType): number | undefined {

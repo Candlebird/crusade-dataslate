@@ -2,11 +2,12 @@ import { useState } from 'react';
 import { useStore } from '../model/store';
 import { uid } from '../model/factory';
 import type { Force, Unit } from '../model/types';
-import { RELICS, REQUISITIONS, SCAR_TABLE, type Requisition } from '../rules/data';
+import { RELICS, REQUISITIONS, SCAR_TABLE, SUPPLY_BUY, type Requisition } from '../rules/data';
 import { applyScar, forceTotals, hasRule, relicHolders, relicSlots, relicTaken, relicTierAllowed, rollDice, rollDie, xpShown } from '../rules/engine';
 import { NEEDS_UNIT, RELIC_TIER, requisitionEligible, requisitionProblem } from '../rules/requisition';
 import { unitName } from '../rules/battle';
-import { isRunaway, supplyRpCost } from '../rules/runaway';
+import { isRunaway, supplyBuysThisRound, supplyGain, supplyRpCost } from '../rules/runaway';
+import { currentRound } from '../rules/nexus';
 import { Modal, RelicOption, toast } from './ui';
 import { localDate } from '../model/date';
 import { Icon } from './Icon';
@@ -33,6 +34,9 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
   const priceOf = (r: Requisition) => (r.name === 'Increase Supply' ? supplyRpCost(state.campaign, force.nexus?.factionId, r.cost) : r.cost);
   const dearer = isRunaway(state.campaign, force.nexus?.factionId);
   const cost = free ? 0 : sel ? priceOf(sel) : 0;
+  // Increase Supply gives less for each buy the faction has already made this round (rules/data.ts SUPPLY_BUY).
+  const supplyBuys = supplyBuysThisRound(state.campaign, state.forces, force);
+  const nextSupply = supplyGain(s.supplyPerRp, supplyBuys);
 
   const pick = (r: Requisition) => {
     setSel(r);
@@ -63,7 +67,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
 
     switch (sel.name) {
       case 'Increase Supply':
-        supply = s.supplyPerRp;
+        supply = nextSupply;
         outcome = `Supply Limit +${supply}.`;
         break;
       case 'Remove a Scar': {
@@ -110,7 +114,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
     }
 
     updateForce(force.id, (d) => {
-      d.ledger.push({ id: uid(), date: today, label: free ? `${label} (forged: free)` : label, rp: -cost, supply });
+      d.ledger.push({ id: uid(), date: today, label: free ? `${label} (forged: free)` : label, rp: -cost, supply, ...(supply && state.campaign ? { round: currentRound(state.campaign) } : {}) });
       if (free && d.nexus?.forged) d.nexus.forged.splice(d.nexus.forged.findIndex((x) => x === tier), 1);
       const u = d.units.find((x) => x.id === unitId);
       if (u && mutate) mutate(u);
@@ -130,7 +134,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
               <span className="cost">{credits(RELIC_TIER[r.name]) ? `${credits(RELIC_TIER[r.name])} forged` : `${priceOf(r)} RP`}</span>
               <div className="grow">
                 <b>{r.name}</b>
-                <div className="muted small">{r.name === 'Increase Supply' ? `+${s.supplyPerRp} Supply Limit.${dearer ? ' Your faction is far ahead, so it costs more.' : ''}` : r.desc}</div>
+                <div className="muted small">{r.name === 'Increase Supply' ? `+${nextSupply} Supply Limit${supplyBuys ? ` (buy ${supplyBuys + 1} this round; each gives ${SUPPLY_BUY.step} less, at least ${SUPPLY_BUY.min})` : ''}.${dearer ? ' Your faction is far ahead, so it costs more.' : ''}` : r.desc}</div>
               </div>
             </div>
           ))}

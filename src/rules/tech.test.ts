@@ -217,8 +217,8 @@ describe('space stations', () => {
   it('need enough Materials across the faction, and take only one building', () => {
     const c = withStation();
     const s = sector(c, 'st');
-    sector(c, 'pA').bank = 150;
-    expect(buildBlock(s, 'watchtower', force('A'), c)).toBe(`Needs ${building('watchtower').cost + PRODUCTION.station.extra} Materials (150 banked across your sectors)`);
+    sector(c, 'pA').bank = 100;
+    expect(buildBlock(s, 'watchtower', force('A'), c)).toBe(`Needs ${building('watchtower').cost + PRODUCTION.station.extra} Materials (100 banked across your sectors)`);
     sector(c, 'hA').bank = 300;
     expect(build(c, s, 'watchtower', force('A'))).toBe(true);
     finishConstruction(c);

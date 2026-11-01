@@ -5,6 +5,7 @@ import {
   AGENDAS, CATEGORIES, CATEGORY_HINT, LEVEL_THRESHOLDS, NEXUS_TRAITS, RELICS, RELIC_SLOTS, RELIC_TIER_MIN_XP, RELIC_WEAPON_RULES,
   REQUISITIONS, REWARD_TABLES, SCAR_TABLE, TRAIT_TABLES, UNIQUE_TRAIT_TABLES, UNIQUE_WEAPON_TRAIT_TABLES, WEAPON_TRAIT_TABLES,
   type RelicDef, type RelicTier, type RewardTableKey, type TableEntry,
+  SUPPLY_BUY,
 } from '../rules/data';
 import {
   ANOMALY_TABLE, BENEFITS, BUILDINGS, GUARDIAN_LOOT, NEXUS_TECH, TECH_BRANCHES, COMBAT_MANIPULATIONS, ECHOES, ECHO_LORDS, GALACTIC_EVENTS, NEXUS_ROUNDS, SECTOR_MODIFIERS, SECTOR_TYPES, STRATEGIC_ASSETS, UMBRA_SHOP, VOID_TABLE, WARLORDS,
@@ -297,7 +298,7 @@ function CrusadeRules() {
               <tr key={r.name} id={entryId('r-req', r.name)}>
                 <td><b>{r.name}</b></td>
                 <td className="muted">{r.cost} RP</td>
-                <td>{r.name === 'Increase Supply' ? `+${supplyPerRp} Supply Limit.` : r.desc}</td>
+                <td>{r.name === 'Increase Supply' ? `+${supplyPerRp} Supply Limit for the faction's first buy each round, then ${SUPPLY_BUY.step} less for each further buy that round (at least ${SUPPLY_BUY.min}).` : r.desc}</td>
               </tr>
             ))}
           </tbody>

@@ -423,8 +423,14 @@ export interface Requisition {
   desc: string;
 }
 
+/**
+ * Increase Supply has diminishing returns within a round: the faction's first buy of the round gives the Settings
+ * amount, each later buy `step` less, never below `min`. It resets when a new round starts (outside a campaign: flat).
+ */
+export const SUPPLY_BUY = { step: 25, min: 100 };
+
 export const REQUISITIONS: Requisition[] = [
-  { name: 'Increase Supply', cost: 1, desc: 'Increase the Supply Limit (amount set in Settings).' },
+  { name: 'Increase Supply', cost: 1, desc: 'Increase the Supply Limit (first buy each round set in Settings, then less).' },
   { name: 'Rearm', cost: 1, desc: 'Replace weapons/equipment; the unit keeps its XP.' },
   { name: 'Remove a Scar', cost: 1, desc: 'Remove one battle scar from a unit.' },
   { name: 'Retraining', cost: 1, desc: 'Swap one upgrade for another from the same table.' },
@@ -505,9 +511,9 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
     label: 'Winners table',
     entries: [
       { text: '6 XP to distribute; undo one scar from this battle', xp: 6, xpTarget: 'any', removeScar: 'battle' },
-      { text: '+100 Supply Limit and +100 Materials', supply: 100, materials: 100 },
+      { text: '+100 Supply Limit and +75 Materials', supply: 100, materials: 75 },
       { text: '+150 Supply Limit', supply: 150 },
-      { text: '1 extra RP and +50 Materials', rp: 1, materials: 50 },
+      { text: '1 extra RP and +35 Materials', rp: 1, materials: 35 },
       { text: '+1 RP and +50 Supply Limit', rp: 1, supply: 50 },
       { text: '6 Umbra Shards', us: 6 },
       { text: '3 Umbra Shards and 4 XP to distribute', us: 3, xp: 4, xpTarget: 'any' },
@@ -519,7 +525,7 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
   winnerSpecial: {
     label: 'Winners special table',
     entries: [
-      { text: '+1 RP, +100 Supply Limit and +150 Materials', rp: 1, supply: 100, materials: 150 },
+      { text: '+1 RP, +100 Supply Limit and +100 Materials', rp: 1, supply: 100, materials: 100 },
       { text: '+1 RP and remove 1 scar', rp: 1, removeScar: 'any' },
       { text: 'Free upgrade', free: 'Free upgrade' },
       { text: 'Free weapon upgrade', free: 'Free weapon upgrade' },
@@ -538,9 +544,9 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
       { text: '6 XP to a survivor', xp: 6, xpTarget: 'survivor' },
       { text: '6 XP to a unit holding a point at the end', xp: 6, xpTarget: 'holder' },
       { text: '10 XP to a unit that died this battle', xp: 10, xpTarget: 'dead' },
-      { text: '+150 Supply Limit and +50 Materials', supply: 150, materials: 50 },
+      { text: '+150 Supply Limit and +35 Materials', supply: 150, materials: 35 },
       { text: '1 extra RP', rp: 1 },
-      { text: '4 Umbra Shards and +50 Materials', us: 4, materials: 50 },
+      { text: '4 Umbra Shards and +35 Materials', us: 4, materials: 35 },
       { text: '3 Umbra Shards and 3 XP to distribute', us: 3, xp: 3, xpTarget: 'any' },
       { text: 'A Nexus trait token', traitTokens: 1 },
       { text: 'A free Combat Manipulation next match', manipulation: true },
@@ -550,10 +556,10 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
     label: 'Growth Through Suffering',
     entries: [
       { text: '2 XP to distribute', xp: 2, xpTarget: 'any' },
-      { text: '2 XP to distribute and +50 Materials', xp: 2, xpTarget: 'any', materials: 50 },
+      { text: '2 XP to distribute and +35 Materials', xp: 2, xpTarget: 'any', materials: 35 },
       { text: '3 XP to distribute', xp: 3, xpTarget: 'any' },
       { text: '4 XP to distribute', xp: 4, xpTarget: 'any' },
-      { text: '4 XP to distribute and +50 Materials', xp: 4, xpTarget: 'any', materials: 50 },
+      { text: '4 XP to distribute and +35 Materials', xp: 4, xpTarget: 'any', materials: 35 },
       { text: '5 XP to distribute', xp: 5, xpTarget: 'any' },
       { text: '6 XP to distribute', xp: 6, xpTarget: 'any' },
       { text: '3 XP to distribute and 3 Umbra Shards', xp: 3, xpTarget: 'any', us: 3 },
@@ -568,9 +574,9 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
       { text: '3 XP to distribute', xp: 3, xpTarget: 'any' },
       { text: '6 XP to distribute', xp: 6, xpTarget: 'any' },
       { text: '6 XP to a unit holding a point at the end', xp: 6, xpTarget: 'holder' },
-      { text: '+50 Supply Limit and +100 Materials', supply: 50, materials: 100 },
+      { text: '+50 Supply Limit and +75 Materials', supply: 50, materials: 75 },
       { text: '3 Umbra Shards', us: 3 },
-      { text: '+100 Supply Limit and +50 Materials', supply: 100, materials: 50 },
+      { text: '+100 Supply Limit and +35 Materials', supply: 100, materials: 35 },
       { text: '3 Umbra Shards and 3 XP to distribute', us: 3, xp: 3, xpTarget: 'any' },
       { text: 'A free Combat Manipulation next match', manipulation: true },
       { text: 'Roll on the special table', subtable: 'aiSpecial' },
@@ -581,8 +587,8 @@ export const REWARD_TABLES: Record<RewardTableKey, { label: string; entries: Rew
     entries: [
       { text: 'Remove 1 scar', removeScar: 'any' },
       { text: '+1 RP', rp: 1 },
-      { text: '+50 Supply Limit and +150 Materials', supply: 50, materials: 150 },
-      { text: '+100 Supply Limit and +100 Materials', supply: 100, materials: 100 },
+      { text: '+50 Supply Limit and +100 Materials', supply: 50, materials: 100 },
+      { text: '+100 Supply Limit and +75 Materials', supply: 100, materials: 75 },
       { text: '8 XP to distribute', xp: 8, xpTarget: 'any' },
       { text: '+1 RP and +50 Supply Limit', rp: 1, supply: 50 },
       { text: '6 Umbra Shards', us: 6 },

@@ -6,9 +6,9 @@ import type { RelicTier } from './data';
 // (Benefit ids are stored on sectors in saved campaigns, so rename a benefit's name, not its id.)
 
 /** Materials a space station's building costs on top of its price (PRODUCTION.station). */
-const STATION_EXTRA = 100;
+const STATION_EXTRA = 75;
 /** Materials a space station makes each round, banked at its faction's nearest bank (PRODUCTION.station). */
-const STATION_INCOME = 50;
+const STATION_INCOME = 35;
 
 export const SECTOR_TYPES: Record<SectorType, { label: string; desc: string }> = {
   home: { label: 'Home sector', desc: 'Each faction has one. It can be attacked but never controlled.' },
@@ -137,21 +137,21 @@ export interface NexusTableEntry {
 export const ANOMALY_TABLE: NexusTableEntry[] = [
   { text: '+3 Umbra Shards', us: 3 },
   { text: '+6 Umbra Shards', us: 6 },
-  { text: '+50 Supply and +100 Materials', supply: 50, materials: 100 },
+  { text: '+50 Supply and +75 Materials', supply: 50, materials: 75 },
   { text: '+100 Supply', supply: 100 },
   { text: 'Remove 1 battle scar from a unit', removeScar: true },
   { text: 'All Nexus tables unlocked until your next round income', unlockAll: true },
-  { text: '+3 Umbra Shards, +50 Supply and +50 Materials', us: 3, supply: 50, materials: 50 },
+  { text: '+3 Umbra Shards, +50 Supply and +35 Materials', us: 3, supply: 50, materials: 35 },
   { text: 'A Nexus trait token (any Nexus trait when a unit levels up)', traitToken: true },
   { text: '+9 Umbra Shards', us: 9 },
   { text: '+100 Supply and +3 Umbra Shards', supply: 100, us: 3 },
 ];
 
 export const VOID_TABLE: NexusTableEntry[] = [
-  { text: '3 XP to distribute and +150 Materials', xp: 3, materials: 150 },
+  { text: '3 XP to distribute and +100 Materials', xp: 3, materials: 100 },
   { text: '6 XP to distribute and +3 Umbra Shards', xp: 6, us: 3 },
   { text: 'Upgrade one unit with any Nexus Trait when levelling up', traitToken: true },
-  { text: '+6 Umbra Shards and +100 Materials', us: 6, materials: 100 },
+  { text: '+6 Umbra Shards and +75 Materials', us: 6, materials: 75 },
   { text: 'One free weapon upgrade', free: 'Free weapon upgrade' },
   { text: 'A Common Nexus Relic (Rare if none is available)', nexusRelic: true },
   { text: '+100 Supply and +3 Umbra Shards', supply: 100, us: 3 },
@@ -356,7 +356,7 @@ export const GALACTIC_EVENTS: GalacticEvent[] = [
   { id: 'resonance', name: 'Nexus Resonance', desc: 'The Nexus hums with power.', battle: 'Casters get +1 to their casting rolls.', cast: 1 },
   { id: 'huntingSeason', name: 'Hunting Season', desc: 'The Echoes stir and leave their lairs: they spread into 1 more sector when this round ends, but every win against them this round drops their threat 1 more.', spread: 1, perWin: 1 },
   { id: 'bloodMoon', name: 'Blood Moon', desc: 'The Echoes gorge under a red sky: their garrisons field 10% more points this round, and every win against them pays +3 Umbra Shards.', garrison: 1.1, winUs: 3 },
-  { id: 'forgeSurge', name: 'Forge Surge', desc: 'The forges run hot and the glow draws the Void: every planet and home banks +100 Materials when this round ends, and the Echoes’ threat rises 1 more.', materials: 100, threat: 1 },
+  { id: 'forgeSurge', name: 'Forge Surge', desc: 'The forges run hot and the glow draws the Void: every planet and home banks +75 Materials when this round ends, and the Echoes’ threat rises 1 more.', materials: 75, threat: 1 },
   { id: 'breakthrough', name: 'Breakthrough', desc: 'A lost theorem resurfaces in the Nexus archives: every faction earns +1 Research when this round ends.', research: 1 },
 ];
 
@@ -418,9 +418,9 @@ export const FOG = {
  */
 export const PRODUCTION = {
   /** Materials banked per round. */
-  perRound: 300,
+  perRound: 200,
   /** …with Barracks. */
-  barracks: 450,
+  barracks: 300,
   /** A bank holds at most this many rounds of production. */
   bankRounds: 4,
   /** Building slots per sector type. */
@@ -433,15 +433,15 @@ export const PRODUCTION = {
   depotSupply: 50,
   /** Logistics Hub: the bank holds this many more rounds, and the sector banks this many more Materials a round. */
   logisticsRounds: 2,
-  logisticsBonus: 50,
+  logisticsBonus: 35,
   /** Trade Hub: Materials a round for each other planet or home the faction holds within `range` hexes, up to `max`. */
-  tradeHub: { perPlanet: 50, range: 2, max: 150 },
+  tradeHub: { perPlanet: 35, range: 2, max: 100 },
   /** Foundry: units produced here cost this much less. */
   foundryDiscount: 0.2,
   /** Vehicle Bay: units with Tough(`tough`) or more produced here cost `discount` less (stacks with the Foundry). */
   vehicleBay: { tough: 6, discount: 0.35 },
   /** Grand Exchange, once a round: `materials` Materials for `shards` Umbra Shards, or `shards` Umbra Shards for `back` Materials. */
-  exchange: { materials: 150, back: 100, shards: 6 },
+  exchange: { materials: 100, back: 75, shards: 6 },
   /** Warp Gate: its sector attacks anything within this many hexes. */
   warpRange: 3,
   /** Umbral Spire: `us` Umbra Shards a round; the threat drops this much each round (however many Spires there are); the
@@ -520,42 +520,42 @@ export const HERO_OFFERS = {
  * shop: Walls are a Reinforce Sector (9 US) that lasts, but uses a slot, Materials and a round, and the enemy keeps
  * them; Barracks raise a planet's production by half again; a Refinery mines 3 US on a 3+ (about 2 a round), so its
  * shards pay for themselves in about 3 rounds; Training Grounds give every unit made there what 1⅓ Umbral Knowledge
- * would. Tier 3 buildings are a campaign's late game: 300+ Materials and 6+ US, and the home-only ones compete for the
+ * would. Tier 3 buildings are a campaign's late game: 200+ Materials and 6+ US, and the home-only ones compete for the
  * home's 3 slots.
  */
 export const BUILDINGS: Building[] = [
   // Economy
-  { id: 'depot', name: 'Supply Depot', icon: '⛁', cost: 200, shards: 0, branch: 'economy', tier: 1, desc: `+${PRODUCTION.depotSupply} Supply in the round income.` },
-  { id: 'refinery', name: 'Shard Refinery', icon: '◆', cost: 250, shards: 6, branch: 'economy', tier: 1, desc: `A shard-mine roll in the round income (${NEXUS_ROUNDS.shardMineRoll}+: ${NEXUS_ROUNDS.shardMineUs} Umbra Shards).` },
-  { id: 'logistics', name: 'Logistics Hub', icon: '⛟', cost: 200, shards: 0, branch: 'economy', tier: 1, producing: true, desc: `+${PRODUCTION.logisticsBonus} Materials a round, and the bank holds ${PRODUCTION.logisticsRounds} more rounds of them.` },
-  { id: 'tradeHub', name: 'Trade Hub', icon: '⚖', cost: 300, shards: 0, branch: 'economy', tier: 2, requires: ['depot'], producing: true, desc: `+${PRODUCTION.tradeHub.perPlanet} Materials a round for each other planet or home you hold within ${PRODUCTION.tradeHub.range} hexes (up to +${PRODUCTION.tradeHub.max}).` },
-  { id: 'beacon', name: 'Hyperlane Beacon', icon: '✧', cost: 200, shards: 3, branch: 'economy', tier: 2, requires: ['logistics'], desc: `Your detachments that start a round's move here or next to it move ${NEXUS_MOVE.beacon} hex further.` },
-  { id: 'foundry', name: 'Foundry', icon: '⚙', cost: 250, shards: 3, branch: 'economy', tier: 2, requires: ['logistics'], producing: true, desc: `Units produced here cost ${PRODUCTION.foundryDiscount * 100}% fewer Materials.` },
-  { id: 'exchange', name: 'Grand Exchange', icon: '⇄', cost: 400, shards: 9, branch: 'economy', tier: 3, requires: ['tradeHub', 'foundry'], homeOnly: true, producing: true, desc: `Once a round: trade ${PRODUCTION.exchange.materials} Materials for ${PRODUCTION.exchange.shards} Umbra Shards, or ${PRODUCTION.exchange.shards} Umbra Shards for ${PRODUCTION.exchange.back} Materials.` },
+  { id: 'depot', name: 'Supply Depot', icon: '⛁', cost: 150, shards: 0, branch: 'economy', tier: 1, desc: `+${PRODUCTION.depotSupply} Supply in the round income.` },
+  { id: 'refinery', name: 'Shard Refinery', icon: '◆', cost: 175, shards: 6, branch: 'economy', tier: 1, desc: `A shard-mine roll in the round income (${NEXUS_ROUNDS.shardMineRoll}+: ${NEXUS_ROUNDS.shardMineUs} Umbra Shards).` },
+  { id: 'logistics', name: 'Logistics Hub', icon: '⛟', cost: 150, shards: 0, branch: 'economy', tier: 1, producing: true, desc: `+${PRODUCTION.logisticsBonus} Materials a round, and the bank holds ${PRODUCTION.logisticsRounds} more rounds of them.` },
+  { id: 'tradeHub', name: 'Trade Hub', icon: '⚖', cost: 200, shards: 0, branch: 'economy', tier: 2, requires: ['depot'], producing: true, desc: `+${PRODUCTION.tradeHub.perPlanet} Materials a round for each other planet or home you hold within ${PRODUCTION.tradeHub.range} hexes (up to +${PRODUCTION.tradeHub.max}).` },
+  { id: 'beacon', name: 'Hyperlane Beacon', icon: '✧', cost: 150, shards: 3, branch: 'economy', tier: 2, requires: ['logistics'], desc: `Your detachments that start a round's move here or next to it move ${NEXUS_MOVE.beacon} hex further.` },
+  { id: 'foundry', name: 'Foundry', icon: '⚙', cost: 175, shards: 3, branch: 'economy', tier: 2, requires: ['logistics'], producing: true, desc: `Units produced here cost ${PRODUCTION.foundryDiscount * 100}% fewer Materials.` },
+  { id: 'exchange', name: 'Grand Exchange', icon: '⇄', cost: 300, shards: 9, branch: 'economy', tier: 3, requires: ['tradeHub', 'foundry'], homeOnly: true, producing: true, desc: `Once a round: trade ${PRODUCTION.exchange.materials} Materials for ${PRODUCTION.exchange.shards} Umbra Shards, or ${PRODUCTION.exchange.shards} Umbra Shards for ${PRODUCTION.exchange.back} Materials.` },
   // Military
-  { id: 'barracks', name: 'Barracks', icon: '⚒', cost: 250, shards: 6, branch: 'military', tier: 1, producing: true, desc: `Production rises to ${PRODUCTION.barracks} Materials a round.` },
-  { id: 'training', name: 'Training Grounds', icon: '⚔', cost: 200, shards: 3, branch: 'military', tier: 1, producing: true, desc: `Units produced here start with ${PRODUCTION.trainingXp} XP.` },
-  { id: 'armoury', name: 'Armoury', icon: '🗡', cost: 250, shards: 6, branch: 'military', tier: 2, requires: ['barracks'], producing: true, desc: 'Units produced here get one free weapon upgrade.' },
-  { id: 'vehicleBay', name: 'Vehicle Bay', icon: '⛭', cost: 250, shards: 3, branch: 'military', tier: 2, requires: ['barracks'], producing: true, desc: `Units with Tough(${PRODUCTION.vehicleBay.tough}) or more produced here cost ${PRODUCTION.vehicleBay.discount * 100}% fewer Materials.` },
-  { id: 'medicae', name: 'Medicae Ward', icon: '✚', cost: 250, shards: 3, branch: 'military', tier: 2, requires: ['training'], desc: 'Remove one Battle Scar from a unit in the round income.' },
-  { id: 'academy', name: 'War Academy', icon: '🎖', cost: 350, shards: 6, branch: 'military', tier: 3, requires: ['armoury', 'medicae'], homeOnly: true, producing: true, desc: 'Units produced here also get one free trait (noted on the unit: take it on its unit sheet).' },
+  { id: 'barracks', name: 'Barracks', icon: '⚒', cost: 175, shards: 6, branch: 'military', tier: 1, producing: true, desc: `Production rises to ${PRODUCTION.barracks} Materials a round.` },
+  { id: 'training', name: 'Training Grounds', icon: '⚔', cost: 150, shards: 3, branch: 'military', tier: 1, producing: true, desc: `Units produced here start with ${PRODUCTION.trainingXp} XP.` },
+  { id: 'armoury', name: 'Armoury', icon: '🗡', cost: 175, shards: 6, branch: 'military', tier: 2, requires: ['barracks'], producing: true, desc: 'Units produced here get one free weapon upgrade.' },
+  { id: 'vehicleBay', name: 'Vehicle Bay', icon: '⛭', cost: 175, shards: 3, branch: 'military', tier: 2, requires: ['barracks'], producing: true, desc: `Units with Tough(${PRODUCTION.vehicleBay.tough}) or more produced here cost ${PRODUCTION.vehicleBay.discount * 100}% fewer Materials.` },
+  { id: 'medicae', name: 'Medicae Ward', icon: '✚', cost: 175, shards: 3, branch: 'military', tier: 2, requires: ['training'], desc: 'Remove one Battle Scar from a unit in the round income.' },
+  { id: 'academy', name: 'War Academy', icon: '🎖', cost: 250, shards: 6, branch: 'military', tier: 3, requires: ['armoury', 'medicae'], homeOnly: true, producing: true, desc: 'Units produced here also get one free trait (noted on the unit: take it on its unit sheet).' },
   // Fortification
-  { id: 'walls', name: 'Walls', icon: '⛫', cost: 200, shards: 6, branch: 'fortification', tier: 1, desc: `The sector is permanently Reinforced: +${NEXUS_REINFORCE_BONUS} Supply Limit when defending it, and Marauders that raid it are thrown back.` },
-  { id: 'militia', name: 'Militia Muster', icon: '⚑', cost: 150, shards: 0, branch: 'fortification', tier: 1, producing: true, desc: 'Marauders that raid the sector are thrown back: they stop a hex short and take nothing.' },
-  { id: 'artillery', name: 'Artillery Battery', icon: '☄', cost: 200, shards: 0, branch: 'fortification', tier: 2, requires: ['walls'], rule: 'table', desc: 'The defender here gets a free Bombardment: once per game, before round 1, one enemy unit takes 6 hits with AP(1).' },
-  { id: 'bunker', name: 'Bunker Network', icon: '⛰', cost: 200, shards: 0, branch: 'fortification', tier: 2, requires: ['militia'], rule: 'table', desc: "The defender's units here start the game in cover, and one of them may Ambush." },
-  { id: 'voidShield', name: 'Void Shield', icon: '◎', cost: 300, shards: 6, branch: 'fortification', tier: 3, requires: ['artillery', 'bunker'], rule: 'table', desc: 'Attackers here get −1 to hit when shooting in rounds 1 and 2.' },
+  { id: 'walls', name: 'Walls', icon: '⛫', cost: 150, shards: 6, branch: 'fortification', tier: 1, desc: `The sector is permanently Reinforced: +${NEXUS_REINFORCE_BONUS} Supply Limit when defending it, and Marauders that raid it are thrown back.` },
+  { id: 'militia', name: 'Militia Muster', icon: '⚑', cost: 100, shards: 0, branch: 'fortification', tier: 1, producing: true, desc: 'Marauders that raid the sector are thrown back: they stop a hex short and take nothing.' },
+  { id: 'artillery', name: 'Artillery Battery', icon: '☄', cost: 150, shards: 0, branch: 'fortification', tier: 2, requires: ['walls'], rule: 'table', desc: 'The defender here gets a free Bombardment: once per game, before round 1, one enemy unit takes 6 hits with AP(1).' },
+  { id: 'bunker', name: 'Bunker Network', icon: '⛰', cost: 150, shards: 0, branch: 'fortification', tier: 2, requires: ['militia'], rule: 'table', desc: "The defender's units here start the game in cover, and one of them may Ambush." },
+  { id: 'voidShield', name: 'Void Shield', icon: '◎', cost: 200, shards: 6, branch: 'fortification', tier: 3, requires: ['artillery', 'bunker'], rule: 'table', desc: 'Attackers here get −1 to hit when shooting in rounds 1 and 2.' },
   // Intelligence
-  { id: 'watchtower', name: 'Watchtower', icon: '👁', cost: 100, shards: 0, branch: 'intelligence', tier: 1, desc: `Sight +${FOG.watchtower}: see further through the fog of war.` },
-  { id: 'listeningPost', name: 'Listening Post', icon: '📡', cost: 150, shards: 0, branch: 'intelligence', tier: 2, requires: ['watchtower'], desc: `Sight +${FOG.listeningPost} (stacks with a Watchtower).` },
-  { id: 'jammer', name: 'Signal Jammer', icon: '⌁', cost: 250, shards: 3, branch: 'intelligence', tier: 2, requires: ['watchtower'], rule: 'table', desc: "Attackers can't use Combat Manipulations against this sector or the sectors next to it." },
-  { id: 'strategium', name: 'Strategium', icon: '♜', cost: 300, shards: 6, branch: 'intelligence', tier: 2, requires: ['watchtower'], homeOnly: true, desc: 'One more Strategic Asset every round, won skirmish or not.' },
-  { id: 'warpGate', name: 'Warp Gate', icon: '⌬', cost: 400, shards: 9, branch: 'intelligence', tier: 3, requires: ['listeningPost', 'jammer'], onePerFaction: true, desc: `Your detachments can move or attack anywhere within ${PRODUCTION.warpRange} hexes of this one, from wherever they are. One per faction.` },
+  { id: 'watchtower', name: 'Watchtower', icon: '👁', cost: 75, shards: 0, branch: 'intelligence', tier: 1, desc: `Sight +${FOG.watchtower}: see further through the fog of war.` },
+  { id: 'listeningPost', name: 'Listening Post', icon: '📡', cost: 100, shards: 0, branch: 'intelligence', tier: 2, requires: ['watchtower'], desc: `Sight +${FOG.listeningPost} (stacks with a Watchtower).` },
+  { id: 'jammer', name: 'Signal Jammer', icon: '⌁', cost: 175, shards: 3, branch: 'intelligence', tier: 2, requires: ['watchtower'], rule: 'table', desc: "Attackers can't use Combat Manipulations against this sector or the sectors next to it." },
+  { id: 'strategium', name: 'Strategium', icon: '♜', cost: 200, shards: 6, branch: 'intelligence', tier: 2, requires: ['watchtower'], homeOnly: true, desc: 'One more Strategic Asset every round, won skirmish or not.' },
+  { id: 'warpGate', name: 'Warp Gate', icon: '⌬', cost: 300, shards: 9, branch: 'intelligence', tier: 3, requires: ['listeningPost', 'jammer'], onePerFaction: true, desc: `Your detachments can move or attack anywhere within ${PRODUCTION.warpRange} hexes of this one, from wherever they are. One per faction.` },
   // Umbra
-  { id: 'observatory', name: 'Nexus Observatory', icon: '🔭', cost: 150, shards: 0, branch: 'umbra', tier: 1, desc: '+1 Research every round.' },
-  { id: 'echoWard', name: 'Echo Ward', icon: '☉', cost: 300, shards: 6, branch: 'umbra', tier: 2, requires: ['observatory'], desc: `The ${ECHOES.name} can't spread into this sector or the sectors next to it.` },
-  { id: 'mercHall', name: 'Mercenary Hall', icon: '⚜', cost: 250, shards: 3, branch: 'umbra', tier: 2, requires: ['observatory'], desc: `A wandering hero offer every round, and hiring costs ${HERO_OFFERS.hallDiscount} Umbra Shards less (${HERO_OFFERS.fee.base} at least).` },
-  { id: 'spire', name: 'Umbral Spire', icon: '♆', cost: 500, shards: 12, branch: 'umbra', tier: 3, requires: ['echoWard', 'mercHall'], homeOnly: true, desc: `+${PRODUCTION.spire.us} Umbra Shards a round and the threat drops by ${PRODUCTION.spire.threat} every round (however many Spires there are), but the ${ECHOES.name} are ${PRODUCTION.spire.weight}× as likely to spread into your sectors.` },
+  { id: 'observatory', name: 'Nexus Observatory', icon: '🔭', cost: 100, shards: 0, branch: 'umbra', tier: 1, desc: '+1 Research every round.' },
+  { id: 'echoWard', name: 'Echo Ward', icon: '☉', cost: 200, shards: 6, branch: 'umbra', tier: 2, requires: ['observatory'], desc: `The ${ECHOES.name} can't spread into this sector or the sectors next to it.` },
+  { id: 'mercHall', name: 'Mercenary Hall', icon: '⚜', cost: 175, shards: 3, branch: 'umbra', tier: 2, requires: ['observatory'], desc: `A wandering hero offer every round, and hiring costs ${HERO_OFFERS.hallDiscount} Umbra Shards less (${HERO_OFFERS.fee.base} at least).` },
+  { id: 'spire', name: 'Umbral Spire', icon: '♆', cost: 350, shards: 12, branch: 'umbra', tier: 3, requires: ['echoWard', 'mercHall'], homeOnly: true, desc: `+${PRODUCTION.spire.us} Umbra Shards a round and the threat drops by ${PRODUCTION.spire.threat} every round (however many Spires there are), but the ${ECHOES.name} are ${PRODUCTION.spire.weight}× as likely to spread into your sectors.` },
 ];
 
 /**
@@ -623,14 +623,14 @@ export const MARAUDERS = {
 export const GUARDIAN_LOOT = {
   bonus: { Common: 0, Rare: 2, Legendary: 3 } as Record<'Common' | 'Rare' | 'Legendary', number>,
   table: [
-    { id: 'materials', name: 'Salvaged Materials', amount: 100, desc: '+100 Materials to a bank.' },
-    { id: 'materials', name: 'Cached Materials', amount: 150, desc: '+150 Materials to a bank.' },
+    { id: 'materials', name: 'Salvaged Materials', amount: 75, desc: '+75 Materials to a bank.' },
+    { id: 'materials', name: 'Cached Materials', amount: 100, desc: '+100 Materials to a bank.' },
     { id: 'research', name: 'Echo Archive', amount: 2, desc: '+2 Research.' },
     { id: 'research', name: 'Lost Schematics', amount: 3, desc: '+3 Research.' },
-    { id: 'materials', name: 'Void Salvage', amount: 200, desc: '+200 Materials to a bank.' },
+    { id: 'materials', name: 'Void Salvage', amount: 150, desc: '+150 Materials to a bank.' },
     { id: 'research', name: 'Echo Codex', amount: 4, desc: '+4 Research.' },
     { id: 'blueprint', name: 'Blueprint', desc: 'Research any one building whose requirements you have, for free.' },
-    { id: 'materials', name: 'Echo Hoard', amount: 250, desc: '+250 Materials to a bank.' },
+    { id: 'materials', name: 'Echo Hoard', amount: 175, desc: '+175 Materials to a bank.' },
     { id: 'research', name: 'Nexus Archive', amount: 6, desc: '+6 Research.' },
     { id: 'core', name: 'Building Expansion', desc: `Install it on one of your planets: +${PRODUCTION.coreSlots} building slot there, for good. One per planet.` },
   ] as GuardianLoot[],

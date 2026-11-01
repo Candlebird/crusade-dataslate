@@ -172,10 +172,10 @@ describe('Warlord perks', () => {
     const b = { cost: 200 };
     expect(buildCost(b, home, c)).toBe(150);
     expect(buildCost(b, plain.sectors[0], plain)).toBe(200);
-    home.bank = 150;
+    home.bank = 113;
     expect(build(c, home, 'depot')).toBe(true);
     expect(home.bank).toBe(0);
-    expect(home.construction?.supply).toBe(150);
+    expect(home.construction?.supply).toBe(113);
   });
 
   it('Conqueror: its detachment moves further, then every detachment', () => {

@@ -72,10 +72,10 @@ describe('battle resolution', () => {
   it('counts a reward’s Materials for a Nexus force, for the wizard to bank', () => {
     const { f, input, id } = setup();
     f.nexus = emptyNexus('A');
-    input.rewards.main = { roll: 2, alloc: {}, target: '' }; // +100 Supply Limit and +100 Materials
+    input.rewards.main = { roll: 2, alloc: {}, target: '' }; // +100 Supply Limit and +75 Materials
     const out = resolveBattle(f, input, id);
-    expect([out.materials, out.supply]).toEqual([100, 100]);
-    expect(out.summary).toContain(materialsLine(100));
+    expect([out.materials, out.supply]).toEqual([75, 100]);
+    expect(out.summary).toContain(materialsLine(75));
   });
 
   it('banks no Materials for a force outside Nexus Wars', () => {
