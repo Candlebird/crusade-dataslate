@@ -27,8 +27,9 @@ import { freshRun } from './freshRun';
 import { thisWeek, useSiegeSettle } from './useSiegeSettle';
 import { useStore } from '../../model/store';
 import { useCloud } from '../../cloud/CloudSync';
-import { myBlueprints } from '../../rules/training';
+import { myBlueprints, newerSave } from '../../rules/training';
 import { useBlueprintHidden, useBlueprintPick } from './blueprintPick';
+import { useCloudRun } from './useCloudRun';
 
 /**
  * The Training sim: draft Shards into a maze, craft units from them and hold the base against endless waves. The run
@@ -48,7 +49,10 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   // An older version's save is dropped first (and the start screen says so, once).
   const [cleared] = useState(() => staleSave(force.id));
   useEffect(() => ackStale(force.id), [force.id]);
-  const [saved, setSaved] = useState<SavedRun | null>(() => loadRun(force.id));
+  const [localSaved, setSaved] = useState<SavedRun | null>(() => loadRun(force.id));
+  // The run in progress is kept in the cloud too, so it can be picked up on another device: resume the newer save.
+  const cloudRun = useCloudRun(force.id);
+  const saved = newerSave(localSaved, cloudRun.saved);
   // The next run is this week's Weekly Siege; the campaign's finished weeks are settled on opening.
   const [siege, setSiege] = useState(false);
   // Normal (none), Hard or Insane, for the next run.
@@ -75,9 +79,16 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   const [auto, setAuto] = useState(false);
   const [tab, setTab] = useState<Tab>('draft');
 
+  /** Save the run between waves, here and (a moment later) in the cloud; not once it has moved on elsewhere. */
+  const keep = (r: TrainingRun, soon = false) => {
+    if (r.phase !== 'build' || cloudRun.movedOn) return;
+    saveRun(r);
+    if (soon) cloudRun.pushSoon(r);
+    else cloudRun.push(r);
+  };
   /** Re-render the panels, saving the run while it is between waves. */
   const refresh = () => {
-    if (run?.phase === 'build') saveRun(run);
+    if (run) keep(run, true);
     setTick((n) => n + 1);
   };
 
@@ -97,6 +108,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     setAuto(false);
     setTab('draft');
     saveRun(r);
+    cloudRun.adopt(r);
     setSaved(null);
     setRun(r);
   };
@@ -106,6 +118,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     quitRun(r);
     bank.finish(r);
     clearSave(r.forceId);
+    cloudRun.drop();
   };
 
   const newRun = () => {
@@ -125,13 +138,14 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     }
     if (r.phase === 'build') {
       bank.bankXp(r);
-      saveRun(r);
+      keep(r);
       setPick(0);
       setPeek(false);
       setTab('draft');
     } else if (r.phase === 'over') {
       bank.finish(r);
       clearSave(r.forceId);
+      cloudRun.drop();
       setCrafting(null);
       setSel(null);
       setFocus(null);
@@ -146,6 +160,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     setFocus(null);
     setPaused(false);
     hpStart.current = run.baseHp;
+    keep(run);
     act(() => startWave(run), () => setTick((n) => n + 1));
     if (!wideSide()) setTab('wave');
   };
@@ -163,9 +178,17 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     if (run?.phase === 'wave') {
       if (!confirmAction('Leave mid-wave? That ends the run; XP already earned stays banked.')) return;
       end(run);
-    } else if (run?.phase === 'build') saveRun(run);
+    } else if (run) keep(run);
     onClose();
   };
+
+  // Picked up on another device since: this one stops (unsaved) and offers the newer save.
+  useEffect(() => {
+    if (!run || !cloudRun.movedOn) return;
+    toast('This run carried on on another device; resume it here to pick up from there.', 'error');
+    setSaved(null);
+    setRun(null);
+  }, [run, cloudRun.movedOn]);
 
   if (!run) {
     return (

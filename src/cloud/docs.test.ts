@@ -5,6 +5,7 @@ import { buildSeedState } from '../model/seed';
 import { newForce } from '../model/factory';
 import { EXAMPLE_MISSION } from '../rules/missions';
 import { newBattle } from '../rules/tracker';
+import { blankRun } from '../rules/training/testRun';
 
 describe('cloud docs', () => {
   it('moves pictures out of the JSON and back', () => {
@@ -161,5 +162,17 @@ describe('cloud docs', () => {
     expect(s.blueprints.find((b) => b.id === 'a')?.name).toBe('Renamed');
     applyDoc(s, 'shared/blueprint-b', null);
     expect(s.blueprints.map((b) => b.id).sort()).toEqual(['a', 'c']);
+  });
+
+  it('syncs runs in progress, each writable only by its player, and applies them by force', () => {
+    const s = buildSeedState();
+    const run = (forceId: string, owner: string) => ({ forceId, owner, device: 'pc', updatedAt: '2026-10-31', saved: { v: 10 as const, savedAt: '2026-10-31', run: blankRun() } });
+    s.trainingRuns = [run('a', 'me@x'), run('b', 'them@x'), run('c', '')];
+    const docs = localDocs(s, { email: 'me@x', isGm: false }, new Map()).filter((d) => d.path.startsWith('shared/trainingrun-'));
+    expect(docs.map((d) => [d.path, d.canWrite])).toEqual([['shared/trainingrun-a', true], ['shared/trainingrun-b', false]]);
+    applyDoc(s, 'shared/trainingrun-a', { ...run('a', 'me@x'), device: 'phone' });
+    expect(s.trainingRuns.find((r) => r.forceId === 'a')?.device).toBe('phone');
+    applyDoc(s, 'shared/trainingrun-b', null);
+    expect(s.trainingRuns.map((r) => r.forceId).sort()).toEqual(['a', 'c']);
   });
 });

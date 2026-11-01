@@ -4,6 +4,7 @@ import type { FinishedBattle, TrackedBattle } from '../rules/tracker';
 import type { SymbolShape } from './emblemSymbols';
 import type { ZoneSave } from '../rules/zone/save';
 import type { Blueprint } from '../rules/training/blueprint';
+import type { CloudRun } from '../rules/training/cloudRun';
 
 export interface WeaponTrait {
   id: string;
@@ -999,6 +1000,8 @@ export interface AppState {
   zoneSaves?: ZoneSave[];
   /** Training maze blueprints, each its player's (synced with their account). */
   blueprints?: Blueprint[];
+  /** Training runs in progress, one per force (synced, so they can be picked up on another device). */
+  trainingRuns?: CloudRun[];
 }
 
 /** A side's pick when its detachment runs into another faction's on the map. */

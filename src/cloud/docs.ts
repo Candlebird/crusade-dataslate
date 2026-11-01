@@ -9,6 +9,7 @@ import type { LocalDoc } from './sync';
 import { canWriteForce } from '../model/owner';
 import { ZONE_SAVE_PREFIX, type ZoneSave } from '../rules/zone/save';
 import { BLUEPRINT_PREFIX, type Blueprint } from '../rules/training/blueprint';
+import { CLOUD_RUN_PREFIX, cloudRunJson, type CloudRun } from '../rules/training/cloudRun';
 
 export const IMG_PREFIX = 'img:';
 
@@ -104,6 +105,12 @@ export function localDocs(state: AppState, who: Who, images: Map<string, string>
     if (!b.owner) continue;
     docs.push({ path: `${BLUEPRINT_PREFIX}${b.id}`, json: JSON.stringify(b), updatedAt: b.updatedAt, canWrite: who.isGm || b.owner === who.email });
   }
+  // Training runs in progress, so their player can pick them up on another device (cloudRun.ts keeps each under the
+  // document size limit).
+  for (const r of state.trainingRuns ?? []) {
+    if (!r.owner) continue;
+    docs.push({ path: `${CLOUD_RUN_PREFIX}${r.forceId}`, json: cloudRunJson(r), updatedAt: r.updatedAt, canWrite: who.isGm || r.owner === who.email });
+  }
   return docs;
 }
 
@@ -135,6 +142,11 @@ export function applyDoc(d: AppState, path: string, value: unknown): void {
     const rest = (d.blueprints ?? []).filter((b) => b.id !== bid);
     if (value !== null) rest.push(value as Blueprint);
     d.blueprints = rest;
+  } else if (path.startsWith(CLOUD_RUN_PREFIX)) {
+    const fid = path.slice(CLOUD_RUN_PREFIX.length);
+    const rest = (d.trainingRuns ?? []).filter((r) => r.forceId !== fid);
+    if (value !== null) rest.push(value as CloudRun);
+    d.trainingRuns = rest;
   } else if (path === SETTINGS_PATH) {
     if (value !== null) d.settings = { ...d.settings, ...(value as ReturnType<typeof sharedSettings>) };
   } else if (path === CORE_RULES_PATH) {
