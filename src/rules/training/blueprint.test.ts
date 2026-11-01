@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { blueprintCode, ghostSpots, mazeLength, myBlueprints, openLength, readBlueprintCode, spotProblem, toggleSpot, type Blueprint } from './blueprint';
+import { blueprintCode, ghostSpots, inRunsId, markInRuns, mazeLength, myBlueprints, openLength, readBlueprintCode, spotProblem, toggleSpot, type Blueprint } from './blueprint';
 import { blankRun } from './testRun';
 import type { Tile } from './map';
 
@@ -58,4 +58,18 @@ describe('blueprint share codes', () => {
 it('a player sees their own blueprints and unsigned ones', () => {
   const b = (id: string, owner: string): Blueprint => ({ id, owner, name: id, updatedAt: '', spots: [] });
   expect(myBlueprints([b('a', 'me@x'), b('b', 'them@x'), b('c', '')], 'me@x').map((x) => x.id)).toEqual(['a', 'c']);
+});
+
+describe('the blueprint in runs', () => {
+  const b = (id: string, inRuns?: boolean): Blueprint => ({ id, owner: 'me@x', name: id, updatedAt: '', spots: [], ...(inRuns ? { inRuns } : {}) });
+  it('is the one marked on the account, else this device\'s old pick if still the player\'s', () => {
+    expect(inRunsId([b('a'), b('b', true)], 'a')).toBe('b');
+    expect(inRunsId([b('a'), b('b')], 'a')).toBe('a');
+    expect(inRunsId([b('a')], 'gone')).toBeNull();
+  });
+  it('marking one unmarks the rest', () => {
+    expect(markInRuns([b('a', true), b('b'), b('c')], 'b').map((x) => x.id)).toEqual(['a', 'b']);
+    expect(markInRuns([b('a', true), b('b')], null).map((x) => x.id)).toEqual(['a']);
+    expect(markInRuns([b('a', true)], 'a')).toEqual([]);
+  });
 });

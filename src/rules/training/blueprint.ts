@@ -16,6 +16,8 @@ export interface Blueprint {
   updatedAt: string;
   /** Each planned 2×2 piece by its top-left cell, in the order they were drawn. */
   spots: Tile[];
+  /** The one its player shows as the ghost in their runs (at most one of theirs; synced, so it holds on every device). */
+  inRuns?: boolean;
 }
 
 export const BLUEPRINT_PREFIX = 'shared/blueprint-';
@@ -89,6 +91,17 @@ export function readBlueprintCode(code: string): { name: string; spots: Tile[]; 
 /** The blueprints a player sees: their own, and any made before they signed in. */
 export const myBlueprints = (all: Blueprint[] | undefined, email: string | undefined): Blueprint[] =>
   (all ?? []).filter((b) => !b.owner || b.owner === email);
+
+/** The id of the blueprint a player shows in runs: the one marked inRuns, else (from before it synced) this device's
+ *  old pick if it is still theirs. */
+export function inRunsId(mine: Blueprint[], devicePick: string | null): string | null {
+  return mine.find((b) => b.inRuns)?.id ?? (mine.some((b) => b.id === devicePick) ? devicePick : null);
+}
+
+/** Mark `id` (null: none) as the player's blueprint in runs, unmarking the rest; returns the ones that changed. */
+export function markInRuns(mine: Blueprint[], id: string | null): Blueprint[] {
+  return mine.filter((b) => !!b.inRuns !== (b.id === id));
+}
 
 /** An empty run in the build phase with the plan's pieces set as rubble, for the editor's map (its route walks round them). */
 export function planRun(spots: Tile[]): TrainingRun {

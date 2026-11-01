@@ -41,10 +41,10 @@ export function BlueprintEditor() {
       toast(`You can keep up to ${BLUEPRINT_KEEP} blueprints; delete one first.`, 'error');
       return null;
     }
-    const b: Blueprint = { id: uid(), owner: cloud.email ?? '', name, updatedAt: nowIso(), spots };
+    // The first one (or the first since none was picked) shows in runs.
+    const b: Blueprint = { id: uid(), owner: cloud.email ?? '', name, updatedAt: nowIso(), spots, ...(pick ? {} : { inRuns: true }) };
     update((d) => { d.blueprints = [...(d.blueprints ?? []), b]; });
     setOpenId(b.id);
-    if (!pick || !mine.some((x) => x.id === pick)) setPick(b.id);
     setWhy('');
     return b;
   };
