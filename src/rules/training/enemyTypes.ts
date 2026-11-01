@@ -69,12 +69,11 @@ export interface Enemy {
   sunder?: number;
 }
 
-/** A nemesis on the field: when it came, its walking speed share (rage, Vengeful), better saves (Hardened), whether
+/** A nemesis on the field: when it came, its walking speed share (rage, Vengeful), whether
  *  anything can hold it (Dread), and the clocks of its timed tricks. */
 export interface NemesisState {
   born: number;
   speed: number;
-  hard: number;
   free?: boolean;
   next: number;
   regen: number;

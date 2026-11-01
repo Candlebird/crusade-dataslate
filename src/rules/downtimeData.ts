@@ -531,8 +531,8 @@ export const TRAINING = {
      * seconds it leaps `dive.cells` cells on (out of any hold). Dirge: for `dirge.secs` of every `dirge.every` towers
      * within `dirge.radius` cells are at -1 to hit. Tremor: every `tremor.every` seconds the base takes `tremor.dmg`.
      * Dread: nothing can hold it. Brood: every `brood.every` seconds `brood.n` Swarmlings, `brood.hp` × as tough as the
-     * wave's own, crawl out where it stands (`brood.spread` cells apart). Rematch tricks (one per time the force has slain it on a Sortie): Hardened +1 to
-     * its saves, Vengeful `vengeful` × as fast, Regenerating mends `regen` of its wounds every `regenEvery` seconds.
+     * wave's own, crawl out where it stands (`brood.spread` cells apart). Rematch tricks (one per time the force has slain it on a Sortie): Hardened
+     * SORTIE.rematch.hp more wounds, Vengeful `vengeful` × as fast, Regenerating mends `regen` of its wounds every `regenEvery` seconds.
      * Slain here, it starts the next Sortie fight against the force `bled` of its wounds down, a trick short.
      */
     nemesis: {
@@ -1117,11 +1117,12 @@ export const SORTIE = {
   omens: { share: 0.2, need: 3, step: 0.15, brace: 0.25, floor: 0.3, answer: 0.5 },
   /** Rematches: a lord slain by the force before comes back changed, with one more trick for each time (up to all three). */
   rematch: {
-    def: 1,
+    /** Hardened: this share more wounds. */
+    hp: 0.2,
     atk: 1.25,
     regen: 0.05,
     tricks: [
-      { name: 'Hardened', text: '+1 to its saves.' },
+      { name: 'Hardened', text: '20% more wounds.' },
       { name: 'Vengeful', text: 'a quarter more attacks.' },
       { name: 'Regenerating', text: 'mends a twentieth of its wounds at the start of each round.' },
     ],

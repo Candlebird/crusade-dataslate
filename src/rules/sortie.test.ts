@@ -14,7 +14,7 @@ import {
   gain, nextTurn, braceFor, omensRead, sigStrength, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicKeysOf, relicsOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, startRound, gunReach, keepsHaul, distOf,
   leaveCombat, leaveEvent, moveMember, nextSlots, onField, partyLine, patchUp, pickBoon, reachable, runXp, skillProblem, skillsOf, squadOf,
   weekKey, weekSeed, weeklyScore, reveal, sightOf, veteranTitle,
-  ambushOdds, beastInfo, beastKey, cursesOf, cursed, shopPrice, goalProgress, goalText, lastStanding, rematchTricks, unlockedBoons, markHeat, marked,
+  ambushOdds, beastInfo, beastKey, cursesOf, cursed, shopPrice, goalProgress, goalText, lastStanding, rematchTricks, sortieHistory, unlockedBoons, markHeat, marked,
   type SortieRun,
 } from './sortie';
 
@@ -1013,10 +1013,48 @@ describe('sortie rematches, boon unlocks and last stands', () => {
     startCombat(run, book, 'boss');
     startCombat(plain, book, 'boss');
     const lord = (r: SortieRun) => r.combat!.enemies.find((e) => e.key === r.combat!.lord)!;
-    expect(lord(run).defMod).toBe(lord(plain).defMod + SORTIE.rematch.def);
+    const wounds = (r: SortieRun) => lord(r).models.reduce((t, m) => t + m.max, 0);
+    expect(lord(run).defMod).toBe(lord(plain).defMod);
+    expect(wounds(run) / wounds(plain)).toBeCloseTo(1 + SORTIE.rematch.hp, 1);
     expect(lord(run).atkBonus).toBeCloseTo(lord(plain).atkBonus * SORTIE.rematch.atk);
     expect(run.combat!.log.some((l) => l.text === bossOf(run).rematch[2])).toBe(true);
     expect(SORTIE_BOSSES.every((b) => b.rematch.length === 3 && b.rematch.every(Boolean))).toBe(true);
+  });
+
+  it('keeps Shard runs clear of the grudges and rematch tricks practice runs earn', () => {
+    let n = 0;
+    const id = () => `id${n++}`;
+    const f = newForce();
+    const party = PARTIES.line();
+    f.units.push(...party);
+    const boss = createRun(party, 1).boss;
+    const free = (seed: number) => Object.assign(createRun(party, seed), { boss });
+    const kill = (run: SortieRun) => Object.assign(won(run), { met: { [`lord:${boss}`]: { met: 1, slain: 1 } } });
+    // Free runs: one lord beats a party, then another is slain twice.
+    applySortie(f, Object.assign(free(1), { over: 'fell', lordWon: true }), '2026-01-01', id, () => 0.99);
+    applySortie(f, kill(free(2)), '2026-01-01', id, () => 0.99);
+    applySortie(f, kill(free(3)), '2026-01-01', id, () => 0.99);
+    expect(f.sortie!.bestiary![`lord:${boss}`].slain).toBe(2);
+    expect(sortieHistory(f.sortie, 'free').slain[boss]).toBe(2);
+    const practice = createRun(party, 1, 'free', 'short', sortieHistory(f.sortie, 'free'));
+    expect(practice.boss).toBe(boss);
+    expect(practice.rematch).toBe(2);
+    // A Shard run meets none of it.
+    expect(sortieHistory(f.sortie, 'shard')).toEqual({ nemesis: {}, slain: {} });
+    const shardRun = createRun(party, 1, 'shard', 'short', sortieHistory(f.sortie, 'shard'));
+    expect(shardRun.boss).toBe(boss);
+    expect(shardRun.rematch).toBeUndefined();
+    expect(shardRun.nemesis).toBeUndefined();
+
+    // A Shard run's own grudge and kills count for Shard runs (and free runs, as ever).
+    applySortie(f, Object.assign(createRun(party, 4, 'shard'), { boss, over: 'fell', lordWon: true }), '2026-01-01', id, () => 0.99);
+    expect(sortieHistory(f.sortie, 'shard').nemesis).toEqual({ [boss]: 1 });
+    expect(f.sortie!.nemesis![boss]).toBe(1);
+    applySortie(f, kill(Object.assign(createRun(party, 5, 'shard'), { boss, nemesis: 1 })), '2026-01-01', id, () => 0.99);
+    expect(f.sortie!.shardNemesis).toBeUndefined();
+    expect(f.sortie!.nemesis![boss]).toBeUndefined();
+    expect(f.sortie!.bestiary![`lord:${boss}`]).toMatchObject({ slain: 3, shard: 1 });
+    expect(sortieHistory(f.sortie, 'shard').slain).toEqual({ [boss]: 1 });
   });
 
   it('starts a force with some boons and unlocks the rest by goals', () => {

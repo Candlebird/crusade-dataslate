@@ -202,7 +202,7 @@ export function spawnOne(run: TrainingRun, s: SpawnPlan): Enemy {
   const e: Enemy = {
     id: run.nextId++, kind: s.kind, x: s.x, y: s.y, leg: s.leg, face: Math.atan2(next.y - s.y, next.x - s.x),
     hp: s.hp, maxHp: s.hp, flies: s.flies, ...(s.elite ? { elite: true } : {}), status: {}, dots: [], regrab: 0,
-    ...(s.nemesis ? { nem: { born: run.t, speed: 1, hard: 0, next: 0, regen: 0 } } : {}),
+    ...(s.nemesis ? { nem: { born: run.t, speed: 1, next: 0, regen: 0 } } : {}),
     ...(s.lord !== undefined ? { lord: { i: s.lord, next: 0, ward: 0, burst: 0 } } : {}),
     ...(s.hard ? { hard: s.hard } : {}), ...(s.final ? { final: true as const } : {}),
   };

@@ -419,17 +419,27 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
   if (run.over === 'won') stats.wins++;
   if (run.over === 'won' && run.party.every(memberUp)) stats.flawless++;
   stats.deepest = Math.max(stats.deepest, run.depth);
+  // Grudges: every run feeds the force's (free runs and Training meet them); a Shard run feeds its own too, the only
+  // ones a Shard run meets (sortieHistory), so practice never hardens a Shard run's lord.
   const grudge = { ...story.nemesis };
-  const grudgeBefore = grudge[run.boss] ?? 0;
+  const shardGrudge = { ...story.shardNemesis };
+  const shard = run.mode === 'shard';
+  const grudgeBefore = (shard ? shardGrudge : grudge)[run.boss] ?? 0;
   const bounty = bountyOf(run);
   if (run.lordWon) {
     grudge[run.boss] = Math.min(SORTIE.nemesis.max, (grudge[run.boss] ?? 0) + 1);
+    if (shard) shardGrudge[run.boss] = Math.min(SORTIE.nemesis.max, (shardGrudge[run.boss] ?? 0) + 1);
     bits.push(`${bossOf(run).name} will remember this`);
-  } else if (run.bossDown && grudge[run.boss]) {
-    delete grudge[run.boss];
-    if (bounty) bits.push(`a grudge settled: ${bounty} RP bounty`);
+  } else if (run.bossDown) {
+    if (grudge[run.boss] || (shard && shardGrudge[run.boss])) {
+      delete grudge[run.boss];
+      if (shard) delete shardGrudge[run.boss];
+      if (bounty) bits.push(`a grudge settled: ${bounty} RP bounty`);
+    }
   }
   story.nemesis = grudge;
+  if (Object.keys(shardGrudge).length) story.shardNemesis = shardGrudge;
+  else delete story.shardNemesis;
   if (threadDone(run) && !run.deep && !story.deep?.includes(run.region)) {
     story.deep = [...(story.deep ?? []), run.region];
     bits.push(`unlocked ${regionOf(run).deep.name}`);
@@ -480,6 +490,8 @@ export function applySortie(force: Force, run: SortieRun, date: string, newId: (
     if (!b.slain && !b.drill && v.slain) learned.push(beastInfo(k).name);
     b.met += v.met;
     b.slain += v.slain;
+    // A lord slain on a Shard run counts toward the rematch tricks Shard runs meet.
+    if (run.mode === 'shard' && k.startsWith('lord:') && v.slain) b.shard = (b.shard ?? 0) + v.slain;
   }
   // Wounds from Training (ForceSortie.bled) are spent once the party meets that lord (not on the weekly, which never
   // brings them).

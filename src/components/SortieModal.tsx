@@ -18,7 +18,7 @@ import {
   active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, startRound, nextTurn, braceFor, omensRead, sigWeaker,
   isFort, keepsHaul, leaveCombat, leaveEvent, memberName, memberUp, nextSlots, onField, patchUp, pickBoon, quitRun, distOf, DISTANCES, reachText, reachable, runXp, skillProblem,
   skillTargets, skillsOf, slotOf, SLOTS, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
-  ambushOdds, beastInfo, tierPay, boonDrawText, boonLabel, heldBoon, isUpgrade, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons,
+  ambushOdds, beastInfo, tierPay, boonDrawText, boonLabel, heldBoon, isUpgrade, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons, sortieHistory,
   type SortieBoonDraw, type SortieFx, type SortieIntentKind, type SortieModel, type SortieNode, type SortieNodeKind, type SortieRun, type SortieSkill, type SortieSkillKind, type SortieSquad,
 } from '../rules/sortie';
 import { SORTIE_BOSSES, SORTIE_REGIONS, type SortieSignature } from '../rules/sortieStory';
@@ -236,6 +236,8 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
   const run = runRef.current;
   const units = picked.map((id) => force.units.find((u) => u.id === id));
   const problem = mode === 'shard' ? sortieProblem(force, c, units) : partyProblem(units);
+  /** The grudges this mode's runs meet: a Shard run only those its own runs made. */
+  const grudges = sortieHistory(force.sortie, mode).nemesis;
   /** Move a pick one place along the starting line; a Fortification stays at the Back. */
   const shift = (i: number, dir: -1 | 1) => setPicked((xs) => {
     const line = lineUp(xs.map((id) => force.units.find((x) => x.id === id)!).filter(Boolean));
@@ -333,9 +335,8 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
     runRef.current = weekly
       ? createRun(lineUp(units as Unit[]), weekSeed(week), mode, SORTIE.weekly.length, { tier: SORTIE.weekly.tier, weekly: week })
       : createRun(lineUp(units as Unit[]), Math.floor(Math.random() * 2 ** 31), mode, length, {
-        nemesis: force.sortie?.nemesis,
+        ...sortieHistory(force.sortie, mode),
         bled: force.sortie?.bled,
-        slain: Object.fromEntries(Object.entries(force.sortie?.bestiary ?? {}).filter(([k]) => k.startsWith('lord:')).map(([k, b]) => [k.slice(5), b.slain])),
         boons: unlockedBoons(force.sortie),
         deep: deepOn ? force.sortie?.deep : undefined,
         tier,
@@ -498,10 +499,10 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               )}
             </>
           )}
-          {Object.keys(force.sortie?.nemesis ?? {}).length ? (
+          {Object.keys(grudges).length ? (
             <p className="small" style={{ margin: '6px 0 0' }}>
-              <b>Nemeses:</b>{' '}
-              {SORTIE_BOSSES.filter((b) => force.sortie?.nemesis?.[b.id]).map((b) => `${b.name} (${force.sortie!.nemesis![b.id]})`).join(', ')}
+              <b>{mode === 'shard' ? 'Shard-run nemeses' : 'Nemeses'}:</b>{' '}
+              {SORTIE_BOSSES.filter((b) => grudges[b.id]).map((b) => `${b.name} (${grudges[b.id]})`).join(', ')}
               <span className="muted"> — each shows up half the time, tougher per grudge, with a {SORTIE.nemesis.bounty} RP bounty per grudge.</span>
             </p>
           ) : null}

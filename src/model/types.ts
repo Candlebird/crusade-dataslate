@@ -228,6 +228,8 @@ export interface EmblemLayer {
 export interface ForceSortie {
   /** Echo lords that beat a party, by id, and how many times (a nemesis grows tougher each time). */
   nemesis?: Record<string, number>;
+  /** The grudges from Shard runs alone, which are all a Shard run meets (practice runs never feed them). */
+  shardNemesis?: Record<string, number>;
   /** Regions whose story thread the force finished, unlocking their deep version. */
   deep?: string[];
   /** Regions whose relic the force has brought home (once each); any unit that can carry one takes it for free. */
@@ -251,6 +253,8 @@ export interface ForceSortie {
 export interface SortieBeast {
   met: number;
   slain: number;
+  /** For a lord: times it was slain on a Shard run (part of `slain`). A Shard run's rematch tricks count only these. */
+  shard?: number;
   /** For a lord: the most pact-mark heat it was slain under. */
   mark?: number;
   /** For a lord: times it was slain in Training (as the force's nemesis). It unlocks the lore, but adds no rematch trick. */

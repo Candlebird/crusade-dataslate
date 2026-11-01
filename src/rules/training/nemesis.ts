@@ -39,7 +39,7 @@ export function nemesisPlan(run: TrainingRun, plans: SpawnPlan[]): SpawnPlan[] {
   const boss = plans.find((s) => TRAINING_ENEMIES[s.kind].spawn === 'boss');
   if (!boss) return plans;
   boss.nemesis = true;
-  boss.hp *= 1 + N.hp * run.nemesis!.grudge;
+  boss.hp *= (1 + N.hp * run.nemesis!.grudge) * (run.nemesis!.rematch >= 1 ? 1 + SORTIE.rematch.hp : 1);
   run.log.push(`${run.nemesis!.name} comes for the base: ${nemesisTricks(run.nemesis!).map((t) => t.name).join(', ')}.`);
   return plans;
 }
@@ -48,7 +48,7 @@ export function nemesisPlan(run: TrainingRun, plans: SpawnPlan[]): SpawnPlan[] {
 export function nemesisTricks(n: RunNemesis): { name: string; text: string }[] {
   const out = [{ name: n.sigName, text: sigText(n.sig) }];
   const R = SORTIE.rematch.tricks;
-  if (n.rematch >= 1) out.push({ name: R[0].name, text: '+1 to its saves.' });
+  if (n.rematch >= 1) out.push({ name: R[0].name, text: `${Math.round(SORTIE.rematch.hp * 100)}% more wounds.` });
   if (n.rematch >= 2) out.push({ name: R[1].name, text: `Walks ${Math.round((N.vengeful - 1) * 100)}% faster.` });
   if (n.rematch >= 3) out.push({ name: R[2].name, text: `Mends ${Math.round(N.regen * 100)}% of its wounds every ${N.regenEvery} s.` });
   return out;
@@ -98,7 +98,7 @@ function act(run: TrainingRun, e: Enemy, sig: string) {
 }
 
 /**
- * The nemesis's tricks, every step after the auras: speed (rage, Vengeful), saves (Hardened), Dread, the dirge's -1 to
+ * The nemesis's tricks, every step after the auras: speed (rage, Vengeful), Dread, the dirge's -1 to
  * hit on towers near it, its timed signature, and Regenerating.
  */
 export function nemesisTick(run: TrainingRun, dt: number): void {
@@ -110,7 +110,6 @@ export function nemesisTick(run: TrainingRun, dt: number): void {
     if (!s.armed) Object.assign(s, { armed: true, next: every(n.sig), regen: N.regenEvery });
     const age = run.t - s.born;
     s.speed = (n.sig === 'rage' ? 1 + Math.min(N.rage.max, N.rage.per * age) : 1) * (n.rematch >= 2 ? N.vengeful : 1);
-    s.hard = n.rematch >= 1 ? SORTIE.rematch.def : 0;
     s.free = n.sig === 'dread' || undefined;
     if (n.sig === 'dirge' && dirgeOn(run, e)) {
       for (const t of towers(run)) {

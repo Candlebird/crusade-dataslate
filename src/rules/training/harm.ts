@@ -84,10 +84,10 @@ export const busy = (run: TrainingRun, t: Tower) => t.guns.some((g) => targetFor
 export const terrainHit = (run: TrainingRun, t: Tower, g: TowerGun, e: Enemy): number =>
   !g.melee && isUnit(t) && t.terrainHit && inTerrain(run, e.x, e.y) ? t.terrainHit : 0;
 
-/** Did a hit get through the enemy's save (Defense + AP; a Hardened nemesis and an Armoured Echo save better, a
+/** Did a hit get through the enemy's save (Defense + AP; an Armoured Echo saves better, a
  *  sundered one worse)? */
 export const unsaved = (run: TrainingRun, e: Enemy, ap: number) =>
-  rand(run) >= saveChance(enemyDef(e).defense - (e.nem?.hard ?? 0) - (e.hard ?? 0), ap + ((e.sunder ?? 0) > 0 ? TRAINING.relics.sunder.ap : 0));
+  rand(run) >= saveChance(enemyDef(e).defense - (e.hard ?? 0), ap + ((e.sunder ?? 0) > 0 ? TRAINING.relics.sunder.ap : 0));
 
 /** A ring of `r` cells swelling out from a point. */
 export const pulse = (run: TrainingRun, x: number, y: number, r: number, color: string) =>

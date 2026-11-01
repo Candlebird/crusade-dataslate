@@ -426,6 +426,17 @@ const allModels = (run: SortieRun) => run.party.flatMap((m) => m.models);
 
 // --- The run -----------------------------------------------------------------------------------------------------
 
+/**
+ * The grudges and lord kills a run of this mode carries in (createRun's `nemesis` and `slain`). A Shard run meets only
+ * what Shard runs did (ForceSortie.shardNemesis, SortieBeast.shard), so practice can't harden its lord; a free run
+ * meets everything, as before.
+ */
+export function sortieHistory(story: ForceSortie | undefined, mode: SortieMode): { nemesis: Record<string, number>; slain: Record<string, number> } {
+  const lords = Object.entries(story?.bestiary ?? {}).filter(([k]) => k.startsWith('lord:'));
+  const slain = Object.fromEntries(lords.map(([k, b]) => [k.slice(5), mode === 'shard' ? b.shard ?? 0 : b.slain]).filter(([, n]) => n));
+  return { nemesis: { ...(mode === 'shard' ? story?.shardNemesis : story?.nemesis) }, slain };
+}
+
 /** A run for a party of units; a Fortification goes to the back of the line. */
 export function createRun(
   units: Unit[], seed: number, mode: SortieMode = 'free', length: SortieLength = 'short',
@@ -1404,8 +1415,9 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
   const lord = boss && enemies[0]?.unit.unitType === boss.unit ? enemies[0] : undefined;
   if (boss && lord) {
     // The lord takes its share of the budget in wounds, less what the party's story choices took off it.
-    // A nemesis comes back tougher for every party of the force it has beaten.
-    const mul = lordScale(budget, echoes[0].points) * (1 + SORTIE.nemesis.tough * (run.nemesis ?? 0)) * (cursed(run, 'grim') ? SORTIE.ascension.lord : 1);
+    // A nemesis comes back tougher for every party of the force it has beaten, and a Hardened rematch tougher still.
+    const mul = lordScale(budget, echoes[0].points) * (1 + SORTIE.nemesis.tough * (run.nemesis ?? 0)) * (cursed(run, 'grim') ? SORTIE.ascension.lord : 1)
+      * ((run.rematch ?? 0) >= 1 ? 1 + SORTIE.rematch.hp : 1);
     const short = 1 - Math.min(run.weaken, SORTIE.maxWeaken);
     for (const m of lord.models) {
       m.max = Math.max(1, Math.round(m.max * mul));
@@ -1422,11 +1434,8 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
       const cu = book.units.find((u) => u.name === 'Fiends');
       if (cu) c.brood = unitFromCatalog(cu, applySelection(cu, {}), book);
     }
-    // A lord slain before comes back with a trick for each time.
-    if (run.rematch) {
-      if (run.rematch >= 1) lord.defMod += SORTIE.rematch.def;
-      if (run.rematch >= 2) lord.atkBonus *= SORTIE.rematch.atk;
-    }
+    // A lord slain before comes back with a trick for each time (Hardened is in its wounds, above).
+    if ((run.rematch ?? 0) >= 2) lord.atkBonus *= SORTIE.rematch.atk;
     log(c, lord.arrives ? `${boss.name} is not on the field yet: its escorts hold the line, and it joins the fight in round ${lord.arrives}.` : run.nemesis ? boss.taunt : boss.intro, 'bad');
     if (run.rematch) {
       log(c, boss.rematch[run.rematch - 1], 'bad');

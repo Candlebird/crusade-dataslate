@@ -46,7 +46,7 @@ describe('tally', () => {
   it('marks the nemesis slain', () => {
     const run = blankRun();
     run.nemesis = { id: 'butcher', name: 'Gorrhul', grudge: 1, rematch: 0, sig: 'rage', sigName: 'Mounting Rage' };
-    const e = testEnemy({ kind: 'lord', hp: 5, nem: { born: 0, speed: 1, hard: 0, next: 0, regen: 0 } });
+    const e = testEnemy({ kind: 'lord', hp: 5, nem: { born: 0, speed: 1, next: 0, regen: 0 } });
     hurt(run, undefined, e, 10, 'other');
     expect(run.nemesis.slain).toBe(true);
     expect(run.beasts?.nemesis.slain).toBe(1);

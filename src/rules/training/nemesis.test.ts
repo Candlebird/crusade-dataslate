@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SORTIE, TRAINING } from '../downtimeData';
 import { holdTime } from './holds';
-import { unsaved } from './harm';
 import { isNemesisWave, nemesisPlan, nemesisTick, nemesisTricks, pickNemesis, sigText } from './nemesis';
 import { blankRun, testEnemy, testUnit } from './testRun';
 import type { RunNemesis, TrainingRun } from './types';
@@ -19,7 +18,7 @@ function field(n: RunNemesis): TrainingRun {
   run.phase = 'wave';
   run.wave = N.wave;
   run.nemesis = n;
-  run.enemies.push(testEnemy({ kind: 'lord', x: 20.5, y: 32, nem: { born: 0, speed: 1, hard: 0, next: 0, regen: 0 } }));
+  run.enemies.push(testEnemy({ kind: 'lord', x: 20.5, y: 32, nem: { born: 0, speed: 1, next: 0, regen: 0 } }));
   return run;
 }
 
@@ -67,18 +66,15 @@ describe('nemesis', () => {
     const e = run.enemies[0];
     expect(e.nem!.speed).toBeCloseTo((1 + Math.min(N.rage.max, N.rage.per * 10)) * N.vengeful);
     expect(speedOf(run, e)).toBeGreaterThan(speedOf(run, { ...e, nem: undefined }));
-    expect(e.nem!.hard).toBe(SORTIE.rematch.def);
   });
 
-  it('Hardened saves better', () => {
-    const tries = (hard: number) => {
-      const run = blankRun(9);
-      const e = testEnemy({ kind: 'lord', nem: { born: 0, speed: 1, hard, next: 0, regen: 0 } });
-      let n = 0;
-      for (let i = 0; i < 600; i++) if (unsaved(run, e, 0)) n++;
-      return n;
-    };
-    expect(tries(1)).toBeLessThan(tries(0));
+  it('Hardened comes with more wounds, not better saves', () => {
+    const run = blankRun();
+    run.wave = N.wave;
+    run.nemesis = nem({ grudge: 1 });
+    const base = nemesisPlan(run, planWave(run, N.wave)).find((s) => s.kind === 'lord')!.hp;
+    const hard = { ...blankRun(), wave: N.wave, nemesis: nem({ grudge: 1, rematch: 1 }) };
+    expect(nemesisPlan(hard, planWave(hard, N.wave)).find((s) => s.kind === 'lord')!.hp).toBeCloseTo(base * (1 + SORTIE.rematch.hp));
   });
 
   it('with Dread, can’t be held', () => {
