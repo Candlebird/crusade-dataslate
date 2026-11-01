@@ -5,7 +5,7 @@ import { visibleTo } from './fog';
 import { moveOf, moveTargets, positionOf, reach, regroup, setPosition } from './movement';
 import { emptyNexus, recordSectorGame, removeSectorGame } from './nexus';
 import { NEXUS_MOVE } from './nexusData';
-import { applyMoves, revealOrders } from './orders';
+import { CLAIM, applyMoves, revealOrders } from './orders';
 
 // A row of hexes: A's home, two empty hexes, an unclaimed planet, then B's planet and home.
 function campaign(): Campaign {
@@ -42,7 +42,21 @@ describe('detachments on the map', () => {
     setPosition(c, f.id, { sectorId: 'e2', factionId: 'A' });
     // An attack ends the move: it can't pass through the planet to B's.
     expect(kinds(c, f)).toEqual({ e1: 'move', hA: 'move', p: 'attack' });
-    expect(moveTargets(c, f).attacks.map((s) => s.id)).toEqual(['p']);
+    expect(moveTargets(c, f).attacks.map((s) => s.id)).toEqual(['e1', 'p']);
+  });
+
+  it('can attack unclaimed empty space to take it, or just move into it', () => {
+    const c = campaign();
+    const f = force('A');
+    expect(moveTargets(c, f).moves.map((s) => s.id)).toEqual(['e1', 'e2']);
+    expect(moveTargets(c, f).attacks.map((s) => s.id)).toEqual(['e1', 'e2']);
+    const move = revealOrders(c, [{ email: 'me@x', round: 1, picks: { [f.id]: 'e1' } }], 1, [f]);
+    expect(move.moves.map((m) => m.sectorId)).toEqual(['e1']);
+    expect(move.attacks).toEqual([]);
+    const attack = revealOrders(c, [{ email: 'me@x', round: 1, picks: { [f.id]: CLAIM + 'e1' } }], 1, [f]);
+    expect(attack.moves).toEqual([]);
+    expect(attack.attacks.map((a) => [a.sectorId, a.defender, a.flags])).toEqual([['e1', '', []]]);
+    expect(applyMoves(c, attack.moves, [f])).toBe(0);
   });
 
   it('moves further with a Beacon, a Forced March or Warp Currents, and less in an Ion Storm', () => {

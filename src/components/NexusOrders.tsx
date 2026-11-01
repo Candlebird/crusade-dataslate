@@ -6,7 +6,7 @@ import { detachmentName } from '../rules/detachments';
 import { aiDefended, ratingFor } from '../rules/difficulty';
 import { ECHOES, currentRound, factionName } from '../rules/nexus';
 import { moveOf, moveTargets, positionOf } from '../rules/movement';
-import { HOLD, applyMoves, beforeMoves, digsIn, noteMoveOrigins, replaceMovedOrder, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
+import { HOLD, applyMoves, attackPick, pickSector, beforeMoves, digsIn, noteMoveOrigins, replaceMovedOrder, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
 import { nowIso } from '../model/factory';
 import { spreadsAt, nextThreat } from '../rules/rounds';
 import { echoMarks, holders } from '../rules/voidspawn';
@@ -200,8 +200,11 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
             };
             // In words, what the pick will do once it's revealed.
             const picked = own?.picks[f.id] ?? own?.picks[f.nexus!.factionId] ?? '';
-            const target = attacks.find((s) => s.id === picked) ?? moves.find((s) => s.id === picked);
-            const isAttack = !!target && attacks.includes(target);
+            // Open empty space is in both lists: a plain pick moves there, a marked one attacks it.
+            const pickedId = pickSector(picked);
+            const claim = pickedId !== picked;
+            const target = claim ? attacks.find((s) => s.id === pickedId) : moves.find((s) => s.id === picked) ?? attacks.find((s) => s.id === picked);
+            const isAttack = !!target && (claim || !moves.includes(target));
             const rating = isAttack && aiDefended(target!) ? ratingFor(target!, f.nexus!.factionId, c) : undefined;
             const means = (kind: OrderKind) => !picked ? (
                 kind === 'move' ? <>Pick where to move. Until you do, nothing is declared and it stays where it is.</>
@@ -210,7 +213,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
               : picked === HOLD ? <>Stays at {at?.name ?? 'its sector'}.{digsIn(c, f) && ' Dug in: if attacked it fights and picks the deployment.'}{fx(at?.id)}</>
               : !target ? <>That sector is out of reach now: pick again.</>
               : isAttack ? <><span className="tag red">Attack</span> Fights for {target.name}: a battle against {rating !== undefined ? `its ${rating} Supply AI garrison` : factionName(c, target.owner)}, at the table
-                {zoneOn ? ' or as a zone battle' : !overrunBlock(target, f, c) ? ' or overrun (an auto-battle)' : ''}, from this panel after the reveal. Win and it moves in.</>
+                {zoneOn ? ' or as a zone battle' : !overrunBlock(target, f, c) ? ' or overrun (an auto-battle)' : ''}, from this panel after the reveal. Win and it moves in{target.type === 'empty' && !target.owner ? ', and the space is yours: a space station' : ''}.</>
               : <><span className="tag">Move</span> Moves to {target.name} with no battle, when the GM moves detachments after the reveal.{fx(target.id)}</>;
             return (
               <OrderPicker
@@ -260,7 +263,7 @@ function targetOptions(c: Campaign, f: Force, at: Campaign = c): { moves: OrderT
     moves: moves.map((s) => ({ id: s.id, text: `${s.name} (${s.owner ? factionName(c, s.owner) : 'empty space'})${fx(s.id)}` })),
     attacks: attacks.map((s) => {
       const r = aiDefended(s) ? ratingFor(s, f.nexus!.factionId, c) : undefined;
-      return { id: s.id, text: `${s.name} (${factionName(c, s.owner)})${r !== undefined ? ` — ${r} Supply` : ''}${overrunBlock(s, f, c) ? '' : ' · ⚡ can overrun'}` };
+      return { id: attackPick(s, f.nexus!.factionId), text: `${s.name} (${!s.owner && s.type === 'empty' ? 'empty space' : factionName(c, s.owner)})${r !== undefined ? ` — ${r} Supply` : ''}${overrunBlock(s, f, c) ? '' : ' · ⚡ can overrun'}` };
     }),
   };
 }
@@ -298,7 +301,7 @@ function OrderPicker({ head, picked, onPick, moves, attacks, means, lockTip = 'S
             <option value="">— Not declared —</option>
             <option value="hold">Hold: stay put, no battle</option>
             <option value="move" disabled={!moves.length}>Move: go to a free or friendly sector, no battle{moves.length ? '' : ' (none in reach)'}</option>
-            <option value="attack" disabled={!attacks.length}>Attack: fight a battle for an enemy sector{attacks.length ? '' : ' (none in reach)'}</option>
+            <option value="attack" disabled={!attacks.length}>Attack: fight a battle to take a sector{attacks.length ? '' : ' (none in reach)'}</option>
           </select>
         </label>
         {(kind === 'move' || kind === 'attack') && (
@@ -508,7 +511,7 @@ function AdjustOrders({ c, orders, round, fb }: { c: Campaign; orders: PlayerOrd
         const means = (kind: OrderKind) => !picked
           ? (kind === 'move' || kind === 'attack' ? <>Pick a sector.</> : <>No order: it stays where it is.</>)
           : picked === HOLD ? <>Holds at {from?.name ?? 'its sector'}.</>
-          : kind === 'attack' ? <><span className="tag red">Attack</span> Attacks {sectorName(picked)}.</>
+          : kind === 'attack' ? <><span className="tag red">Attack</span> Attacks {sectorName(pickSector(picked))}.</>
           : <><span className="tag">Move</span> Moves to {sectorName(picked)}.</>;
         return (
           <OrderPicker

@@ -1,4 +1,4 @@
-import type { Campaign, CampaignEvent, Force, ForcePosition } from '../model/types';
+import type { Campaign, CampaignEvent, Force, ForcePosition, Sector } from '../model/types';
 import { frontier, hexDistance, isPlaced } from './hexmap';
 import { PRODUCTION, homeChallengeBlock, stormed } from './nexus';
 import { hasBuilding } from './production';
@@ -11,6 +11,13 @@ import { siegeAttack, siegeOf } from './sieges';
 // detachment and declares its own order, within its reach on the map (movement.ts).
 
 export const HOLD = 'hold';
+
+/** A pick that attacks open empty space (which could also just be walked into) carries this mark before the sector id. */
+export const CLAIM = 'attack:';
+/** The sector a pick names. */
+export const pickSector = (pick: string) => (pick.startsWith(CLAIM) ? pick.slice(CLAIM.length) : pick);
+/** The pick that attacks this sector: marked when the sector is open ground for the faction. */
+export const attackPick = (s: Sector, factionId: string) => (isOpen(s, factionId) ? CLAIM + s.id : s.id);
 
 /** A detachment holding on its own faction's sector digs in: if the sector is attacked that round, it defends it. */
 export const digsIn = (c: Campaign, force: Force) => !!force.nexus && positionOf(c, force)?.owner === force.nexus.factionId;
@@ -111,13 +118,15 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
         holds.push({ email: o.email, factionId, ...(forceId ? { forceId } : {}) });
         continue;
       }
-      const s = c.sectors.find((x) => x.id === pick);
+      const sectorId = pickSector(pick);
+      const claim = sectorId !== pick;
+      const s = c.sectors.find((x) => x.id === sectorId);
       if (!s) continue;
       const flags: string[] = [];
       if (force && forceId) {
-        // A detachment's order: a move if it's open ground, else an attack, either one within its reach.
+        // A detachment's order: a move if it's open ground (unless it's marked as an attack), else an attack, either one within its reach.
         if (!reach(c, force).has(s.id)) flags.push('Out of reach');
-        if (isOpen(s, factionId)) {
+        if (!claim && isOpen(s, factionId)) {
           moves.push({ email: o.email, factionId, forceId, sectorId: s.id, flags });
           continue;
         }
@@ -132,9 +141,9 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
     const siege = siegeOf(c, f.id);
     if (!siege || seen.has(f.id)) continue;
     seen.add(f.id);
-    const own = orders.find((o) => o.round === round && (o.picks[f.id] ?? HOLD) !== HOLD && o.picks[f.id] !== siege.sectorId && o.picks[f.id] !== undefined);
+    const own = orders.find((o) => o.round === round && (o.picks[f.id] ?? HOLD) !== HOLD && pickSector(o.picks[f.id]) !== siege.sectorId);
     const a = siegeAttack(c, siege, f.owner ?? '');
-    if (own) a.flags.push(`Pinned by the siege: its order to ${c.sectors.find((x) => x.id === own.picks[f.id])?.name ?? 'move'} doesn't count`);
+    if (own) a.flags.push(`Pinned by the siege: its order to ${c.sectors.find((x) => x.id === pickSector(own.picks[f.id]))?.name ?? 'move'} doesn't count`);
     attacks.push(a);
   }
   const name = (id: string) => c.factions.find((f) => f.id === id)?.name ?? id;

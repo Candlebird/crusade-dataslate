@@ -7,13 +7,16 @@ import { hasPerk, leadsWith } from './warlords';
 
 // Detachments on the Nexus map (Nexus Wars). Each force linked to a faction stands in one sector, its faction's home
 // until it first moves. A round it moves up to NEXUS_MOVE.base hexes: through its faction's sectors and unclaimed empty
-// space freely, and into anything else as an attack, which ends its move. It takes the sector by winning there, and is
+// space freely, and into anything else as an attack, which ends its move. Unclaimed empty space can be attacked too, to take it. It takes the sector by winning there, and is
 // pushed back to its faction's nearest sector if someone else takes the one it stands in.
 
 export type MoveKind = 'move' | 'attack';
 
 /** Passing through it is a plain move: the faction holds it, or it's unclaimed empty space with nothing guarding it. */
-export const isOpen = (s: Sector, factionId: string) => s.owner === factionId || (!s.owner && s.type === 'empty' && !s.guardian);
+export const isOpen = (s: Sector, factionId: string) => s.owner === factionId || claimable(s);
+
+/** Unclaimed, unguarded empty space: free to pass through, or to attack (its AI garrison) to take it as a space station. */
+export const claimable = (s: Sector) => !s.owner && s.type === 'empty' && !s.guardian;
 
 /** The faction's sector nearest a hex: where its detachments fall back to. */
 export function nearestHeld(c: Campaign, factionId: string, from?: Hex): (Sector & Hex) | undefined {
@@ -119,11 +122,11 @@ export function reach(c: Campaign, force: Force): Map<string, Reach> {
   return out;
 }
 
-/** Where a detachment can go this round, by name: its moves and its attacks. */
+/** Where a detachment can go this round, by name: its moves and its attacks (empty space it can claim is both). */
 export function moveTargets(c: Campaign, force: Force) {
   const r = reach(c, force);
   const all = c.sectors.filter((s) => r.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
-  return { moves: all.filter((s) => r.get(s.id)!.kind === 'move'), attacks: all.filter((s) => r.get(s.id)!.kind === 'attack') };
+  return { moves: all.filter((s) => r.get(s.id)!.kind === 'move'), attacks: all.filter((s) => r.get(s.id)!.kind === 'attack' || claimable(s)) };
 }
 
 /**

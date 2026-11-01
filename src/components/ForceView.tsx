@@ -544,7 +544,7 @@ function HeroOffers({ f, c }: { f: Force; c: Campaign }) {
         return (
           <div key={o.id} className="row" data-tip={o.unit.rules.join(', ')}>
             <span className="grow">
-              <Icon name="g:round-star" /> <b>{o.unit.unitType}</b> <span className="muted">— level {levelForXp(o.unit.xp)}, {o.unit.points} pts{relic ? <>, carrying <b>{relic.name}</b> ({relic.tier})</> : ''}. {umbraShards(o.fee)}; {offerEnds(o) > currentRound(c) ? 'leaves after next round' : 'leaves when this round ends'}.</span>
+              <Icon name="g:round-star" /> <b>{o.unit.unitType}</b> <span className="muted">— level {levelForXp(o.unit.xp)}, {o.unit.points} pts{relic ? <>, carrying <b>{relic.name}</b> ({relic.tier})</> : ''}. {umbraShards(o.fee)}; {offerEnds(o) > currentRound(c) ? 'offer ends after next round' : 'offer ends when this round ends'}.</span>
             </span>
             <button disabled={!!block} data-tip={block ?? `Hire for ${o.fee} Umbra Shards. They join ${f.name} for good.`} onClick={() => {
               if (!confirmAction(`Hire ${o.unit.unitType} into ${f.name} for ${o.fee} Umbra Shards?`)) return;
