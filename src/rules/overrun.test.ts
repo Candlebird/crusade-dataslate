@@ -13,8 +13,8 @@ function campaign(): Campaign {
     id: 'c', name: 'Test', updatedAt: '',
     factions: [{ id: 'A', name: 'Alpha', player: '', color: '#f00' }, { id: 'B', name: 'Bravo', player: '', color: '#00f' }],
     sectors: [
-      { id: 'p', name: 'Weak World', type: 'planet', notes: '', difficulty: 900, ratings: { A: 700, B: 900 } },
-      { id: 'q', name: 'Strong World', type: 'planet', notes: '', difficulty: 800, ratings: { A: 800 } },
+      { id: 'p', name: 'Weak World', type: 'planet', notes: '', difficulty: 700 },
+      { id: 'q', name: 'Strong World', type: 'planet', notes: '', difficulty: 800 },
       { id: 'g', name: 'Guarded', type: 'planet', notes: '', difficulty: 500, guardian: { name: 'The Warden' } as never },
       { id: 'v', name: 'Voidspawn', type: 'voidspawn', notes: '', difficulty: 300 },
       { id: 'b', name: 'Bravo World', type: 'planet', owner: 'B', notes: '', difficulty: 300 },
@@ -37,12 +37,15 @@ describe('Overrun', () => {
     expect([1000, 2000, 4000, 1450, 500].map(overrunMax)).toEqual([700, 1400, 3000, 1000, 300]);
   });
 
-  it("goes by the attacker's own rating, and leaves set pieces and players' sectors to the table", () => {
+  it("goes by the sector's rating, and leaves set pieces and players' sectors to the table", () => {
     const c = campaign();
     const a = force('A', 1000);
     expect(overrunBlock(sector(c, 'p'), a)).toBe('');
-    expect(overrunBlock(sector(c, 'p'), force('B', 1000))).toMatch(/900 Supply/);
     expect(overrunBlock(sector(c, 'q'), a)).toMatch(/over the 700/);
+    // A muster adds its detachments up; a raid is an even fight, so it can always be settled off the table.
+    expect(overrunBlock(sector(c, 'q'), a, c, { supply: 1200, muster: true })).toBe('');
+    expect(overrunBlock(sector(c, 'q'), a, c, { raid: true })).toBe('');
+    expect(overrunBlock(sector(c, 'v'), a, c, { raid: true })).not.toBe('');
     for (const id of ['g', 'v', 'b']) expect(overrunBlock(sector(c, id), force('A', 9000))).not.toBe('');
     expect(overrunBlock(sector(c, 'p'), undefined)).not.toBe('');
   });
@@ -59,6 +62,25 @@ describe('Overrun', () => {
     b.auto = { winner: 'A', dealt: { A: 500, B: 100 } };
     b.ended = true;
     expect(sectorGame(b, c, [a])).toEqual({ event: expect.objectContaining({ sectorId: 'p', attacker: 'A', winner: 'A', forceId: a.id, notes: expect.stringMatching(/^Auto-battle/) }) });
+  });
+
+  it('sets a raid against a garrison the size of the raiders, and a muster with a side for each detachment', () => {
+    const c = campaign();
+    const a = force('A', 500);
+    const raid = attackBattle(c, { ...attack(a, 'q'), raid: true }, [a], [], DEFAULT_SETTINGS, () => 0.5);
+    expect(raid.raid).toBe(true);
+    const pts = raid.sides.find((x) => x.ai)!.units.reduce((n, u) => n + (u.points ?? 0), 0);
+    expect(pts).toBeLessThanOrEqual(530);
+    raid.auto = { winner: 'A', dealt: { A: 500, B: 100 } };
+    raid.ended = true;
+    expect(sectorGame(raid, c, [a])).toEqual({ event: expect.objectContaining({ raid: { cut: 0 }, notes: expect.stringMatching(/^Raid\. /) }) });
+
+    const [m1, m2, m3] = [force('A', 600), force('A', 700), force('A', 400)];
+    const muster = attackBattle(c, { ...attack(m1, 'q'), forceIds: [m1.id, m2.id, m3.id] }, [m1, m2, m3], [], DEFAULT_SETTINGS, () => 0.5);
+    expect(muster.sides.filter((x) => x.team === 'A').map((x) => x.forceId)).toEqual([m1.id, m2.id, m3.id]);
+    muster.auto = { winner: 'A', dealt: { A: 500, B: 100 } };
+    muster.ended = true;
+    expect(sectorGame(muster, c, [m1, m2, m3])).toEqual({ event: expect.objectContaining({ forceId: m1.id, forceIds: [m1.id, m2.id, m3.id] }) });
   });
 
   it("falls back on the defender's dug-in detachment for a player-held sector", () => {

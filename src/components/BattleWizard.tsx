@@ -72,7 +72,7 @@ export default function BattleWizard({ forceId, battleId, sideId }: { forceId: s
   const [input, setInput] = useState<BattleInput | null>(() => {
     if (!f) return null;
     const blank = initialInput(f, forceTotals(f, state.settings).bp);
-    return source ? wizardPrefill(source.battle, source.side, blank, f, state.campaign) : blank;
+    return source ? wizardPrefill(source.battle, source.side, blank, f, state.campaign, state.forces) : blank;
   });
   const [applied, setApplied] = useState<BattleOutcome | null>(null);
 

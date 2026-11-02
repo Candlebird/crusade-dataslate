@@ -16,6 +16,7 @@ import { grantRelic } from './relicVault';
 import { MANIPULATION_PREFIX, NEXUS_ROUNDS, RELIC_TAKEN, emptyNexusPick, expireNexus, nexusEntry, type NexusContext, type NexusPick } from './nexus';
 import { ZONE_REWARDS, type ZoneMode } from './zone/rewards';
 import { SOLO_PATROL } from './downtimeData';
+import { RAID } from './nexusData';
 
 // Post-battle resolution ("Gaining Experience", "Gaining RP", "Deaths").
 // resolveBattle() mutates a force draft, so the wizard can preview on a clone and apply the same code for real.
@@ -75,6 +76,10 @@ export interface BattleInput {
   patrol?: boolean;
   /** Fought as a zone battle: Command (3/4 XP) or Quick (1/2 XP, no reward rolls). Neither earns the match bonus. */
   zone?: ZoneMode;
+  /** Nexus Wars: XP each unit that fought gets on a win, for attacking a garrison over its Supply (rules/fieldCap.ts). */
+  underdog?: number;
+  /** Nexus Wars: the side raided the sector: a win pays RAID.us Umbra Shards. */
+  raid?: boolean;
 }
 
 export interface RewardRow {
@@ -100,6 +105,8 @@ export function restartInput(blank: BattleInput, prev: BattleInput, used: string
   const next: BattleInput = { ...blank, units: { ...blank.units }, from: prev.from };
   if (prev.patrol) Object.assign(next, { patrol: true, vsAi: prev.vsAi });
   if (prev.zone) next.zone = prev.zone;
+  if (prev.raid) next.raid = true;
+  if (prev.underdog) next.underdog = prev.underdog;
   for (const id of used) if (next.units[id]) next.units[id] = { ...next.units[id], in: false };
   return next;
 }
@@ -324,6 +331,8 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
       if (name && byId.has(pick.target)) relicGains.push({ unitId: pick.target, name });
       else warnings.push(`${source}: choose a relic and a unit.`);
     };
+    // A won raid pays Umbra Shards.
+    if (input.raid && input.result === 'win') addUs('Raid', RAID.us);
     for (const item of input.nexus?.items ?? []) {
       const pick = input.nexusPicks?.[item.key] ?? emptyNexusPick();
       const src = item.source;
@@ -430,6 +439,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
       if (r.killXp) parts.push({ label: 'Kills', xp: r.killXp });
       if (r.bonusXp && !input.patrol) parts.push({ label: 'Agendas / bonus', xp: r.bonusXp });
       if (r.destroyed && r.death?.outcome === 'xp') parts.push({ label: 'Death roll', xp: 1 });
+      if (input.underdog && input.result === 'win' && !input.patrol) parts.push({ label: 'Underdog', xp: input.underdog });
     }
     // A zone battle earns a share of the XP a table game would (what its reward rolls give comes on top, in full).
     if (input.zone) for (const p of parts) p.xp = Math.round(p.xp * ZONE_REWARDS[input.zone].xp * 10) / 10;

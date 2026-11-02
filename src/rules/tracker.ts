@@ -6,6 +6,8 @@ import { NEXUS_CRISIS, activeEvent, unitsUsed, benefitOf, ECHOES, factionName, l
 import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
 import { aiStyleFor, type AiStyle } from './aiTrees';
 import { aiDefended, modifierOf, ratingFor } from './difficulty';
+import { supplyLimit } from './detachments';
+import { underdogXp } from './fieldCap';
 import { isReinforced } from './production';
 import type { ZoneMode } from './zone/rewards';
 
@@ -98,6 +100,10 @@ export interface TrackedBattle {
   crisis?: number;
   /** A solo patrol (downtime): reduced rewards, see SOLO_PATROL. */
   patrol?: boolean;
+  /** Nexus Wars: a raid (rules/fieldCap.ts): the garrison matches the raiders; a win cuts it instead of taking the sector. */
+  raid?: boolean;
+  /** Nexus Wars: XP each attacking unit gets on a win for taking on a garrison over its Supply (rules/fieldCap.ts underdogXp). */
+  underdog?: number;
   /** Fought as a zone battle instead of at the table: Command or Quick rewards (zone/setup.ts ZONE_REWARDS). */
   zoneMode?: ZoneMode;
   /** OPR Advanced deployment style, if one was picked or rolled. */
@@ -355,19 +361,26 @@ export function teamFaction(b: TrackedBattle, t: TeamKey, c: Campaign, forces: F
  * Set a new battle up to be fought over a sector: team A attacks for a faction, team B defends.
  * A team's first player gets their faction's force loaded: the attacking detachment if given, else the faction's only force.
  */
-export function atSector(b: TrackedBattle, c: Campaign, forces: Force[], s: Settings, sectorId: string, attacker: string, forceId?: string) {
+export function atSector(b: TrackedBattle, c: Campaign, forces: Force[], s: Settings, sectorId: string, attacker: string, forceId?: string | string[]) {
   b.sectorId = sectorId;
   b.attacker = 'A';
   const owner = c.sectors.find((x) => x.id === sectorId)?.owner;
-  const load = (t: TeamKey, factionId: string | undefined, pick?: string) => {
-    const side = membersOf(b, t).find((x) => !x.ai);
+  const load = (t: TeamKey, factionId: string | undefined, pick?: string, side = membersOf(b, t).find((x) => !x.ai)) => {
     const theirs = forces.filter((f) => factionId && f.nexus?.factionId === factionId);
     const one = theirs.find((f) => f.id === pick) ?? (theirs.length === 1 ? theirs[0] : undefined);
     if (side && one) loadForce(side, one, undefined, s, c);
   };
-  load('A', attacker, forceId);
+  // A muster: each of the faction's detachments takes its own side on team A.
+  const ids = Array.isArray(forceId) ? forceId : forceId ? [forceId] : [];
+  if (ids.length > 1) {
+    const players = () => membersOf(b, 'A').filter((x) => !x.ai);
+    while (players().length < ids.length) addSide(b, 'A');
+    ids.forEach((id, i) => load('A', attacker, id, players()[i]));
+  } else load('A', attacker, ids[0]);
   if (owner !== attacker) load('B', owner);
 }
+
+const aiDefendedSector = (s: { owner?: string }) => !s.owner || s.owner === ECHOES.id;
 
 export type SectorGame = { event: Omit<CampaignEvent, 'id' | 'date'> } | { problem: string };
 
@@ -395,9 +408,12 @@ export function sectorGame(b: TrackedBattle, c: Campaign | undefined, forces: Fo
     ? `Auto-battle: ${teamsOf(b).map((t) => `${teamName(b, t)} dealt ${b.auto!.dealt[t] ?? 0}`).join(', ')} pts.`
     : `${b.mission.name}: ${teamsOf(b).map((t) => `${teamName(b, t)} ${sc[t]!.total}`).join(', ')} VP.`)
     + (standIn ? ` The ${ECHOES.name} stood in for ${factionName(c, standIn)}.` : '');
-  const forceId = membersOf(b, b.attacker).map((x) => forces.find((f) => f.id === x.forceId)).find((f) => f?.nexus?.factionId === attacker)?.id;
+  const mine = [...new Set(membersOf(b, b.attacker).map((x) => forces.find((f) => f.id === x.forceId)).filter((f) => f?.nexus?.factionId === attacker).map((f) => f!.id))];
+  const forceId = mine[0];
   const stories = b.auto?.stories;
-  return { event: { sectorId: sector.id, attacker, defender, winner: won, notes, battleId: b.id, ...(forceId ? { forceId } : {}), ...(stories?.length ? { stories } : {}) } };
+  // A raid takes nothing: the win cuts the garrison instead (recordSectorGame).
+  const raid = b.raid && aiDefendedSector(sector) ? { raid: { cut: 0 } } : {};
+  return { event: { sectorId: sector.id, attacker, defender, winner: won, notes: (b.raid ? 'Raid. ' : '') + notes, battleId: b.id, ...(forceId ? { forceId } : {}), ...(mine.length > 1 ? { forceIds: mine } : {}), ...raid, ...(stories?.length ? { stories } : {}) } };
 }
 
 /**
@@ -449,7 +465,7 @@ export function standInFor(b: TrackedBattle, c: Campaign, forces: Force[]): stri
 }
 
 /** What the post-battle wizard can fill in for one side of a tracked battle. */
-export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInput, f: Force, c?: Campaign): BattleInput {
+export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInput, f: Force, c?: Campaign, forces: Force[] = [f]): BattleInput {
   const side = b.sides.find((x) => x.id === sideId)!;
   const opps = b.sides.filter((x) => x.team !== side.team);
   const allies = membersOf(b, side.team).filter((x) => x !== side);
@@ -492,7 +508,26 @@ export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInp
     from: { battleId: b.id, sideId },
     ...(b.patrol ? { patrol: true } : {}),
     ...(b.zoneMode ? { zone: b.zoneMode } : {}),
+    ...(b.raid && side.team === b.attacker ? { raid: true } : {}),
+    ...(() => {
+      const xp = side.team === b.attacker ? battleUnderdog(b, c, forces) : 0;
+      return xp ? { underdog: xp } : {};
+    })(),
   };
+}
+
+/**
+ * Underdog XP for the attackers of a battle over an AI-held sector (not a raid): its garrison over their Supply, every
+ * detachment on the attacking team counted (rules/fieldCap.ts underdogXp). Paid on a win.
+ */
+export function battleUnderdog(b: TrackedBattle, c: Campaign | undefined, forces: Force[]): number {
+  const sector = c?.sectors.find((x) => x.id === b.sectorId);
+  if (!c || !sector || !b.attacker || b.raid || b.patrol || !aiDefended(sector)) return 0;
+  const supply = membersOf(b, b.attacker).reduce((n, x) => {
+    const f = forces.find((y) => y.id === x.forceId);
+    return n + (f ? supplyLimit(f) : 0);
+  }, 0);
+  return underdogXp(ratingFor(sector, undefined, c), supply);
 }
 
 /** Which side of the tracked battle a force played, if it still needs recording. */

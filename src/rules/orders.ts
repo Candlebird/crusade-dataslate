@@ -77,6 +77,10 @@ export interface Attack {
   flags: string[];
   /** The defender's detachment dug in there: it fights the battle and picks the deployment. */
   dugIn?: string;
+  /** A muster (rules/fieldCap.ts): every detachment of the faction attacking the sector together, `forceId` first. */
+  forceIds?: string[];
+  /** A raid: the garrison matches the raiders, and a win cuts it rather than taking the sector. */
+  raid?: boolean;
 }
 
 /** A detachment moving through its own or empty space: no game, the GM moves it on the map. */

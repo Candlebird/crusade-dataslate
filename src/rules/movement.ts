@@ -1,7 +1,7 @@
 import type { Campaign, CampaignEvent, Force, ForcePosition, Sector } from '../model/types';
 import { hexDistance, hexKey, isPlaced, neighbors, type Hex } from './hexmap';
 import { activeEvent, currentRound, homeOf, stormed } from './nexus';
-import { NEXUS_MOVE, PRODUCTION, WARLORDS } from './nexusData';
+import { FIELD_CAP, NEXUS_MOVE, PRODUCTION, WARLORDS } from './nexusData';
 import { hasBuilding } from './production';
 import { hasPerk, leadsWith } from './warlords';
 
@@ -74,6 +74,12 @@ export function moveOf(c: Campaign, force: Force): { move: number; why: string[]
     if (m.kind !== 'order' || !m.move || m.forceId !== force.id || m.from > round || (m.until != null && m.until < round)) continue;
     move += m.move;
     why.push(`${m.move > 0 ? '+' : ''}${m.move} ${m.name}`);
+  }
+  // A lean detachment (few points in the field, but some) moves further.
+  const fielded = force.units.filter((u) => u.status === 'active');
+  if (fielded.length && fielded.reduce((n, u) => n + u.points, 0) <= FIELD_CAP.lean) {
+    move += FIELD_CAP.leanMove;
+    why.push(`+${FIELD_CAP.leanMove} lean`);
   }
   const event = activeEvent(c);
   if (event?.move) {
@@ -151,10 +157,13 @@ export function regroup(c: Campaign): Record<string, ForcePosition | null> {
  */
 export function settleGame(c: Campaign, e: CampaignEvent, s: Sector, undo: NonNullable<CampaignEvent['undo']>) {
   const was: Record<string, ForcePosition | null> = {};
-  if (e.forceId && e.winner === e.attacker && s.owner === e.winner && isPlaced(s)) {
-    was[e.forceId] = c.positions?.[e.forceId] ?? null;
-    setPosition(c, e.forceId, { sectorId: s.id, factionId: e.winner });
-  }
+  // A muster moves in together.
+  const ids = e.forceIds?.length ? e.forceIds : e.forceId ? [e.forceId] : [];
+  if (e.winner === e.attacker && s.owner === e.winner && isPlaced(s))
+    for (const id of ids) {
+      was[id] = c.positions?.[id] ?? null;
+      setPosition(c, id, { sectorId: s.id, factionId: e.winner });
+    }
   Object.assign(was, regroup(c));
   if (Object.keys(was).length) undo.positions = was;
 }

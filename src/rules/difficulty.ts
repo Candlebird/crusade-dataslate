@@ -2,15 +2,15 @@ import type { Campaign, Force, Sector } from '../model/types';
 import { factionForces, supplyLimit } from './detachments';
 import { hexDistance, isPlaced, type Hex, type Rand } from './hexmap';
 import { ECHOES, activeEvent } from './nexus';
-import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY, SECTOR_MODIFIERS } from './nexusData';
+import { cutOf, fieldCap } from './fieldCap';
+import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY, RATING_BANDS, SECTOR_MODIFIERS } from './nexusData';
 
-// Nexus Wars sector difficulty. Every sector off a faction's home is rated in Supply: the size of the AI garrison that
-// holds it. Ratings run from NEXUS_DIFFICULTY.min up to the faction's own total Supply × maxFactor, so the far reaches
-// of the map are always a step up for whoever attacks, and they're recalculated every round as the factions grow. A
-// small faction isn't priced out by the leader's growth, and the leader's growth shows as reach (Overrun), not odds.
-// Each sector rolls one offset up or down, the same for every faction, so nearby sectors differ. Each sector also
-// rolls one modifier (two when it's rated hard) that favours its defender. The Voidspawn is everyone's top: the
-// biggest faction's maximum.
+// Nexus Wars sector difficulty. Every sector off the homes is rated in Supply: the size of the AI garrison that holds
+// it. Ratings come in bands scaled to the field cap (rules/fieldCap.ts), not to anyone's Supply, so one faction's growth
+// doesn't raise everyone's targets: near the homes a garrison is RATING_BANDS.near × the cap, at the far reach far × the
+// cap, and the set pieces (the Voidspawn, a Lost Archive, a guardian's sector) setPiece × the cap. They're recalculated
+// when a round ends, as the cap grows. Each sector rolls one offset up or down, so nearby sectors differ, and one
+// modifier (two when it's rated hard) that favours its defender. A won raid cuts a garrison for good (Sector.cut).
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 
@@ -22,29 +22,30 @@ export const factionSupply = (forces: Force[], factionId: string) =>
 export const difficultyLevel = (c: Campaign) =>
   DIFFICULTY_LEVELS.find((l) => l.id === c.difficulty) ?? DIFFICULTY_LEVELS.find((l) => l.id === 'normal')!;
 
+/** Set pieces are rated RATING_BANDS.setPiece × the cap: the Voidspawn, a Lost Archive, and any sector a guardian holds. */
+export const setPiece = (s: Sector) => s.type === 'voidspawn' || s.type === 'archive' || (!!s.guardian && aiDefended(s));
+
 /**
- * The current scale of sector ratings: `base` near the homes up to `max`; with the random roll, ratings land in
- * `min`–`max`. The campaign's difficulty level scales all three.
+ * The current scale of sector ratings, all on the field cap and scaled by the difficulty level: `base` near the homes,
+ * `far` at the far reach, `max` for the set pieces; with the random roll, ratings land in `min`–`max`.
  */
-export function difficultyRange(c: Campaign, forces: Force[], factionId?: string) {
-  const { min, minSpread, maxFactor, step, floor, jitter } = NEXUS_DIFFICULTY;
-  const top = factionId ? factionSupply(forces, factionId) : Math.max(0, ...c.factions.map((f) => factionSupply(forces, f.id)));
-  const scaled = (n: number) => Math.max(step, Math.round((n * difficultyLevel(c).scale) / step) * step);
-  return {
-    min: scaled(Math.max(floor, min - jitter)),
-    base: scaled(min),
-    max: scaled(Math.max(min + minSpread, Math.round((top * maxFactor) / step) * step)),
-  };
+export function difficultyRange(c: Campaign, _forces?: Force[]) {
+  const { near, far, setPiece: top, jitter } = RATING_BANDS;
+  const { step } = NEXUS_DIFFICULTY;
+  const cap = fieldCap(c);
+  const scaled = (n: number) => Math.max(step, Math.round((n * cap * difficultyLevel(c).scale) / step) * step);
+  return { min: scaled(near - jitter), base: scaled(near), far: scaled(far), max: scaled(top) };
 }
 
 /**
- * The garrison `factionId` faces at `s`: its own rating, else the sector's (the biggest faction's scale). With the
- * campaign, the round's Galactic Event counts too (a Blood Moon swells AI garrisons, to the nearest 10).
+ * The garrison at `s`: its rating, less any raid cut (to the nearest 10). With the campaign, the round's Galactic Event
+ * counts too (a Blood Moon swells AI garrisons). The faction no longer matters: every faction faces the same garrison.
  */
-export function ratingFor(s: Sector, factionId?: string, c?: Campaign): number | undefined {
-  const rating = (factionId && s.ratings?.[factionId]) || s.difficulty;
-  const swell = c && aiDefended(s) ? activeEvent(c)?.garrison : undefined;
-  return rating !== undefined && swell ? Math.round((rating * swell) / 10) * 10 : rating;
+export function ratingFor(s: Sector, _factionId?: string, c?: Campaign): number | undefined {
+  if (s.difficulty === undefined) return undefined;
+  const cut = 1 - cutOf(s);
+  const swell = c && aiDefended(s) ? activeEvent(c)?.garrison ?? 1 : 1;
+  return cut === 1 && swell === 1 ? s.difficulty : Math.round((s.difficulty * cut * swell) / 10) * 10;
 }
 
 /** Is the sector held by the AI (unclaimed, or the Echoes'), so an attacker faces its garrison? */
@@ -68,11 +69,11 @@ export const modifierOf = (id: string) => SECTOR_MODIFIERS.find((m) => m.id === 
  * `reroll`, AI-held sectors roll fresh modifiers (a new round, a new garrison); player-held sectors keep theirs.
  * Mutates `c`; returns the range used.
  */
-export function rateSectors(c: Campaign, forces: Force[], rand: Rand = Math.random, o: { reroll?: boolean } = {}) {
-  const range = difficultyRange(c, forces);
-  const own = c.factions.map((f) => [f.id, difficultyRange(c, forces, f.id)] as const);
-  const { step, hardAt, jitter } = NEXUS_DIFFICULTY;
-  const roll = () => (Math.floor(rand() * (2 * Math.floor(jitter / step) + 1)) - Math.floor(jitter / step)) * step;
+export function rateSectors(c: Campaign, _forces?: Force[], rand: Rand = Math.random, o: { reroll?: boolean } = {}) {
+  const range = difficultyRange(c);
+  const { step, hardAt } = NEXUS_DIFFICULTY;
+  const jitter = Math.floor((RATING_BANDS.jitter * fieldCap(c) * difficultyLevel(c).scale) / step);
+  const roll = () => (Math.floor(rand() * (2 * jitter + 1)) - jitter) * step;
   for (const s of c.sectors) {
     if (s.type === 'home') {
       delete s.difficulty;
@@ -80,17 +81,11 @@ export function rateSectors(c: Campaign, forces: Force[], rand: Rand = Math.rand
       delete s.modifiers;
       continue;
     }
+    delete s.ratings;
     const t = sectorThreat(c, s);
-    // The Voidspawn is always the top of the scale; everything else rolls around its place on it.
-    if (s.type === 'voidspawn') {
-      s.difficulty = range.max;
-      delete s.ratings;
-    } else {
-      const offset = roll();
-      const rate = (r: typeof range) => clamp(Math.round((r.base + t * (r.max - r.base)) / step) * step + offset, r.min, r.max);
-      s.difficulty = rate(range);
-      s.ratings = Object.fromEntries(own.map(([id, r]) => [id, rate(r)]));
-    }
+    // Set pieces sit at the top of the scale; everything else rolls around its place in the near–far band.
+    if (setPiece(s)) s.difficulty = range.max;
+    else s.difficulty = clamp(Math.round((range.base + t * (range.far - range.base)) / step) * step + roll(), range.min, range.max);
     if (s.modifiers?.length && !(o.reroll && aiDefended(s))) continue;
     const pool = [...SECTOR_MODIFIERS];
     const picks: string[] = [];
@@ -98,4 +93,10 @@ export function rateSectors(c: Campaign, forces: Force[], rand: Rand = Math.rand
     s.modifiers = picks;
   }
   return { min: range.min, max: range.max };
+}
+
+/** A guardian that turned up since the last rating makes its sector a set piece: rate it so. */
+export function rateGuardians(c: Campaign) {
+  const top = difficultyRange(c).max;
+  for (const s of c.sectors) if (setPiece(s) && s.type !== 'home') s.difficulty = top;
 }

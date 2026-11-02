@@ -7,7 +7,8 @@ import {
 import { explore } from './fog';
 import { MARAUDER_ID, unrecordMarauderGame } from './marauders';
 import { settleGame, unsettleGame } from './movement';
-import { isPlaced } from './hexmap';
+import { hexKey, isPlaced, neighbors } from './hexmap';
+import { cutGarrison, uncutGarrison } from './fieldCap';
 import { deposited, depositNearest, hasBuilding, loseBank } from './production';
 import { hasPerk } from './warlords';
 import { ZONE_REWARDS, type ZoneMode } from './zone/rewards';
@@ -153,6 +154,14 @@ export function recordSectorGame(c: Campaign, e: CampaignEvent, rand = Math.rand
   c.log.push(e);
   const s = c.sectors.find((x) => x.id === e.sectorId);
   if (!s || !e.winner || e.winner === 'ai') return;
+  // A raid takes nothing: a win cuts the garrison for good and scouts the sector and all round it.
+  if (e.raid) {
+    if (e.winner === e.attacker) {
+      e.raid = { cut: cutGarrison(s) };
+      scoutAround(c, e.attacker, s);
+    }
+    return;
+  }
   const undo: NonNullable<CampaignEvent['undo']> = {};
   if (!isStronghold(s) && s.owner !== e.winner) changeHands(s, e.winner, undo);
   if (s.type === 'void' && e.defender === 'ai' && !s.rewardClaimed) {
@@ -173,6 +182,18 @@ export function recordSectorGame(c: Campaign, e: CampaignEvent, rand = Math.rand
   settleGame(c, e, s, undo);
   if (Object.keys(undo).length) e.undo = undo;
   explore(c);
+}
+
+/** A won raid shows the raiders the sector and every sector next to it, this round and the next (like a Recon unit). */
+function scoutAround(c: Campaign, factionId: string, s: Sector) {
+  const f = c.factions.find((x) => x.id === factionId);
+  if (!f || !isPlaced(s)) return;
+  const near = new Set(neighbors(s).map((h) => hexKey(h.q, h.r)));
+  const ids = [s.id, ...c.sectors.filter((x) => isPlaced(x) && near.has(hexKey(x.q, x.r))).map((x) => x.id)];
+  const round = currentRound(c);
+  const now = f.recon?.find((r) => r.round === round);
+  if (now) now.sectorIds = [...new Set([...now.sectorIds, ...ids])];
+  else f.recon = [...(f.recon ?? []), { round, sectorIds: ids }];
 }
 
 /** Delete a log entry. If nothing has changed the sector since, put it back the way the game found it. */
@@ -197,6 +218,7 @@ export function removeSectorGame(c: Campaign, id: string) {
     return;
   }
   const s = c.sectors.find((x) => x.id === e.sectorId);
+  if (s && e.raid?.cut) uncutGarrison(s, e.raid.cut);
   if (!s || !e.undo || c.log.slice(i).some((x) => x.sectorId === e.sectorId && x.undo)) return;
   if (e.undo.owner !== undefined && s.owner === e.winner) {
     if (e.undo.owner) s.owner = e.undo.owner;

@@ -172,6 +172,11 @@ export interface ForceNexus {
   forged?: ('Common' | 'Rare')[];
   /** Garrisons (`sectorId@round`) whose raid XP this force has taken. */
   garrisonsPaid?: string[];
+  /** Field cap (rules/fieldCap.ts): the Supply this detachment had over the cap when the cap came in. It keeps it (grandfathered)
+   *  but can't grow past it until the cap catches up. Unset: it has been checked and was under the cap. */
+  capHold?: number;
+  /** Field cap: set once this force has been checked against the cap (the first check grandfathers, later ones bank the excess). */
+  capSeen?: boolean;
 }
 
 /** A unit's downtime task for a round. */
@@ -555,10 +560,10 @@ export interface Sector {
   reinforced?: boolean;
   /** Void one-off reward already taken. */
   rewardClaimed?: boolean;
-  /** Nexus Wars difficulty: the Supply of the AI garrison holding it, recalculated each round (rules/difficulty). On the
-   *  biggest faction's scale; each faction faces its own rating (`ratings`). */
+  /** Nexus Wars difficulty: the Supply of the AI garrison holding it, on the field cap's bands, recalculated when a round
+   *  ends (rules/difficulty). A raid cut (`cut`) takes off it. */
   difficulty?: number;
-  /** The rating each faction faces here, scaled to its own total Supply (rules/difficulty ratingFor). */
+  /** No longer used: every faction faces the same rating. Cleared when sectors are rated. */
   ratings?: Record<string, number>;
   /** Sector modifier ids (SECTOR_MODIFIERS) that favour its defender. */
   modifiers?: string[];
@@ -589,6 +594,9 @@ export interface Sector {
   project?: SectorProject;
   /** Units that garrisoned it lately, newest last (a few rounds are kept, so raid XP waits to be taken). */
   garrisons?: SectorGarrison[];
+  /** Raids (rules/fieldCap.ts): the share cut off its garrison by won raids (0.1 a raid, stacking). It regrows when a round
+   *  ends with no attack on it. */
+  cut?: number;
 }
 
 /** A Marauder band (rules/marauders.ts): raiders belonging to no one, always on the map. */
@@ -644,6 +652,11 @@ export interface CampaignFaction {
   thread?: JournalThreadState;
   /** Sectors scouted by Recon units: seen in the round they were scouted and the next. */
   recon?: { round: number; sectorIds: string[] }[];
+  /** Field cap: Supply over a detachment's cap, waiting to be handed to a detachment with room or to found a new one. */
+  bank?: number;
+  /** Supply handed from the bank to another player's detachment, waiting for that player's app to take it in (only a force's
+   *  owner can change it). */
+  grants?: { id: string; forceId: string; supply: number }[];
 }
 
 /** A story thread a faction's journals follow over several rounds: the step it's at, and the rival it names, if any. */
@@ -726,6 +739,10 @@ export interface CampaignEvent {
   marauder?: Marauder;
   /** Materials a band took off the faction for barring its road (lost the fight), so deleting the entry gives them back. */
   toll?: number;
+  /** A raid (rules/fieldCap.ts): no capture; a win cut the garrison by `cut` (taken back if the entry is deleted). */
+  raid?: { cut: number };
+  /** A muster: every detachment that fought (the first is `forceId`). All of them move in on a win. */
+  forceIds?: string[];
 }
 
 /** A sector the Void Echoes are massing against: it falls when the round ends unless the line is held. */
@@ -813,6 +830,8 @@ export interface Campaign {
   sieges?: Siege[];
   /** No longer read: zone battles are open to every player. Kept so older saves still type-check. */
   zoneOpen?: boolean;
+  /** The GM's field cap override (rules/fieldCap.ts); FIELD_CAP (nexusData.ts) when unset. */
+  fieldCap?: { base: number; perRound: number; max: number };
 }
 
 /** The evening's roll call: the factions whose players said they're coming, for a campaign round. */

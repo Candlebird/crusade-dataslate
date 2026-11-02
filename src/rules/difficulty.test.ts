@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { newForce } from '../model/factory';
 import type { Campaign, Sector } from '../model/types';
-import { difficultyRange, factionSupply, rateSectors, ratingFor, sectorThreat } from './difficulty';
+import { difficultyRange, factionSupply, rateGuardians, rateSectors, ratingFor, sectorThreat, setPiece } from './difficulty';
 import { cells, colOf, defaultCounts, defaultMap, generateMap, hexDistance, isConnected, isPlaced, refreshSectors, rng, type Hex } from './hexmap';
 import { ECHOES, emptyNexus } from './nexus';
 import { NEXUS_DIFFICULTY, NEXUS_MAP, SECTOR_MODIFIERS } from './nexusData';
@@ -64,66 +64,88 @@ describe('map generation for Nexus Wars', () => {
 });
 
 describe('sector difficulty', () => {
-  it('runs from the minimum to the biggest faction × 1.5, counting every detachment, with a spread from the start', () => {
+  it("rates on bands of the field cap, not on anyone's Supply: near 0.4×, far 1.5×, set pieces 2×", () => {
     const c = campaign();
-    expect(difficultyRange(c, [])).toEqual({ min: 500, base: 800, max: 1500 });
+    // Round 1: the cap is 1600.
+    expect(difficultyRange(c)).toEqual({ min: 500, base: 600, far: 2400, max: 3200 });
     const forces = [force('A', 1000), force('A', 500), force('B', 1200)];
     expect(factionSupply(forces, 'A')).toBe(1500);
-    expect(difficultyRange(c, forces)).toEqual({ min: 500, base: 800, max: 2300 });
+    expect(difficultyRange(c, forces)).toEqual(difficultyRange(c));
+    c.round = 6;
+    expect(difficultyRange(c)).toEqual({ min: 600, base: 800, far: 3200, max: 4200 });
+    c.round = 40;
+    expect(difficultyRange(c).max).toBe(8000);
+    c.fieldCap = { base: 1000, perRound: 0, max: 1000 };
+    expect(difficultyRange(c)).toEqual({ min: 300, base: 400, far: 1500, max: 2000 });
   });
 
   it('scales the whole range with the campaign difficulty', () => {
     const c = campaign();
     c.difficulty = 'easy';
-    expect(difficultyRange(c, [])).toEqual({ min: 400, base: 600, max: 1100 });
+    expect(difficultyRange(c)).toEqual({ min: 400, base: 500, far: 1800, max: 2400 });
     c.difficulty = 'brutal';
-    expect(difficultyRange(c, [])).toEqual({ min: 800, base: 1200, max: 2300 });
+    expect(difficultyRange(c)).toEqual({ min: 700, base: 1000, far: 3600, max: 4800 });
     c.difficulty = 'nonsense';
-    expect(difficultyRange(c, [])).toEqual({ min: 500, base: 800, max: 1500 });
+    expect(difficultyRange(c).base).toBe(600);
     c.difficulty = 'hard';
     const g = generate(c, 'a1');
     rateSectors(g, [], rng('h'));
     const rated = g.sectors.filter((s) => s.type !== 'home').map((s) => s.difficulty!);
-    expect(rated.every((d) => d % 100 === 0 && d >= 600 && d <= 1900)).toBe(true);
-    expect(g.sectors.find((s) => s.type === 'voidspawn')!.difficulty).toBe(1900);
+    expect(rated.every((d) => d % 100 === 0 && d >= 600 && d <= 4000)).toBe(true);
+    expect(g.sectors.find((s) => s.type === 'voidspawn')!.difficulty).toBe(4000);
   });
 
   it('rolls ratings up or down in 100-Supply steps, so the map has a spread of fights from round one', () => {
     for (const seed of ['a1', 'b2', 'c3']) {
       const c = generate(campaign(), seed);
       rateSectors(c, [], rng(seed));
-      const rated = c.sectors.filter((s) => s.type !== 'home' && s.type !== 'voidspawn').map((s) => s.difficulty!);
-      expect(rated.every((d) => d % 100 === 0 && d >= 500 && d <= 1500)).toBe(true);
-      expect(new Set(rated).size, `seed ${seed}: ${[...new Set(rated)].sort()}`).toBeGreaterThanOrEqual(5);
+      const rated = c.sectors.filter((s) => s.type !== 'home' && !setPiece(s)).map((s) => s.difficulty!);
+      expect(rated.every((d) => d % 100 === 0 && d >= 500 && d <= 2600)).toBe(true);
+      expect(new Set(rated).size, `seed ${seed}: ${[...new Set(rated)].sort()}`).toBeGreaterThanOrEqual(8);
     }
   });
 
-  it('rates sectors further from the homes higher, the Voidspawn highest, and skips homes', () => {
+  it('rates sectors further from the homes higher, set pieces highest, and skips homes', () => {
     const c = generate(campaign(), 'a1');
     const forces = [force('A', 1000), force('B', 1000)];
     rateSectors(c, forces, rng('x'));
     const rated = c.sectors.filter((s) => s.type !== 'home');
-    expect(rated.every((s) => s.difficulty! >= 500 && s.difficulty! <= 1500 && s.difficulty! % NEXUS_DIFFICULTY.step === 0)).toBe(true);
+    expect(rated.every((s) => s.difficulty! >= 500 && s.difficulty! <= 3200 && s.difficulty! % NEXUS_DIFFICULTY.step === 0)).toBe(true);
     expect(c.sectors.filter((s) => s.type === 'home').every((s) => s.difficulty === undefined && !s.modifiers)).toBe(true);
-    expect(c.sectors.find((s) => s.type === 'voidspawn')!.difficulty).toBe(1500);
-    const planets = rated.filter((s) => s.type === 'planet');
-    const home = c.sectors.find((s) => s.id === 'hA') as Sector & Hex;
-    const close = planets.reduce((a, b) => (hexDistance(home, a as Hex) < hexDistance(home, b as Hex) ? a : b));
-    expect(sectorThreat(c, close)).toBeLessThan(sectorThreat(c, c.sectors.find((s) => s.type === 'voidspawn')!));
-    expect(Math.min(...rated.map((s) => s.difficulty!))).toBeLessThan(800);
+    expect(c.sectors.find((s) => s.type === 'voidspawn')!.difficulty).toBe(3200);
+    const archive = c.sectors.find((s) => s.type === 'archive');
+    if (archive) expect(archive.difficulty).toBe(3200);
+    const homes = c.sectors.filter((s) => s.type === 'home') as (Sector & Hex)[];
+    const plain = rated.filter((s) => !setPiece(s));
+    const away = (s: Sector) => Math.min(...homes.map((h) => hexDistance(h, s as Hex)));
+    const near = plain.filter((s) => away(s) <= 2);
+    const far = plain.filter((s) => away(s) >= 5);
+    const avg = (xs: Sector[]) => xs.reduce((n, s) => n + s.difficulty!, 0) / xs.length;
+    expect(avg(near)).toBeLessThan(1100);
+    expect(avg(far)).toBeGreaterThan(avg(near) + 500);
   });
 
-  it("rates each sector on each faction's own scale, so the leader's growth doesn't price out the rest", () => {
+  it('gives every faction the same garrison, less any raid cut', () => {
     const c = generate(campaign(), 'a1');
     rateSectors(c, [force('A', 4000), force('B', 1000)], rng('x'));
-    const rated = c.sectors.filter((s) => s.type !== 'home' && s.type !== 'voidspawn');
-    expect(rated.every((s) => ratingFor(s, 'A')! >= ratingFor(s, 'B')!)).toBe(true);
-    expect(Math.max(...rated.map((s) => ratingFor(s, 'B')!))).toBeLessThanOrEqual(difficultyRange(c, [force('B', 1000)]).max);
-    expect(Math.max(...rated.map((s) => ratingFor(s, 'A')!))).toBeGreaterThan(1500);
-    // Without a faction (the GM's view), it's the biggest faction's scale; the Voidspawn is everyone's top.
-    expect(rated.every((s) => ratingFor(s) === s.ratings!.A)).toBe(true);
-    const vs = c.sectors.find((s) => s.type === 'voidspawn')!;
-    expect(ratingFor(vs, 'B')).toBe(vs.difficulty);
+    const s = c.sectors.find((x) => x.type === 'planet' && !x.owner)!;
+    expect(ratingFor(s, 'A')).toBe(ratingFor(s, 'B'));
+    expect(s.ratings).toBeUndefined();
+    s.difficulty = 1000;
+    s.cut = 0.2;
+    expect(ratingFor(s)).toBe(800);
+    s.cut = 1.5;
+    expect(ratingFor(s)).toBe(0);
+  });
+
+  it('rates a sector a guardian holds as a set piece', () => {
+    const c = generate(campaign(), 'b2');
+    rateSectors(c, [], rng('g'));
+    const s = c.sectors.find((x) => x.type === 'planet' && !x.owner)!;
+    expect(s.difficulty).toBeLessThan(3200);
+    s.guardian = { name: 'G', tier: 'Common', unit: {} as never };
+    rateGuardians(c);
+    expect(s.difficulty).toBe(3200);
   });
 
   it('rolls one modifier, two on hard sectors, all different', () => {
@@ -137,7 +159,7 @@ describe('sector difficulty', () => {
     }
   });
 
-  it('rescales at the end of the round, rerolling only AI-held modifiers', () => {
+  it('rescales at the end of the round as the cap grows, rerolling only AI-held modifiers', () => {
     const c = generate(campaign(), 'c3');
     const forces = [force('A', 1000), force('B', 1000)];
     rateSectors(c, forces, rng('z'));
@@ -145,18 +167,33 @@ describe('sector difficulty', () => {
     const theirs = c.sectors.filter((s) => !s.owner || s.owner === ECHOES.id);
     const before = { mine: mine.modifiers, theirs: theirs.map((s) => s.modifiers!.join()) };
     const vs = c.sectors.find((s) => s.type === 'voidspawn')!;
-    expect(vs.difficulty).toBe(1500);
+    expect(vs.difficulty).toBe(3200);
 
-    forces[0].startingSupply = 2000;
+    // A faction's growth doesn't move the ratings; the round's cap does.
+    forces[0].startingSupply = 9000;
     const r = endRound(c, rng('round'), '2026-01-01', forces);
-    expect(r.difficulty).toEqual({ min: 500, max: 3000 });
-    expect(vs.difficulty).toBe(3000);
+    expect(r.difficulty).toEqual({ min: 500, max: 3400 });
+    expect(vs.difficulty).toBe(3400);
     expect(mine.modifiers).toBe(before.mine);
     expect(theirs.map((s) => s.modifiers!.join())).not.toEqual(before.theirs);
 
     // Without the forces (older callers), ratings are left alone.
     expect(endRound(c, rng('again')).difficulty).toBeUndefined();
-    expect(vs.difficulty).toBe(3000);
+    expect(vs.difficulty).toBe(3400);
+  });
+
+  it('grows raided garrisons back when a round ends with no attack on them', () => {
+    const c = generate(campaign(), 'c3');
+    const [a, b] = c.sectors.filter((s) => s.type === 'planet' && !s.owner);
+    a.cut = 0.3;
+    b.cut = 0.05;
+    const hit = c.sectors.find((s) => s.type === 'research' && !s.owner)!;
+    hit.cut = 0.2;
+    c.log.push({ id: 'e', date: '', sectorId: hit.id, attacker: 'A', defender: '', winner: 'A', notes: '', round: 1 });
+    endRound(c, rng('r'));
+    expect(a.cut).toBe(0.2);
+    expect(b.cut).toBeUndefined();
+    expect(hit.cut).toBe(0.2);
   });
 });
 

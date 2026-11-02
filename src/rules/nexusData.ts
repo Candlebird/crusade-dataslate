@@ -741,3 +741,47 @@ export const GAME_NIGHT = {
  * 1000 → 700, 2000 → 1400, 4000 → 3000. Rounded down to `step`.
  */
 export const OVERRUN = { share: 0.7, upper: 0.8, knee: 2000, step: 100 };
+
+/**
+ * The field cap (rules/fieldCap.ts): the most Supply one detachment may field. It grows with the campaign, `base` +
+ * `perRound` each round, up to `max`; the GM can change all three on the Nexus Wars page. Supply a detachment earns
+ * past it goes to its faction's bank. A detachment already over it when it came in keeps its Supply, but grows no
+ * more until the cap passes it.
+ */
+export const FIELD_CAP = {
+  base: 1500,
+  perRound: 100,
+  max: 4000,
+  /** A new detachment founded from the faction bank takes at least this much Supply from it. */
+  foundMin: 500,
+  /** Umbra Shards to move a unit to a detachment in another sector (in the same sector it's free). */
+  transferUs: 3,
+  /** A lean detachment (its units' points at most this) moves `leanMove` more hexes. */
+  lean: 1000,
+  leanMove: 1,
+};
+
+/**
+ * Sector ratings by geography, scaled to the field cap: near the homes a garrison is `near` × the cap, at the far
+ * reach `far` × the cap, and set pieces (the Voidspawn, a Lost Archive, a guardian's sector) `setPiece` × the cap.
+ * Each sector rolls up or down by up to `jitter` × the cap. The difficulty level scales them all.
+ */
+export const RATING_BANDS = { near: 0.4, far: 1.5, setPiece: 2, jitter: 0.1 };
+
+/** Attacking above your weight: a win pays +1 XP to every unit that fought for each `gap` the garrison is over the
+ *  attackers' Supply, up to `max`. */
+export const UNDERDOG_XP = { gap: 0.25, max: 4 };
+
+/**
+ * Raids: a detachment facing a garrison over `prompt` × its Supply may raid instead of attacking in full. The garrison
+ * it meets matches its own Supply. A win pays `us` Umbra Shards, scouts the sector and its neighbours, and cuts the
+ * garrison by `cut` of its rating for good (raids stack, with no floor). A sector nobody attacked in a round grows back
+ * `regrow`, up to its full rating.
+ */
+export const RAID = { prompt: 1.1, us: 3, cut: 0.1, regrow: 0.1 };
+
+/**
+ * Musters: two or more of a faction's detachments that attack the same sector fight it together. The zone board grows
+ * with the points: past the field cap it's `large`, past `huge` × the cap it's bigger still.
+ */
+export const MUSTER = { huge: 2, /** The planner calls a fight lopsided past this ratio either way. */ lopsided: 2 };

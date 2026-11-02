@@ -21,15 +21,23 @@ export function overrunMax(supply: number): number {
   return Math.floor(reach / step + 1e-9) * step;
 }
 
-/** Why `force` can't overrun `s`, or '' when it can. */
-export function overrunBlock(s: Sector, force: Force | undefined, c?: Campaign): string {
+/** The Supply of every detachment in an attack (a muster adds them up). */
+export const attackSupply = (a: Pick<Attack, 'forceId' | 'forceIds'>, forces: Force[]) =>
+  (a.forceIds ?? (a.forceId ? [a.forceId] : [])).reduce((n, id) => n + (forces.find((f) => f.id === id) ? supplyLimit(forces.find((f) => f.id === id)!) : 0), 0);
+
+/**
+ * Why `force` (or a muster of `supply`) can't overrun `s`, or '' when it can. A raid can always be settled off the
+ * table: its garrison matches the raiders, so it's an even fight either way.
+ */
+export function overrunBlock(s: Sector, force: Force | undefined, c?: Campaign, o: { supply?: number; raid?: boolean; muster?: boolean } = {}): string {
   if (!aiDefended(s)) return 'only AI-held sectors can be overrun';
   if (s.type === 'home' || s.type === 'voidspawn') return 'set pieces are fought at the table';
   if (s.guardian) return `${s.guardian.name} is fought at the table`;
+  if (o.raid) return force ? '' : 'the raiders are not known';
   const rating = ratingFor(s, force?.nexus?.factionId, c);
   if (!force || rating === undefined) return 'the sector is not rated yet';
-  const max = overrunMax(supplyLimit(force));
-  return rating > max ? `its ${rating} Supply garrison is over the ${max} this detachment can overrun` : '';
+  const max = overrunMax(o.supply ?? supplyLimit(force));
+  return rating > max ? `its ${rating} Supply garrison is over the ${max} ${o.muster ? 'this muster' : 'this detachment'} can overrun` : '';
 }
 
 /** The defender's detachment for an attack fought without the table: the one dug in, else one there, else any of theirs. */
@@ -46,14 +54,17 @@ export function defenderForce(c: Campaign, a: Attack, forces: Force[]): Force | 
 export function attackBattle(c: Campaign, a: Attack, forces: Force[], books: CatalogBook[], settings: Settings, rand = Math.random): TrackedBattle {
   const s = c.sectors.find((x) => x.id === a.sectorId)!;
   const defender = aiDefended(s) ? undefined : defenderForce(c, a, forces);
+  // A muster fields each detachment as its own side on team A.
   const b = newBattle(STANDARD_MISSION, `auto-${a.sectorId}-${a.forceId ?? a.factionId}-${Date.now()}`, new Date().toISOString(), rand,
     FORMATS.find((x) => x.label === (defender ? '1 v 1' : '1 v AI')));
-  atSector(b, c, forces, settings, a.sectorId, a.factionId, a.forceId);
-  if (defender) loadForce(b.sides[1], defender, undefined, settings, c);
-  else {
-    const attacker = forces.find((f) => f.id === a.forceId);
-    const target = ratingFor(s, a.factionId, c) ?? (attacker ? supplyLimit(attacker) : 1000);
-    loadUnits(b.sides.find((x) => x.ai)!, ECHOES.name, garrison(s, echoesBook(books), target, rand));
+  atSector(b, c, forces, settings, a.sectorId, a.factionId, a.forceIds?.length ? a.forceIds : a.forceId);
+  if (a.raid) b.raid = true;
+  const ai = b.sides.find((x) => x.ai);
+  if (defender) loadForce(b.sides.find((x) => x.team !== 'A')!, defender, undefined, settings, c);
+  else if (ai) {
+    const supply = attackSupply(a, forces);
+    const target = a.raid ? supply : ratingFor(s, a.factionId, c) ?? (supply || 1000);
+    loadUnits(ai, ECHOES.name, garrison(s, echoesBook(books), target, rand));
   }
   return b;
 }

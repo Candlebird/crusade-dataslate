@@ -8,6 +8,7 @@ import { nowIso, uid } from './factory';
 import { localDate } from './date';
 import { clawbackDuplicateFeats, clawbackFeats } from '../rules/feats';
 import { canWriteForce } from './owner';
+import { claimGrants, sweepCap } from '../rules/fieldCap';
 import { toast } from '../components/ui';
 
 const STORAGE_KEY = 'opr-crusade-tracker:v1';
@@ -84,6 +85,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       noteVeterancy(f);
       clawbackFeats(f, localDate(), uid);
       if (draft.campaign) clawbackDuplicateFeats(f, draft.forces, localDate(), uid);
+      // The field cap: take in bank Supply handed to this detachment, then send anything past its cap to the bank.
+      claimGrants(draft.campaign, f, localDate(), uid);
+      sweepCap(draft.campaign, f, localDate(), uid);
     });
     tidy();
     fn(draft);

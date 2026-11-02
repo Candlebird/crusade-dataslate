@@ -10,7 +10,8 @@ import { endSieges } from './sieges';
 import { crisisRound, placeCrisis, rollEvent, settleCrisis, type CrisisEnd } from './events';
 import { pickSpread, resolveMarks, type MarkEnd } from './voidspawn';
 import { factionClaimedRound } from './detachments';
-import { rateSectors } from './difficulty';
+import { rateSectors, rateGuardians } from './difficulty';
+import { regrowCuts } from './fieldCap';
 import { explore } from './fog';
 import { regroup } from './movement';
 import { moveMarauders, type Raid, type Toll } from './marauders';
@@ -263,6 +264,8 @@ export function endRound(
   const held = new Set(Object.values(holdings).flat());
   const was = cleared.filter((s) => held.has(s.id));
   if (was.length) snapshot.was = was;
+  // Raided garrisons nobody attacked this round grow back a little, then everything is rated on the new round's cap.
+  regrowCuts(c, round);
   const difficulty = forces ? rateSectors(c, forces, rand, { reroll: true }) : undefined;
   // What the next round brings.
   rollEvent(c, rand);
@@ -277,6 +280,7 @@ export function endRound(
   const marauders = moveMarauders(c, threat, rand, uid, forces);
   const offers = forces && books ? rollOffers(c, books, forces, rand, uid) : undefined;
   const guardians = forces && books ? placeGuardians(c, books, forces, rand, uid) : [];
+  if (difficulty) rateGuardians(c);
   const end: Omit<RoundEnd, 'report'> = {
     round, threatBefore, threat, wins, voidspawnWins: voidspawn, patrols, spread, marks, marked: next, difficulty, cleared, fresh,
     event: event?.id, crisis, nextEvent: c.event?.id, newCrisis, production, research, built, offers, guardians, marauders, warlords,

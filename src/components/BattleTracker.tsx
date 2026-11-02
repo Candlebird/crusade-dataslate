@@ -51,7 +51,8 @@ import {
 import { AI_TREES } from '../rules/aiTrees';
 import { echoesBook, randomEchoes } from '../rules/echoForce';
 import { garrison as guardedGarrison, garrisonRand } from '../rules/guardians';
-import { ECHOES, NEXUS_CRISIS, NEXUS_REINFORCE_BONUS } from '../rules/nexusData';
+import { ECHOES, NEXUS_CRISIS, NEXUS_REINFORCE_BONUS, RAID } from '../rules/nexusData';
+import { supplyLimit } from '../rules/detachments';
 import { aiDefended, ratingFor } from '../rules/difficulty';
 import { isReinforced } from '../rules/production';
 import SectorDanger from './SectorDanger';
@@ -73,7 +74,7 @@ import { Icon } from './Icon';
 import { WornTag } from './Tags';
 
 /** With a sector (from the Nexus Wars map), a new battle is set up to be fought over it. */
-export default function BattleTracker({ sectorId, attacker, forceId, crisis, past }: { sectorId?: string; attacker?: string; forceId?: string; crisis?: boolean; past?: boolean }) {
+export default function BattleTracker({ sectorId, attacker, forceId, raid, crisis, past }: { sectorId?: string; attacker?: string; forceId?: string; raid?: boolean; crisis?: boolean; past?: boolean }) {
   const { state, update } = useStore();
   const b = state.battle;
   const sector = state.campaign?.sectors.find((s) => s.id === sectorId);
@@ -88,7 +89,7 @@ export default function BattleTracker({ sectorId, attacker, forceId, crisis, pas
     const t = window.setTimeout(() => document.getElementById('battle-past')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
     return () => window.clearTimeout(t);
   }, [past]);
-  if (!b) return <StartBattle sectorId={sector?.id} preset={attacker} presetForce={forceId} crisis={crisis} />;
+  if (!b) return <StartBattle sectorId={sector?.id} preset={attacker} presetForce={forceId} raid={raid} crisis={crisis} />;
 
   const set = (fn: (d: TrackedBattle) => void) => update((s) => void (s.battle && fn(s.battle)));
   const sc = score(b);
@@ -355,7 +356,7 @@ function objectiveScoring(m: MissionDef): string {
   return `${base}${bonus}.`;
 }
 
-function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { sectorId?: string; preset?: string; presetForce?: string; crisis?: boolean }) {
+function StartBattle({ sectorId, preset, presetForce, raid, crisis: wantCrisis }: { sectorId?: string; preset?: string; presetForce?: string; raid?: boolean; crisis?: boolean }) {
   const { state, update } = useStore();
   const cloud = useCloud();
   const c = state.campaign;
@@ -408,7 +409,11 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
     update((s) => {
       const b = newBattle(mission, uid(), nowIso(), Math.random, format);
       if (crisis && s.campaign) atCrisis(b, s.campaign, s.forces, s.settings);
-      else if (sector && s.campaign) atSector(b, s.campaign, s.forces, s.settings, sector.id, attacker, attacker === preset ? presetForce : undefined);
+      else if (sector && s.campaign) {
+        // A muster's detachments come joined by '+'; each takes a side on team A.
+        atSector(b, s.campaign, s.forces, s.settings, sector.id, attacker, attacker === preset ? presetForce?.split('+') : undefined);
+        if (raid && attacker === preset && aiDefended(sector)) b.raid = true;
+      }
       // The picked forces fill their sides, players first. Over a sector or in the Crisis some sides load already, so
       // the picks (the randomizer's) fill whatever is still open.
       const order = [...b.sides.filter((x) => !x.ai), ...b.sides.filter((x) => x.ai)];
@@ -465,9 +470,12 @@ function StartBattle({ sectorId, preset, presetForce, crisis: wantCrisis }: { se
               Team A attacks; everyone else defends. The result goes into the campaign log and the map.
             </p>
             <SectorDanger s={sector} factionId={attacker} c={state.campaign} />
-            {aiDefended(sector) && ratingFor(sector, attacker, state.campaign) !== undefined && (
+            {aiDefended(sector) && ratingFor(sector, attacker, state.campaign) !== undefined && (raid ? (
+              <p className="small"><span className="tag gold">Raid</span> The {ECHOES.name}' garrison meets you at your own Supply. Win and it's cut by {Math.round(RAID.cut * 100)}% for good, with {RAID.us} Umbra Shards and a look at what's around it. The sector isn't taken.</p>
+            ) : (
               <p className="muted small">The {ECHOES.name} hold it with a {ratingFor(sector, attacker, state.campaign)}-Supply garrison. Play <b>1 v AI</b> and generate their army at that size. Modifiers favour the defender.</p>
-            )}
+            ))}
+            {(presetForce?.split('+').length ?? 0) > 1 && <p className="small"><span className="tag">Muster</span> {presetForce!.split('+').length} detachments fight together on team A, each on its own side. On a win they all move in.</p>}
             {homeChallengeBlock(c, sector) && <p className="small"><span className="tag red">{homeChallengeBlock(c, sector)}</span> Check with the GM before playing this one.</p>}
             <label className="field">
               <span>Attacking faction</span>
@@ -792,7 +800,10 @@ function SidePanel({ id, b, set, forces }: { id: string; b: TrackedBattle; set: 
   const reinforced = defending && !!sector && isReinforced(sector);
   const enemies = b.sides.filter((x) => x.team !== side.team).reduce((n, x) => n + sidePoints(x), 0) + (reinforced ? NEXUS_REINFORCE_BONUS : 0);
   // Holding an AI sector, the Echoes field its garrison: the sector's difficulty rating.
-  const garrison = defending && sector && aiDefended(sector) && state.campaign ? ratingFor(sector, teamFaction(b, b.attacker!, state.campaign, forces), state.campaign) : undefined;
+  // A raid's garrison matches the raiders' Supply instead.
+  const raiders = b.raid && b.attacker ? membersOf(b, b.attacker).reduce((n, x) => n + (forces.find((f) => f.id === x.forceId) ? supplyLimit(forces.find((f) => f.id === x.forceId)!) : 0), 0) : 0;
+  const garrison = defending && sector && aiDefended(sector) && state.campaign
+    ? (b.raid && raiders ? raiders : ratingFor(sector, teamFaction(b, b.attacker!, state.campaign, forces), state.campaign)) : undefined;
   const [target, setTarget] = useState(() => garrison || enemies || 1000);
   const generate = () => {
     if (!book) return;

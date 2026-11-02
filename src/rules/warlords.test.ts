@@ -180,11 +180,13 @@ describe('Warlord perks', () => {
 
   it('Conqueror: its detachment moves further, then every detachment', () => {
     const { c, f } = withWarlord('conqueror', 10);
+    // Big enough not to be lean (a lean detachment moves further too).
+    f.units[0].points = 1500;
     const other = force('A', [], 'Other');
     expect(leadsWith(c, f, 'march')).toBe(true);
     expect(moveOf(c, f).move).toBe(NEXUS_MOVE.base + WARLORDS.march);
     expect(moveOf(c, other).move).toBe(NEXUS_MOVE.base);
-    syncWarlords(c, [{ ...f, units: [hero(90)].map((u) => ({ ...u, id: f.units[0].id })) }]);
+    syncWarlords(c, [{ ...f, units: [hero(90)].map((u) => ({ ...u, id: f.units[0].id, points: 1500 })) }]);
     expect(moveOf(c, f).move).toBe(NEXUS_MOVE.base + WARLORDS.march + WARLORDS.blitz);
     expect(moveOf(c, other).move).toBe(NEXUS_MOVE.base + WARLORDS.blitz);
     expect(moveOf(c, other).why).toContain(`+${WARLORDS.blitz} Warlord (Blitzkrieg)`);
