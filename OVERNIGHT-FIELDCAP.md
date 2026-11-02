@@ -11,7 +11,7 @@ Branch `field-cap`, 6 local commits on top of `main`. **Nothing is pushed.**
 | e94650a | Pass 2 (balance): raid Umbra Shards scale with the raiders' size too, so many small detachments can't farm raids. |
 | f444691 | Pass 3 (UX): a grandfathered detachment reads as held from page load, not only after its first change. |
 
-Checks: `tsc` clean, `npm test` 1036/1036 passing. `npm run test:balance` is 16/17: the one failure, "a 60,000 force mostly beats Hard and mostly falls to Insane", also fails on a20181a, from before this work, so it isn't from these changes.
+Checks: `tsc` clean, `npm test` 1035/1035 passing. `npm run test:balance` is 16/17: the one failure, "a 60,000 force mostly beats Hard and mostly falls to Insane", also fails on a20181a, from before this work, so it isn't from these changes.
 
 The live campaign re-rates sectors at the next round end, as agreed.
 
