@@ -1,10 +1,11 @@
 import type { Campaign, Force } from '../model/types';
 import { factionForces, supplyLimit } from './detachments';
-import { aiDefended, ratingFor } from './difficulty';
+import { aiDefended, bandFightSize, ratingFor } from './difficulty';
 import { hexDistance, isPlaced, type Rand } from './hexmap';
 import { ATTACK_DEFEND_MISSIONS, rollAdvancedMission, type MissionDef } from './missions';
 import { ECHOES, currentRound, factionName } from './nexus';
-import { GAME_NIGHT, NEXUS_REINFORCE_BONUS } from './nexusData';
+import { GAME_NIGHT, MUSTER, NEXUS_REINFORCE_BONUS } from './nexusData';
+import { fieldCap } from './fieldCap';
 import { foughtFor, type Attack } from './orders';
 import { isReinforced } from './production';
 
@@ -20,6 +21,12 @@ export interface NightTable {
   factions: string[];
   /** The attacking detachment. */
   forceId?: string;
+  /** A muster: every detachment attacking together. */
+  forceIds?: string[];
+  /** A big game: a muster, its armies together over the field cap. */
+  big?: boolean;
+  /** A raid: the garrison matches the raiders. */
+  raid?: boolean;
   sectorId?: string;
   bandId?: string;
   /** Who the GM fields when the other side isn't a player. */
@@ -56,17 +63,35 @@ export function planNight(c: Campaign, forces: Force[], attacks: Attack[], comin
   const round = currentRound(c);
   const attackMission = () => ATTACK_DEFEND_MISSIONS[Math.floor(rand() * ATTACK_DEFEND_MISSIONS.length)];
 
-  for (const a of attacks) {
+  // Musters first (they're the big games), closest fights first among them; then the rest as declared.
+  const supplyOf = (a: Attack) => (a.forceIds ?? (a.forceId ? [a.forceId] : [])).reduce((n, id) => n + (forces.find((f) => f.id === id) ? supplyLimit(forces.find((f) => f.id === id)!) : 0), 0);
+  const gap = (a: Attack) => {
+    const s = c.sectors.find((x) => x.id === a.sectorId);
+    const g = s && aiDefended(s) && !a.raid ? ratingFor(s, a.factionId, c) : undefined;
+    const mine = supplyOf(a);
+    return g && mine ? Math.max(g, mine) / Math.min(g, mine) : 1;
+  };
+  const muster = (a: Attack) => (a.forceIds?.length ?? 0) > 1;
+  const ordered = [...attacks].sort((x, y) => Number(muster(y)) - Number(muster(x)) || (muster(x) ? gap(x) - gap(y) : 0));
+  for (const a of ordered) {
     const s = c.sectors.find((x) => x.id === a.sectorId);
     if (!s || !here.has(a.factionId) || foughtFor(c, a, round)) continue;
     if (tables.some((t) => t.sectorId === s.id && t.factions[0] === a.factionId)) continue;
-    const points = nightPoints(forces, a.factionId, a.forceId);
+    const together = muster(a) ? roundDown(supplyOf(a)) : 0;
+    const points = together || nightPoints(forces, a.factionId, a.forceId);
     const notes = [...a.flags];
-    const base = { forceId: a.forceId, sectorId: s.id, mission: attackMission(), notes };
+    const big = together > fieldCap(c);
+    const base = {
+      forceId: a.forceId, sectorId: s.id, mission: attackMission(), notes,
+      ...(muster(a) ? { forceIds: a.forceIds } : {}), ...(big ? { big } : {}), ...(a.raid ? { raid: true } : {}),
+    };
     seated.add(a.factionId);
     if (aiDefended(s)) {
-      tables.push({ ...base, kind: s.guardian ? 'guardian' : 'ai', factions: [a.factionId], points: ratingFor(s, a.factionId, c) ?? points,
-        foe: s.guardian ? `${s.guardian.name} (guardian)` : s.owner ? ECHOES.name : 'The sector\'s defenders' });
+      const garrison = a.raid ? points : ratingFor(s, a.factionId, c) ?? points;
+      if (!a.raid && Math.max(garrison, points) >= MUSTER.lopsided * Math.min(garrison, points))
+        notes.push(`Lopsided: ${points} against a ${garrison} garrison. Settle it off the table (overrun or zone battle) and keep the table for a close fight`);
+      tables.push({ ...base, kind: s.guardian ? 'guardian' : 'ai', factions: [a.factionId], points: garrison,
+        foe: s.guardian ? `${s.guardian.name} (guardian)` : s.owner ? ECHOES.name : "The sector's defenders" });
       continue;
     }
     if (isReinforced(s)) notes.push(`Reinforced: the defender gets +${NEXUS_REINFORCE_BONUS} Supply`);
@@ -94,7 +119,7 @@ export function planNight(c: Campaign, forces: Force[], attacks: Attack[], comin
       spare.push(id);
       continue;
     }
-    tables.push({ kind: 'marauder', factions: [id], sectorId: band.sectorId, bandId: band.id, foe: band.name, points: band.strength, mission: rollAdvancedMission(rand), notes: [] });
+    tables.push({ kind: 'marauder', factions: [id], sectorId: band.sectorId, bandId: band.id, foe: band.name, points: bandFightSize(c, band.strength, band.barred?.sectorId ?? band.sectorId), mission: rollAdvancedMission(rand), notes: [] });
   }
   for (let i = 0; i + 1 < spare.length; i += 2) {
     const pair = [spare[i], spare[i + 1]];

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { newForce } from '../model/factory';
 import type { Campaign } from '../model/types';
 import { emptyNexus } from './nexus';
-import { HOLD, applyMoves, attackTargets, beforeMoves, foughtFor, myDetachments, noteMoveOrigins, playedDetachments, replaceMovedOrder, revealOrders } from './orders';
+import { HOLD, applyMoves, attackTargets, beforeMoves, foughtFor, makePick, myDetachments, noteMoveOrigins, parsePick, pickBase, pickSector, playedDetachments, replaceMovedOrder, revealOrders, withMark } from './orders';
 import { positionOf } from './movement';
 import { callMeeting, meetingState, meetings, settleMeeting } from './meetings';
 
@@ -149,11 +149,52 @@ describe('sealed orders', () => {
     expect([at(a), at(b)]).toEqual(['e1', 'p2']);
   });
 
-  it('flags two detachments of one faction on the same sector, not as a rival', () => {
+  it('musters two detachments of one faction on the same sector, unless one fights apart', () => {
     const a1 = force('me@x', 'A', 'One');
-    const a2 = force('me@x', 'A', 'Two');
-    const r = revealOrders(campaign(), [{ email: 'me@x', round: 1, picks: { [a1.id]: 'x', [a2.id]: 'x' } }], 1, [a1, a2]);
-    expect(r.attacks[0].flags).toEqual(['Another detachment of Alpha attacks it too: pick one, or fight together']);
+    const a2 = force('you@x', 'A', 'Two');
+    const orders = (p2: string) => [
+      { email: 'me@x', round: 1, picks: { [a1.id]: 'x' } },
+      { email: 'you@x', round: 1, picks: { [a2.id]: p2 } },
+    ];
+    const r = revealOrders(campaign(), orders('x'), 1, [a1, a2]);
+    expect(r.attacks).toHaveLength(1);
+    expect(r.attacks[0]).toMatchObject({ forceId: a1.id, forceIds: [a1.id, a2.id] });
+    expect(r.attacks[0].flags[0]).toBe('Muster: One + Two fight as one army; on a win all move in');
+
+    const apart = revealOrders(campaign(), orders(withMark('x', 'apart', true)), 1, [a1, a2]);
+    expect(apart.attacks).toHaveLength(2);
+    expect(apart.attacks.every((a) => !a.forceIds)).toBe(true);
+    expect(apart.attacks[0].flags).toEqual(['Another detachment of Alpha attacks it too, apart: fight one battle each, or one of them stands down']);
+
+    // A raid and a full attack don't muster together; two raids do.
+    const mixed = revealOrders(campaign(), orders(withMark('x', 'raid', true)), 1, [a1, a2]);
+    expect(mixed.attacks).toHaveLength(2);
+    expect(mixed.attacks[1].raid).toBe(true);
+  });
+
+  it('reads and writes pick marks', () => {
+    expect(parsePick('raid:apart:x')).toEqual({ sectorId: 'x', claim: false, raid: true, apart: true, allied: false });
+    expect(parsePick('raid:attack:x')).toMatchObject({ sectorId: 'x', claim: true, raid: true });
+    expect(parsePick('attack:x')).toMatchObject({ sectorId: 'x', claim: true, raid: false });
+    expect(makePick({ sectorId: 'x', claim: true })).toBe('attack:x');
+    expect(makePick({ sectorId: 'x', claim: true, raid: true })).toBe('raid:attack:x');
+    expect(pickBase('raid:attack:x')).toBe('attack:x');
+    expect(withMark('raid:x', 'raid', false)).toBe('x');
+    expect(withMark('x', 'allied', true)).toBe('allied:x');
+    expect(pickSector('allied:raid:x')).toBe('x');
+  });
+
+  it('two factions on a set piece fight 3-way unless both ally', () => {
+    const c = campaign();
+    c.sectors.find((s) => s.id === 'x')!.type = 'voidspawn';
+    const a = force('a@x', 'A', 'One');
+    const b = force('b@x', 'B', 'Two');
+    const go = (pa: string, pb: string) => revealOrders(c, [
+      { email: 'a@x', round: 1, picks: { [a.id]: pa } },
+      { email: 'b@x', round: 1, picks: { [b.id]: pb } },
+    ], 1, [a, b]).attacks;
+    expect(go('x', 'allied:x')[0].flags).toContain('3-way battle with Bravo: the garrison is sized to the biggest attacker, the most VP wins');
+    expect(go('allied:x', 'allied:x')[0].flags).toContain('Allied with Bravo: one battle together against the garrison; agree who takes the prize');
   });
 
   it('lists attacks and holds from the current round only', () => {

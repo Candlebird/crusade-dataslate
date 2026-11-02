@@ -69,12 +69,12 @@ function TableRow({ c, t, n }: { c: Campaign; t: NightTable; n: number }) {
     <div className="list-item small" style={{ alignItems: 'flex-start' }}>
       <span className="muted">#{n}</span>
       <span className="grow">
-        <b>{KIND[t.kind]}</b>{sector && <> at <a href={href.campaign('map', sector.id)}>{sector.name}</a></>}: {who}{t.foe && <> vs <b>{t.foe}</b></>}
+        <b>{KIND[t.kind]}</b>{t.forceIds && <span className="tag" style={{ marginLeft: 4 }}>Muster</span>}{t.big && <span className="tag red" style={{ marginLeft: 4 }} data-tip="The mustered armies are over the field cap together: a big game, on a bigger table">Big</span>}{t.raid && <span className="tag red" style={{ marginLeft: 4 }}>Raid</span>}{sector && <> at <a href={href.campaign('map', sector.id)}>{sector.name}</a></>}: {who}{t.foe && <> vs <b>{t.foe}</b></>}
         <br />
         <span className="muted">{t.points} pts · <a href={href.missions()} data-tip={t.mission.summary}>{t.mission.name}</a></span>
         {t.notes.map((x) => <div key={x} className="muted">· {x}</div>)}
       </span>
-      {sector && t.kind !== 'marauder' && <a className="btn" href={href.tracker(sector.id, t.factions[0], t.forceId)} data-tip="Open the battle tracker for this table">Start</a>}
+      {sector && t.kind !== 'marauder' && <a className="btn" href={href.tracker(sector.id, t.factions[0], t.forceIds ?? t.forceId, t.raid)} data-tip="Open the battle tracker for this table">Start</a>}
     </div>
   );
 }

@@ -38,6 +38,8 @@ export interface ZSetup {
   points: number;
   sector?: Parameters<typeof makeBoard>[0]['sector'];
   shape?: BoardShape;
+  /** Nexus Wars: the field cap, so a muster over it gets a bigger board. */
+  cap?: number;
   seed: number | string;
   members: ZMember[];
   teams: [TeamKey, TeamKey];
@@ -50,7 +52,7 @@ export interface ZSetup {
 export function createBattle(s: ZSetup): ZBattle {
   const seed = typeof s.seed === 'number' ? s.seed : hashSeed(s.seed);
   const rng = resume({ seed, n: 0 });
-  const board = makeBoard({ points: s.points, mission: s.mission, sector: s.sector, shape: s.shape, rng });
+  const board = makeBoard({ points: s.points, mission: s.mission, sector: s.sector, shape: s.shape, cap: s.cap, rng });
   const units: ZUnit[] = s.units.map((u) => {
     const hooks = unitHooks(u.p);
     return {

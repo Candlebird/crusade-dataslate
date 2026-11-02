@@ -5,6 +5,7 @@ import { hasBuilding } from './production';
 import { isOpen, positionOf, reach, setPosition } from './movement';
 import { fallBack, meetingOutcomes, meetings } from './meetings';
 import { siegeAttack, siegeOf } from './sieges';
+import { aiDefended, setPiece } from './difficulty';
 
 // Nexus Wars sealed orders: each player picks where their detachments move or what they attack next game (or holds),
 // nobody sees anyone else's picks until the GM reveals them. Each force linked to a faction is a
@@ -14,8 +15,43 @@ export const HOLD = 'hold';
 
 /** A pick that attacks open empty space (which could also just be walked into) carries this mark before the sector id. */
 export const CLAIM = 'attack:';
+/** Marks on an attack pick, before the sector id (any of them makes it an attack, even on open ground). */
+export const PICK_MARKS = { raid: 'raid:', apart: 'apart:', allied: 'allied:' } as const;
+export interface ParsedPick {
+  sectorId: string;
+  /** Marked `attack:` (on open ground it would otherwise be a move). Other marks make it an attack too: isAttackPick. */
+  claim: boolean;
+  /** A raid (rules/fieldCap.ts): the garrison matches the raiders, a win cuts it rather than taking the sector. */
+  raid: boolean;
+  /** Fight alone: don't muster with the faction's other detachments attacking the same sector. */
+  apart: boolean;
+  /** On a set piece another faction attacks too: fight it together as allies (both must say so), not 3-way. */
+  allied: boolean;
+}
+/** Read a pick's marks and sector. */
+export function parsePick(pick: string): ParsedPick {
+  const out: ParsedPick = { sectorId: pick, claim: false, raid: false, apart: false, allied: false };
+  for (let again = true; again;) {
+    again = false;
+    if (out.sectorId.startsWith(CLAIM)) { out.claim = true; out.sectorId = out.sectorId.slice(CLAIM.length); again = true; }
+    for (const [k, mark] of Object.entries(PICK_MARKS))
+      if (out.sectorId.startsWith(mark)) { out[k as keyof typeof PICK_MARKS] = true; out.sectorId = out.sectorId.slice(mark.length); again = true; }
+  }
+  return out;
+}
+/** Write a pick: the marks, then the attack mark (if any), then the sector id. */
+export function makePick(p: Partial<ParsedPick> & { sectorId: string }): string {
+  const marks = (Object.keys(PICK_MARKS) as (keyof typeof PICK_MARKS)[]).filter((k) => p[k]).map((k) => PICK_MARKS[k]).join('');
+  return marks + (p.claim ? CLAIM : '') + p.sectorId;
+}
+/** A pick without its raid/apart/allied marks: the attack it names, as the target list writes it. */
+export const pickBase = (pick: string) => makePick({ sectorId: parsePick(pick).sectorId, claim: parsePick(pick).claim });
+/** Any mark makes a pick an attack, even on open ground. */
+export const isAttackPick = (p: ParsedPick) => p.claim || p.raid || p.apart || p.allied;
 /** The sector a pick names. */
-export const pickSector = (pick: string) => (pick.startsWith(CLAIM) ? pick.slice(CLAIM.length) : pick);
+export const pickSector = (pick: string) => parsePick(pick).sectorId;
+/** The same pick with one mark set or cleared. */
+export const withMark = (pick: string, mark: keyof typeof PICK_MARKS, on: boolean) => makePick({ ...parsePick(pick), [mark]: on });
 /** The pick that attacks this sector: marked when the sector is open ground for the faction. */
 export const attackPick = (s: Sector, factionId: string) => (isOpen(s, factionId) ? CLAIM + s.id : s.id);
 
@@ -81,6 +117,31 @@ export interface Attack {
   forceIds?: string[];
   /** A raid: the garrison matches the raiders, and a win cuts it rather than taking the sector. */
   raid?: boolean;
+  /** The pick said fight alone, not in a muster. */
+  apart?: boolean;
+  /** The pick said ally with another faction on a set piece. */
+  allied?: boolean;
+}
+
+/**
+ * Musters: the detachments of one faction attacking the same sector, the same way (raid or full attack), fight it
+ * together as one army unless one said apart. The first one declared leads (`forceId`); `forceIds` lists them all.
+ * Sieges don't muster (their detachment is pinned to its own battle).
+ */
+export function musterAttacks(c: Campaign, attacks: Attack[]) {
+  const groups = new Map<string, Attack[]>();
+  for (const a of attacks) {
+    if (!a.forceId || a.apart || siegeOf(c, a.forceId)) continue;
+    const key = `${a.factionId}|${a.sectorId}|${a.raid ? 'raid' : ''}`;
+    groups.set(key, [...(groups.get(key) ?? []), a]);
+  }
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const [lead, ...rest] = group;
+    lead.forceIds = group.map((a) => a.forceId!);
+    lead.flags = [...new Set(group.flatMap((a) => a.flags))];
+    for (const a of rest) attacks.splice(attacks.indexOf(a), 1);
+  }
 }
 
 /** A detachment moving through its own or empty space: no game, the GM moves it on the map. */
@@ -122,8 +183,9 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
         holds.push({ email: o.email, factionId, ...(forceId ? { forceId } : {}) });
         continue;
       }
-      const sectorId = pickSector(pick);
-      const claim = sectorId !== pick;
+      const parsed = parsePick(pick);
+      const { sectorId } = parsed;
+      const claim = isAttackPick(parsed);
       const s = c.sectors.find((x) => x.id === sectorId);
       if (!s) continue;
       const flags: string[] = [];
@@ -137,9 +199,13 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
       } else if (!frontier(c, factionId).has(s.id)) flags.push('No longer next to their territory');
       const blocked = homeChallengeBlock(c, s);
       if (blocked) flags.push(blocked);
-      attacks.push({ email: o.email, factionId, ...(forceId ? { forceId } : {}), sectorId: s.id, defender: s.owner ?? '', flags });
+      attacks.push({
+        email: o.email, factionId, ...(forceId ? { forceId } : {}), sectorId: s.id, defender: s.owner ?? '', flags,
+        ...(parsed.raid ? { raid: true } : {}), ...(parsed.apart ? { apart: true } : {}), ...(parsed.allied ? { allied: true } : {}),
+      });
     }
   }
+  musterAttacks(c, attacks);
   // Standing sieges attack again every round.
   for (const f of forces) {
     const siege = siegeOf(c, f.id);
@@ -159,10 +225,21 @@ export function revealOrders(c: Campaign, orders: PlayerOrders[], round: number,
       a.dugIn = dug.id;
       a.flags.push(`Dug in: ${dug.name} defends it and picks the deployment`);
     }
+    if (a.forceIds && a.forceIds.length > 1) {
+      const names = a.forceIds.map((id) => forces.find((f) => f.id === id)?.name ?? 'a detachment');
+      a.flags.unshift(`Muster: ${names.join(' + ')} fight as one army; on a win all move in`);
+    }
     const rivals = attacks.filter((x) => x !== a && x.sectorId === a.sectorId);
     const others = [...new Set(rivals.filter((x) => x.factionId !== a.factionId).map((x) => x.factionId))];
     if (others.length) a.flags.push(`Also attacked by ${others.map(name).join(', ')}`);
-    if (rivals.some((x) => x.factionId === a.factionId)) a.flags.push(`Another detachment of ${name(a.factionId)} attacks it too: pick one, or fight together`);
+    if (rivals.some((x) => x.factionId === a.factionId)) a.flags.push(`Another detachment of ${name(a.factionId)} attacks it too, apart: fight one battle each, or one of them stands down`);
+    const sector = c.sectors.find((s) => s.id === a.sectorId);
+    if (others.length && sector && setPiece(sector) && aiDefended(sector)) {
+      const allies = rivals.filter((x) => x.factionId !== a.factionId);
+      a.flags.push(a.allied && allies.every((x) => x.allied)
+        ? `Allied with ${others.map(name).join(', ')}: one battle together against the garrison; agree who takes the prize`
+        : `3-way battle with ${others.map(name).join(', ')}: the garrison is sized to the biggest attacker, the most VP wins`);
+    }
     if (rivals.length && c.sectors.find((s) => s.id === a.sectorId)?.type === 'home') a.flags.push('A home sector can only be challenged once per round');
     if (a.defender && a.defender !== a.factionId && attacks.some((x) => x.factionId === a.defender && c.sectors.find((s) => s.id === x.sectorId)?.owner === a.factionId))
       a.flags.push(`${name(a.defender)} is attacking them too`);

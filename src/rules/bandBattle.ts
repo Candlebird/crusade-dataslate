@@ -1,4 +1,5 @@
 import type { Campaign, CatalogBook, Force, Marauder, Settings } from '../model/types';
+import { bandFightSize } from './difficulty';
 import { positionOf } from './movement';
 import { STANDARD_MISSION } from './missions';
 import { MARAUDERS } from './nexusData';
@@ -6,7 +7,8 @@ import { raidBand, raiderPool } from './raiders';
 import { FORMATS, loadForce, loadUnits, newBattle, type TrackedBattle } from './tracker';
 
 // A band that was barred turns on whoever barred it: the fight, set up for the auto-battle. The faction's detachment
-// that stood in the band's way (or any of its detachments) against squads from the other armies, to the band's Supply.
+// that stood in the band's way (or any of its detachments) against squads from the other armies, to the band's Supply
+// (no more than the band of the sector it fights at: bandFightSize).
 
 /** The faction's detachment that barred the band, or any of its detachments. */
 export function bandBlocker(c: Campaign, m: Marauder, factionId: string, forces: Force[]): Force | undefined {
@@ -21,6 +23,6 @@ export function bandBattle(c: Campaign, m: Marauder, factionId: string, forces: 
   const f = bandBlocker(c, m, factionId, forces);
   if (f) loadForce(me, f, undefined, settings, c);
   const band = b.sides.find((x) => x.ai)!;
-  loadUnits(band, m.name, raidBand(raiderPool(books, forces, f), m.strength, MARAUDERS.squads, rand).map((x) => x.unit));
+  loadUnits(band, m.name, raidBand(raiderPool(books, forces, f), bandFightSize(c, m.strength, m.barred?.sectorId ?? m.sectorId), MARAUDERS.squads, rand).map((x) => x.unit));
   return b;
 }

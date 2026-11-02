@@ -48,6 +48,13 @@ export function ratingFor(s: Sector, _factionId?: string, c?: Campaign): number 
   return cut === 1 && swell === 1 ? s.difficulty : Math.round((s.difficulty * cut * swell) / 10) * 10;
 }
 
+/** The band at a sector: its rating (before raid cuts and events), or the near band for a home or unrated sector. */
+export const bandAt = (c: Campaign, s: Sector | undefined) => s?.difficulty ?? difficultyRange(c).base;
+
+/** A Marauder band's Supply when it fights at `sectorId`: its own strength, but no more than that sector's band. */
+export const bandFightSize = (c: Campaign, strength: number, sectorId: string | undefined) =>
+  Math.min(strength, bandAt(c, c.sectors.find((s) => s.id === sectorId)));
+
 /** Is the sector held by the AI (unclaimed, or the Echoes'), so an attacker faces its garrison? */
 export const aiDefended = (s: Sector) => !s.owner || s.owner === ECHOES.id;
 

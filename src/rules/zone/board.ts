@@ -2,6 +2,7 @@ import type { SectorType } from '../../model/types';
 import type { MissionDef } from '../missions';
 import { deploymentMap, type MapShape } from '../tableMap';
 import { roll, type Rng } from './dice';
+import { MUSTER } from '../nexusData';
 
 // The zone battle's table: 12" zones, each split 2×2 into 6" squares. Units stand on squares; distances are counted
 // in squares (a diagonal step is one), so 6" is a square. Terrain sits on squares, and only Blocking terrain stops
@@ -10,7 +11,8 @@ import { roll, type Rng } from './dice';
 export const SQUARE = 6;
 export const ZONE_SQUARES = 2;
 
-export type BoardShape = 'wide' | 'deep' | 'small';
+/** small 4×4 zones, wide 6×4, deep 4×6; for big musters (Nexus Wars) large 5×8 and huge 6×10. */
+export type BoardShape = 'wide' | 'deep' | 'small' | 'large' | 'huge';
 
 export interface Terrain {
   cover?: boolean;
@@ -151,13 +153,22 @@ const SECTOR_TERRAIN: Record<SectorType | 'default', { pieces: Terrain[]; densit
   default: { density: 0.22, pieces: [{ name: 'Ruins', cover: true }, { name: 'Woods', cover: true, difficult: true }, { name: 'Building', blocking: true }, { name: 'Rubble', difficult: true }] },
 };
 
-/** The board size for a battle: under 1250 pts a side 4×4 zones, otherwise wide (6×4) or deep (4×6) at random. */
-export function boardShape(points: number, rng: Rng): BoardShape {
+/**
+ * The board size for a battle: under 1250 pts a side 4×4 zones, otherwise wide (6×4) or deep (4×6) at random. In a
+ * Nexus War (`cap`, the field cap), a side over the cap gets a large board (5×8 zones), over MUSTER.huge × the cap a
+ * huge one (6×10): a muster's armies need the room.
+ */
+export function boardShape(points: number, rng: Rng, cap?: number): BoardShape {
   if (points > 0 && points < 1250) return 'small';
+  if (cap && points > cap * MUSTER.huge) return 'huge';
+  if (cap && points > cap) return 'large';
   return rng() < 0.5 ? 'wide' : 'deep';
 }
 
-const tableFor = (shape: BoardShape) => (shape === 'small' ? { w: 48, h: 48 } : shape === 'wide' ? { w: 72, h: 48 } : { w: 48, h: 72 });
+const TABLES: Record<BoardShape, { w: number; h: number }> = {
+  small: { w: 48, h: 48 }, wide: { w: 72, h: 48 }, deep: { w: 48, h: 72 }, large: { w: 60, h: 96 }, huge: { w: 72, h: 120 },
+};
+const tableFor = (shape: BoardShape) => TABLES[shape];
 
 /** Squares whose centre lies inside a map shape. */
 function covered(b: Pick<Board, 'w' | 'h'>, s: MapShape, t: { w: number; h: number }): number[] {
@@ -178,13 +189,15 @@ export interface BoardOpts {
   mission: MissionDef;
   sector?: SectorType;
   shape?: BoardShape;
+  /** The Nexus Wars field cap, for big boards (boardShape). */
+  cap?: number;
   /** Markers rolled ('D3+2') come from here. */
   rng: Rng;
 }
 
 /** A battle's board: its shape, deployment zones and markers from the mission's map, and seeded terrain for the sector. */
 export function makeBoard(o: BoardOpts): Board {
-  const shape = o.shape ?? boardShape(o.points, o.rng);
+  const shape = o.shape ?? boardShape(o.points, o.rng, o.cap);
   const t = tableFor(shape);
   const b: Board = { shape, w: t.w / SQUARE, h: t.h / SQUARE, terrain: [], deploy: [[], []], edges: [], objectives: [], notes: [] };
   b.terrain = Array(b.w * b.h).fill(null);

@@ -2,6 +2,7 @@ import type { Campaign, CatalogBook, Force, Unit } from '../../model/types';
 import type { Hook } from '../oprRules';
 import { bookRules } from '../oprRules';
 import { activeEvent } from '../nexus';
+import { fieldCap } from '../fieldCap';
 import { modifierOf } from '../difficulty';
 import { leadsWith } from '../warlords';
 import { teamsOf, type Holder, type TeamKey, type TrackedBattle } from '../tracker';
@@ -77,7 +78,7 @@ export function startZoneBattle(b: TrackedBattle, forces: Force[], books: Catalo
   const points = Math.max(...[0, 1].map((s) => units.filter((u) => u.side === s).reduce((n, u) => n + u.points, 0)));
   const sector = c?.sectors.find((s) => s.id === b.sectorId);
   const setup: ZSetup = {
-    id: b.id, mission: b.mission, points, sector: sector?.type, seed,
+    id: b.id, mission: b.mission, points, sector: sector?.type, seed, ...(c && b.sectorId ? { cap: fieldCap(c) } : {}),
     members: b.sides.filter((s) => s.team === teams[0] || s.team === teams[1])
       .map((s) => ({ id: s.id, name: s.name, side: sideOf(s.team), ai: mode === 'quick' || !!s.ai, team: s.team })),
     teams, units, smart: [true, true],

@@ -56,13 +56,20 @@ describe('profile', () => {
 describe('board', () => {
   const missions = [...FACE_OFF_MISSIONS, ...PROGRESSIVE_MISSIONS, ...ATTACK_DEFEND_MISSIONS];
   it('builds every mission on every shape', () => {
-    for (const m of missions) for (const shape of ['wide', 'deep', 'small'] as const) {
+    for (const m of missions) for (const shape of ['wide', 'deep', 'small', 'large', 'huge'] as const) {
       const b = makeBoard({ points: 2000, mission: m, shape, sector: 'planet', rng: mulberry32(7) });
       expect(b.deploy[0].length, `${m.id} ${shape}`).toBeGreaterThan(0);
       expect(b.deploy[1].length, `${m.id} ${shape}`).toBeGreaterThan(0);
       expect(b.objectives.length, `${m.id} ${shape}`).toBeGreaterThan(0);
       expect(b.deploy[0].some((s) => b.deploy[1].includes(s))).toBe(false);
     }
+  });
+  it('gives a muster over the field cap a bigger board', () => {
+    const at = (points: number, cap?: number) => makeBoard({ points, mission: STANDARD_MISSION, cap, rng: mulberry32(3) });
+    expect(['wide', 'deep']).toContain(at(3000).shape);
+    expect(['wide', 'deep']).toContain(at(2000, 2000).shape);
+    expect(at(2100, 2000)).toMatchObject({ shape: 'large', w: 10, h: 16 });
+    expect(at(4100, 2000)).toMatchObject({ shape: 'huge', w: 12, h: 20 });
   });
   it('measures, sees and moves', () => {
     const b = makeBoard({ points: 2000, mission: STANDARD_MISSION, shape: 'wide', rng: mulberry32(1) });

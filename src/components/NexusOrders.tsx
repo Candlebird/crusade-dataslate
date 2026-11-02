@@ -2,11 +2,13 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useCloud } from '../cloud/CloudSync';
 import { useStore } from '../model/store';
 import type { Campaign, Force } from '../model/types';
-import { detachmentName } from '../rules/detachments';
-import { aiDefended, ratingFor } from '../rules/difficulty';
+import { detachmentName, factionForces, supplyLimit } from '../rules/detachments';
+import { aiDefended, ratingFor, setPiece } from '../rules/difficulty';
+import { raidOffered, underdogXp } from '../rules/fieldCap';
+import { RAID } from '../rules/nexusData';
 import { ECHOES, currentRound, factionName } from '../rules/nexus';
 import { moveOf, moveTargets, positionOf } from '../rules/movement';
-import { HOLD, applyMoves, attackPick, pickSector, beforeMoves, digsIn, noteMoveOrigins, replaceMovedOrder, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
+import { HOLD, applyMoves, attackPick, isAttackPick, parsePick, pickBase, pickSector, withMark, beforeMoves, digsIn, noteMoveOrigins, replaceMovedOrder, foughtFor, myDetachments, playedDetachments, revealOrders, type Declared, type OrderRound, type PlayerOrders } from '../rules/orders';
 import { nowIso } from '../model/factory';
 import { spreadsAt, nextThreat } from '../rules/rounds';
 import { echoMarks, holders } from '../rules/voidspawn';
@@ -19,7 +21,7 @@ import ZoneFight, { useZoneBattles } from './ZoneFight';
 import { attackTableOnly } from '../rules/zone/eligible';
 import { SIEGE, openSieges, siegeOf, siegesToOpen } from '../rules/sieges';
 import { go, href } from '../route';
-import { attackBattle, overrunBlock } from '../rules/overrun';
+import { attackBattle, attackSupply, overrunBlock } from '../rules/overrun';
 import { useEndRound } from './RoundPanel';
 import { Panel, confirmAction, toast } from './ui';
 import { Icon } from './Icon';
@@ -201,20 +203,50 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
             // In words, what the pick will do once it's revealed.
             const picked = own?.picks[f.id] ?? own?.picks[f.nexus!.factionId] ?? '';
             // Open empty space is in both lists: a plain pick moves there, a marked one attacks it.
-            const pickedId = pickSector(picked);
-            const claim = pickedId !== picked;
+            const parsed = parsePick(picked);
+            const pickedId = parsed.sectorId;
+            const claim = isAttackPick(parsed);
             const target = claim ? attacks.find((s) => s.id === pickedId) : moves.find((s) => s.id === picked) ?? attacks.find((s) => s.id === picked);
             const isAttack = !!target && (claim || !moves.includes(target));
             const rating = isAttack && aiDefended(target!) ? ratingFor(target!, f.nexus!.factionId, c) : undefined;
+            const supply = supplyLimit(f);
+            const raid = isAttack && parsed.raid && rating !== undefined;
+            const underdog = isAttack && !raid ? underdogXp(rating, supply) : 0;
             const means = (kind: OrderKind) => !picked ? (
                 kind === 'move' ? <>Pick where to move. Until you do, nothing is declared and it stays where it is.</>
                 : kind === 'attack' ? <>Pick which sector to attack. Until you do, nothing is declared and it stays where it is.</>
                 : <>Not declared yet: pick an order before the GM reveals, or it just stays where it is.</>)
               : picked === HOLD ? <>Stays at {at?.name ?? 'its sector'}.{digsIn(c, f) && ' Dug in: if attacked it fights and picks the deployment.'}{fx(at?.id)}</>
               : !target ? <>That sector is out of reach now: pick again.</>
+              : raid ? <><span className="tag red">Raid</span> Raids {target.name}: its garrison meets you at your own {supply} Supply, at the table or off it. Win and you take {RAID.us} Umbra Shards, see all round it, and its garrison is {Math.round(RAID.cut * 100)}% weaker for good (it grows back {Math.round(RAID.regrow * 100)}% each round nobody attacks it). The sector stays theirs.</>
               : isAttack ? <><span className="tag red">Attack</span> Fights for {target.name}: a battle against {rating !== undefined ? `its ${rating} Supply AI garrison` : factionName(c, target.owner)}, at the table
-                {zoneOn ? ' or as a zone battle' : !overrunBlock(target, f, c) ? ' or overrun (an auto-battle)' : ''}, from this panel after the reveal. Win and it moves in{target.type === 'empty' && !target.owner ? ', and the space is yours: a space station' : ''}.</>
+                {zoneOn ? ' or as a zone battle' : !overrunBlock(target, f, c) ? ' or overrun (an auto-battle)' : ''}, from this panel after the reveal. Win and it moves in{target.type === 'empty' && !target.owner ? ', and the space is yours: a space station' : ''}.
+                {underdog > 0 && <> Outnumbered: each unit that fights gets +{underdog} XP on a win.</>}
+                {!parsed.apart && factionForces(state.forces, f.nexus!.factionId).length > 1 && <> If another of your faction's detachments attacks it too, they muster: one army, and all move in on a win.</>}</>
               : <><span className="tag">Move</span> Moves to {target.name} with no battle, when the GM moves detachments after the reveal.{fx(target.id)}</>;
+            // The marks an attack can carry: raid (a garrison well over you), fight apart (no muster), ally (a set piece).
+            const marks = isAttack && target ? (
+              <div className="row small" style={{ gap: 10, flexWrap: 'wrap' }}>
+                {rating !== undefined && (raidOffered(rating, supply) || parsed.raid) && (
+                  <label className="row" style={{ gap: 4 }} data-tip={`Its ${rating} Supply garrison is well over your ${supply}. A raid fights it at your size: you can't take the sector, but you weaken it`}>
+                    <select value={parsed.raid ? 'raid' : 'full'} onChange={(e) => pick(f.id, withMark(picked, 'raid', e.target.value === 'raid'))}>
+                      <option value="full">Full attack ({rating} Supply garrison{underdogXp(rating, supply) ? `, +${underdogXp(rating, supply)} XP on a win` : ''})</option>
+                      <option value="raid">Raid (garrison at your {supply} Supply)</option>
+                    </select>
+                  </label>
+                )}
+                {factionForces(state.forces, f.nexus!.factionId).length > 1 && (
+                  <label className="row" style={{ gap: 4 }} data-tip="Two of your faction's detachments attacking one sector the same way fight it as one army (a muster). Tick this to fight alone">
+                    <input type="checkbox" checked={parsed.apart} onChange={(e) => pick(f.id, withMark(picked, 'apart', e.target.checked))} /> Fight apart, not in a muster
+                  </label>
+                )}
+                {setPiece(target) && aiDefended(target) && (
+                  <label className="row" style={{ gap: 4 }} data-tip="If another faction attacks this set piece too: ally with them (they must tick it too) and fight the garrison together, or it's a 3-way battle">
+                    <input type="checkbox" checked={parsed.allied} onChange={(e) => pick(f.id, withMark(picked, 'allied', e.target.checked))} /> Ally with another faction attacking it
+                  </label>
+                )}
+              </div>
+            ) : null;
             return (
               <OrderPicker
                 key={f.id}
@@ -223,6 +255,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
                 onPick={(v) => pick(f.id, v)}
                 {...targetOptions(c, f)}
                 means={means}
+                marks={marks}
               />
             );
           })}
@@ -269,8 +302,10 @@ function targetOptions(c: Campaign, f: Force, at: Campaign = c): { moves: OrderT
 }
 
 /** One detachment's sealed order: first the kind of order, then (for a move or an attack) where. Two boxes so a move can't be picked by mistake for an attack. */
-function OrderPicker({ head, picked, onPick, moves, attacks, means, lockTip = 'Saved and sealed: you can change it until the GM reveals' }: {
+function OrderPicker({ head, picked: full, onPick, moves, attacks, means, marks, lockTip = 'Saved and sealed: you can change it until the GM reveals' }: {
   head: ReactNode;
+  /** Raid / fight apart / ally choices for an attack. */
+  marks?: ReactNode;
   lockTip?: string;
   picked: string;
   onPick: (target: string) => void;
@@ -278,6 +313,8 @@ function OrderPicker({ head, picked, onPick, moves, attacks, means, lockTip = 'S
   attacks: OrderTarget[];
   means: (kind: OrderKind) => ReactNode;
 }) {
+  // The target lists name the plain attack; raid/apart/ally marks ride on top of it.
+  const picked = full === HOLD ? full : pickBase(full);
   const kindOf = (p: string): OrderKind => p === HOLD ? 'hold' : attacks.some((s) => s.id === p) ? 'attack' : moves.some((s) => s.id === p) ? 'move' : '';
   const [kind, setKind] = useState<OrderKind>(kindOf(picked));
   // A saved pick (here or from another device) sets the kind; an empty one leaves a half-made choice alone.
@@ -314,6 +351,7 @@ function OrderPicker({ head, picked, onPick, moves, attacks, means, lockTip = 'S
           </label>
         )}
       </div>
+      {kind === 'attack' && marks}
       <span className={`order-means${picked ? '' : ' muted'}`}>
         {picked && <span className="tag green" data-tip={lockTip}><Icon name="l:lock" /> Locked in</span>} {means(kind)}
       </span>
@@ -402,19 +440,24 @@ function RevealedOrders({ c, orders, round, gm, fb }: { c: Campaign; orders: Pla
         const fought = foughtFor(c, a, currentRound(c)); // games are logged by campaign round, not by orders #
         const sector = c.sectors.find((s) => s.id === a.sectorId);
         const force = state.forces.find((f) => f.id === a.forceId);
-        const block = sector ? overrunBlock(sector, force, c) : 'the sector is gone';
-        const mine = gm || (!!cloud.email && force?.owner === cloud.email);
+        const ids = a.forceIds ?? (a.forceId ? [a.forceId] : []);
+        const muster = ids.length > 1;
+        const supply = attackSupply(a, state.forces);
+        const block = sector ? overrunBlock(sector, force, c, { supply, raid: a.raid, muster }) : 'the sector is gone';
+        const mine = gm || (!!cloud.email && ids.some((id) => state.forces.find((f) => f.id === id)?.owner === cloud.email));
         return (
-          <div key={a.forceId ?? a.factionId} className="list-item small">
+          <div key={`${a.forceId ?? a.factionId}${a.raid ? ':raid' : ''}`} className="list-item small">
             <span className="grow">
-              <b>{who(a.factionId, a.forceId)}</b> attacks <b>{sectorName(a.sectorId)}</b> ({factionName(c, a.defender)})
+              <b>{muster ? ids.map((id) => who(a.factionId, id)).join(' + ') : who(a.factionId, a.forceId)}</b> {a.raid ? 'raids' : 'attacks'} <b>{sectorName(a.sectorId)}</b> ({factionName(c, a.defender)})
+              {muster && <span className="tag" style={{ marginLeft: 6 }} data-tip={`A muster: ${supply} Supply between them`}><Icon name="g:crossed-swords" /> Muster</span>}
+              {a.raid && <span className="tag red" style={{ marginLeft: 6 }} data-tip={`The garrison meets the raiders at their ${supply} Supply; a win cuts it ${Math.round(RAID.cut * 100)}%`}>Raid</span>}
               {!fought && a.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}><Icon name="g:hazard-sign" /> {f}</span>)}
             </span>
             {fought ? (
               <span className="tag green" data-tip={fought.notes || undefined}><Icon name="l:check" /> Fought: {fought.winner ? `${factionName(c, fought.winner)} won` : 'a draw'}</span>
             ) : (
               <span className="row" style={{ gap: 4 }}>
-                <a className="btn" href={href.tracker(a.sectorId, a.factionId, a.forceId)}><Icon name="g:crossed-swords" /> Start battle</a>
+                <a className="btn" href={href.tracker(a.sectorId, a.factionId, muster ? ids : a.forceId, a.raid)}><Icon name="g:crossed-swords" /> Start battle</a>
                 {siegeOf(c, a.forceId) && mine && (
                   <button className="small" data-tip="Call the siege off: the detachment is free to move from the next orders" onClick={() => {
                     if (!confirmAction('Lift the siege? The attack is called off.')) return;
