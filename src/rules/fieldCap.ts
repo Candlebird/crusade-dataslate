@@ -16,8 +16,15 @@ export function fieldCap(c: Campaign | undefined): number {
   return Math.min(max, base + perRound * (c ? currentRound(c) : 1));
 }
 
-/** The most Supply this detachment can hold: the cap, or what it was grandfathered at, whichever is more. */
-export const capFor = (c: Campaign | undefined, f: Force) => Math.max(fieldCap(c), f.nexus?.capHold ?? 0);
+/**
+ * The most Supply this detachment can hold: the cap, or what it was grandfathered at, whichever is more. One the tidy
+ * step hasn't seen yet is held at its Supply now, as the first sweep will record it, so the page reads right before then.
+ */
+export const capFor = (c: Campaign | undefined, f: Force) =>
+  Math.max(fieldCap(c), f.nexus?.capHold ?? (f.nexus && !f.nexus.capSeen ? supplyLimit(f) : 0));
+
+/** Is this detachment grandfathered over the field cap (or about to be, when first seen)? */
+export const heldOver = (c: Campaign | undefined, f: Force) => capFor(c, f) > fieldCap(c);
 
 /** Supply this detachment can still take before it hits its cap. */
 export const roomFor = (c: Campaign | undefined, f: Force) => Math.max(0, capFor(c, f) - supplyLimit(f));

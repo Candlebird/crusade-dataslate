@@ -5,7 +5,7 @@ import { supplyLimit } from './detachments';
 import {
   raidCut,
   raidShards,
-  capFor, claimGrants, cutGarrison, fieldCap, foundFromBank, foundProblem, grantFromBank, grantProblem, isLean, pendingGrants,
+  capFor, claimGrants, heldOver, cutGarrison, fieldCap, foundFromBank, foundProblem, grantFromBank, grantProblem, isLean, pendingGrants,
   raidOffered, regrowCuts, roomFor, sweepCap, transferCost, transferProblem, transferUnit, uncutGarrison, underdogXp,
 } from './fieldCap';
 import { emptyNexus, recordSectorGame, removeSectorGame, unitsUsed } from './nexus';
@@ -55,6 +55,10 @@ describe('the field cap', () => {
   it('grandfathers a detachment already over the cap, then banks what it earns past it', () => {
     const c = campaign();
     const big = force('big', 'A', 3000);
+    // Before the first sweep, the page already reads it as held at its Supply.
+    expect(capFor(c, big)).toBe(3000);
+    expect(heldOver(c, big)).toBe(true);
+    expect(heldOver(c, force('small', 'A', 500))).toBe(false);
     expect(sweepCap(c, big, 'd', id)).toBe(0);
     expect(big.nexus!.capSeen).toBe(true);
     expect(big.nexus!.capHold).toBe(3000);
