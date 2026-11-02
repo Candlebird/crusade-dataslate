@@ -11,6 +11,10 @@ import {
 import { href } from '../route';
 import { Modal, Stepper, UsAbbr, confirmAction, toast } from './ui';
 import { localDate } from '../model/date';
+import {
+  capFor, fieldCap, foundFromBank, foundProblem, grantFromBank, grantProblem, pendingGrants, roomFor, transferCost, transferProblem, transferUnit,
+} from '../rules/fieldCap';
+import { FIELD_CAP } from '../rules/nexusData';
 
 const COST = NEXUS_DETACHMENTS.reorganiseCost;
 const shards = (n: number) => `${n} Umbra Shard${n === 1 ? '' : 's'}`;
@@ -54,7 +58,7 @@ export function DetachmentsBox({ f, c }: { f: Force; c: Campaign }) {
       {all.map((x) => (
         <div key={x.id}>
           {x.id === f.id ? <b>{x.name}</b> : <a href={href.force(x.id)}>{x.name}</a>}
-          <span className="muted"> — {supplyLimit(x)} Supply · {x.umbraShards} <UsAbbr />{x.owner && x.owner !== cloud.email ? ` · ${x.owner}` : ''}</span>
+          <span className="muted"> — {supplyLimit(x)} / {capFor(c, x)} Supply · {x.umbraShards} <UsAbbr />{x.owner && x.owner !== cloud.email ? ` · ${x.owner}` : ''}</span>
         </div>
       ))}
       <div className="row" style={{ marginTop: '0.35rem' }}>
@@ -69,6 +73,7 @@ export function DetachmentsBox({ f, c }: { f: Force; c: Campaign }) {
           data-tip={done ? 'Already reorganised this round' : total < COST ? `Needs ${shards(COST)} across your detachments (they have ${total})` : undefined}
           onClick={() => (needNew ? setNaming(true) : setOpen(true))}>Reorganise…</button>
       </div>
+      <BankBox c={c} factionId={factionId} all={all} mine={mine} make={make} />
       {naming && <NameModal onNext={start} onClose={() => setNaming(false)} />}
       {open && <ReorganiseModal forces={mine} first={first} make={make} payer={f.id} c={c} onClose={close} />}
     </div>
@@ -113,6 +118,8 @@ function ReorganiseModal({ forces: existing, first, make, payer, c, onClose }: {
   const sum = (r: Record<string, number>) => forces.reduce((n, f) => n + (r[f.id] ?? 0), 0);
   const setNum = (key: 'supply' | 'us', id: string, v: number) => setPlan({ ...plan, [key]: { ...plan[key], [id]: v } });
   const over = forces.filter((f) => points[f.id] > plan.supply[f.id]);
+  // Supply planned past a detachment's field cap goes to the faction bank when the reorganisation lands.
+  const pastCap = forces.filter((f) => plan.supply[f.id] > capFor(c, f));
 
   const add = () => {
     if (!newName.trim()) return;
@@ -207,12 +214,139 @@ function ReorganiseModal({ forces: existing, first, make, payer, c, onClose }: {
           </div>
         );
       })}
-      {(problems.length > 0 || over.length > 0) && (
+      {(problems.length > 0 || over.length > 0 || pastCap.length > 0) && (
         <ul className="issues">
           {problems.map((p) => <li key={p} className="error">{p}</li>)}
+          {pastCap.map((f) => <li key={`cap${f.id}`} className="warn">{f.name}'s cap is {capFor(c, f)}: {plan.supply[f.id] - capFor(c, f)} Supply would go to the faction bank.</li>)}
           {over.map((f) => <li key={f.id} className="warn">{f.name} would field {points[f.id]} pts on {plan.supply[f.id]} Supply.</li>)}
         </ul>
       )}
     </Modal>
+  );
+}
+
+/**
+ * The faction bank (Supply its detachments earned past the field cap), and what to do with it: hand it to a detachment
+ * with room, or found a new detachment with it. Also moving one unit between your own detachments.
+ */
+function BankBox({ c, factionId, all, mine, make }: {
+  c: Campaign; factionId: string; all: Force[]; mine: Force[]; make: (name: string) => Force;
+}) {
+  const { update } = useStore();
+  const faction = c.factions.find((x) => x.id === factionId);
+  const bank = faction?.bank ?? 0;
+  const [to, setTo] = useState(all[0]?.id ?? '');
+  const [give, setGive] = useState(100);
+  const [name, setName] = useState('');
+  const [found, setFound] = useState(FIELD_CAP.foundMin);
+  const target = all.find((x) => x.id === to);
+  const grantWhy = target ? grantProblem(c, target, give) : 'Pick a detachment.';
+  const foundWhy = name.trim() ? foundProblem(c, factionId, found) : 'Name the new detachment.';
+
+  const grant = () => {
+    let err: string | undefined;
+    update((d) => {
+      const dc = d.campaign;
+      const f = d.forces.find((x) => x.id === to);
+      if (!dc || !f) return;
+      err = grantFromBank(dc, f, give, uid);
+      if (!err) dc.updatedAt = new Date().toISOString();
+    });
+    if (err) toast(err, 'error');
+    else toast(`${give} Supply from the bank to ${target!.name}.${mine.some((x) => x.id === to) ? '' : ' It lands when its owner next opens the app.'}`);
+  };
+  const doFound = () => {
+    const x = make(name.trim());
+    let err: string | undefined;
+    update((d) => {
+      const dc = d.campaign;
+      if (!dc) return;
+      err = foundFromBank(dc, x, found, localDate(), uid);
+      if (err) return;
+      dc.updatedAt = x.updatedAt = new Date().toISOString();
+      d.forces.push(x);
+    });
+    if (err) toast(err, 'error');
+    else {
+      toast(`${x.name} founded with ${found} Supply from the bank.`);
+      setName('');
+    }
+  };
+
+  if (!faction) return null;
+  return (
+    <div style={{ marginTop: '0.5rem' }}>
+      <div className="muted">
+        Faction bank: <b>{bank} Supply</b>. Field cap this round: {fieldCap(c)} a detachment; Supply earned past it lands here.
+      </div>
+      {bank > 0 && (
+        <>
+          <div className="row" style={{ marginTop: '0.35rem' }}>
+            <select aria-label="Detachment to give bank Supply" value={to} onChange={(e) => setTo(e.target.value)}>
+              {all.map((x) => {
+                const room = roomFor(c, x) - pendingGrants(c, x);
+                return <option key={x.id} value={x.id}>{x.name} (room {Math.max(0, room)})</option>;
+              })}
+            </select>
+            <Stepper value={give} step={50} min={50} onChange={setGive} />
+            <button disabled={!!grantWhy} data-tip={grantWhy} onClick={grant}>Give</button>
+          </div>
+          {bank >= FIELD_CAP.foundMin && (
+            <div className="row" style={{ marginTop: '0.35rem' }}>
+              <input className="grow" aria-label="New detachment from the bank" placeholder="Found a new detachment" value={name} onChange={(e) => setName(e.target.value)} />
+              <Stepper value={found} step={50} min={FIELD_CAP.foundMin} onChange={setFound} />
+              <button disabled={!!foundWhy} data-tip={foundWhy} onClick={doFound}>Found</button>
+            </div>
+          )}
+        </>
+      )}
+      {mine.length > 1 && <TransferRow c={c} mine={mine} all={all} />}
+    </div>
+  );
+}
+
+/** Move one unit between two of your detachments: free in one sector, otherwise Umbra Shards. It arrives Battle-Worn. */
+function TransferRow({ c, mine, all }: { c: Campaign; mine: Force[]; all: Force[] }) {
+  const { update } = useStore();
+  const [fromId, setFrom] = useState(mine[0].id);
+  const from = mine.find((x) => x.id === fromId) ?? mine[0];
+  const others = mine.filter((x) => x.id !== from.id);
+  const [toId, setToId] = useState(others[0]?.id ?? '');
+  const to = others.find((x) => x.id === toId) ?? others[0];
+  const units = from.units.filter((u) => u.status !== 'removed');
+  const [unitId, setUnit] = useState('');
+  const unit = units.find((u) => u.id === unitId) ?? units[0];
+  if (!to) return null;
+  const cost = transferCost(c, from, to);
+  const why = unit ? transferProblem(c, all, from, to, unit.id) : `${from.name} has no units.`;
+  const send = () => {
+    let err: string | undefined;
+    update((d) => {
+      const dc = d.campaign;
+      const a = d.forces.find((x) => x.id === from.id);
+      const b = d.forces.find((x) => x.id === to.id);
+      if (!dc || !a || !b) return;
+      err = transferUnit(dc, d.forces, a, b, unit!.id, localDate(), uid);
+      if (!err) a.updatedAt = b.updatedAt = new Date().toISOString();
+    });
+    if (err) toast(err, 'error');
+    else toast(`${unit!.name || unit!.unitType} moved to ${to.name}${cost ? ` for ${shards(cost)}` : ''}. It fights Battle-Worn this round.`);
+  };
+  return (
+    <div className="row" style={{ marginTop: '0.35rem' }}>
+      <span className="muted">Send</span>
+      <select aria-label="Unit to send" value={unit?.id ?? ''} onChange={(e) => setUnit(e.target.value)}>
+        {units.map((u) => <option key={u.id} value={u.id}>{u.name || u.unitType} ({u.points})</option>)}
+      </select>
+      <select aria-label="From detachment" value={from.id} onChange={(e) => { setFrom(e.target.value); setUnit(''); }}>
+        {mine.map((x) => <option key={x.id} value={x.id}>from {x.name}</option>)}
+      </select>
+      <select aria-label="To detachment" value={to.id} onChange={(e) => setToId(e.target.value)}>
+        {others.map((x) => <option key={x.id} value={x.id}>to {x.name}</option>)}
+      </select>
+      <button disabled={!!why} data-tip={why ?? (cost ? `Different sectors: ${shards(cost)}` : 'Same sector: free')} onClick={send}>
+        Send{cost ? ` (${cost} US)` : ''}
+      </button>
+    </div>
   );
 }

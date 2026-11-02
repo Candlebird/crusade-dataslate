@@ -1,6 +1,7 @@
 import type { MouseEvent, ReactNode } from 'react';
 import { href } from '../route';
 import { Panel } from './ui';
+import { FIELD_CAP } from '../rules/nexusData';
 import { Icon } from './Icon';
 
 /** One numbered tutorial step: a title, the page it happens on, and the instructions. */
@@ -38,6 +39,7 @@ export default function GuidePage() {
           <a href="#guide-force" onClick={jump}>2 · Import your force</a>
           <a href="#guide-edit" onClick={jump}>3 · Edit your force</a>
           <a href="#guide-claim" onClick={jump}>4 · Claim battle rewards</a>
+          <a href="#guide-cap" onClick={jump}>5 · Grow past the field cap</a>
         </nav>
         <p className="muted small" style={{ marginBottom: 0 }}>
           Looking up a trait, relic, scar or requisition? The <a href={href.rules()}>Rules</a> page has every table, with a search box at the top.
@@ -167,6 +169,33 @@ export default function GuidePage() {
           <p className="small muted">
             See <b>Claim as…</b>? No force was loaded for that side, so pick the force you played. Claimed battles are listed in the
             force's <b>Battle log</b>.
+          </p>
+        </Step>
+      </Panel>
+
+      <Panel id="guide.cap" domId="guide-cap" title="5 · Grow past the field cap (Nexus Wars)">
+        <p className="muted small" style={{ marginTop: 0 }}>
+          One detachment holds at most the field cap: {FIELD_CAP.base} Supply + {FIELD_CAP.perRound} a round, up to {FIELD_CAP.max}.
+          The force page shows <b>Supply x / cap y</b> under its name. Sector garrisons are sized to the cap too, not to your faction's total.
+        </p>
+        <Step n={1} title="Supply past the cap goes to the bank" where="Detachments box">
+          <p>
+            Increase Supply, feats and reorganising still pay in full; what's over the cap lands in your faction's bank. Any of your
+            faction's players can <b>Give</b> it to a detachment with room, or <b>Found</b> a new detachment with it
+            (at least {FIELD_CAP.foundMin} Supply).
+          </p>
+        </Step>
+        <Step n={2} title="Send units where they're needed" where="Detachments box">
+          <p>
+            <b>Send</b> moves one unit to another of your detachments: free in the same sector, {FIELD_CAP.transferUs} Umbra Shards
+            otherwise. It fights Battle-Worn that round. A detachment fielding {FIELD_CAP.lean} pts or less is <b>Lean</b> and moves one hex further.
+          </p>
+        </Step>
+        <Step n={3} title="Muster, raid, or punch up" where="Sealed orders">
+          <p>
+            Two of your detachments attacking one sector <b>muster</b>: one big army, and all move in on a win (tick <b>Fight apart</b> to
+            opt out). Facing a garrison too big for you? Pick <b>Raid</b> to fight one your size for shards, scouting and a cut to its
+            garrison, or attack anyway for bonus XP on a win.
           </p>
         </Step>
       </Panel>

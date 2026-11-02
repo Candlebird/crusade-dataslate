@@ -6,6 +6,7 @@ import { comingTonight } from './gameNight';
 import { journalStatus } from './journal';
 import { activeCrisis, crisisUntil, currentRound, eventById, factionName } from './nexus';
 import { reportFor } from './report';
+import { fieldCap } from './fieldCap';
 
 // Since You Last Looked (the home page): what changed in the war and on your forces. Each item has a key that stays
 // the same while it's news, so the page can remember which ones you've seen.
@@ -33,6 +34,15 @@ export function digest(c: Campaign | undefined, myForces: Force[], me?: string):
   const crisis = activeCrisis(c);
   if (crisis && !crisis.result)
     out.push({ key: `crisis:${crisis.round}:${round}`, icon: '☄', text: `Nexus Crisis: all factions against an Echo Lord, until the end of round ${crisisUntil(crisis)}.`, href: href.campaign('map', crisis.sectorId) });
+
+  // The field cap: a note once, when it comes in, and the faction bank whenever it holds Supply.
+  const home = myForces.find((f) => f.nexus?.factionId === me);
+  const toForce = home ? href.force(home.id) : href.campaign();
+  out.push({ key: 'fieldcap:intro', icon: '⚖', href: href.rules(),
+    text: `New: the field cap. One detachment holds at most ${fieldCap(c)} Supply this round (it grows each round); Supply past it goes to your faction bank, to hand out or found new detachments. Sector ratings follow the cap, not your faction's size, and raids and musters are in. See Rules: Field cap.` });
+  const bank = c.factions.find((x) => x.id === me)?.bank ?? 0;
+  if (bank > 0) out.push({ key: `bank:${round}:${bank}`, icon: '🏦', href: toForce,
+    text: `Your faction bank holds ${bank} Supply: give it to a detachment with room, or found a new one.` });
 
   const report = c.reports?.[c.reports.length - 1];
   if (report) {

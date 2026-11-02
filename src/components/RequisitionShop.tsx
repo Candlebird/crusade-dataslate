@@ -7,6 +7,7 @@ import { applyScar, forceTotals, hasRule, relicHolders, relicSlots, relicTaken, 
 import { NEEDS_UNIT, RELIC_TIER, requisitionEligible, requisitionProblem } from '../rules/requisition';
 import { unitName } from '../rules/battle';
 import { isRunaway, supplyBuysThisRound, supplyGain, supplyRpCost } from '../rules/runaway';
+import { capped, roomFor } from '../rules/fieldCap';
 import { currentRound } from '../rules/nexus';
 import { Modal, RelicOption, toast } from './ui';
 import { localDate } from '../model/date';
@@ -37,6 +38,11 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
   // Increase Supply gives less for each buy the faction has already made this round (rules/data.ts SUPPLY_BUY).
   const supplyBuys = supplyBuysThisRound(state.campaign, state.forces, force);
   const nextSupply = supplyGain(s.supplyPerRp, supplyBuys);
+  // Past the field cap, Increase Supply still buys Supply, but what's over goes to the faction bank.
+  const room = capped(state.campaign, force) ? roomFor(state.campaign, force) : Infinity;
+  const capNote = room >= nextSupply ? '' : room <= 0
+    ? ' At the field cap: all of it goes to the faction bank.'
+    : ` Only ${room} fits under the field cap; the rest goes to the faction bank.`;
 
   const pick = (r: Requisition) => {
     setSel(r);
@@ -134,7 +140,7 @@ export default function RequisitionShop({ force, onClose }: { force: Force; onCl
               <span className="cost">{credits(RELIC_TIER[r.name]) ? `${credits(RELIC_TIER[r.name])} forged` : `${priceOf(r)} RP`}</span>
               <div className="grow">
                 <b>{r.name}</b>
-                <div className="muted small">{r.name === 'Increase Supply' ? `+${nextSupply} Supply Limit${supplyBuys ? ` (buy ${supplyBuys + 1} this round; each gives ${SUPPLY_BUY.step} less, at least ${SUPPLY_BUY.min})` : ''}.${dearer ? ' Your faction is far ahead, so it costs more.' : ''}` : r.desc}</div>
+                <div className="muted small">{r.name === 'Increase Supply' ? `+${nextSupply} Supply Limit${supplyBuys ? ` (buy ${supplyBuys + 1} this round; each gives ${SUPPLY_BUY.step} less, at least ${SUPPLY_BUY.min})` : ''}.${dearer ? ' Your faction is far ahead, so it costs more.' : ''}${capNote}` : r.desc}</div>
               </div>
             </div>
           ))}

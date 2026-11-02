@@ -13,8 +13,9 @@ import {
   roundAge, threatOf, underdogBonus, type RoundEnd,
 } from '../rules/rounds';
 import { difficultyLevel, difficultyRange, rateSectors } from '../rules/difficulty';
-import { DIFFICULTY_LEVELS, NEXUS_DIFFICULTY } from '../rules/nexusData';
-import { Panel, confirmAction, toast, umbraShards } from './ui';
+import { DIFFICULTY_LEVELS, FIELD_CAP, RATING_BANDS } from '../rules/nexusData';
+import { fieldCap } from '../rules/fieldCap';
+import { Panel, Stepper, confirmAction, toast, umbraShards } from './ui';
 import { localDate } from '../model/date';
 import { breaksLeft, echoMarks, holders } from '../rules/voidspawn';
 import { Icon } from './Icon';
@@ -157,8 +158,8 @@ export default function RoundPanel({ c, gm = true, viewer }: { c: Campaign; gm?:
         </div>
       )}
       <div className="row small" style={{ flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem' }}>
-        <span className="tag" data-tip={`From ${NEXUS_DIFFICULTY.min} up to the biggest faction's total Supply × ${NEXUS_DIFFICULTY.maxFactor}, × ${difficultyLevel(c).scale} for ${difficultyLevel(c).name} difficulty; rescaled when the round ends`}>
-          Sector difficulty {range.min}–{range.max} Supply
+        <span className="tag" data-tip={`Bands of the field cap (${fieldCap(c)} a detachment this round): about ${RATING_BANDS.near}× near the homes, ${RATING_BANDS.far}× at the far reach, ${RATING_BANDS.setPiece}× for set pieces; × ${difficultyLevel(c).scale} for ${difficultyLevel(c).name} difficulty. Rescaled when the round ends`}>
+          Field cap {fieldCap(c)} · sectors {range.min}–{range.max} Supply
         </span>
         {gm && <span className="muted">Difficulty and rescaling: <b>Campaign settings</b>, below.</span>}
       </div>
@@ -244,9 +245,10 @@ export function CampaignSettingsPanel({ c }: { c: Campaign }) {
           </label>
           <p className="muted">Scales every sector rating; changing it rescales the sectors now.</p>
         </div>
+        <FieldCapSetting c={c} change={change} />
         <div>
           <button onClick={rescale}>{rated ? 'Rescale sectors now' : 'Rate sectors'}</button>
-          <p className="muted">Rates sectors {range.min}–{range.max} Supply against current faction Supply. Each round end does this too.</p>
+          <p className="muted">Rates sectors {range.min}–{range.max} Supply in bands of the field cap. Each round end does this too.</p>
         </div>
         <div>
           <span className="row"><button onClick={guard}>Place guardians</button><button onClick={reguard}>Re-roll guardians</button></span>
@@ -363,6 +365,31 @@ function AssetsRow({ c, only }: { c: Campaign; only?: string }) {
           </div>
         );
       })}
+    </div>
+  );
+}
+
+/** The GM's override of the field cap: where it starts, how much it grows a round and where it stops. */
+function FieldCapSetting({ c, change }: { c: Campaign; change: (fn: (d: Campaign) => void) => void }) {
+  const cap = c.fieldCap ?? FIELD_CAP;
+  const set = (key: 'base' | 'perRound' | 'max', v: number) => change((d) => {
+    const next = { base: cap.base, perRound: cap.perRound, max: cap.max, [key]: v };
+    if (next.base === FIELD_CAP.base && next.perRound === FIELD_CAP.perRound && next.max === FIELD_CAP.max) delete d.fieldCap;
+    else d.fieldCap = next;
+  });
+  return (
+    <div>
+      <div className="row" style={{ gap: '0.35rem', flexWrap: 'wrap' }}>
+        <b>Field cap</b>
+        <label className="row" style={{ gap: '0.25rem' }}>start <Stepper value={cap.base} step={100} min={500} onChange={(v) => set('base', v)} /></label>
+        <label className="row" style={{ gap: '0.25rem' }}>+ a round <Stepper value={cap.perRound} step={25} min={0} onChange={(v) => set('perRound', v)} /></label>
+        <label className="row" style={{ gap: '0.25rem' }}>max <Stepper value={cap.max} step={250} min={500} onChange={(v) => set('max', v)} /></label>
+        {c.fieldCap && <button className="ghost small" onClick={() => change((d) => void delete d.fieldCap)}>Default</button>}
+      </div>
+      <p className="muted">
+        The most Supply one detachment holds: {fieldCap(c)} this round. Supply past it goes to the faction bank. Ratings follow it at the next round end
+        (or Rescale now).
+      </p>
     </div>
   );
 }

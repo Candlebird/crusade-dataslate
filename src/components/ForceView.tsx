@@ -35,6 +35,8 @@ import { localDate } from '../model/date';
 import { EmblemButton } from './Emblem';
 import { defaultEmblem, emblemLayers } from '../model/emblem';
 import { Icon } from './Icon';
+import { capFor, fieldCap, isLean } from '../rules/fieldCap';
+import { FIELD_CAP } from '../rules/nexusData';
 
 /** Hands the force to another player on the campaign, e.g. when you've been looking after their army. */
 function TransferForce({ f }: { f: Force }) {
@@ -126,6 +128,14 @@ export default function ForceView({ forceId }: { forceId: string }) {
             </EmblemButton>
             {f.name}
           </h1>
+          {inCampaign && (
+            <div className="muted small" data-tip={`The field cap grows each round. Supply past it goes to the faction bank.${isLean(f) ? `
+Lean: fielding ${FIELD_CAP.lean} pts or less, it moves ${FIELD_CAP.leanMove} more hex${FIELD_CAP.leanMove === 1 ? '' : 'es'}.` : ''}`}>
+              Supply {t.supplyLimit} / cap {capFor(c, f)}
+              {f.nexus?.capHold ? ` (held over the ${fieldCap(c)} cap: grows no more until the cap passes it)` : ''}
+              {isLean(f) ? ' · Lean' : ''}
+            </div>
+          )}
         </div>
         <div className="row">
           {armyUrl && <a className="btn" href={armyUrl} target="_blank" rel="noreferrer">Army Forge <Icon name="l:external-link" /></a>}

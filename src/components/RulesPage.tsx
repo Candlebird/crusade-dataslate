@@ -463,7 +463,7 @@ function NexusRules() {
           the <a href={href.campaign()}>Nexus Wars</a> page.
         </p>
         <Toc items={[
-          ['n-map', 'Sectors'], ['n-danger', 'Difficulty & modifiers'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'],
+          ['n-map', 'Sectors'], ['n-danger', 'Difficulty & modifiers'], ['n-benefits', 'Benefits'], ['n-rounds', 'Rounds & income'], ['n-skirmish', 'Skirmishes & Assets'], ['n-attack', 'The Battle'], ['n-detach', 'Detachments'], ['n-cap', 'Field cap & musters'],
           ['n-home', 'Home challenges'], ['n-echoes', ECHOES.name], ['n-events', 'Galactic Events'], ['n-crisis', 'Nexus Crisis'], ['n-downtime', 'Downtime'], ['n-fog', 'Fog of war & Chronicle'], ['n-night', 'Game night'], ['n-warroom', 'War Room'], ['n-production', 'Production'], ['n-tech', 'Tech tree'], ['n-heroes', 'Heroes & guardians'], ['n-marauders', 'Marauders'], ['n-warlords', 'Warlords'], ['n-duels', 'Nexus Duels'], ['n-catchup', 'Catching up'], ['n-tables', 'Anomaly & Void tables'],
           ['n-shop', 'Umbra Shard shop'],
         ]} />
@@ -507,6 +507,10 @@ function NexusRules() {
 
       <Section id="n-detach" title="Detachments">
         <Prose lines={NEXUS_TEXT.detachments} />
+      </Section>
+
+      <Section id="n-cap" title="Field cap, the bank, raids and musters">
+        <Prose lines={NEXUS_TEXT.fieldCap} />
       </Section>
 
       <Section id="n-home" title="Home-sector challenges">

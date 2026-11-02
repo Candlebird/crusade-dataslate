@@ -39,8 +39,19 @@ describe('digest', () => {
     c.gameNight = { round: 2, coming: ['B'] };
     c.duels = [{ id: 'd', date: '', round: 2, status: 'open', challenger: { factionId: 'B', forceId: 'x', wager: {} }, challenged: { factionId: 'A', forceId: 'y', wager: {} } }];
     const items = digest(c, [], 'A');
-    expect(items.map((i) => i.key)).toEqual(['report:1', 'raid:1:pA', 'night:2', 'duel:d', 'log:g1']);
+    expect(items.map((i) => i.key)).toEqual(['fieldcap:intro', 'report:1', 'raid:1:pA', 'night:2', 'duel:d', 'log:g1']);
     expect(items.find((i) => i.key === 'log:g1')!.href).toBe('#/campaign/log/g1');
     expect(items.find((i) => i.key === 'raid:1:pA')!.href).toBe('#/campaign/map/pA');
+  });
+
+  it("shows the faction bank, linking to one of your faction's forces", () => {
+    const c = campaign();
+    c.factions[0].bank = 400;
+    const f = newForce('Mine');
+    f.nexus = { factionId: 'A' } as never;
+    const bank = digest(c, [f], 'A').find((i) => i.key.startsWith('bank:'))!;
+    expect(bank).toMatchObject({ key: 'bank:2:400', href: `#/force/${f.id}` });
+    expect(bank.text).toContain('400 Supply');
+    expect(digest(c, [f], 'B').some((i) => i.key.startsWith('bank:'))).toBe(false);
   });
 });

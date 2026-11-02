@@ -86,8 +86,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       clawbackFeats(f, localDate(), uid);
       if (draft.campaign) clawbackDuplicateFeats(f, draft.forces, localDate(), uid);
       // The field cap: take in bank Supply handed to this detachment, then send anything past its cap to the bank.
-      claimGrants(draft.campaign, f, localDate(), uid);
-      sweepCap(draft.campaign, f, localDate(), uid);
+      // Both change the force and the campaign; stamp them so the sync uploads the change.
+      const moved = claimGrants(draft.campaign, f, localDate(), uid) + sweepCap(draft.campaign, f, localDate(), uid);
+      if (moved && draft.campaign) {
+        f.updatedAt = draft.campaign.updatedAt = nowIso();
+      }
     });
     tidy();
     fn(draft);

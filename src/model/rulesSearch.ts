@@ -56,6 +56,7 @@ const NEXUS_SECTIONS: Record<keyof typeof NEXUS_TEXT, [string, string]> = {
   skirmishes: ['n-skirmish', 'Skirmishes & Strategic Assets'],
   attacking: ['n-attack', 'The Battle'],
   detachments: ['n-detach', 'Detachments'],
+  fieldCap: ['n-cap', 'Field cap, the bank, raids and musters'],
   home: ['n-home', 'Home-sector challenges'],
   echoes: ['n-echoes', 'Echoes'],
   events: ['n-events', 'Galactic Events'],

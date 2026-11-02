@@ -391,7 +391,7 @@ function MapEditor({ c, setC, onRecord, gm, fog, focus }: { c: Campaign; setC: S
                     {markOn(c, s.id) && !markOn(c, s.id)!.brokenBy && (
                       <SvgIcon name="g:hazard-sign" x={p.x + 19} y={p.y + 9} size={11} className="hex-mark hex-echo" title={MARK_TIP} />
                     )}
-                    {ratingFor(s, viewAs, c) !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff" data-tip={`AI garrison${viewAs ? ` for ${factionName(c, viewAs)}` : " (the biggest faction's scale)"}: ${ratingFor(s, viewAs, c)} Supply`}>{ratingFor(s, viewAs, c)}</text>}
+                    {ratingFor(s, viewAs, c) !== undefined && aiDefended(s) && <text x={p.x} y={p.y + 32} className="hex-diff" data-tip={`AI garrison: ${ratingFor(s, viewAs, c)} Supply${s.cut ? ` (raids cut it ${Math.round(s.cut * 100)}%)` : ''}`}>{ratingFor(s, viewAs, c)}</text>}
                     {/* Detachments: your own always, anyone else's only while you can see the sector. */}
                     {(() => {
                       const here = (posted.get(s.id) ?? []).filter((f) => !viewAs || known === 'visible' || f.nexus?.factionId === viewAs);
