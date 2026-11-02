@@ -7,6 +7,7 @@ import { journalStatus } from './journal';
 import { activeCrisis, crisisUntil, currentRound, eventById, factionName } from './nexus';
 import { reportFor } from './report';
 import { fieldCap } from './fieldCap';
+import { FIELD_CAP, RAID, RATING_BANDS, UNDERDOG_XP } from './nexusData';
 
 // Since You Last Looked (the home page): what changed in the war and on your forces. Each item has a key that stays
 // the same while it's news, so the page can remember which ones you've seen.
@@ -38,8 +39,23 @@ export function digest(c: Campaign | undefined, myForces: Force[], me?: string):
   // The field cap: a note once, when it comes in, and the faction bank whenever it holds Supply.
   const home = myForces.find((f) => f.nexus?.factionId === me);
   const toForce = home ? href.force(home.id) : href.campaign();
-  out.push({ key: 'fieldcap:intro', icon: '⚖', href: href.rules(),
-    text: `New: the field cap. One detachment holds at most ${fieldCap(c)} Supply this round (it grows each round); Supply past it goes to your faction bank, to hand out or found new detachments. Sector ratings follow the cap, not your faction's size, and raids and musters are in. See Rules: Field cap.` });
+  // What's new with the field cap, one item each, so a player can tick them off.
+  const rules = href.rules('nexus');
+  const pct = (x: number) => `${Math.round(x * 100)}%`;
+  out.push(
+    { key: 'fieldcap:intro', icon: '⚖', href: toForce,
+      text: `New: the field cap. One detachment holds at most ${fieldCap(c)} Supply this round, growing ${FIELD_CAP.perRound} a round up to ${FIELD_CAP.max}. Your force page shows "Supply x / cap y". A detachment already over it keeps what it has but grows no more until the cap catches up.` },
+    { key: 'fieldcap:bank', icon: '🏦', href: toForce,
+      text: `New: the faction bank. Supply earned past the cap goes there, not lost. Anyone in the faction can give it to a detachment with room, or found a new detachment with ${FIELD_CAP.foundMin}+ (Detachments box on your force page).` },
+    { key: 'fieldcap:send', icon: '⇄', href: toForce,
+      text: `New: send a unit between your detachments: free in the same sector, else ${FIELD_CAP.transferUs} Umbra Shards. It arrives Battle-Worn.` },
+    { key: 'fieldcap:ratings', icon: '◎', href: rules,
+      text: `Changed: sector garrisons now follow the field cap, not your faction's total Supply, so growing no longer makes every fight harder. Near home ${RATING_BANDS.near}× the cap, far out ${RATING_BANDS.far}×, set pieces ${RATING_BANDS.setPiece}×. Attack a garrison bigger than you and win: +1 XP a unit per ${pct(UNDERDOG_XP.gap)} it was bigger (up to +${UNDERDOG_XP.max}).` },
+    { key: 'fieldcap:raid', icon: '⚔', href: rules,
+      text: `New: raids. Facing a garrison over ${RAID.prompt}× your Supply, you can raid instead: it meets you at your own size. Win for Umbra Shards, a look around, and a cut of up to ${pct(RAID.cut)} to the garrison that stacks round to round (it grows back ${pct(RAID.regrow)} a round left alone).` },
+    { key: 'fieldcap:muster', icon: '⚑', href: rules,
+      text: `New: musters. Your faction's detachments that attack the same sector fight as one army (tick "Fight apart" to opt out), and all move in on a win. Big musters get a bigger zone board. Lean detachments (${FIELD_CAP.lean} pts or less fielded) move ${FIELD_CAP.leanMove} more hex${FIELD_CAP.leanMove === 1 ? '' : 'es'}.` },
+  );
   const bank = c.factions.find((x) => x.id === me)?.bank ?? 0;
   if (bank > 0) out.push({ key: `bank:${round}:${bank}`, icon: '🏦', href: toForce,
     text: `Your faction bank holds ${bank} Supply: give it to a detachment with room, or found a new one.` });

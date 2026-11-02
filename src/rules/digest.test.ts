@@ -24,6 +24,8 @@ function campaign(): Campaign {
   };
 }
 
+const FIELDCAP_NEWS = ['fieldcap:intro', 'fieldcap:bank', 'fieldcap:send', 'fieldcap:ratings', 'fieldcap:raid', 'fieldcap:muster'];
+
 describe('digest', () => {
   it("has only feats when you aren't in the campaign", () => {
     const f = { ...newForce('Iron'), id: 'f', feats: { firstBlood: '2026-10-20' } };
@@ -39,7 +41,7 @@ describe('digest', () => {
     c.gameNight = { round: 2, coming: ['B'] };
     c.duels = [{ id: 'd', date: '', round: 2, status: 'open', challenger: { factionId: 'B', forceId: 'x', wager: {} }, challenged: { factionId: 'A', forceId: 'y', wager: {} } }];
     const items = digest(c, [], 'A');
-    expect(items.map((i) => i.key)).toEqual(['fieldcap:intro', 'report:1', 'raid:1:pA', 'night:2', 'duel:d', 'log:g1']);
+    expect(items.map((i) => i.key)).toEqual([...FIELDCAP_NEWS, 'report:1', 'raid:1:pA', 'night:2', 'duel:d', 'log:g1']);
     expect(items.find((i) => i.key === 'log:g1')!.href).toBe('#/campaign/log/g1');
     expect(items.find((i) => i.key === 'raid:1:pA')!.href).toBe('#/campaign/map/pA');
   });
