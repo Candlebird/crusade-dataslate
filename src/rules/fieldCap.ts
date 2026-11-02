@@ -183,6 +183,10 @@ export const cutOf = (s: Sector) => Math.min(1, Math.max(0, s.cut ?? 0));
 export const raidCut = (c: Campaign, supply?: number) =>
   Math.round(RAID.cut * (supply ? Math.min(1, supply / fieldCap(c)) : 1) * 100) / 100;
 
+/** Umbra Shards a won raid pays a detachment: RAID.us at the field cap, less in step for smaller ones (at least 1). */
+export const raidShards = (c: Campaign | undefined, supply: number) =>
+  Math.max(1, Math.round(RAID.us * Math.min(1, supply / fieldCap(c))));
+
 /** A won raid cuts the sector's garrison by `cut` more. Returns the cut added, so deleting the game can take it back. */
 export function cutGarrison(s: Sector, cut: number = RAID.cut): number {
   const before = cutOf(s);

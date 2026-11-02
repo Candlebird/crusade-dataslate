@@ -471,7 +471,7 @@ function StartBattle({ sectorId, preset, presetForce, raid, crisis: wantCrisis }
             </p>
             <SectorDanger s={sector} factionId={attacker} c={state.campaign} />
             {aiDefended(sector) && ratingFor(sector, attacker, state.campaign) !== undefined && (raid ? (
-              <p className="small"><span className="tag gold">Raid</span> The {ECHOES.name}' garrison meets you at your own Supply. Win and it's cut by {Math.round(RAID.cut * 100)}% for good, with {RAID.us} Umbra Shards and a look at what's around it. The sector isn't taken.</p>
+              <p className="small"><span className="tag gold">Raid</span> The {ECHOES.name}' garrison meets you at your own Supply. Win and it's cut for good (up to {Math.round(RAID.cut * 100)}%, less for a raid smaller than the field cap), with up to {RAID.us} Umbra Shards each and a look at what's around it. The sector isn't taken.</p>
             ) : (
               <p className="muted small">The {ECHOES.name} hold it with a {ratingFor(sector, attacker, state.campaign)}-Supply garrison. Play <b>1 v AI</b> and generate their army at that size. Modifiers favour the defender.</p>
             ))}

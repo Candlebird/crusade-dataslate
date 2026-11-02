@@ -4,11 +4,12 @@ import type { Campaign, Force } from '../model/types';
 import { supplyLimit } from './detachments';
 import {
   raidCut,
+  raidShards,
   capFor, claimGrants, cutGarrison, fieldCap, foundFromBank, foundProblem, grantFromBank, grantProblem, isLean, pendingGrants,
   raidOffered, regrowCuts, roomFor, sweepCap, transferCost, transferProblem, transferUnit, uncutGarrison, underdogXp,
 } from './fieldCap';
 import { emptyNexus, recordSectorGame, removeSectorGame, unitsUsed } from './nexus';
-import { FIELD_CAP } from './nexusData';
+import { FIELD_CAP, RAID } from './nexusData';
 
 function campaign(): Campaign {
   return {
@@ -243,6 +244,10 @@ describe('lean detachments, underdogs and raids', () => {
     expect(raidCut(c, cap * 2)).toBe(0.1);
     expect(raidCut(c, cap / 4)).toBe(0.03);
     expect(raidCut(c)).toBe(0.1);
+    expect(raidShards(c, cap)).toBe(RAID.us);
+    expect(raidShards(c, cap * 3)).toBe(RAID.us);
+    expect(raidShards(c, cap / 2)).toBe(Math.round(RAID.us / 2));
+    expect(raidShards(c, 1)).toBe(1);
     const win = (id: string, supply: number) =>
       recordSectorGame(c, { id, date: 'd', sectorId: 'p1', attacker: 'A', defender: 'ai', winner: 'A', notes: '', round: 1, raid: { cut: 0, supply } });
     win('a', cap / 4);

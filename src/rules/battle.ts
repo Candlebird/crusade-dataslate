@@ -78,8 +78,9 @@ export interface BattleInput {
   zone?: ZoneMode;
   /** Nexus Wars: XP each unit that fought gets on a win, for attacking a garrison over its Supply (rules/fieldCap.ts). */
   underdog?: number;
-  /** Nexus Wars: the side raided the sector: a win pays RAID.us Umbra Shards. */
+  /** Nexus Wars: the side raided the sector: a win pays `raidUs` Umbra Shards (RAID.us when not given). */
   raid?: boolean;
+  raidUs?: number;
 }
 
 export interface RewardRow {
@@ -332,7 +333,7 @@ export function resolveBattle(force: Force, input: BattleInput, newId: () => str
       else warnings.push(`${source}: choose a relic and a unit.`);
     };
     // A won raid pays Umbra Shards.
-    if (input.raid && input.result === 'win') addUs('Raid', RAID.us);
+    if (input.raid && input.result === 'win') addUs('Raid', input.raidUs ?? RAID.us);
     for (const item of input.nexus?.items ?? []) {
       const pick = input.nexusPicks?.[item.key] ?? emptyNexusPick();
       const src = item.source;

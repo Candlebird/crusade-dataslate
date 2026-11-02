@@ -7,7 +7,7 @@ import type { MissionDef, MissionRule, ObjectiveRoll } from './missions';
 import { aiStyleFor, type AiStyle } from './aiTrees';
 import { aiDefended, modifierOf, ratingFor } from './difficulty';
 import { supplyLimit } from './detachments';
-import { underdogXp } from './fieldCap';
+import { raidShards, underdogXp } from './fieldCap';
 import { isReinforced } from './production';
 import type { ZoneMode } from './zone/rewards';
 
@@ -509,7 +509,11 @@ export function wizardPrefill(b: TrackedBattle, sideId: string, input: BattleInp
     from: { battleId: b.id, sideId },
     ...(b.patrol ? { patrol: true } : {}),
     ...(b.zoneMode ? { zone: b.zoneMode } : {}),
-    ...(b.raid && side.team === b.attacker ? { raid: true } : {}),
+    ...(() => {
+      if (!b.raid || side.team !== b.attacker) return {};
+      const f = forces.find((x) => x.id === side.forceId);
+      return { raid: true, ...(f ? { raidUs: raidShards(c, supplyLimit(f)) } : {}) };
+    })(),
     ...(() => {
       const xp = side.team === b.attacker ? battleUnderdog(b, c, forces) : 0;
       return xp ? { underdog: xp } : {};

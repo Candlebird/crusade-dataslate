@@ -4,7 +4,7 @@ import { useStore } from '../model/store';
 import type { Campaign, Force } from '../model/types';
 import { detachmentName, factionForces, supplyLimit } from '../rules/detachments';
 import { aiDefended, ratingFor, setPiece } from '../rules/difficulty';
-import { raidOffered, underdogXp } from '../rules/fieldCap';
+import { raidCut, raidOffered, raidShards, underdogXp } from '../rules/fieldCap';
 import { RAID } from '../rules/nexusData';
 import { ECHOES, currentRound, factionName } from '../rules/nexus';
 import { moveOf, moveTargets, positionOf } from '../rules/movement';
@@ -218,7 +218,7 @@ export default function OrdersPanel({ c }: { c: Campaign }) {
                 : <>Not declared yet: pick an order before the GM reveals, or it just stays where it is.</>)
               : picked === HOLD ? <>Stays at {at?.name ?? 'its sector'}.{digsIn(c, f) && ' Dug in: if attacked it fights and picks the deployment.'}{fx(at?.id)}</>
               : !target ? <>That sector is out of reach now: pick again.</>
-              : raid ? <><span className="tag red">Raid</span> Raids {target.name}: its garrison meets you at your own {supply} Supply, at the table or off it. Win and you take {RAID.us} Umbra Shards, see all round it, and its garrison is {Math.round(RAID.cut * 100)}% weaker for good (it grows back {Math.round(RAID.regrow * 100)}% each round nobody attacks it). The sector stays theirs.</>
+              : raid ? <><span className="tag red">Raid</span> Raids {target.name}: its garrison meets you at your own {supply} Supply, at the table or off it. Win and you take {raidShards(c, supply)} Umbra Shards, see all round it, and its garrison is {Math.round(raidCut(c, supply) * 100)}% weaker for good (one raid's cut a round; it grows back {Math.round(RAID.regrow * 100)}% each round nobody attacks it). The sector stays theirs.</>
               : isAttack ? <><span className="tag red">Attack</span> Fights for {target.name}: a battle against {rating !== undefined ? `its ${rating} Supply AI garrison` : factionName(c, target.owner)}, at the table
                 {zoneOn ? ' or as a zone battle' : !overrunBlock(target, f, c) ? ' or overrun (an auto-battle)' : ''}, from this panel after the reveal. Win and it moves in{target.type === 'empty' && !target.owner ? ', and the space is yours: a space station' : ''}.
                 {underdog > 0 && <> Outnumbered: each unit that fights gets +{underdog} XP on a win.</>}
@@ -450,7 +450,7 @@ function RevealedOrders({ c, orders, round, gm, fb }: { c: Campaign; orders: Pla
             <span className="grow">
               <b>{muster ? ids.map((id) => who(a.factionId, id)).join(' + ') : who(a.factionId, a.forceId)}</b> {a.raid ? 'raids' : 'attacks'} <b>{sectorName(a.sectorId)}</b> ({factionName(c, a.defender)})
               {muster && <span className="tag" style={{ marginLeft: 6 }} data-tip={`A muster: ${supply} Supply between them`}><Icon name="g:crossed-swords" /> Muster</span>}
-              {a.raid && <span className="tag red" style={{ marginLeft: 6 }} data-tip={`The garrison meets the raiders at their ${supply} Supply; a win cuts it ${Math.round(RAID.cut * 100)}%`}>Raid</span>}
+              {a.raid && <span className="tag red" style={{ marginLeft: 6 }} data-tip={`The garrison meets the raiders at their ${supply} Supply; a win cuts it ${Math.round(raidCut(c, supply) * 100)}%`}>Raid</span>}
               {!fought && a.flags.map((f) => <span key={f} className="tag" style={{ marginLeft: 6 }}><Icon name="g:hazard-sign" /> {f}</span>)}
             </span>
             {fought ? (
