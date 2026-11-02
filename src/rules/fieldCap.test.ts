@@ -3,6 +3,7 @@ import { newForce, newUnit } from '../model/factory';
 import type { Campaign, Force } from '../model/types';
 import { supplyLimit } from './detachments';
 import {
+  raidCut,
   capFor, claimGrants, cutGarrison, fieldCap, foundFromBank, foundProblem, grantFromBank, grantProblem, isLean, pendingGrants,
   raidOffered, regrowCuts, roomFor, sweepCap, transferCost, transferProblem, transferUnit, uncutGarrison, underdogXp,
 } from './fieldCap';
@@ -232,6 +233,26 @@ describe('lean detachments, underdogs and raids', () => {
     expect(s.cut).toBeUndefined();
 
     recordSectorGame(c, { id: 'l', date: 'd', sectorId: 'p1', attacker: 'A', defender: 'ai', winner: 'ai', notes: '', raid: { cut: 0 } });
+    expect(s.cut).toBeUndefined();
+  });
+
+  it("sizes a raid's cut to the raiders and cuts a sector once a round", () => {
+    const c = campaign();
+    const cap = FIELD_CAP.base + FIELD_CAP.perRound; // round 1
+    expect(raidCut(c, cap)).toBe(0.1);
+    expect(raidCut(c, cap * 2)).toBe(0.1);
+    expect(raidCut(c, cap / 4)).toBe(0.03);
+    expect(raidCut(c)).toBe(0.1);
+    const win = (id: string, supply: number) =>
+      recordSectorGame(c, { id, date: 'd', sectorId: 'p1', attacker: 'A', defender: 'ai', winner: 'A', notes: '', round: 1, raid: { cut: 0, supply } });
+    win('a', cap / 4);
+    const s = c.sectors[1];
+    expect(s.cut).toBe(0.03);
+    // A second won raid this round scouts and pays, but cuts no more.
+    win('b', cap);
+    expect(s.cut).toBe(0.03);
+    expect(c.log.find((e) => e.id === 'b')!.raid!.cut).toBe(0);
+    removeSectorGame(c, 'a');
     expect(s.cut).toBeUndefined();
   });
 

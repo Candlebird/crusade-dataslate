@@ -73,7 +73,7 @@ describe('Overrun', () => {
     expect(pts).toBeLessThanOrEqual(530);
     raid.auto = { winner: 'A', dealt: { A: 500, B: 100 } };
     raid.ended = true;
-    expect(sectorGame(raid, c, [a])).toEqual({ event: expect.objectContaining({ raid: { cut: 0 }, notes: expect.stringMatching(/^Raid\. /) }) });
+    expect(sectorGame(raid, c, [a])).toEqual({ event: expect.objectContaining({ raid: { cut: 0, supply: expect.any(Number) }, notes: expect.stringMatching(/^Raid\. /) }) });
 
     const [m1, m2, m3] = [force('A', 600), force('A', 700), force('A', 400)];
     const muster = attackBattle(c, { ...attack(m1, 'q'), forceIds: [m1.id, m2.id, m3.id] }, [m1, m2, m3], [], DEFAULT_SETTINGS, () => 0.5);

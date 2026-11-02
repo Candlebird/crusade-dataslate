@@ -594,7 +594,7 @@ export interface Sector {
   project?: SectorProject;
   /** Units that garrisoned it lately, newest last (a few rounds are kept, so raid XP waits to be taken). */
   garrisons?: SectorGarrison[];
-  /** Raids (rules/fieldCap.ts): the share cut off its garrison by won raids (0.1 a raid, stacking). It regrows when a round
+  /** Raids (rules/fieldCap.ts): the share cut off its garrison by won raids (up to 0.1 a raid, one a round, stacking). It regrows when a round
    *  ends with no attack on it. */
   cut?: number;
 }
@@ -739,8 +739,9 @@ export interface CampaignEvent {
   marauder?: Marauder;
   /** Materials a band took off the faction for barring its road (lost the fight), so deleting the entry gives them back. */
   toll?: number;
-  /** A raid (rules/fieldCap.ts): no capture; a win cut the garrison by `cut` (taken back if the entry is deleted). */
-  raid?: { cut: number };
+  /** A raid (rules/fieldCap.ts): no capture; a win cut the garrison by `cut` (taken back if the entry is deleted).
+   *  `supply`: the raiders' Supply, which sizes the cut. */
+  raid?: { cut: number; supply?: number };
   /** A muster: every detachment that fought (the first is `forceId`). All of them move in on a win. */
   forceIds?: string[];
 }

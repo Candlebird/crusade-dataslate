@@ -11,7 +11,7 @@ import {
   BENEFITS, ECHOES, SECTOR_TYPES, SECTOR_TYPE_KEYS, activeCrisis, activeEvent, benefitOf, factionColor, factionName, homeChallengeBlock, isStronghold, lordById, sidesOf, stormed,
 } from '../rules/nexus';
 import { breakMark, breaksLeft, holders, markOn, pickSpread, restoreMark, spreadInto, spreadTargets } from '../rules/voidspawn';
-import { aiDefended, rateSectors, ratingFor } from '../rules/difficulty';
+import { aiDefended, bandFightSize, rateSectors, ratingFor } from '../rules/difficulty';
 import {
   bankCap, build, buildBlock, buildCost, buildingById, buildingSlots, cancelBuilding, coreBlock, demolish, exchange, exchangeBlock, freeSlots, hasBuilding, installCore,
   factionBanked, isReinforced, isStation, produces, productionRate, tradeBonus, type ExchangeTrade,
@@ -640,10 +640,11 @@ function MarauderBox({ c, s, gm, viewer, setC }: { c: Campaign; s: Sector; gm: b
   return (
     <div className="marauder-box small">
       {bands.map((m) => {
-        const tier = marauderTier(m);
+        const size = bandFightSize(c, m.strength, m.barred?.sectorId ?? m.sectorId);
+        const tier = marauderTier(m, size);
         return (
           <div key={m.id}>
-            <span className="tag red"><Icon name="g:hood" /> Marauders</span> <b>{m.name}</b>: <b>{m.strength} Supply</b>, about since round {m.since}.
+            <span className="tag red"><Icon name="g:hood" /> Marauders</span> <b>{m.name}</b>: <b>{m.strength} Supply</b>{size < m.strength ? ` (fights at ${size} here, the sector's band)` : ''}, about since round {m.since}.
             {' '}Beat them and roll <span className={`tag${tier === 'Legendary' ? ' gold' : tier === 'Rare' ? ' red' : ''}`}>{tier}</span> Guardian loot.
             {(() => {
               const h = bandHeading(c, m);

@@ -258,6 +258,9 @@ describe('Warlord perks', () => {
     const band = { id: 'm', name: 'Band', sectorId: 'e1', strength: 0, since: 1 };
     expect(lootTier(c, band, 'A')).toBe('Rare');
     expect(lootTier(c, band, 'B')).toBe('Common');
+    // A huge band met at a small sector fights, and loots, at that sector's band.
+    expect(lootTier(c, { ...band, strength: 100000 }, 'B')).not.toBe('Legendary');
+    c.sectors.find((s) => s.id === 'e1')!.difficulty = 100000;
     expect(lootTier(c, { ...band, strength: 100000 }, 'A')).toBe('Legendary');
   });
 });

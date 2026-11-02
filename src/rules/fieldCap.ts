@@ -176,11 +176,18 @@ export const raidOffered = (garrison: number | undefined, attackers: number) => 
 /** A sector's raid cut, 0 to 1. */
 export const cutOf = (s: Sector) => Math.min(1, Math.max(0, s.cut ?? 0));
 
-/** A won raid cuts the sector's garrison by RAID.cut more. Returns the cut added, so deleting the game can take it back. */
-export function cutGarrison(s: Sector): number {
+/**
+ * How much a won raid cuts: RAID.cut for raiders at the field cap, less for smaller ones (a 500-Supply raid on a
+ * 2000 cap cuts a quarter as much), so a swarm of tiny detachments can't strip a fortress. `supply` unknown: the full cut.
+ */
+export const raidCut = (c: Campaign, supply?: number) =>
+  Math.round(RAID.cut * (supply ? Math.min(1, supply / fieldCap(c)) : 1) * 100) / 100;
+
+/** A won raid cuts the sector's garrison by `cut` more. Returns the cut added, so deleting the game can take it back. */
+export function cutGarrison(s: Sector, cut: number = RAID.cut): number {
   const before = cutOf(s);
-  s.cut = Math.min(1, Math.round((before + RAID.cut) * 100) / 100);
-  return s.cut - before;
+  s.cut = Math.min(1, Math.round((before + cut) * 100) / 100);
+  return Math.round((s.cut - before) * 100) / 100;
 }
 
 /** Take back a deleted raid's cut. */

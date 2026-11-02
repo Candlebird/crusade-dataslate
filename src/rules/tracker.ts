@@ -412,7 +412,8 @@ export function sectorGame(b: TrackedBattle, c: Campaign | undefined, forces: Fo
   const forceId = mine[0];
   const stories = b.auto?.stories;
   // A raid takes nothing: the win cuts the garrison instead (recordSectorGame).
-  const raid = b.raid && aiDefendedSector(sector) ? { raid: { cut: 0 } } : {};
+  const raidSupply = mine.reduce((n, id) => n + supplyLimit(forces.find((f) => f.id === id)!), 0);
+  const raid = b.raid && aiDefendedSector(sector) ? { raid: { cut: 0, ...(raidSupply ? { supply: raidSupply } : {}) } } : {};
   return { event: { sectorId: sector.id, attacker, defender, winner: won, notes: (b.raid ? 'Raid. ' : '') + notes, battleId: b.id, ...(forceId ? { forceId } : {}), ...(mine.length > 1 ? { forceIds: mine } : {}), ...raid, ...(stories?.length ? { stories } : {}) } };
 }
 

@@ -8,7 +8,7 @@ import { explore } from './fog';
 import { MARAUDER_ID, unrecordMarauderGame } from './marauders';
 import { settleGame, unsettleGame } from './movement';
 import { hexKey, isPlaced, neighbors } from './hexmap';
-import { cutGarrison, uncutGarrison } from './fieldCap';
+import { cutGarrison, raidCut, uncutGarrison } from './fieldCap';
 import { deposited, depositNearest, hasBuilding, loseBank } from './production';
 import { hasPerk } from './warlords';
 import { ZONE_REWARDS, type ZoneMode } from './zone/rewards';
@@ -154,10 +154,12 @@ export function recordSectorGame(c: Campaign, e: CampaignEvent, rand = Math.rand
   c.log.push(e);
   const s = c.sectors.find((x) => x.id === e.sectorId);
   if (!s || !e.winner || e.winner === 'ai') return;
-  // A raid takes nothing: a win cuts the garrison for good and scouts the sector and all round it.
+  // A raid takes nothing: a win cuts the garrison for good and scouts the sector and all round it. A sector takes one
+  // raid's cut a round (a second won raid still scouts and pays its shards), sized by the raiders' Supply.
   if (e.raid) {
     if (e.winner === e.attacker) {
-      e.raid = { cut: cutGarrison(s) };
+      const cutThisRound = c.log.some((x) => x !== e && x.sectorId === s.id && x.round === e.round && x.raid?.cut);
+      e.raid = { ...e.raid, cut: cutThisRound ? 0 : cutGarrison(s, raidCut(c, e.raid.supply)) };
       scoutAround(c, e.attacker, s);
     }
     return;

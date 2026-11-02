@@ -1,6 +1,6 @@
 import type { Campaign, CampaignEvent, Force, Marauder, Sector, SectorGarrison } from '../model/types';
 import type { RelicTier } from './data';
-import { difficultyLevel } from './difficulty';
+import { bandFightSize, difficultyLevel } from './difficulty';
 import { GARRISON } from './downtimeData';
 import { colOf, hexKey, isPlaced, neighbors, type Hex, type Rand } from './hexmap';
 import { positionOf } from './movement';
@@ -50,14 +50,15 @@ export const bandsAt = (c: Campaign, sectorId: string) => (c.marauders ?? []).fi
 /** Was this sector raided, so it produces nothing this round? */
 export const isRaided = (c: Campaign, s: Sector) => s.raided === (c.round ?? 1);
 
-/** The loot tier a band rolls at when beaten. */
-export const marauderTier = (m: Marauder): RelicTier =>
-  m.strength >= MARAUDERS.legendaryAt ? 'Legendary' : m.strength >= MARAUDERS.rareAt ? 'Rare' : 'Common';
+/** The loot tier a band rolls at when beaten: by the size it fought at (`size`, its strength when not given). */
+export const marauderTier = (m: Marauder, size = m.strength): RelicTier =>
+  size >= MARAUDERS.legendaryAt ? 'Legendary' : size >= MARAUDERS.rareAt ? 'Rare' : 'Common';
 
 const TIERS: RelicTier[] = ['Common', 'Rare', 'Legendary'];
 /** The tier a faction loots a beaten band at: one higher for a Reaver Warlord's Headhunter. */
+// A band met at a sector whose band is smaller than it fights at that size (bandFightSize), and loots at that size too.
 export const lootTier = (c: Campaign, m: Marauder, factionId: string): RelicTier =>
-  TIERS[Math.min(TIERS.length - 1, TIERS.indexOf(marauderTier(m)) + (hasPerk(c, factionId, 'bounty') ? 1 : 0))];
+  TIERS[Math.min(TIERS.length - 1, TIERS.indexOf(marauderTier(m, bandFightSize(c, m.strength, m.barred?.sectorId ?? m.sectorId))) + (hasPerk(c, factionId, 'bounty') ? 1 : 0))];
 
 /** Does a detachment of the sector's owner stand there (with the forces, or by recorded position without them)? */
 function garrisoned(c: Campaign, s: Sector, forces?: Force[]) {
