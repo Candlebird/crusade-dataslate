@@ -87,7 +87,7 @@ export interface Unit {
   titles?: string[];
   /** The title it shows: one it holds, '-' for none; unset = the latest earned. */
   title?: string;
-  /** Off-table XP banked from free Sorties and Training, and the round (or week) it was banked in (OFF_TABLE_XP). */
+  /** Off-table XP banked from free Sorties and Training, and the week it was banked in (OFF_TABLE_XP; older saves may hold a round key, which simply no longer matches). */
   offTableXp?: { key: string; n: number };
   relics: Relic[];
   /** Manual BP adjustment (e.g. Heroic Rise +1). */
@@ -436,7 +436,7 @@ export interface Force {
   finale?: ForceFinale;
   /** Unique feats earned, by id, with the date (rules/feats.ts): each pays once for the faction (the force outside a campaign). */
   feats?: Record<string, string>;
-  /** Repeatable feats, by id: the round or week (offTableKey) last done, how many times, and the date. */
+  /** Repeatable feats, by id: the week (offTableKey) last done, how many times, and the date. */
   featRepeats?: Record<string, { key: string; n: number; last: string }>;
   /** Which feat rewards the force's feats were paid at (rules/feats.ts FEATS_VERSION; unset: the first). */
   featsV?: number;

@@ -73,7 +73,7 @@ export const featFaction = (force: Force, forces?: Force[], inCampaign = true): 
 /** Who earned the unique feat: the force or another of its faction (`faction` from featFaction). */
 export const featHolder = (faction: Force[], id: string) => faction.find((f) => f.feats?.[id]);
 
-/** Who did the repeatable feat this round or week (`key`, from offTableKey), if any of the faction did. */
+/** Who did the repeatable feat this week (`key`, from offTableKey), if any of the faction did. */
 export const repeatHolder = (faction: Force[], id: string, key: string) => faction.find((f) => f.featRepeats?.[id]?.key === key);
 
 export function rewardText(r: FeatReward): string {
@@ -153,7 +153,7 @@ export const trainingRepeats = (cleared: number, lords = 0, more: TrainingFeatFa
 
 /**
  * Pay the feats: a unique one only if no force of `faction` (featFaction; the force alone if left out) has earned it,
- * a repeatable one only if none did it this round or week (`key`, from offTableKey; without a key none is paid). Umbra
+ * a repeatable one only if none did it this week (`key`, from offTableKey; without a key none is paid). Umbra
  * Shards and XP straight away, RP and Supply on the ledger. Returns a line for each feat paid.
  */
 export function awardFeats(force: Force, ids: FeatId[], unitIds: string[], date: string, newId: () => string, faction: Force[] = [force], key?: string): string[] {

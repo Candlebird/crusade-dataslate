@@ -82,7 +82,7 @@ export function useBank(force: Force, c?: Campaign, onBanked?: (news: BankNews) 
       // The Victory, Endless depth and the Final it opens, before the Drill's news (Win at N goals read it).
       if (!run.siege) finale = bankFinale(f, run, localDate());
       // Feats after the ladder: opening a Final or winning every one counts this run.
-      // Unique feats count across the faction in a campaign; the repeatable ones once a round (a week outside one).
+      // Unique feats count across the faction in a campaign; the repeatable ones once a week.
       const facts = featFacts(f, run);
       const ids = [...trainingFeats(run.cleared, lordsSlain(run), facts), ...trainingRepeats(run.cleared, lordsSlain(run), facts)];
       feats = awardFeats(f, ids, run.crafted, localDate(), uid, featFaction(f, d.forces, !!c), offTableKey(c, localDate()));

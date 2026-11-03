@@ -5,6 +5,7 @@ export type ZoneMode = 'command' | 'quick';
 
 /** XP and rewards against a table game. */
 export const ZONE_REWARDS: Record<ZoneMode, { xp: number; rolls: boolean }> = {
-  command: { xp: 0.75, rolls: true },
-  quick: { xp: 0.5, rolls: false },
+  // Command was 0.75: with rounds about twice a week, zone battles levelled units far too fast.
+  command: { xp: 0.5, rolls: true },
+  quick: { xp: 0.4, rolls: false },
 };

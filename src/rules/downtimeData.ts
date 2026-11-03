@@ -139,8 +139,8 @@ export const PROJECTS: ProjectDef[] = [
   { id: 'rareRelic', name: 'Forge a rare relic', goal: 18, desc: 'A free Rare relic, taken in the Requisition shop by the force that finishes it.', reward: { relic: 'Rare' } },
 ];
 
-/** Off-table XP: the most a unit banks from free Sorties and Training runs together in a round (a week outside a campaign). */
-export const OFF_TABLE_XP = { perRound: 5 };
+/** Off-table XP: the most a unit banks from free Sorties and Training runs together in a week (Monday to Sunday), in a campaign or not: rounds come about twice a week, so a per-round limit paid double. */
+export const OFF_TABLE_XP = { perWeek: 5 };
 
 /**
  * Training sim: a Gem TD-like run between games. Before every wave five Shards are drawn and set on the map, one is
@@ -759,7 +759,7 @@ export const TRAINING = {
    * Killing the Final boss with the base standing is a Victory: bank it, or go on into Endless.
    * The bars are paced to a full campaign. A round (a week outside one) a unit takes about 3 XP from a table game
    * (participation 2, an agenda or Marked for Greatness now and then; 0-2 games a week, so about one) and most of its
-   * off-table 5 (OFF_TABLE_XP.perRound: Training and Sorties), so about 7-8 XP; a force of about 8 units banks some 60
+   * off-table 5 (OFF_TABLE_XP.perWeek: Training and Sorties), so about 7-8 XP; a force of about 8 units banks some 60
    * a round. A season of about 12 rounds is some 700: `to` opens near its end, a step every two rounds or so.
    * Past wave `from` every wave is planned at that wave's level (budget, wounds) and `climb` times tougher a wave up to
    * the Final; past the Final (Endless) `endless` a wave, `rise` more for every `riseEvery` waves gone, never more than

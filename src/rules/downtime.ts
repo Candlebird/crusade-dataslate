@@ -346,18 +346,21 @@ export function applyExpedition(force: Force, e: Expedition, date: string, newId
   return summary;
 }
 
-/** What the off-table XP limit counts over: the campaign's round, or outside a campaign the week. */
-export const offTableKey = (c: Campaign | undefined, date: string) => (c ? `round-${currentRound(c)}` : weekKey(date));
+/**
+ * What the off-table XP limit (and repeatable feats) count over: the week, in a campaign or not. Rounds come about
+ * twice a week, so counting by round paid double. `_c` stays so callers needn't change if this ever goes back.
+ */
+export const offTableKey = (_c: Campaign | undefined, date: string) => weekKey(date);
 
-/** Off-table XP the unit can still bank in this round (or week). */
+/** Off-table XP the unit can still bank this week. */
 export const offTableLeft = (u: Unit, key: string) =>
-  Math.max(0, OFF_TABLE_XP.perRound - (u.offTableXp?.key === key ? u.offTableXp.n : 0));
+  Math.max(0, OFF_TABLE_XP.perWeek - (u.offTableXp?.key === key ? u.offTableXp.n : 0));
 
 /** Bank up to n XP from a free Sortie or a Training run, as far as the off-table limit allows. Returns what it got. */
 export function bankOffTableXp(u: Unit, n: number, key: string): number {
   const left = offTableLeft(u, key);
   const got = Math.max(0, Math.min(n, left));
-  u.offTableXp = { key, n: OFF_TABLE_XP.perRound - left + got };
+  u.offTableXp = { key, n: OFF_TABLE_XP.perWeek - left + got };
   u.xp += got;
   return got;
 }

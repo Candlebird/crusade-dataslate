@@ -74,7 +74,7 @@ export interface BattleInput {
   from?: { battleId: string; sideId: string };
   /** Solo patrol (downtime): participation and kill XP only — no RP, reward rolls or Marked for Greatness. */
   patrol?: boolean;
-  /** Fought as a zone battle: Command (3/4 XP) or Quick (1/2 XP, no reward rolls). Neither earns the match bonus. */
+  /** Fought as a zone battle: Command or Quick (ZONE_REWARDS: XP share, and whether it rolls rewards). Neither earns the match bonus. */
   zone?: ZoneMode;
   /** Nexus Wars: XP each unit that fought gets on a win, for attacking a garrison over its Supply (rules/fieldCap.ts). */
   underdog?: number;

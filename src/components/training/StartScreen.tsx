@@ -101,7 +101,7 @@ export function StartScreen({ force, c, saved, cleared, siege, onSiege, mode, on
         {tab === 'units' && (
           <>
             <p className="muted" style={{ margin: '0 0 8px' }}>
-              Each unit has a recipe of Shards: craft it to field it as a tower. XP left is what each can still bank off the table this {c ? 'round' : 'week'}.
+              Each unit has a recipe of Shards: craft it to field it as a tower. XP left is what each can still bank off the table this week.
             </p>
             {!units.length && <p className="muted">No active units to train.</p>}
             <div className="training-roster">
@@ -137,8 +137,8 @@ export function StartScreen({ force, c, saved, cleared, siege, onSiege, mode, on
                   The Echoes walk from S over pads 1–{TRAINING.route.pads.length} to the base. Slay the boss of the Final wave
                   ({finaleOpen(force)} for now) with the base ({TRAINING.baseHp} HP) standing for a Victory, then bank it or go on
                   into Endless; the run ends when the base falls, and saves between waves. Each crafted unit earns <b>+{TRAINING.xpPerWave} XP</b> every
-                  {' '}{TRAINING.xpEvery} waves, up to <b>{TRAINING.xpCap}</b> a run, within the {OFF_TABLE_XP.perRound} off-table XP a unit banks
-                  each {c ? 'round' : 'week'}.
+                  {' '}{TRAINING.xpEvery} waves, up to <b>{TRAINING.xpCap}</b> a run, within the {OFF_TABLE_XP.perWeek} off-table XP a unit banks
+                  each week.
                 </p>
               </div>
               <RouteThumb />

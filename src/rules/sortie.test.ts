@@ -482,13 +482,13 @@ describe('sortie', () => {
     applySortie(f, won(), '2026-01-01', id, () => 0.99, 'round-1');
     expect(party.map((u) => u.xp)).toEqual([4, 4, 4]);
     const text = applySortie(f, won(), '2026-01-01', id, () => 0.99, 'round-1');
-    expect(party.map((u) => u.xp)).toEqual([OFF_TABLE_XP.perRound, OFF_TABLE_XP.perRound, OFF_TABLE_XP.perRound]);
+    expect(party.map((u) => u.xp)).toEqual([OFF_TABLE_XP.perWeek, OFF_TABLE_XP.perWeek, OFF_TABLE_XP.perWeek]);
     expect(text).toContain('off-table XP limit');
     expect(party.map((u) => offTableLeft(u, 'round-1'))).toEqual([0, 0, 0]);
     // A new round opens the allowance again; a Shard run never counts against it.
-    expect(offTableLeft(party[0], 'round-2')).toBe(OFF_TABLE_XP.perRound);
+    expect(offTableLeft(party[0], 'round-2')).toBe(OFF_TABLE_XP.perWeek);
     applySortie(f, Object.assign(createRun(party, 2, 'shard'), { over: 'won' as const, xp: 9 }), '2026-01-01', id, () => 0.99, 'round-1');
-    expect(party[0].xp).toBe(OFF_TABLE_XP.perRound + SORTIE.caps.shard.short);
+    expect(party[0].xp).toBe(OFF_TABLE_XP.perWeek + SORTIE.caps.shard.short);
   });
 
   it('shares the off-table XP limit with Training, by week outside a campaign', () => {
@@ -496,9 +496,15 @@ describe('sortie', () => {
     const key = offTableKey(undefined, '2026-10-22');
     expect(key).toBe(weekKey('2026-10-22'));
     expect(bankOffTableXp(u, 3, key)).toBe(3);
-    expect(bankOffTableXp(u, 3, key)).toBe(OFF_TABLE_XP.perRound - 3);
+    expect(bankOffTableXp(u, 3, key)).toBe(OFF_TABLE_XP.perWeek - 3);
     expect(bankOffTableXp(u, 3, key)).toBe(0);
     expect(bankOffTableXp(u, 3, offTableKey(undefined, '2026-10-29'))).toBe(3);
+  });
+
+  it('counts the off-table XP limit by week in a campaign too, however many rounds end that week', () => {
+    const c = { rounds: [] } as unknown as Parameters<typeof offTableKey>[0];
+    expect(offTableKey(c, '2026-11-03')).toBe(weekKey('2026-11-03'));
+    expect(offTableKey(c, '2026-11-06')).toBe(offTableKey(c, '2026-11-03'));
   });
 
   it('is hard but winnable (balance probe)', () => {

@@ -110,7 +110,7 @@ export default function DowntimePanel({ f }: { f: Force }) {
         A Shard run costs {SORTIE.cost} Umbra Shards, earns up to {SORTIE.caps.shard.long} XP and brings home Supply, RP and up to {SORTIE.haul.maxUs} shards.
       </Mode>
       <p className="muted small" style={{ margin: '0.5rem 0 0' }}>
-        <Icon name="g:upgrade" /> Training and free Sorties together bank at most {OFF_TABLE_XP.perRound} XP per unit a {c ? 'round' : 'week'}.
+        <Icon name="g:upgrade" /> Training and free Sorties together bank at most {OFF_TABLE_XP.perWeek} XP per unit a week.
       </p>
 
       {open === 'expedition' && nexus && <ExpeditionModal force={f} c={nexus} onClose={close} />}

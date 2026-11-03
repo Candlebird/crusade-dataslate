@@ -18,7 +18,7 @@ export function FeatList({ force, where, c }: { force: Force; where: Feat['where
   const feats = FEATS.filter((f) => f.where === where && !f.repeat);
   const repeats = FEATS.filter((f) => f.where === where && f.repeat);
   const earned = feats.filter((f) => featHolder(faction, f.id)).length;
-  const span = c ? 'round' : 'week';
+  const span = 'week';
   const who = (f: Force) => (f.id === force.id ? '' : ` by ${f.name}`);
   return (
     <div className="sortie-choice">
