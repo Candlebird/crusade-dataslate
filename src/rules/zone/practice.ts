@@ -5,7 +5,7 @@ import { ECHOES } from '../nexusData';
 import { FORMATS, loadForce, loadUnits, newBattle, type TrackedBattle } from '../tracker';
 
 // Practice: a force's active units against Void Echoes of about the same points, on a zone board. Nothing is lost and
-// nothing is earned, so it's free to try a list or learn the board. Units that already fought this round come Battle-Worn.
+// nothing is earned, so it's free to try a list or learn the board. Battle-Worn never applies in a zone battle.
 
 /** The practice battle's save id for a force (one at a time). */
 export const practiceId = (forceId: string) => `practice-${forceId}`;

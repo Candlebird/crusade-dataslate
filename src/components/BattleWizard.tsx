@@ -380,7 +380,7 @@ function UnitsStep({ units, input, setUnit, worn }: { units: Unit[]; input: Batt
       </div>
       <p className="muted small">Total excludes death rolls and table rewards. Comatose units sit out by default and recover once the battle is applied.</p>
       {units.some((u) => worn.includes(u.id)) && (
-        <p className="muted small">Battle-Worn units already fought this round (a Solo patrol, an Expedition or a task): they fight at -1 Quality and -1 Defense until the GM ends the round.</p>
+        <p className="muted small">Battle-Worn units already fought this round (a Solo patrol, an Expedition or a task): they fight at -1 Quality and -1 Defense at the table until the GM ends the round (not in a zone battle).</p>
       )}
     </div>
   );

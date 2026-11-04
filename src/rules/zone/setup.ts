@@ -70,9 +70,9 @@ export function startZoneBattle(b: TrackedBattle, forces: Force[], books: Catalo
       // The tracker's wounds are the truth: they carry earlier losses (and a size the force page may not show).
       const full = maxWoundsOf(z.p);
       const pre = setupUnit(u, key, s, side.id, book, rules, Math.min(full, Math.round(t.wounds * (full / Math.max(1, t.maxWounds)))));
-      // Battle-Worn (it already fought this round): -1 Quality and -1 Defense, so each needs one more on the die.
-      if (t.worn) pre.p = { ...pre.p, kits: pre.p.kits.map((k) => ({ ...k, quality: Math.min(6, k.quality + 1), defense: Math.min(6, k.defense + 1) })) };
-      units.push({ ...pre, name: t.name || pre.name, points: t.points ?? u.points, ...(t.aiStyle ? { ai: t.aiStyle } : {}), ...(t.worn ? { worn: true } : {}) });
+      // Battle-Worn doesn't follow a unit into a zone battle: the round-end fight of a detachment whose units spent the
+      // round on tasks, Expeditions or patrols would otherwise come all worn. It still counts at the table.
+      units.push({ ...pre, name: t.name || pre.name, points: t.points ?? u.points, ...(t.aiStyle ? { ai: t.aiStyle } : {}) });
     }
   }
   const points = Math.max(...[0, 1].map((s) => units.filter((u) => u.side === s).reduce((n, u) => n + u.points, 0)));

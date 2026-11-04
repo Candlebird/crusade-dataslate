@@ -5,7 +5,7 @@ import type { CatalogBook, Unit } from '../model/types';
 import { Icon } from './Icon';
 
 /** What Battle-Worn means, everywhere it's shown. */
-export const WORN_TIP = 'Already fought this round (a Solo patrol, an Expedition or a task): -1 Quality and -1 Defense in any battle until the GM ends the round';
+export const WORN_TIP = 'Already fought this round (a Solo patrol, an Expedition or a task): -1 Quality and -1 Defense in a table battle until the GM ends the round (not in a zone battle)';
 
 /** The Battle-Worn mark: the same gold tag wherever a unit that already fought this round is listed. */
 export function WornTag() {

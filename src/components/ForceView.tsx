@@ -108,7 +108,6 @@ export default function ForceView({ forceId }: { forceId: string }) {
   const inCampaign = !!c && !!n && c.factions.some((x) => x.id === n.factionId);
   // Units that already fought this round (patrol, Expedition, task): they fight Battle-Worn until the round ends.
   const worn = new Set(unitsUsed(f, c));
-  const wornActive = f.units.filter((u) => u.status === 'active' && worn.has(u.id)).length;
   const toClaim = !theirs && c && n && inCampaign ? claimableRounds(c, n, state.forces) : [];
 
   const addLedger = (label: string, rp: number, supply: number) =>
@@ -143,8 +142,7 @@ Lean: fielding ${FIELD_CAP.lean} pts or less, it moves ${FIELD_CAP.leanMove} mor
           {edit && <button onClick={() => setAdding(true)}>+ Add unit</button>}
           {zoneOn && !theirs && (
             <button disabled={!f.units.some((u) => u.status === 'active')} onClick={() => setPractice(practiceBattle(f, state.books, s, state.campaign))}
-              data-tip={`A zone battle against Void Echoes of about the same points. Nothing is lost and nothing is earned${wornActive ? `
-${wornActive} unit${wornActive === 1 ? '' : 's'} will fight Battle-Worn (-1 Quality and -1 Defense)` : ''}`}>
+              data-tip="A zone battle against Void Echoes of about the same points. Nothing is lost and nothing is earned">
               <Icon name="g:archery-target" /> {practiceSave ? 'Resume practice' : 'Practice'}</button>
           )}
           <button className="primary" onClick={() => go(href.battle(f.id))}><Icon name="g:crossed-swords" /> Record battle</button>
