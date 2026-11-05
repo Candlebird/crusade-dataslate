@@ -1,4 +1,4 @@
-import { hymn, onField, SITE_NAMES, terrainNear, WARPATH, type SiteKind, type Squad, type WarpathRun } from '../../rules/warpath';
+import { holdOf, hymn, onField, SITE_NAMES, terrainNear, WARPATH, type SiteKind, type Squad, type WarpathRun } from '../../rules/warpath';
 import type { IconName } from '../iconData';
 import { ICONS } from '../iconData';
 import { alpha, bar } from '../training/art';
@@ -203,15 +203,15 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
     ctx.strokeStyle = alpha(col, 0.75);
     ctx.stroke();
     ctx.setLineDash([]);
-    if (st.kind === 'shrine' && st.held > 0) {
+    if (st.kind !== 'champion' && st.held > 0) {
       ctx.beginPath();
-      ctx.arc(x, y, R, -Math.PI / 2, -Math.PI / 2 + (st.held / WARPATH.sites.hold) * Math.PI * 2);
+      ctx.arc(x, y, R, -Math.PI / 2, -Math.PI / 2 + Math.min(1, st.held / holdOf(st.kind)) * Math.PI * 2);
       ctx.lineWidth = 5;
       ctx.strokeStyle = col;
       ctx.stroke();
     }
     if (st.kind !== 'champion') stamp(ctx, icon, col, x, y - Math.sin(now * 3 + st.id) * 0.15 * ppi, 2.6 * ppi, 8);
-    number(ctx, st.kind === 'shrine' ? `${SITE_NAMES.shrine}: stand in it` : SITE_NAMES[st.kind], x, y + R + 10, 13, col);
+    number(ctx, st.kind === 'champion' ? SITE_NAMES[st.kind] : `${SITE_NAMES[st.kind]}: stand in it`, x, y + R + 10, 13, col);
   }
 
   // Pickups.

@@ -2,6 +2,9 @@ import { rand } from '../training/rng';
 import { WARPATH } from './data';
 import { unblock } from './field';
 import { eliteShare, pickKind, spawnEnemy, spawnRate } from './enemies';
+
+/** How long a site must be held. */
+export const holdOf = (k: SiteKind) => (k === 'shrine' ? S.hold : k === 'cache' ? S.cacheHold : k === 'well' ? S.wellHold : 0);
 import { clock } from './loot';
 import type { SiteKind, WarpathRun } from './types';
 
@@ -122,19 +125,31 @@ export function siteStep(run: WarpathRun, dt: number): void {
         run.fx.push({ kind: 'spell', x: s.x, y: s.y, n: S.radius * 2, t: 0.8 });
         s.held = -1;
       }
-    } else if (s.kind === 'cache' && on) {
-      run.queued += 1;
-      banner(run, 'Supply cache: a free level-up. Ambush!', 'warn');
-      run.log.push(`${clock(run.t)} A supply cache opened; an ambush springs.`);
-      const kind = pickKind(run);
-      for (let i = 0; i < S.ambush; i++) {
-        const a = (i / S.ambush) * Math.PI * 2;
-        const p = { x: s.x + Math.cos(a) * 10, y: s.y + Math.sin(a) * 10 };
-        unblock(run.seed, p, 1);
-        spawnEnemy(run, kind, p.x, p.y, undefined, true);
+    } else if (s.kind === 'cache') {
+      // Stepping on springs the ambush (the book's toughest kind, elite and tougher still); holding it open pays out.
+      if (on && !s.sprung) {
+        s.sprung = true;
+        banner(run, 'Ambush! Hold the cache open', 'warn');
+        run.log.push(`${clock(run.t)} A supply cache: an ambush springs.`);
+        const kind = champKind(run);
+        for (let i = 0; i < S.ambush; i++) {
+          const a = (i / S.ambush) * Math.PI * 2;
+          const p = { x: s.x + Math.cos(a) * 10, y: s.y + Math.sin(a) * 10 };
+          unblock(run.seed, p, 1);
+          const e = spawnEnemy(run, kind, p.x, p.y, undefined, true);
+          e.hp = e.maxHp = e.maxHp * S.ambushHp;
+        }
       }
-      s.held = -1;
-    } else if (s.kind === 'well' && on) {
+      s.held = on ? s.held + dt : Math.max(0, s.held - dt * 0.5);
+      if (s.held >= S.cacheHold) {
+        run.queued += 1;
+        banner(run, 'Supply cache: a free level-up', 'good');
+        run.log.push(`${clock(run.t)} A supply cache opened.`);
+        s.held = -1;
+      }
+    } else if (s.kind === 'well') {
+      s.held = on ? s.held + dt : Math.max(0, s.held - dt * 0.5);
+      if (s.held < S.wellHold) continue;
       const before = run.hp;
       run.hp = Math.min(run.maxHp, run.hp + run.maxHp * S.heal);
       if (run.fx.length < 700) run.fx.push({ kind: 'heal', x: run.hx, y: run.hy - 2, n: run.hp - before, t: 0.8 });

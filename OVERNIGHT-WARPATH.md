@@ -111,3 +111,16 @@ Hard ends at 9–12 min for most runs (up to 22) and kills a lord 1 in 6.
   - **Champion:** the book's toughest kind, as an elite with ×6 HP. It holds its ground until the hero comes close, and drops 60 XP.
   - Sites you leave 110" behind are gone.
 - Probe after these changes, Normal: the median run falls at about 12.5 min (was 16), and the lord falls 3 of 24 times (was 11). Hard ends at 6–13 min. I left it here because you asked for harder. The bot rarely uses sites well, so a person should do better.
+
+## Follow-up 3 (2026-11-05)
+
+- Free rations are gone. They used to turn up every 45 s and heal 25%. Healing now comes only from cards, Field Medics, aid stations and units with Heal.
+- The Heal rule gives half as much: 3 HP per wound (was 6).
+- Sites take longer:
+  - **Shrine:** hold for 8 s (was 4).
+  - **Aid station:** hold for 3 s (was instant).
+  - **Supply cache:** hold for 5 s. The ambush springs as soon as you step on it: 8 of the book's toughest kind, as elites with ×2.5 HP on top.
+  - Progress drains at half speed while you're off a site.
+- Enemy HP grows 11% a minute (was 7%). Bosses grow with it.
+- The thumbstick stays where you first press. It no longer slides after your thumb.
+- Probe, Normal: runs end at about 11.8 min on average, and the lord falls 3 of 24 times. A few Hard runs end at 2–5 min.

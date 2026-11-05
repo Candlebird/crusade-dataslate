@@ -36,14 +36,14 @@ export const WARPATH = {
   /** Caster(X) casts every `every` / X s: a blast of `hits` × X at AP `ap` around the thickest knot of enemies. */
   caster: { every: 24, hits: 3, ap: 1, radius: 4 },
   /** Heal and Shield rules: HP onto the hero for each wound the rule names, every `every` OPR rounds × `round` s. */
-  ability: { round: 8, hpPer: 6, barrageRadius: 3 },
+  ability: { round: 8, hpPer: 3, barrageRadius: 3 },
   /** Pickups: reach to collect, how far the pull goes, rations (a share of HP), beacons (pull every gem). */
   pickups: { reach: 1.4, pull: 6, pullSpeed: 30, ration: 0.25, rationEvery: 45, beaconEvery: 110, gemLife: 120 },
   /** Enemy spawning: the ring they come from (beyond the screen), per second at the start, + each minute; a cap on the field. */
   spawn: {
     ring: 42, perSec: 2.75, perMin: 1.05, maxField: 1400,
     /** Wounds and damage grow by these shares each minute from the start. */
-    hpPerMin: 0.07, dmgPerMin: 0.03,
+    hpPerMin: 0.11, dmgPerMin: 0.03,
     /** Every 5 min the mix steps tougher; the tiers by points a model (cheapest third, middle, dearest). */
     shiftEvery: 300,
     /** Past this many minutes, wounds and damage grow by these shares a minute. */
@@ -63,7 +63,7 @@ export const WARPATH = {
    *  gone past `lose`. A shrine is held `hold` s (within `radius`) for a Battle Hymn (fire `hymn` faster for `hymnSecs`);
    *  a cache gives a level-up and springs an elite ambush of `ambush`; a well heals `heal`; a champion (an elite ×`champHp`
    *  that holds its ground until the hero comes within `wake`) drops `champXp` XP of Shards. */
-  sites: { live: 3, every: 35, first: 20, near: 34, far: 60, lose: 110, radius: 3.5, hold: 4, hymn: 0.4, hymnSecs: 40, ambush: 8, heal: 0.6, champHp: 6, wake: 16, champXp: 60 },
+  sites: { live: 3, every: 35, first: 20, near: 34, far: 60, lose: 110, radius: 3.5, hold: 8, cacheHold: 5, wellHold: 3, hymn: 0.4, hymnSecs: 40, ambush: 8, ambushHp: 2.5, heal: 0.6, champHp: 6, wake: 16, champXp: 60 },
   /** Hard mode: enemy wounds and damage, and how much faster they come. */
   hard: { hp: 1.5, dmg: 1.5, spawn: 1.3 },
   /** Score once everything is maxed. */

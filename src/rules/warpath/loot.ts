@@ -84,12 +84,7 @@ export function collect(run: WarpathRun, dt: number): void {
   }
   if (beacon) for (const p of run.pickups) if (p.kind === 'gem') p.pulled = true;
   run.pickups = run.pickups.filter((p) => p.life > 0 || p.pulled);
-  // Rations and beacons turn up now and then, a screen away.
-  if (run.t >= run.nextRation) {
-    run.nextRation = run.t + P.rationEvery;
-    const a = rand(run) * Math.PI * 2;
-    drop(run, 'ration', run.hx + Math.cos(a) * 20, run.hy + Math.sin(a) * 20);
-  }
+  // Recall beacons turn up now and then, a screen away. (Free rations are gone: healing comes from cards, sites and units.)
   if (run.t >= run.nextBeacon) {
     run.nextBeacon = run.t + P.beaconEvery;
     const a = rand(run) * Math.PI * 2;

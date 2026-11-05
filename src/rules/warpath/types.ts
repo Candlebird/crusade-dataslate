@@ -158,7 +158,7 @@ export interface Pickup { id: number; kind: PickupKind; x: number; y: number; xp
 
 /** A site on the map: a shrine to hold, a cache to open, a well to drink from, a champion to slay. */
 export type SiteKind = 'shrine' | 'cache' | 'well' | 'champion';
-export interface Site { id: number; kind: SiteKind; x: number; y: number; /** Seconds held (a shrine). */ held: number }
+export interface Site { id: number; kind: SiteKind; x: number; y: number; /** Seconds held. */ held: number; /** A cache's ambush has sprung. */ sprung?: boolean }
 
 /** A horde on its way: when it lands, a ring round the hero or a column from angle `a`. */
 export interface Horde { at: number; kind: 'ring' | 'column'; a: number }

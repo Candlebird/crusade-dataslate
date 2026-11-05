@@ -12,4 +12,4 @@ export { warpathXp, warpathFeats, warpathRepeats, bankRecords, weekBoard, hardOp
 export { saveWarpath, loadWarpath, clearWarpath, readSaved, packRun, newerWarpath, warpathKey } from './save';
 export { DOCTRINES } from './data';
 export type { CloudWarpath } from './cloud';
-export { SITE_NAMES, hymn } from './events';
+export { SITE_NAMES, hymn, holdOf } from './events';

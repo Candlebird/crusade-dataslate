@@ -201,7 +201,7 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
     try { localStorage.setItem(ZOOM_KEY, String(zoom.current)); } catch { /* not kept */ }
   };
 
-  // The floating thumbstick: press anywhere, drag to move.
+  // The thumbstick: anchored wherever the press lands, drag to move.
   const onDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -215,9 +215,7 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
     let dy = e.clientY - s.oy;
     const d = Math.hypot(dx, dy);
     if (d > STICK) {
-      // Drag past the rim and the stick follows the thumb.
-      s.ox += (dx / d) * (d - STICK);
-      s.oy += (dy / d) * (d - STICK);
+      // The stick stays where it was pressed; past the rim the knob just pins to the edge.
       dx = (dx / d) * STICK;
       dy = (dy / d) * STICK;
     }

@@ -111,10 +111,11 @@ describe('Warpath', () => {
     run.nextSite = 1e9;
     run.hp = 10;
     siteStep(run, 0.1);
+    expect(run.enemies.filter((e) => e.elite)).toHaveLength(WARPATH.sites.ambush);
+    expect(run.queued).toBe(0);
+    for (let i = 0; i < 120 && (run.sites ?? []).length; i++) siteStep(run, 0.1);
     expect(run.hp).toBeGreaterThan(10);
     expect(run.queued).toBe(1);
-    expect(run.enemies.filter((e) => e.elite)).toHaveLength(WARPATH.sites.ambush);
-    for (let i = 0; i < 60 && (run.sites ?? []).length; i++) siteStep(run, 0.1);
     expect(run.hymnUntil).toBeGreaterThan(run.t);
     expect(run.sites).toHaveLength(0);
   });
