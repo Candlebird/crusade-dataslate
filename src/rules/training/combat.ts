@@ -7,6 +7,7 @@ import {
 } from './harm';
 import { lordHit } from './lords';
 import { hitChance, rand } from './rng';
+import { rawDamage, readShot, runVolley, throughArmour } from '../shots';
 import type { Enemy, Tower, TowerGun, TowerSkill, TrainingRun } from './types';
 
 // Towers at work: volleys and OPR rolls, statuses, dots, and taking the dead off. Holds are in holds.ts, timed
@@ -51,7 +52,9 @@ export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): bo
   const nexus = affixHit(run, g, d, reach(t, g)) + lordHit(run, g, target);
   const p = g.reliable ? hitChance(2, ground + nexus) : hitChance(t.quality, g.hitMod + (g.melee ? t.hitMelee : t.hitShoot) + t.boost.hit + ground + far + nexus);
   const r = rand(run);
-  const miss = r >= p;
+  const live = isUnit(t) ? t.skills.filter((s) => carried(s, g)) : [];
+  const sixes = r < 1 / 6 && r < p ? live.flatMap((s) => (s.effect.kind === 'sixes' ? [s.effect] : [])) : [];
+  const { miss, six, rend, ap } = readShot(r, p, g.ap, g.rending, sixes.some((e) => e.rend));
   // Where a shot lands is only for show, so it doesn't touch the run's dice.
   const a = Math.random() * Math.PI * 2;
   const off = miss ? 0.45 + Math.random() * 0.35 : Math.random() * 0.12;
@@ -62,14 +65,9 @@ export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): bo
     melee: g.melee, miss,
   });
   if (miss) return true;
-  const six = r < 1 / 6;
-  const live = isUnit(t) ? t.skills.filter((s) => carried(s, g)) : [];
-  const sixes = six ? live.flatMap((s) => (s.effect.kind === 'sixes' ? [s.effect] : [])) : [];
-  const rend = six && (g.rending || sixes.some((e) => e.rend));
-  const ap = rend ? Math.max(g.ap, 4) : g.ap;
   const how = g.melee ? 'melee' : 'shot';
-  const raw = Math.max(1, g.deadly) + levelDmg(t, g) + (six && isUnit(t) && t.category === 'Elite' ? 1 : 0) + sixes.reduce((n, e) => n + (e.dmg ?? 0), 0);
-  const dmgTo = (e: Enemy) => Math.max(0.5, raw - (rend ? 0 : enemyDef(e).armor)) * dmgMul(t) * cardMul(run, t, e) * (e.flies ? g.air ?? 1 : 1);
+  const raw = rawDamage(g.deadly, levelDmg(t, g) + (six && isUnit(t) && t.category === 'Elite' ? 1 : 0) + sixes.reduce((n, e) => n + (e.dmg ?? 0), 0));
+  const dmgTo = (e: Enemy) => throughArmour(raw, enemyDef(e).armor, rend) * dmgMul(t) * cardMul(run, t, e) * (e.flies ? g.air ?? 1 : 1);
   // Blast(X): the hit spills onto up to X−1 others close by, each saving on its own.
   const splash = g.blast > 1 ? enemiesNear(run, target.x, target.y, TRAINING.blastRadius).filter((o) => o !== target && canAim(g, o)).slice(0, g.blast - 1) : [];
   if (unsaved(run, target, ap)) {
@@ -97,32 +95,9 @@ function onWound(run: TrainingRun, t: Tower, g: TowerGun, e: Enemy, live: TowerS
   }
 }
 
-/** Attacks in a volley: whole ones, and a fraction as a chance of one more (Shards have half attacks). */
-function volleySize(run: TrainingRun, attacks: number): number {
-  const whole = Math.floor(attacks);
-  return whole + (attacks > whole && rand(run) < attacks - whole ? 1 : 0);
-}
-
-/** One gun's clocks: start a volley when it's ready and something is in reach; its shots go one after another over
- *  the first part of the wait before the next. The wait carries what this step overshot (never more than a step), so
- *  a quick gun keeps its rate between fixed steps. */
-function runGun(run: TrainingRun, t: Tower, g: TowerGun, rate: number, dt: number) {
-  g.cd -= dt;
-  if (g.cd <= 1e-9 && g.pending <= 0 && targetFor(run, t, g)) {
-    const wait = (g.melee ? TRAINING.meleeEvery : TRAINING.shootEvery) / rate;
-    g.cd = Math.max(g.cd, -dt) + wait;
-    g.pending = volleySize(run, g.attacks);
-    g.gap = g.pending ? (wait * TRAINING.volleySpread) / g.pending : 0;
-    g.next = 0;
-  }
-  if (g.pending <= 0) return;
-  g.next -= dt;
-  while (g.pending > 0 && g.next <= 0) {
-    g.pending -= 1;
-    g.next += g.gap;
-    if (!fire(run, t, g)) g.pending = 0;
-  }
-}
+/** One gun's clocks (shots.ts runVolley, at Training's pace). */
+const runGun = (run: TrainingRun, t: Tower, g: TowerGun, rate: number, dt: number) =>
+  runVolley(g, rate, dt, TRAINING, () => rand(run), () => !!targetFor(run, t, g), () => fire(run, t, g));
 
 /** Every tower's guns: volley clocks and shots. */
 export function fireAll(run: TrainingRun, dt: number): void {
