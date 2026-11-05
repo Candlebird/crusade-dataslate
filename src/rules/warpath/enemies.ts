@@ -2,7 +2,7 @@ import { hitChance, rand, saveChance } from '../training/rng';
 import { DOCTRINES, WARPATH } from './data';
 import { inCover, terrainAt, unblock, type Grid } from './field';
 import { onField } from './combat';
-import { enemyMul, minutes, mods } from './mods';
+import { enemyMul, minutes, mods, woundsPer } from './mods';
 import { clock } from './loot';
 import type { Enemy, EnemyKind, Missile, Squad, WarpathRun } from './types';
 import { has, TREE_FX } from './meta';
@@ -74,10 +74,21 @@ export function spawnStep(run: WarpathRun, dt: number): void {
     for (let i = 0; i < n; i++) {
       const p = { x: cx + (rand(run) - 0.5) * 4, y: cy + (rand(run) - 0.5) * 4 };
       unblock(run.seed, p, k.size / 2);
-      spawnEnemy(run, kind, p.x, p.y, undefined, rand(run) < eliteShare(run));
+      // Bodies owed while the field was full come in folded into elites (each worth `elite.hp` bodies of wounds).
+      let elite = rand(run) < eliteShare(run);
+      if (!elite && (run.surplus ?? 0) >= W.elite.hp - 1) {
+        elite = true;
+        run.surplus! -= W.elite.hp - 1;
+      }
+      spawnEnemy(run, kind, p.x, p.y, undefined, elite);
     }
     run.owed -= n;
     live += n;
+  }
+  // The field is full: what's owed builds up as surplus, to come in as elites once there's room.
+  if (live >= W.spawn.maxField && run.owed > 1) {
+    run.surplus = Math.min(W.spawn.maxField, (run.surplus ?? 0) + run.owed - 1);
+    run.owed = 1;
   }
   if (run.owed > 20) run.owed = 20;
 }
@@ -142,8 +153,9 @@ export function hurtSquad(run: WarpathRun, s: Squad, wounds: number): void {
   }
   s.wounds += wounds * mods(run).losses;
   let lost = 0;
-  while (s.wounds >= s.tough && s.alive > 0) {
-    s.wounds -= s.tough;
+  const per = woundsPer(s);
+  while (s.wounds >= per && s.alive > 0) {
+    s.wounds -= per;
     s.alive -= 1;
     lost += 1;
   }
@@ -193,7 +205,7 @@ const rollOnHero = (run: WarpathRun, attacks: number, quality: number, ap: numbe
 
 /** Attacks on a squad: wounds on its models (a fortification takes them as HP). */
 function strikeSquad(run: WarpathRun, s: Squad, attacks: number, quality: number, ap: number, deadly: number, mul: number): void {
-  const w = rollWounds(run, s.defense, coverMod(run, s.x, s.y), attacks, quality, ap, deadly, s.fort ? deadly : s.tough);
+  const w = rollWounds(run, s.defense, coverMod(run, s.x, s.y), attacks, quality, ap, deadly, s.fort ? deadly : woundsPer(s));
   if (w > 0) hurtSquad(run, s, w * mul * W.losses.squadDmg);
 }
 

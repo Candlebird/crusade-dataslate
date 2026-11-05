@@ -197,3 +197,27 @@ The Armoury is now a real skill tree. There are 4 branches with 5 tiers each, an
 | No meta | about 11 min | 6–20 | none |
 | Full tree, prestige 2 | 20.2 | 12–24 | none |
 | Full tree, prestige 10 | 24.8 | 17 to 30+ | 1 of 12; most others fell at 27–29 |
+
+## 2026-11-05: doubled wounds, zoom, staggered hordes, field cap
+
+- **Upgrades double wounds:** each level-up of a squad doubles each model's wounds (`levels.woundsMul` 2, via `woundsPer` in mods.ts). Forts get ×2 HP. The user found that 1-wound units were always dead.
+- **Zoom:** on desktop (a fine pointer), the view zooms out to 90 px/in (was 72). Touch still stops at 72.
+- **Hordes land in batches:** at most 40 bodies a step (`horde.batch`, using `run.landing`). The biggest horde is now 150, down from 250. This avoids the lag spike when a horde lands.
+- **Field cap:** at most 900 enemies at once (was 1400), spawned on a ring 48 out. Bodies owed past the cap fold into elites (`run.surplus`), so a full field still gets harder.
+- **Blank icons:** the likely cause was the browser dropping the offscreen canvases that hold the sprites under memory pressure, which leaves every cached sprite blank. The caches now reset on contextlost/contextrestored, and a check every 100 ms finds lost canvases.
+- **Retune:**
+  - Enemy HP grows 16% a minute and damage 5.5%.
+  - From 18 minutes on, a further +12% HP and +8% damage a minute.
+- **Probe** (bot, Normal, 6 forces × 2 seeds):
+
+| Build | Mean | Range | Reached 30 min |
+|---|---|---|---|
+| No meta | about 12 min | 8–17 | none |
+| Full tree, prestige 2 | — | 18–28 | 1 of 12 |
+| Full tree, prestige 10 | — | 22 to 30+ | 3 of 12 |
+
+- **Faster probes:**
+  - Each run is its own job, 16 at a time (`xargs -P 16`).
+  - Normal only, unless `WARPATH_MODES=all`.
+  - `WARPATH_TUNE` and `WARPATH_META` env overrides.
+  - A prestige 2 + prestige 10 pair takes about 4.5 min.

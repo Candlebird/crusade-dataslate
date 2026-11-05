@@ -8,7 +8,7 @@ export const holdOf = (k: SiteKind, run?: WarpathRun) =>
   (k === 'shrine' ? S.hold : k === 'cache' ? S.cacheHold : k === 'well' ? S.wellHold : 0) * (1 - T.pathfinder * (run ? metaLv(run, 'pathfinder') : 0));
 import { clock } from './loot';
 import { has, metaLv, TREE_FX as T } from './meta';
-import type { SiteKind, WarpathRun } from './types';
+import type { HordeLanding, SiteKind, WarpathRun } from './types';
 
 // The run's surprises. Hordes: every so often, after a short warning, a ring of one kind closes round the hero or a
 // column charges in from one side. Sites: a shrine to hold, a cache to open, an aid station, a champion holding its
@@ -37,6 +37,7 @@ export function hordeStep(run: WarpathRun): void {
     banner(run, kind === 'ring' ? 'A horde closes in from every side!' : `A horde charges from the ${dirOf(a)}!`, 'warn', warn + 1);
     return;
   }
+  if (run.landing) return landStep(run, run.landing);
   if (!run.horde || run.t < run.horde.at) return;
   const h = run.horde;
   run.horde = undefined;
@@ -45,10 +46,18 @@ export function hordeStep(run: WarpathRun): void {
   for (const e of run.enemies) if (e.hp > 0) live++;
   const n = Math.min(Math.round(Math.max(H.least, Math.round(spawnRate(run) * H.secs)) * (has(run, 'warning') ? T.warnSize : 1)), WARPATH.spawn.maxField + H.over - live);
   if (n <= 0) return;
-  const kind = pickKind(run);
+  const ek = pickKind(run);
+  run.landing = { kind: h.kind, a: h.a, n, done: 0, ek, share: eliteShare(run) };
+  run.log.push(`${clock(run.t)} A horde of ${n} ${run.enemyKinds[ek].name} (${h.kind === 'ring' ? 'all round' : `from the ${dirOf(h.a)}`}).`);
+  landStep(run, run.landing);
+}
+
+/** Land the next `batch` of a horde round where the hero is now. */
+function landStep(run: WarpathRun, h: HordeLanding): void {
+  const { n, ek: kind, share } = h;
   const size = run.enemyKinds[kind].size;
-  const share = eliteShare(run);
-  for (let i = 0; i < n; i++) {
+  const end = Math.min(n, h.done + H.batch);
+  for (let i = h.done; i < end; i++) {
     let x: number;
     let y: number;
     if (h.kind === 'ring') {
@@ -71,7 +80,8 @@ export function hordeStep(run: WarpathRun): void {
     unblock(run.seed, p, size / 2);
     spawnEnemy(run, kind, p.x, p.y, undefined, rand(run) < share);
   }
-  run.log.push(`${clock(run.t)} A horde of ${n} ${run.enemyKinds[kind].name} (${h.kind === 'ring' ? 'all round' : `from the ${dirOf(h.a)}`}).`);
+  h.done = end;
+  if (h.done >= n) run.landing = undefined;
 }
 
 /** What each site is called, for banners and the log. */

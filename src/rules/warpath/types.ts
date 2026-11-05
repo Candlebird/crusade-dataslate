@@ -168,6 +168,8 @@ export interface Site { id: number; kind: SiteKind; x: number; y: number; /** Se
 
 /** A horde on its way: when it lands, a ring round the hero or a column from angle `a`. */
 export interface Horde { at: number; kind: 'ring' | 'column'; a: number }
+/** A horde landing: `n` bodies of one kind, `done` of them in so far. */
+export interface HordeLanding { kind: 'ring' | 'column'; a: number; n: number; done: number; ek: number; share: number }
 
 /** A level-up card. */
 export type Card =
@@ -234,6 +236,9 @@ export interface WarpathRun {
   /** Hordes: when the next is announced, and one on its way. */
   nextHorde?: number;
   horde?: Horde;
+  /** Bodies owed while the field was full, to come in folded into elites. */
+  surplus?: number;
+  landing?: HordeLanding;
   /** Sites on the map, and when the next turns up. */
   sites?: Site[];
   nextSite?: number;

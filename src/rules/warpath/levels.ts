@@ -1,6 +1,6 @@
 import { rand } from '../training/rng';
 import { DOCTRINE_IDS, DOCTRINES, WARPATH, type DoctrineId } from './data';
-import { heroMaxHp } from './mods';
+import { heroMaxHp, woundsPer } from './mods';
 import type { Card, Squad, WarpathRun } from './types';
 import { has, TREE_FX } from './meta';
 
@@ -87,14 +87,14 @@ export function callIn(run: WarpathRun, unitId: string): Squad | undefined {
   s.x = run.hx + Math.cos(a) * 6;
   s.y = run.hy + Math.sin(a) * 6;
   s.angle = a;
+  // Veteran Cadre: called in a level or two up (within the unit's own cap).
+  if (has(run, 'veterans')) s.level = Math.min(s.maxLevel, s.level + TREE_FX.veterans);
   if (s.kind === 'fort') {
-    const hp = s.tough * s.size * WARPATH.fort.hpPerTough;
+    const hp = woundsPer(s) * s.size * WARPATH.fort.hpPerTough;
     s.fort = { hp, maxHp: hp, down: 0, fall: 1.2 };
     s.x = run.hx + Math.cos(a) * WARPATH.fort.land;
     s.y = run.hy + Math.sin(a) * WARPATH.fort.land;
   }
-  // Veteran Cadre: called in a level or two up (within the unit's own cap).
-  if (has(run, 'veterans')) s.level = Math.min(s.maxLevel, s.level + TREE_FX.veterans);
   run.squads.push(s);
   run.points += s.points;
   run.log.push(`${Math.floor(run.t / 60)}:${String(Math.floor(run.t % 60)).padStart(2, '0')} ${s.name} called in (${run.points}/${WARPATH.cap} pts).`);
@@ -110,6 +110,10 @@ export function choose(run: WarpathRun, i: number): void {
     const s = run.squads.find((x) => x.unitId === c.unitId);
     if (s && s.level < s.maxLevel) {
       s.level += 1;
+      if (s.fort) {
+        s.fort.maxHp *= WARPATH.levels.woundsMul;
+        s.fort.hp *= WARPATH.levels.woundsMul;
+      }
       if (s.kind === 'hero') {
         const before = run.maxHp;
         run.maxHp = heroMaxHp(run);
@@ -161,7 +165,9 @@ export function cardText(run: WarpathRun, c: Card): { title: string; text: strin
     const guns = s.guns.map((g) => g.name).join(', ');
     return { title: s.name, text: `${s.size > 1 ? `${s.size} models, ` : ''}Q${s.quality}+ D${s.defense}+${s.kind === 'fort' ? ', drops in as a turret' : s.kind === 'air' ? ', flies strafing loops' : ''}. ${guns}.`, tag: `Call in · ${s.points} pts` };
   }
-  const lines = s.kind === 'hero' ? 'faster attacks, longer reach, more HP and speed' : 'faster attacks and longer reach';
+  const lines = s.kind === 'hero'
+    ? 'faster attacks, longer reach, more HP and speed'
+    : `faster attacks, longer reach, ${s.kind === 'fort' ? `×${WARPATH.levels.woundsMul} HP` : `${woundsPer(s) * WARPATH.levels.woundsMul} wounds a model`}`;
   return { title: s.name, text: `Level ${s.level} → ${s.level + 1}: ${lines}${(s.level + 1) % WARPATH.levels.dmgEvery === 0 ? ', harder hits' : ''}.`, tag: `Drill · max ${s.maxLevel}` };
 }
 

@@ -3,13 +3,15 @@ import {
   bossesOf, botInput, botPick, cardText, choose, clock, reroll, skip, step, WARPATH, xpNeed, type Input, type WarpathRun,
 } from '../../rules/warpath';
 import { Icon } from '../Icon';
-import { drawWarpath, type Palette, type View } from './draw';
+import { checkSprites, drawWarpath, resetSprites, type Palette, type View } from './draw';
 
 // The run on screen: a full-screen canvas, the HUD, the level-up cards and the pause menu. The sim steps at a fixed 60 a
 // second from a requestAnimationFrame loop; the canvas redraws every frame and the HUD ten times a second.
 
 const ZOOM_KEY = 'warpath-zoom';
-const ZOOM = { min: 48, max: 72, start: 60 };
+/** Inches across the screen's long side: up to `max` on a phone, `wide` on a desktop (a mouse to point with). */
+const ZOOM = { min: 48, max: 72, wide: 90, start: 60 };
+const zoomMax = () => (typeof window !== 'undefined' && window.matchMedia?.('(pointer: fine)').matches ? ZOOM.wide : ZOOM.max);
 /** Most sim steps a frame (a slow frame plays a little slower rather than jumping). */
 const MAX_STEPS = 6;
 const STICK = 56;
@@ -17,7 +19,7 @@ const STICK = 56;
 function readZoom(): number {
   try {
     const z = Number(localStorage.getItem(ZOOM_KEY));
-    return z >= ZOOM.min && z <= ZOOM.max ? z : ZOOM.start;
+    return z >= ZOOM.min && z <= zoomMax() ? z : ZOOM.start;
   } catch {
     return ZOOM.start;
   }
@@ -188,16 +190,23 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
       drawWarpath(ctx, run, view, palette, now / 1000);
       if (now - hudAt > 100) {
         hudAt = now;
+        checkSprites();
         setHud(hudOf(run));
       }
     };
     raf = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(raf);
+    // A canvas whose pixels the browser dropped comes back blank: redraw the sprite caches from scratch.
+    const c0 = canvas.current;
+    c0?.addEventListener('contextrestored', resetSprites);
+    return () => {
+      cancelAnimationFrame(raf);
+      c0?.removeEventListener('contextrestored', resetSprites);
+    };
   }, [run, palette]);
 
   // Zoom with the wheel or a pinch (two pointers).
   const onWheel = (e: React.WheelEvent) => {
-    zoom.current = Math.max(ZOOM.min, Math.min(ZOOM.max, zoom.current + Math.sign(e.deltaY) * 3));
+    zoom.current = Math.max(ZOOM.min, Math.min(zoomMax(), zoom.current + Math.sign(e.deltaY) * 3));
     try { localStorage.setItem(ZOOM_KEY, String(zoom.current)); } catch { /* not kept */ }
   };
 

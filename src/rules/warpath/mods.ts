@@ -51,6 +51,9 @@ export function enemyMul(run: WarpathRun): { hp: number; dmg: number } {
 }
 
 /** The hero's most HP: hpMin + Tough × hpPerTough, + a share a level. */
+/** Wounds a model in this squad takes to fall: its Tough, doubled by each drill level. */
+export const woundsPer = (s: Squad) => s.tough * WARPATH.levels.woundsMul ** s.level;
+
 export function heroMaxHp(run: WarpathRun): number {
   const h = run.squads[0];
   const H = WARPATH.hero;

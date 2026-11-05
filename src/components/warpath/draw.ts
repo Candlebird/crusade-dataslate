@@ -18,6 +18,30 @@ export interface Palette { own: string; foe: string; faces?: Record<string, Embl
 
 const faces = new Map<string, HTMLCanvasElement>();
 
+/** Drop every cached sprite. The browser can throw away a canvas's pixels when it runs short of graphics memory (after
+ *  a long stall, say); cached sprites would then stamp blank forever, so a lost or restored canvas clears the caches
+ *  and they draw afresh. */
+export function resetSprites(): void {
+  faces.clear();
+  sprites.clear();
+}
+
+/** A fresh offscreen canvas for the cache, which clears the caches if its pixels are ever lost. */
+function cacheCanvas(): HTMLCanvasElement {
+  const c = document.createElement('canvas');
+  c.addEventListener('contextlost', resetSprites);
+  c.addEventListener('contextrestored', resetSprites);
+  return c;
+}
+
+/** Spot-check one cached sprite now and then: a lost one means they all go. */
+export function checkSprites(): void {
+  for (const c of [sprites.values().next().value, faces.values().next().value]) {
+    const ctx = c?.getContext('2d') as (CanvasRenderingContext2D & { isContextLost?: () => boolean }) | null | undefined;
+    if (ctx?.isContextLost?.()) return resetSprites();
+  }
+}
+
 /** A unit's emblem `px` across, drawn once per size and cached, on a dark disc so it reads on any ground. */
 function face(id: string, layers: EmblemLayer[], px: number): HTMLCanvasElement {
   const size = Math.max(6, Math.round(px / 2) * 2);
@@ -26,7 +50,7 @@ function face(id: string, layers: EmblemLayer[], px: number): HTMLCanvasElement 
   if (c) return c;
   if (faces.size > 300) faces.clear();
   const dpr = Math.min(2, window.devicePixelRatio || 1);
-  c = document.createElement('canvas');
+  c = cacheCanvas();
   c.width = c.height = Math.ceil(size * dpr);
   const ctx = c.getContext('2d')!;
   ctx.scale(dpr, dpr);
@@ -64,7 +88,7 @@ function sprite(name: IconName, color: string, px: number, glow = 0): HTMLCanvas
   if (c) return c;
   if (sprites.size > 600) sprites.clear();
   const pad = Math.ceil(size * 0.15) + glow;
-  c = document.createElement('canvas');
+  c = cacheCanvas();
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   c.width = c.height = Math.ceil((size + pad * 2) * dpr);
   const ctx = c.getContext('2d')!;

@@ -9,7 +9,8 @@ import { autoplay, heroesOf, newRun, step } from './sim';
 import { hordeStep, siteStep } from './events';
 import { callLevel } from './levels';
 import { enemyKindsOf } from './roster';
-import { spawnEnemy } from './enemies';
+import { hurtSquad, spawnEnemy } from './enemies';
+import { woundsPer } from './mods';
 import { chunkTerrain, inCover } from './field';
 import { bankRenown, cantTake, laurelsFor, metaOf, nodeCost, nodeState, HONOURS, prestige, PRESTIGE, renownOf, resetTree, takeNode, TREE_FX } from './meta';
 import { hurtEnemy } from './combat';
@@ -256,6 +257,38 @@ describe('Warpath', () => {
     }
     expect(s.alive * s.tough - s.wounds).toBeLessThan(s.size * s.tough);
     expect(run.hp).toBeGreaterThanOrEqual(before - 1e-9);
+  });
+
+  it('a big horde lands a batch a step, not all at once', () => {
+    const run = start(0, 'horde');
+    run.t = 1200;
+    run.enemies = [];
+    run.horde = { at: run.t, kind: 'ring', a: 0 };
+    hordeStep(run);
+    expect(run.landing).toBeTruthy();
+    const n = run.landing!.n;
+    expect(n).toBeGreaterThan(WARPATH.horde.batch);
+    expect(run.enemies.length).toBe(WARPATH.horde.batch);
+    for (let i = 0; i < 20 && run.landing; i++) hordeStep(run);
+    expect(run.landing).toBeUndefined();
+    expect(run.enemies.length).toBe(n);
+  });
+
+  it('each drill level doubles the wounds a model takes to fall', () => {
+    let run = start(0);
+    for (let i = 0; i < 6 && !run.squads.some((q) => q.kind === 'foot'); i++) autoplay((run = start(i)), 180);
+    const s = run.squads.find((q) => q.kind === 'foot')!;
+    s.alive = s.size;
+    s.wounds = 0;
+    s.level = 0;
+    expect(woundsPer(s)).toBe(s.tough);
+    s.level = 2;
+    expect(woundsPer(s)).toBe(s.tough * 4);
+    const k = 1 / mods(run).losses;
+    hurtSquad(run, s, s.tough * 3.9 * k);
+    expect(s.alive).toBe(s.size);
+    hurtSquad(run, s, s.tough * 0.2 * k);
+    expect(s.alive).toBe(s.size - 1);
   });
 
   it('infantry take cover near the hero and leave it when the hero moves on', () => {

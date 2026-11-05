@@ -36,7 +36,9 @@ export const WARPATH = {
   /** Call-in cards only on every `callEvery`-th level-up (and one is then always offered if a unit fits). */
   cards: { callEvery: 3, offer: 3, rerolls: 3, skipHeal: 0.2, healAtMax: 0.15 },
   /** Units and the hero level to 5 (+1 a trait, −1 a scar); each level: attacks rate, reach, damage on even levels. */
-  levels: { max: 5, rate: 0.14, reach: 0.1, dmgEvery: 2, hp: 0.12, speed: 0.03 },
+  /** Per drill level: fire rate, reach, harder hits every `dmgEvery`, hero HP and speed; each model's wounds (and a
+   *  turret's HP) ×`woundsMul`. */
+  levels: { max: 5, rate: 0.14, reach: 0.1, dmgEvery: 2, hp: 0.12, speed: 0.03, woundsMul: 2 },
   /** Doctrine slots and levels. */
   doctrines: { slots: 6, max: 5 },
   /** Relics fire a golden volley on their own clock. */
@@ -47,15 +49,16 @@ export const WARPATH = {
   ability: { round: 8, hpPer: 3, barrageRadius: 3 },
   /** Pickups: reach to collect, how far the pull goes, rations (a share of HP), beacons (pull every gem). */
   pickups: { reach: 1.4, pull: 6, pullSpeed: 30, ration: 0.25, rationEvery: 45, beaconEvery: 110, gemLife: 120 },
-  /** Enemy spawning: the ring they come from (beyond the screen), per second at the start, + each minute; a cap on the field. */
+  /** Enemy spawning: the ring they come from (beyond the screen), per second at the start, + each minute; a cap on the
+   *  field (bodies owed past it come in later folded into elites, so a full field still grows harder). */
   spawn: {
-    ring: 42, perSec: 2.75, perMin: 1.05, maxField: 1400,
+    ring: 48, perSec: 2.75, perMin: 1.05, maxField: 900,
     /** Wounds and damage grow by these shares each minute from the start. */
-    hpPerMin: 0.125, dmgPerMin: 0.035,
+    hpPerMin: 0.16, dmgPerMin: 0.055,
     /** Every 5 min the mix steps tougher; the tiers by points a model (cheapest third, middle, dearest). */
     shiftEvery: 300,
     /** Past this many minutes, wounds and damage grow by these shares a minute. */
-    lateFrom: 30, lateHp: 0.05, lateDmg: 0.035,
+    lateFrom: 18, lateHp: 0.12, lateDmg: 0.08,
   },
   /** Enemy bodies: HP an unsaved wound takes off the hero, inches a second per inch of Advance, how close counts as touching, attack clocks. */
   enemy: { dmgPerWound: 3, heroDeadlyCap: 2, heroBlowCap: 0.35, speedPer: 0.85, touch: 1.1, meleeEvery: 1.1, hpPerTough: 1, windUp: 0.9, shotSpeed: 22, shotRadius: 0.9, blastRadius: 3, blastFuse: 1.2, shooterShare: 0.18 },
@@ -65,8 +68,9 @@ export const WARPATH = {
    *  blows, a bigger body and a gold rim; their Shard is worth `xp` times as much. */
   elite: { from: 60, share: 0.03, perMin: 0.012, max: 0.17, hp: 3, dmg: 1.5, size: 1.35, xp: 5 },
   /** Hordes: every `min`–`max` s (from `from`), after a `warn` s warning, a ring closes round the hero or a column
-   *  charges from one side: `secs` seconds of the spawn rate at once (at least `least`), over the field cap by `over`. */
-  horde: { from: 75, min: 50, max: 95, warn: 3, secs: 9, least: 24, over: 250, ringR: 30 },
+   *  charges from one side: `secs` seconds of the spawn rate at once (at least `least`), over the field cap by `over`.
+   *  It lands `batch` bodies a step, so a big one comes in over a few frames rather than all in one. */
+  horde: { from: 75, min: 50, max: 95, warn: 3, secs: 9, least: 24, over: 150, ringR: 30, batch: 40 },
   /** Sites round the map, to go out to: up to `live` at once, a new one every `every` s, `near`–`far` from the hero,
    *  gone past `lose`. A shrine is held `hold` s (within `radius`) for a Battle Hymn (fire `hymn` faster for `hymnSecs`);
    *  a cache gives a level-up and springs an elite ambush of `ambush`; a well heals `heal`; a champion (an elite ×`champHp`
