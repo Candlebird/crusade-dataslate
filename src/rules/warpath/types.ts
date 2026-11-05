@@ -75,6 +75,10 @@ export interface Squad {
   frenzyLeft: number;
   /** Aircraft: where on its loop it is (radians). */
   angle: number;
+  /** Where it's drifting to, as an offset from the hero, and seconds until it picks another spot. */
+  wander?: { ox: number; oy: number; t: number };
+  /** Infantry: a spot in cover it's holding near the hero. */
+  cover?: { x: number; y: number };
   /** Fortification: its own HP, seconds until it lands again (dropping or destroyed), and where it stands. */
   fort?: { hp: number; maxHp: number; down: number; fall: number };
   /** Damage dealt this run (the run summary's meter), and kills. */

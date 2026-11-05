@@ -4,7 +4,7 @@ export * from './types';
 export { newRun, step, autoplay, botInput, botPick, heroesOf, themeBooks, weekTheme, playable, WARPATH_VERSION, type Input, type NewRun } from './sim';
 export { choose, skip, reroll, cardText, xpNeed, pointsLeft, openLevelUp } from './levels';
 export { onField, originOf, reachOf } from './combat';
-export { chunkTerrain, terrainNear } from './field';
+export { chunkTerrain, inCover, terrainNear } from './field';
 export { mods, heroMaxHp, minutes } from './mods';
 export { clock } from './loot';
 export { squadOf, enemyKindsOf, fieldPoints } from './roster';
@@ -14,6 +14,6 @@ export { DOCTRINES } from './data';
 export type { CloudWarpath } from './cloud';
 export { SITE_NAMES, hymn, holdOf } from './events';
 export {
-  BRANCHES, BRANCH_IDS, TREE, TREE_FX, NODE_IDS, RENOWN, PRESTIGE, metaOf, nodeCost, nodeState, cantTake, takeNode, resetTree, resetValue, spentOn,
+  BRANCHES, BRANCH_IDS, TREE, TREE_FX, NODE_IDS, RENOWN, PRESTIGE, HONOURS, honoursOf, metaOf, nodeCost, nodeState, cantTake, takeNode, resetTree, resetValue, spentOn,
   renownOf, bankRenown, laurelsFor, prestige, renownLine, type NodeId, type BranchId, type NodeState,
 } from './meta';

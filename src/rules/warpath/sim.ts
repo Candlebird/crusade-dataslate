@@ -78,7 +78,7 @@ export function newRun(o: NewRun): WarpathRun {
     level: 1, xp: 0, queued: 0, offer: [], rerolls: W.cards.rerolls, doctrines: {}, kills: 0, captains: 0, lordKills: 0, score: 0,
     log: [`0:00 ${hero.name} leads ${o.force.name} against ${theme.name}${o.mode === 'hard' ? ' (Hard)' : ''}.`], fx: [],
   };
-  run.meta = { ...(o.force.warpath?.meta?.nodes ?? {}) };
+  run.meta = { ...(o.force.warpath?.meta?.nodes ?? {}), honours: o.force.warpath?.meta?.prestige ?? 0 };
   if (has(run, 'reserves')) run.rerolls += TREE_FX.reserves;
   if (has(run, 'orders')) run.queued += TREE_FX.orders;
   run.maxHp = run.hp = heroMaxHp(run);

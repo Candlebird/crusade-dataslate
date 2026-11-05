@@ -53,10 +53,10 @@ const pct = (x: number) => `${Math.round(x * 100)}%`;
 
 /** The numbers each node turns. */
 export const TREE_FX = {
-  edge: 0.05, drill: 0.05, hailRate: 0.25, hailDmg: 0.15, overchargeEvery: 6, overchargeMul: 3,
-  wrathEvery: 15, wrathRadius: 7, wrathHits: 24, wrathAp: 2, executeBelow: 0.2,
-  vigour: 0.06, warded: 0.04, thorns: 0.2, thornsBoss: 0.02, bastionEvery: 20, bastion: 0.15, secondWind: 0.4, windIframes: 3,
-  lastStandBelow: 0.35, lastStand: 0.4, unbreakable: 0.15,
+  edge: 0.04, drill: 0.04, hailRate: 0.2, hailDmg: 0.15, overchargeEvery: 6, overchargeMul: 2,
+  wrathEvery: 20, wrathRadius: 7, wrathHits: 16, wrathAp: 2, executeBelow: 0.15,
+  vigour: 0.05, warded: 0.03, thorns: 0.2, thornsBoss: 0.02, bastionEvery: 20, bastion: 0.12, secondWind: 0.25, windIframes: 3,
+  lastStandBelow: 0.35, lastStand: 0.3, unbreakable: 0.25,
   lore: 0.06, lodestone: 0.2, reserves: 2, orders: 2, musterEvery: 2, veterans: 2,
   march: 0.04, pathfinder: 0.15, plunder: 2, pilgrimSecs: 80, pilgrimHymn: 0.6, cartoLive: 5, cartoEvery: 20, warnSecs: 6, warnSize: 0.7,
 };
@@ -100,6 +100,11 @@ export const NODE_IDS = Object.keys(TREE) as NodeId[];
 
 /** Renown a run earns: minutes, kills, captains and lords; Hard pays more; each Laurel adds a share. */
 export const RENOWN = { perMin: 8, perKills: 100, captain: 15, lord: 60, hard: 1.5, laurel: 0.1 };
+/** Honours: each prestige makes the force a little stronger in every run for good (damage and hero HP), up to `max`
+ *  prestiges. It's what lets a deep-prestige force outlast the late swarm; a fresh tree alone can't. */
+export const HONOURS = { dmg: 0.11, hp: 0.11, max: 10 };
+/** The prestiges a run counts for Honours. */
+export const honoursOf = (run: WarpathRun) => Math.min(HONOURS.max, run.meta?.honours ?? 0);
 /** Prestige: needs this much Renown earned in the cycle; Laurels = ⌊√(cycle / perLaurel)⌋. A tree reset gives back `refund`. */
 export const PRESTIGE = { min: 2000, perLaurel: 500, refund: 0.8 };
 

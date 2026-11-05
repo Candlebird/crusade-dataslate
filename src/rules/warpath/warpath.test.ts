@@ -9,7 +9,9 @@ import { autoplay, heroesOf, newRun, step } from './sim';
 import { hordeStep, siteStep } from './events';
 import { callLevel } from './levels';
 import { enemyKindsOf } from './roster';
-import { bankRenown, cantTake, laurelsFor, metaOf, nodeCost, nodeState, prestige, PRESTIGE, renownOf, resetTree, takeNode, TREE_FX } from './meta';
+import { spawnEnemy } from './enemies';
+import { chunkTerrain, inCover } from './field';
+import { bankRenown, cantTake, laurelsFor, metaOf, nodeCost, nodeState, HONOURS, prestige, PRESTIGE, renownOf, resetTree, takeNode, TREE_FX } from './meta';
 import { hurtEnemy } from './combat';
 import { mods } from './mods';
 
@@ -182,7 +184,7 @@ describe('Warpath', () => {
     const run = newRun({ force, heroId: heroesOf(force)[0].id, books: [echoes], mode: 'normal', date: '2026-11-04', seed: 's1', theme: echoes });
     const plain = start(2);
     expect(run.maxHp).toBeGreaterThan(plain.maxHp);
-    expect(mods(run).shootRate).toBeGreaterThan(mods(plain).shootRate * 1.25);
+    expect(mods(run).shootRate).toBeGreaterThan(mods(plain).shootRate * 1.2);
     expect(mods(run).dmg).toBeLessThan(mods(plain).dmg);
     // A reset gives most of it back and opens both sides again.
     const before = metaOf(force).renown;
@@ -214,6 +216,70 @@ describe('Warpath', () => {
     expect(renownOf(run, 3)).toBeGreaterThan(renownOf(run, 0));
   });
 
+  it('meta: each prestige adds Honours (damage and hero HP) to every run, up to a cap', () => {
+    const force = forceOf(2);
+    const opts = { force, heroId: heroesOf(force)[0].id, books: [echoes], mode: 'normal' as const, date: '2026-11-04', seed: 's1', theme: echoes };
+    const plain = newRun(opts);
+    force.warpath = { meta: { renown: 0, cycle: 0, total: 0, prestige: 4, laurels: 6, nodes: {} } };
+    const vet = newRun(opts);
+    expect(vet.maxHp).toBeCloseTo(plain.maxHp * (1 + HONOURS.hp * 4), -1);
+    expect(mods(vet).dmg).toBeCloseTo(mods(plain).dmg * (1 + HONOURS.dmg * 4));
+    force.warpath.meta!.prestige = 50;
+    expect(mods(newRun(opts)).dmg).toBeCloseTo(mods(plain).dmg * (1 + HONOURS.dmg * HONOURS.max));
+  });
+
+  it('the swarm goes for the nearest body: a squad loses its own models, the hero loses nothing for it', () => {
+    let run = start(0);
+    for (let i = 0; i < 6 && !run.squads.some((q) => q.kind === 'foot'); i++) autoplay((run = start(i)), 180);
+    const s = run.squads.find((q) => q.kind === 'foot')!;
+    expect(s).toBeTruthy();
+    run.enemies = [];
+    run.queued = 0;
+    run.phase = 'play';
+    run.hp = run.maxHp;
+    s.alive = s.size;
+    s.wounds = 0;
+    s.x = run.hx + 30;
+    s.y = run.hy;
+    const pack = new Set<unknown>();
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const e = spawnEnemy(run, 0, s.x + Math.cos(a) * 3, s.y + Math.sin(a) * 3);
+      e.hp = e.maxHp = 1e6;
+      e.shoots = false;
+      pack.add(e);
+    }
+    const before = run.hp;
+    for (let i = 0; i < 120 && run.phase === 'play'; i++) {
+      run.enemies = run.enemies.filter((e) => pack.has(e));
+      step(run, { dx: 0, dy: 0 });
+    }
+    expect(s.alive * s.tough - s.wounds).toBeLessThan(s.size * s.tough);
+    expect(run.hp).toBeGreaterThanOrEqual(before - 1e-9);
+  });
+
+  it('infantry take cover near the hero and leave it when the hero moves on', () => {
+    let run = start(0);
+    for (let i = 0; i < 6 && !run.squads.some((q) => q.kind === 'foot'); i++) autoplay((run = start(i)), 180);
+    const s = run.squads.find((q) => q.kind === 'foot')!;
+    let t;
+    for (let c = 1; c < 40 && !t; c++) t = chunkTerrain(run.seed, c, 0).find((x) => x.kind === 'cover');
+    expect(t).toBeTruthy();
+    run.hx = t!.x;
+    run.hy = t!.y + t!.r + 4;
+    run.enemies = [];
+    run.queued = 0;
+    run.phase = 'play';
+    run.hp = run.maxHp;
+    for (const q of run.squads) { delete q.cover; delete q.wander; q.x = run.hx; q.y = run.hy; }
+    for (let i = 0; i < 60 * 8; i++) { run.enemies = []; step(run, { dx: 0, dy: 0 }); }
+    expect(s.cover).toBeTruthy();
+    expect(inCover(run.seed, s.x, s.y)).toBe(true);
+    run.hx += 40;
+    step(run, { dx: 0, dy: 0 });
+    expect(s.cover).toBeUndefined();
+  });
+
   it('keystones change the run: Second Wind, Executioner, Plunder', () => {
     const run = start(0, 'ks');
     run.meta = { secondWind: 1, executioner: 1, plunder: 1 };
@@ -224,13 +290,13 @@ describe('Warpath', () => {
     run.hp = -5;
     step(run, { dx: 0, dy: 0 });
     expect(run.phase).toBe('over');
-    // Executioner: a hit that leaves a non-boss under a fifth of its HP kills it.
+    // Executioner: a hit that leaves a non-boss under 15% of its HP kills it.
     const r2 = start(0, 'ex');
     r2.meta = { executioner: 1 };
     for (let i = 0; i < 300 && !r2.enemies.length; i++) step(r2, { dx: 0, dy: 0 });
     const e = r2.enemies[0];
     e.hp = e.maxHp = 100;
-    hurtEnemy(r2, 0, e, 85);
+    hurtEnemy(r2, 0, e, 90);
     expect(e.hp).toBeLessThanOrEqual(0);
     // Plunder: a cache gives two level-ups.
     const r3 = start(0, 'pl');

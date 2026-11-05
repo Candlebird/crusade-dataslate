@@ -1,4 +1,4 @@
-import { holdOf, hymn, onField, SITE_NAMES, terrainNear, WARPATH, type SiteKind, type Squad, type WarpathRun } from '../../rules/warpath';
+import { holdOf, hymn, inCover, onField, SITE_NAMES, terrainNear, WARPATH, type SiteKind, type Squad, type WarpathRun } from '../../rules/warpath';
 import type { IconName } from '../iconData';
 import { ICONS } from '../iconData';
 import { alpha, bar } from '../training/art';
@@ -342,6 +342,17 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
     const big = s.kind === 'heavy' || s.kind === 'artillery' || s.kind === 'air';
     const px = (big ? 2.4 : 1.25) * ppi;
     const spread = big ? 1.2 + s.size * 0.5 : 0.9 + Math.sqrt(s.size) * 0.75;
+    // In cover: a faint dashed ring round the squad (+1 Defense).
+    if (s.kind !== 'air' && inCover(run.seed, s.x, s.y)) {
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(126, 224, 126, 0.55)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(sx(s.x), sy(s.y), (spread + 0.8) * ppi, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     let top = 0;
     for (let i = 0; i < s.alive && i < CLUSTER.length; i++) {
       const [ox, oy] = CLUSTER[i];
@@ -367,12 +378,31 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       ctx.moveTo(x, y);
       ctx.lineTo(sx(f.x2), sy(f.y2));
       ctx.stroke();
-    } else if (f.kind === 'melee') {
-      ctx.strokeStyle = `rgba(255,255,255,${Math.min(1, f.t * 5)})`;
-      ctx.lineWidth = 2;
+    } else if (f.kind === 'melee' && f.x2 !== undefined && f.y2 !== undefined) {
+      // A blow, as in Training: a yellow half-circle swipe across the target from the striker's side, with sparks
+      // flying on through it.
+      const tx = sx(f.x2);
+      const ty = sy(f.y2);
+      const a = Math.atan2(ty - y, tx - x);
+      const done = 1 - f.t / 0.25;
+      const r = 0.9 * ppi;
+      const from = a + Math.PI - 1.4;
+      ctx.strokeStyle = `rgba(255,214,90,${Math.min(1, f.t * 6)})`;
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.arc(x, y, 1.2 * ppi, -0.9 + f.t * 6, 0.9 + f.t * 6);
+      ctx.arc(tx, ty, r, from, from + 2.8 * Math.min(1, done * 2.5));
       ctx.stroke();
+      ctx.lineWidth = 1.5;
+      for (const k of [-0.6, 0, 0.6]) {
+        const d = a + k;
+        const r1 = ppi * (0.25 + done * 0.4);
+        ctx.beginPath();
+        ctx.moveTo(tx + Math.cos(d) * r1, ty + Math.sin(d) * r1);
+        ctx.lineTo(tx + Math.cos(d) * (r1 + ppi * 0.35), ty + Math.sin(d) * (r1 + ppi * 0.35));
+        ctx.stroke();
+      }
+      ctx.lineCap = 'butt';
     } else if (f.kind === 'boom' || f.kind === 'land' || f.kind === 'spell') {
       const k = 1 - Math.min(1, f.t / 0.6);
       const R = (f.n ?? 3) * ppi * (0.4 + 0.6 * k);

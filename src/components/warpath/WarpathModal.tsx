@@ -12,7 +12,7 @@ import { unitPortrait } from '../../model/emblem';
 import {
   bankRecords, bossesOf, clearWarpath, clock, DOCTRINES, hardOpen, heroesOf, loadWarpath, newerWarpath, newRun, saveWarpath, warpathFeats, warpathRepeats,
   warpathXp, weekBoard, weekTheme, WARPATH, type WarpathMode, type WarpathRun,
-  BRANCHES, BRANCH_IDS, TREE, NODE_IDS, RENOWN, PRESTIGE, metaOf, nodeCost, nodeState, cantTake, takeNode, resetTree, resetValue, bankRenown, laurelsFor,
+  BRANCHES, BRANCH_IDS, TREE, NODE_IDS, RENOWN, PRESTIGE, HONOURS, metaOf, nodeCost, nodeState, cantTake, takeNode, resetTree, resetValue, bankRenown, laurelsFor,
   prestige, renownLine, type NodeId, type BranchId,
 } from '../../rules/warpath';
 import { FeatList } from '../Feats';
@@ -317,7 +317,7 @@ function Armoury({ force }: { force: Force }) {
       <h3><Icon name="g:knight-banner" /> War Council</h3>
       <p className="small">
         <b>{m.renown.toLocaleString()} Renown</b>
-        {m.prestige > 0 && <> · Prestige {m.prestige} · {m.laurels} Laurel{m.laurels === 1 ? '' : 's'} (+{Math.round(RENOWN.laurel * m.laurels * 100)}% Renown)</>}
+        {m.prestige > 0 && <> · Prestige {m.prestige} · {m.laurels} Laurel{m.laurels === 1 ? '' : 's'} (+{Math.round(RENOWN.laurel * m.laurels * 100)}% Renown) · Honours +{Math.round(HONOURS.dmg * Math.min(HONOURS.max, m.prestige) * 100)}% damage and hero HP</>}
         <span className="muted"> · Runs earn Renown by minutes, kills and bosses ({RENOWN.hard}× on Hard). The tree only touches this force's Warpath runs.</span>
       </p>
       <div className="wt-tree">
@@ -360,7 +360,7 @@ function Armoury({ force }: { force: Force }) {
       </div>
       <p className="small">
         <b>Reset the tree</b> to choose again: {Math.round(PRESTIGE.refund * 100)}% of the Renown spent comes back{back > 0 ? ` (${back.toLocaleString()})` : ''}.
-        {' '}<b>Prestige:</b> wipe the tree and the Renown in hand for Laurels. Each Laurel adds {Math.round(RENOWN.laurel * 100)}% to every run's Renown for good; prestige 1 opens the keystones, prestige 2 the capstones.
+        {' '}<b>Prestige:</b> wipe the tree and the Renown in hand for Laurels. Each Laurel adds {Math.round(RENOWN.laurel * 100)}% to every run's Renown for good; each prestige also gives Honours, +{Math.round(HONOURS.dmg * 100)}% damage and hero HP for good (to prestige {HONOURS.max}). Prestige 1 opens the keystones, prestige 2 the capstones.
         {' '}This cycle: {m.cycle.toLocaleString()} Renown earned{gain > 0 ? `, worth ${gain} Laurel${gain === 1 ? '' : 's'}` : ` (needs ${PRESTIGE.min.toLocaleString()})`}.
       </p>
       <div className="row">

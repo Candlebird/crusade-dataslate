@@ -1,15 +1,15 @@
 import { hitChance, rand, saveChance } from '../training/rng';
 import { DOCTRINES, WARPATH } from './data';
-import { terrainAt, unblock, type Grid } from './field';
+import { inCover, terrainAt, unblock, type Grid } from './field';
 import { onField } from './combat';
 import { enemyMul, minutes, mods } from './mods';
 import { clock } from './loot';
-import type { Enemy, EnemyKind, Missile, WarpathRun } from './types';
+import type { Enemy, EnemyKind, Missile, Squad, WarpathRun } from './types';
 import { has, TREE_FX } from './meta';
 
 // The horde: packs come in from a ring past the screen edge, tougher every 5 minutes; a share stop at range and shoot
-// (telegraphed); a captain every 3 minutes, an Echo Lord every 15 with its trick. Blows on the hero spread model losses
-// to the squads around it.
+// (telegraphed); a captain every 3 minutes, an Echo Lord every 15 with its trick. Each goes for the nearest body, the hero
+// or a squad on the ground: a squad hit rolls its own saves and loses models (they come back in time), the hero loses HP.
 
 const W = WARPATH;
 const E = W.enemy;
@@ -120,14 +120,48 @@ export function bossStep(run: WarpathRun): void {
 /** The hero's Defense (a scarred save counts). */
 const heroDef = (run: WarpathRun) => run.squads[0].defense;
 
-/** Damage onto the hero: Hold the Line, a shield, then HP; a share spreads to squads near it as lost models. */
+/** How far a squad's models stand from its anchor (as drawn), so how big a body it is to hit. */
+export const bodyOf = (s: Squad) =>
+  s.kind === 'fort' ? 1.6 : s.kind === 'heavy' || s.kind === 'artillery' ? 1.2 + s.size * 0.5 : 0.9 + Math.sqrt(s.size) * 0.75;
+
+/** Squads the swarm can hit: on the field and on the ground (not aircraft). */
+const groundSquads = (run: WarpathRun) => run.squads.filter((s, i) => i > 0 && s.kind !== 'air' && onField(s));
+
+/** Wounds onto a squad: a fortification loses HP; anything else loses models by Tough (Hold the Line shrugs some off). */
+export function hurtSquad(run: WarpathRun, s: Squad, wounds: number): void {
+  if (wounds <= 0 || !onField(s)) return;
+  if (s.fort) {
+    s.fort.hp -= wounds * E.dmgPerWound;
+    if (s.fort.hp <= 0) {
+      s.fort.hp = 0;
+      s.fort.down = W.fort.respawn + W.fort.perPts * s.points;
+      run.fx.push({ kind: 'boom', x: s.x, y: s.y, n: 3, t: 0.6 });
+      run.log.push(`${clock(run.t)} ${s.name} destroyed; back in ${Math.round(s.fort.down)}s.`);
+    }
+    return;
+  }
+  s.wounds += wounds * mods(run).losses;
+  let lost = 0;
+  while (s.wounds >= s.tough && s.alive > 0) {
+    s.wounds -= s.tough;
+    s.alive -= 1;
+    lost += 1;
+  }
+  if (!lost) return;
+  if (run.fx.length < 700) run.fx.push({ kind: 'dmg', x: s.x, y: s.y - bodyOf(s), n: lost, t: 0.8, hurt: true });
+  if (s.alive <= 0) {
+    s.wounds = 0;
+    run.log.push(`${clock(run.t)} ${s.name} is cut down; it regroups.`);
+  }
+}
+
+/** Damage onto the hero: Hold the Line, a shield, then HP. */
 export function hurtHero(run: WarpathRun, dmg: number): void {
   if (dmg <= 0 || run.hp <= 0) return;
   const m = mods(run);
   // No one blow (a lord's swing, a big blast) takes more than a share of the hero's HP: it can be dodged, not one-shot.
   dmg = Math.min(dmg * m.heroDmg, run.maxHp * (has(run, 'unbreakable') ? TREE_FX.unbreakable : E.heroBlowCap));
   run.iframes = W.hero.iframes;
-  const spread = dmg * W.losses.share * m.losses;
   if (run.shield && run.shield > 0) {
     const soak = Math.min(run.shield, dmg);
     run.shield -= soak;
@@ -135,54 +169,68 @@ export function hurtHero(run: WarpathRun, dmg: number): void {
   }
   run.hp -= dmg;
   if (run.fx.length < 700 && dmg > 0) run.fx.push({ kind: 'dmg', x: run.hx, y: run.hy - 1.5, n: dmg, t: 0.8, hurt: true });
-  // Squads close by lose models in proportion: wounds pile up on the next model to fall.
-  const near = run.squads.filter((s, i) => i > 0 && s.kind !== 'air' && s.kind !== 'fort' && s.alive > 0 && (s.x - run.hx) ** 2 + (s.y - run.hy) ** 2 < W.losses.radius ** 2);
-  if (!near.length) return;
-  const each = spread / near.length;
-  for (const s of near) {
-    s.wounds += each;
-    while (s.wounds >= s.tough && s.alive > 0) {
-      s.wounds -= s.tough;
-      s.alive -= 1;
-    }
-    if (s.alive <= 0) s.wounds = 0;
-  }
 }
 
-/** One enemy model's blows (or a shot's hits) on the hero: OPR to-hit and saves, Deadly per wound. */
-function rollOnHero(run: WarpathRun, attacks: number, quality: number, ap: number, deadly: number, mul: number): number {
-  let dmg = 0;
+/** Wounds from attacks: OPR to-hit and saves against `def` (+`mod`: cover); Deadly per wound, up to `cap` (it doesn't
+ *  carry over). */
+function rollWounds(run: WarpathRun, def: number, mod: number, attacks: number, quality: number, ap: number, deadly: number, cap: number): number {
+  let w = 0;
   const whole = Math.floor(attacks) + (rand(run) < attacks % 1 ? 1 : 0);
   for (let i = 0; i < whole; i++) {
     if (rand(run) >= hitChance(quality, 0)) continue;
-    if (rand(run) < saveChance(heroDef(run), ap)) continue;
-    dmg += Math.min(deadly, E.heroDeadlyCap) * mul * E.dmgPerWound;
+    if (rand(run) < saveChance(def, ap, mod)) continue;
+    w += Math.min(deadly, cap);
   }
-  return dmg;
+  return w;
 }
 
-/** A missile lands (a shot that reached the hero, or a blast marker's fuse running out). */
+/** Cover's Defense bonus for a body standing at (x, y). */
+const coverMod = (run: WarpathRun, x: number, y: number) => (inCover(run.seed, x, y) ? W.follow.coverDef : 0);
+
+/** Attacks on the hero: wounds as HP (`mul`: the clock's damage growth, an elite's blows). */
+const rollOnHero = (run: WarpathRun, attacks: number, quality: number, ap: number, deadly: number, mul: number) =>
+  rollWounds(run, heroDef(run), coverMod(run, run.hx, run.hy), attacks, quality, ap, deadly, E.heroDeadlyCap) * mul * E.dmgPerWound;
+
+/** Attacks on a squad: wounds on its models (a fortification takes them as HP). */
+function strikeSquad(run: WarpathRun, s: Squad, attacks: number, quality: number, ap: number, deadly: number, mul: number): void {
+  const w = rollWounds(run, s.defense, coverMod(run, s.x, s.y), attacks, quality, ap, deadly, s.fort ? deadly : s.tough);
+  if (w > 0) hurtSquad(run, s, w * mul * W.losses.squadDmg);
+}
+
+/** A missile lands on the hero (unless it's untouchable). */
 function land(run: WarpathRun, m: Missile): void {
   if (run.iframes > 0) return;
   const dmg = rollOnHero(run, m.attacks, m.quality, m.ap, m.dmg, enemyMul(run).dmg);
   if (dmg > 0) hurtHero(run, dmg);
 }
 
+/** A missile lands on a squad. */
+const landOn = (run: WarpathRun, s: Squad, m: Missile) => strikeSquad(run, s, m.attacks, m.quality, m.ap, m.dmg, enemyMul(run).dmg);
+
 /** Shots fly and blasts tick down. */
 export function missileStep(run: WarpathRun, dt: number): void {
+  const ground = groundSquads(run);
   for (const m of run.missiles) {
     m.life -= dt;
     if (m.blast) {
       if (m.life <= 0) {
         run.fx.push({ kind: 'boom', x: m.x, y: m.y, n: E.blastRadius, t: 0.4 });
         if ((run.hx - m.x) ** 2 + (run.hy - m.y) ** 2 < E.blastRadius ** 2) land(run, m);
+        for (const s of ground) if ((s.x - m.x) ** 2 + (s.y - m.y) ** 2 < (E.blastRadius + bodyOf(s) * 0.5) ** 2) landOn(run, s, m);
       }
       continue;
     }
     m.x += m.vx * dt;
     m.y += m.vy * dt;
+    // A shot stops in the first body it reaches: the hero or a squad.
     if ((run.hx - m.x) ** 2 + (run.hy - m.y) ** 2 < E.shotRadius ** 2) {
       land(run, m);
+      m.life = -1;
+      continue;
+    }
+    const s = ground.find((q) => (q.x - m.x) ** 2 + (q.y - m.y) ** 2 < (bodyOf(q) * 0.8 + E.shotRadius) ** 2);
+    if (s) {
+      landOn(run, s, m);
       m.life = -1;
     }
   }
@@ -264,7 +312,7 @@ export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Ene
   const mul = enemyMul(run);
   const fear = mods(run).fear;
   const fearR2 = DOCTRINES.fearTactics.radius ** 2;
-  const forts = run.squads.filter((s) => s.kind === 'fort' && onField(s));
+  const ground = groundSquads(run);
   for (const e of run.enemies) {
     if (e.hp <= 0) continue;
     const k = run.enemyKinds[e.kind];
@@ -275,26 +323,27 @@ export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Ene
       if ((run.hx - e.x) ** 2 + (run.hy - e.y) ** 2 > W.sites.wake ** 2) continue;
       delete e.guard;
     }
-    // Its mark: a landed fortification closer than the hero and within 8", else the hero.
+    // Its mark: the nearest body. A squad (its edge) closer than the hero and within `aggro`, else the hero.
     let tx = run.hx;
     let ty = run.hy;
-    let fort = -1;
-    let best = (run.hx - e.x) ** 2 + (run.hy - e.y) ** 2;
-    const dh = best;
-    for (const s of forts) {
-      const d = (s.x - e.x) ** 2 + (s.y - e.y) ** 2;
-      if (d < best && d < 64) { best = d; tx = s.x; ty = s.y; fort = run.squads.indexOf(s); }
+    let mark: Squad | undefined;
+    const dh2 = (run.hx - e.x) ** 2 + (run.hy - e.y) ** 2;
+    let d = Math.sqrt(dh2);
+    let body = 0.4;
+    for (const s of ground) {
+      const r = bodyOf(s);
+      const ds = Math.hypot(s.x - e.x, s.y - e.y);
+      if (ds - r < d - body && ds - r < W.losses.aggro) { d = ds; body = r; tx = s.x; ty = s.y; mark = s; }
     }
-    const d = Math.sqrt(best);
-    const reach = (e.size + (fort >= 0 ? 2.4 : 0.8)) / 2 + E.touch * 0.5;
+    const reach = e.size / 2 + body + E.touch * 0.5;
     // Shooters stop at range and wind up.
-    if (e.shoots && k.gun && fort < 0 && d < k.gun.reach * 0.85 && d > reach) {
+    if (e.shoots && k.gun && d < k.gun.reach * 0.85 && d > reach) {
       if (e.aim > 0) {
         e.aim -= dt;
         if (e.aim <= 0) { loose(run, e, k); e.cd = 3 + rand(run) * 2; }
       } else {
         e.cd -= dt;
-        if (e.cd <= 0) { e.aim = E.windUp; e.tx = run.hx; e.ty = run.hy; }
+        if (e.cd <= 0) { e.aim = E.windUp; e.tx = tx; e.ty = ty; }
       }
       continue;
     }
@@ -303,7 +352,7 @@ export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Ene
       let v = k.speed * (e.boss ? 0.85 : 1);
       if (e.status.slow) v *= 0.5;
       if (e.status.daze) v *= 0.75;
-      if (fear && dh < fearR2) v *= 1 - fear;
+      if (fear && dh2 < fearR2) v *= 1 - fear;
       const t = terrainAt(run.seed, e.x, e.y);
       if (t?.kind === 'difficult') v *= 0.6;
       else if (t?.kind === 'dangerous' && rand(run) < dt * 0.5) hurt(e, 1);
@@ -330,20 +379,8 @@ export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Ene
     if (e.cd > 0) continue;
     e.cd = E.meleeEvery * (e.boss ? B.every : 1) * (e.status.daze ? 1.4 : 1);
     const attacks = k.melee.attacks * (e.boss === 'lord' ? B.lordBlows : e.boss ? B.blows : 1);
-    if (fort >= 0) {
-      const s = run.squads[fort];
-      let dmg = 0;
-      const whole = Math.round(attacks);
-      for (let i = 0; i < whole; i++) if (rand(run) < hitChance(k.quality, 0) && rand(run) >= saveChance(s.defense, k.melee.ap)) dmg += k.melee.deadly * mul.dmg * E.dmgPerWound;
-      if (s.fort && dmg > 0) {
-        s.fort.hp -= dmg;
-        if (s.fort.hp <= 0) {
-          s.fort.hp = 0;
-          s.fort.down = W.fort.respawn + W.fort.perPts * s.points;
-          run.fx.push({ kind: 'boom', x: s.x, y: s.y, n: 3, t: 0.6 });
-          run.log.push(`${clock(run.t)} ${s.name} destroyed; back in ${Math.round(s.fort.down)}s.`);
-        }
-      }
+    if (mark) {
+      strikeSquad(run, mark, attacks, k.quality, k.melee.ap, k.melee.deadly, mul.dmg * (e.elite ? W.elite.dmg : 1));
       continue;
     }
     if (run.iframes > 0) continue;

@@ -45,6 +45,9 @@ export function terrainAt(seed: number, x: number, y: number): Terrain | undefin
   return undefined;
 }
 
+/** Is (x, y) in cover? */
+export const inCover = (seed: number, x: number, y: number) => terrainAt(seed, x, y)?.kind === 'cover';
+
 /** Push a body of radius `br` out of blocking terrain. */
 export function unblock(seed: number, p: { x: number; y: number }, br: number): void {
   for (const t of chunkTerrain(seed, Math.floor(p.x / C), Math.floor(p.y / C))) {

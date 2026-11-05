@@ -171,3 +171,29 @@ The Armoury is now a real skill tree. There are 4 branches with 5 tiers each, an
 | Full prestige-2 build | 17–32 min (median 22) | 12 |
 
   In the full build, one Cobalt Knights run reached the 30-min cap.
+
+## Squads as targets, cover, wander, swipe, and the 30-minute wall (2026-11-05)
+
+- **Squads are bodies, not shields.** They no longer soak the hero's wounds.
+  - Enemies pick the nearest body (hero or a ground squad, by edge distance, within `losses.aggro`). They walk to it, shoot at it and strike it.
+  - Shots and blasts stop in whichever body they hit first. A squad rolls its own Defense (Deadly capped at its Tough), and wounds take models off.
+  - A wiped squad regroups after `losses.regen` s. Forts still take damage as HP.
+  - Hold the Line now reads "squads shrug off 10% of wounds."
+- **Cover:**
+  - Any body standing in a cover feature gets +1 Defense (`follow.coverDef`) against everything, melee included. This applies to the hero too.
+  - Foot squads (infantry and lone heroes) look for cover within 12" of the hero, at most 2 squads to a feature. They leave it once the hero is 18" away.
+  - A dashed green ring marks a squad in cover.
+- **Wander:** each squad drifts to a new spot near its own slot every 2–5 s (±0.8 rad, ×0.6–1.5 radius), instead of holding a fixed point.
+- **Melee:** the Training-style yellow half-circle swipe now lands at the target, facing the striker, with three sparks.
+- **Honours:** each prestige adds +11% damage and +11% hero HP to every run, up to prestige 10.
+- **Trims:**
+  - Edge/Drill .04, Hail +20%, Overcharge ×2, Wrath 16 hits every 20 s, Executioner 15%.
+  - Vigour .05, Warded .03, Bastion 12%, Second Wind 25%, Last Stand +30%, Unbreakable 25%.
+  - Enemy HP growth is 12.5%/min.
+- **Probe** (bot, 6 live forces, fell at, Normal):
+
+| Build | Mean | Range | Reached 30 min |
+|---|---|---|---|
+| No meta | about 11 min | 6–20 | none |
+| Full tree, prestige 2 | 20.2 | 12–24 | none |
+| Full tree, prestige 10 | 24.8 | 17 to 30+ | 1 of 12; most others fell at 27–29 |

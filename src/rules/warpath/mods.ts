@@ -1,5 +1,5 @@
 import { DOCTRINES, WARPATH, type DoctrineId } from './data';
-import { has, metaLv, TREE_FX as T } from './meta';
+import { has, HONOURS, honoursOf, metaLv, TREE_FX as T } from './meta';
 import type { Squad, WarpathRun } from './types';
 
 // What doctrines, levels and the clock add up to, read wherever combat needs them.
@@ -27,7 +27,8 @@ export function mods(run: WarpathRun) {
     modelRegen: 1 / (1 + D.reinforcements.regen * l('reinforcements')),
     splash: D.shrapnel.splash * l('shrapnel'),
     ap: D.armourPiercing.ap * l('armourPiercing') + (has(run, 'bigGuns') ? 1 : 0),
-    dmg: (1 + D.deadlyStrikes.dmg * l('deadlyStrikes')) * (1 + T.edge * metaLv(run, 'edge')) * (has(run, 'hail') ? 1 - T.hailDmg : 1),
+    dmg: (1 + D.deadlyStrikes.dmg * l('deadlyStrikes')) * (1 + T.edge * metaLv(run, 'edge')) * (has(run, 'hail') ? 1 - T.hailDmg : 1)
+      * (1 + HONOURS.dmg * honoursOf(run)),
     pull: (1 + D.shardLure.pull * l('shardLure')) * (1 + T.lodestone * metaLv(run, 'lodestone')),
     xp: (1 + D.shardLure.xp * l('shardLure')) * (1 + T.lore * metaLv(run, 'lore')),
     reach: 1 + D.veteranDrills.reach * l('veteranDrills'),
@@ -53,7 +54,7 @@ export function enemyMul(run: WarpathRun): { hp: number; dmg: number } {
 export function heroMaxHp(run: WarpathRun): number {
   const h = run.squads[0];
   const H = WARPATH.hero;
-  return Math.round((H.hpMin + h.tough * H.hpPerTough) * (1 + WARPATH.levels.hp * h.level) * (1 + T.vigour * metaLv(run, 'vigour')));
+  return Math.round((H.hpMin + h.tough * H.hpPerTough) * (1 + WARPATH.levels.hp * h.level) * (1 + T.vigour * metaLv(run, 'vigour')) * (1 + HONOURS.hp * honoursOf(run)));
 }
 
 /** Penalty skills (scars) on a stat, summed. */

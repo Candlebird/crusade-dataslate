@@ -15,9 +15,17 @@ export const WARPATH = {
   /** Hero: inches a second for each inch of Advance (6" → 7.2"/s); HP = hpMin + hpPerTough × Tough. */
   hero: { speedPer: 1.2, hpPerTough: 5, hpMin: 40, iframes: 0.3 },
   /** Followers: anchors trail the hero this far out (more for each squad), heavy ones turn this slowly. */
-  follow: { ring: 5, ringPer: 0.9, lag: 4, heavyLag: 1.6, artilleryBack: 9, sallyMul: 0.5, sallyMin: 4 },
-  /** Model losses: a share of each wound on the hero spreads to squads within `radius`. Models come back one per `regen` s. */
-  losses: { share: 0.6, radius: 16, regen: 10 },
+  follow: {
+    ring: 5, ringPer: 0.9, lag: 4, heavyLag: 1.6, artilleryBack: 9, sallyMul: 0.5, sallyMin: 4,
+    /** Squads drift: a new spot every `wanderMin`-`wanderMax` s, up to `wanderSway` radians off their slot, `wanderIn`-`wanderOut` x its ring. */
+    wanderMin: 2, wanderMax: 5, wanderSway: 0.8, wanderIn: 0.6, wanderOut: 1.5,
+    /** Infantry and lone heroes take cover within `coverSeek` of the hero (at most `coverShare` squads to a feature) and
+     *  leave it once the hero is `coverLeash` away. Any body standing in cover gets +`coverDef` Defense. */
+    coverSeek: 12, coverLeash: 18, coverShare: 2, coverDef: 1,
+  },
+  /** Squads as bodies: an enemy goes for a squad whose edge is within `aggro` and nearer than the hero. Wounds on a
+   *  squad (x `squadDmg`) take its models by Tough; lost models come back one per `regen` s. */
+  losses: { aggro: 8, squadDmg: 1, regen: 10 },
   /** Aircraft fly loops this far out at this many inches a second. */
   air: { radius: 22, speed: 26 },
   /** Fortifications: land this far from the hero, hurt what they land on, come back after `respawn` + `perPts` × points
@@ -43,7 +51,7 @@ export const WARPATH = {
   spawn: {
     ring: 42, perSec: 2.75, perMin: 1.05, maxField: 1400,
     /** Wounds and damage grow by these shares each minute from the start. */
-    hpPerMin: 0.11, dmgPerMin: 0.03,
+    hpPerMin: 0.125, dmgPerMin: 0.035,
     /** Every 5 min the mix steps tougher; the tiers by points a model (cheapest third, middle, dearest). */
     shiftEvery: 300,
     /** Past this many minutes, wounds and damage grow by these shares a minute. */
@@ -81,7 +89,7 @@ export const DOCTRINES = {
   relentless: { name: 'Relentless', icon: 'g:bullets', text: 'Shooting attacks come 8% faster.', rate: 0.08 },
   furious: { name: 'Furious', icon: 'g:crossed-swords', text: 'Melee attacks come 10% faster.', rate: 0.1 },
   goodShot: { name: 'Good Shot', icon: 'g:archery-target', text: '+5% to hit.', hit: 0.3 },
-  holdLine: { name: 'Hold the Line', icon: 'g:checked-shield', text: 'The hero takes 7% less damage; squads lose 10% fewer models.', dmg: 0.07, losses: 0.1 },
+  holdLine: { name: 'Hold the Line', icon: 'g:checked-shield', text: 'The hero takes 7% less damage; squads shrug off 10% of wounds.', dmg: 0.07, losses: 0.1 },
   rapidAdvance: { name: 'Rapid Advance', icon: 'g:running-ninja', text: 'The hero moves 6% faster.', speed: 0.06 },
   fieldMedics: { name: 'Field Medics', icon: 'g:medical-pack', text: 'The hero mends 0.25 HP a second.', regen: 0.25 },
   reinforcements: { name: 'Reinforcements', icon: 'g:backup', text: 'Lost models come back 15% sooner.', regen: 0.15 },

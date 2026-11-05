@@ -1,13 +1,14 @@
 import { rand } from '../training/rng';
 import { WARPATH } from './data';
-import { terrainAt, unblock, type Grid } from './field';
+import { terrainAt, terrainNear, unblock, type Grid } from './field';
 import { blastAt } from './combat';
 import { mods } from './mods';
 import { clock } from './loot';
 import type { Squad, WarpathRun } from './types';
 
-// The force moving with the hero: foot squads hold a ring of anchors round it, heavy ones lag, artillery hangs back,
-// aircraft fly loops, melee squads sally at enemies close to their anchor. Fortifications drop in as turrets, hurt what
+// The force moving with the hero: squads drift round a loose ring about it (each near its own slot), heavy ones lag,
+// artillery hangs back, aircraft fly loops, melee squads sally at enemies close by, and infantry take cover near the
+// hero, leaving it to fall back in when the hero moves on. Fortifications drop in as turrets, hurt what
 // they land on, come back after a while if destroyed, and lift off to drop again near the hero if it walks away.
 
 const W = WARPATH;
@@ -20,15 +21,46 @@ const speedOf = (s: Squad) => s.advance * W.hero.speedPer * (s.kind === 'heavy' 
 /** Only melee guns (it sallies). */
 const brawler = (s: Squad) => s.guns.length > 0 && s.guns.every((g) => g.melee);
 
-/** Where a squad wants to stand. */
-function anchorOf(run: WarpathRun, s: Squad, i: number): { x: number; y: number } {
-  if (s.kind === 'artillery') {
-    const a = run.face + Math.PI + ((i % 3) - 1) * 0.5;
-    return { x: run.hx + Math.cos(a) * F.artilleryBack, y: run.hy + Math.sin(a) * F.artilleryBack };
+/** A fresh spot to drift to round the hero, near the squad's own slot (artillery: behind the hero). */
+function driftOf(run: WarpathRun, s: Squad, i: number): { ox: number; oy: number } {
+  const sway = (rand(run) - 0.5) * 2 * F.wanderSway;
+  const out = F.wanderIn + rand(run) * (F.wanderOut - F.wanderIn);
+  const a = s.kind === 'artillery' ? run.face + Math.PI + ((i % 3) - 1) * 0.5 + sway : i * GOLDEN + sway;
+  const r = (s.kind === 'artillery' ? F.artilleryBack : F.ring + F.ringPer * Math.sqrt(i)) * out;
+  return { ox: Math.cos(a) * r, oy: Math.sin(a) * r };
+}
+
+/** Infantry and lone heroes: a spot in cover within reach of the hero, in a feature not already full. */
+function findCover(run: WarpathRun, s: Squad): { x: number; y: number } | undefined {
+  const R = F.coverSeek;
+  let best: { x: number; y: number } | undefined;
+  let bestD = Infinity;
+  for (const t of terrainNear(run.seed, run.hx - R, run.hy - R, run.hx + R, run.hy + R)) {
+    if (t.kind !== 'cover' || (t.x - run.hx) ** 2 + (t.y - run.hy) ** 2 > R * R) continue;
+    const held = run.squads.filter((q) => q !== s && q.cover && (q.cover.x - t.x) ** 2 + (q.cover.y - t.y) ** 2 < t.r * t.r).length;
+    if (held >= F.coverShare) continue;
+    const d = (t.x - s.x) ** 2 + (t.y - s.y) ** 2;
+    if (d >= bestD) continue;
+    const a = rand(run) * Math.PI * 2;
+    const r = rand(run) * t.r * 0.5;
+    best = { x: t.x + Math.cos(a) * r, y: t.y + Math.sin(a) * r };
+    bestD = d;
   }
-  const a = i * GOLDEN + run.t * 0.02;
-  const r = F.ring + F.ringPer * Math.sqrt(i);
-  return { x: run.hx + Math.cos(a) * r, y: run.hy + Math.sin(a) * r };
+  return best;
+}
+
+/** Where a squad wants to stand: its cover if it holds some, else a spot it drifts to round the hero. */
+function anchorOf(run: WarpathRun, s: Squad, i: number, dt: number): { x: number; y: number } {
+  if (s.cover && (s.cover.x - run.hx) ** 2 + (s.cover.y - run.hy) ** 2 > F.coverLeash ** 2) delete s.cover;
+  const w = (s.wander ??= { ...driftOf(run, s, i), t: 0 });
+  w.t -= dt;
+  if (w.t <= 0) {
+    Object.assign(w, driftOf(run, s, i));
+    w.t = F.wanderMin + rand(run) * (F.wanderMax - F.wanderMin);
+    if (s.kind === 'foot' && !s.cover) s.cover = findCover(run, s);
+  }
+  if (s.cover) return s.cover;
+  return { x: run.hx + w.ox, y: run.hy + w.oy };
 }
 
 /** Land a fortification near the hero, at a spot ahead of it. */
@@ -85,7 +117,7 @@ export function squadStep(run: WarpathRun, grid: Grid, dt: number): void {
       s.y = run.hy + Math.sin(s.angle) * W.air.radius * 0.55;
       return;
     }
-    let goal = anchorOf(run, s, si);
+    let goal = anchorOf(run, s, si, dt);
     if (brawler(s)) {
       const reach = Math.max(...s.guns.map((g) => g.reach)) + 4;
       const foe = grid.pick(goal.x, goal.y, reach);
