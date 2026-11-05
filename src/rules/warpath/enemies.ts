@@ -120,7 +120,7 @@ export function hurtHero(run: WarpathRun, dmg: number): void {
     dmg -= soak;
   }
   run.hp -= dmg;
-  if (run.fx.length < 700 && dmg > 0) run.fx.push({ kind: 'dmg', x: run.hx, y: run.hy - 1.5, n: dmg, t: 0.8, hero: true, crit: true });
+  if (run.fx.length < 700 && dmg > 0) run.fx.push({ kind: 'dmg', x: run.hx, y: run.hy - 1.5, n: dmg, t: 0.8, hurt: true });
   // Squads close by lose models in proportion: wounds pile up on the next model to fall.
   const near = run.squads.filter((s, i) => i > 0 && s.kind !== 'air' && s.kind !== 'fort' && s.alive > 0 && (s.x - run.hx) ** 2 + (s.y - run.hy) ** 2 < W.losses.radius ** 2);
   if (!near.length) return;

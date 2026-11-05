@@ -10,6 +10,7 @@ import { canWriteForce } from '../model/owner';
 import { ZONE_SAVE_PREFIX, type ZoneSave } from '../rules/zone/save';
 import { BLUEPRINT_PREFIX, type Blueprint } from '../rules/training/blueprint';
 import { CLOUD_RUN_PREFIX, cloudRunJson, type CloudRun } from '../rules/training/cloudRun';
+import { WARPATH_RUN_PREFIX, cloudWarpathJson, type CloudWarpath } from '../rules/warpath/cloud';
 
 export const IMG_PREFIX = 'img:';
 
@@ -111,6 +112,10 @@ export function localDocs(state: AppState, who: Who, images: Map<string, string>
     if (!r.owner) continue;
     docs.push({ path: `${CLOUD_RUN_PREFIX}${r.forceId}`, json: cloudRunJson(r), updatedAt: r.updatedAt, canWrite: who.isGm || r.owner === who.email });
   }
+  for (const r of state.warpathRuns ?? []) {
+    if (!r.owner) continue;
+    docs.push({ path: `${WARPATH_RUN_PREFIX}${r.forceId}`, json: cloudWarpathJson(r), updatedAt: r.updatedAt, canWrite: who.isGm || r.owner === who.email });
+  }
   return docs;
 }
 
@@ -147,6 +152,11 @@ export function applyDoc(d: AppState, path: string, value: unknown): void {
     const rest = (d.trainingRuns ?? []).filter((r) => r.forceId !== fid);
     if (value !== null) rest.push(value as CloudRun);
     d.trainingRuns = rest;
+  } else if (path.startsWith(WARPATH_RUN_PREFIX)) {
+    const fid = path.slice(WARPATH_RUN_PREFIX.length);
+    const rest = (d.warpathRuns ?? []).filter((r) => r.forceId !== fid);
+    if (value !== null) rest.push(value as CloudWarpath);
+    d.warpathRuns = rest;
   } else if (path === SETTINGS_PATH) {
     if (value !== null) d.settings = { ...d.settings, ...(value as ReturnType<typeof sharedSettings>) };
   } else if (path === CORE_RULES_PATH) {

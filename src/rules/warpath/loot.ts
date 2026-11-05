@@ -41,6 +41,10 @@ export function killed(run: WarpathRun, e: Enemy, si: number): void {
   } else run.captains += 1;
   run.score += e.boss === 'lord' ? WARPATH.score.lord : WARPATH.score.boss;
   if (run.lordKills + run.captains === 2 && run.musterAtSecond === undefined) run.musterAtSecond = run.points;
+  // The build feats count bosses slain by the force as it stands.
+  if (run.squads.every((x) => x.kind === 'hero' || x.kind === 'foot')) run.pure = (run.pure ?? 0) + 1;
+  if (run.squads.length === 1) run.lone = (run.lone ?? 0) + 1;
+  if (run.squads.length <= 2) run.single = (run.single ?? 0) + 1;
   run.log.push(`${clock(run.t)} ${name} slain by ${s?.name ?? 'the field'}.`);
 }
 

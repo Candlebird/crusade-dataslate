@@ -1677,3 +1677,58 @@ abbr.us-abbr { text-decoration: underline dotted; text-underline-offset: 2px; cu
 /* Battle-Worn: a small dark "-1" badge on the token's lower right (already fought this round: -1 Quality and -1 Defense). */
 .zb-worn { position: absolute; right: -8%; bottom: -8%; z-index: 2; pointer-events: none; min-width: 1.35em; padding: 0 0.15em; border-radius: 0.7em;
   font-size: clamp(0.5rem, 0.8vw, 0.65rem); font-weight: 800; line-height: 1.35em; text-align: center; background: #1a1408; color: #e8a49b; border: 1px solid #e8a49b; }
+
+/* Warpath: a full-screen canvas with the HUD over it. */
+.warpath-screen { position: fixed; inset: 0; z-index: 60; background: #16171c; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.warpath-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: crosshair; }
+.warpath-hud { position: absolute; left: 0; right: 0; top: 0; padding: max(8px, env(safe-area-inset-top)) 10px 0; display: flex; flex-direction: column; gap: 6px; pointer-events: none; }
+.warpath-hud button { pointer-events: auto; }
+.warpath-xp { position: relative; height: 14px; border-radius: 7px; background: rgba(0, 0, 0, 0.6); border: 1px solid rgba(111, 211, 255, 0.4); overflow: hidden; }
+.warpath-xp > div { position: absolute; inset: 0 auto 0 0; background: linear-gradient(90deg, #2d8fd0, #6fd3ff); transition: width 0.1s linear; }
+.warpath-xp > span { position: relative; display: block; text-align: center; font-size: 0.72rem; line-height: 14px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
+.warpath-hud-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.warpath-hp { position: relative; flex: 0 1 220px; min-width: 120px; height: 18px; border-radius: 4px; background: rgba(0, 0, 0, 0.65); border: 1px solid rgba(255, 255, 255, 0.25); overflow: hidden; }
+.warpath-hp > div { position: absolute; inset: 0 auto 0 0; transition: width 0.1s linear; }
+.warpath-hp > span { position: relative; display: block; text-align: center; font-size: 0.78rem; line-height: 18px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; }
+.warpath-stat { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: #f0ead8; text-shadow: 0 1px 3px #000; font-variant-numeric: tabular-nums; }
+.warpath-time { font-size: 1.05rem; color: #ffe08a; }
+.warpath-pause { margin-left: auto; padding: 4px 10px; background: rgba(0, 0, 0, 0.55); border: 1px solid rgba(255, 255, 255, 0.3); }
+.warpath-boss { align-self: center; width: min(520px, 92vw); text-align: center; font-weight: 700; color: #ffc94d; text-shadow: 0 1px 3px #000; font-size: 0.85rem; }
+.warpath-boss.lord { color: #ff7ae6; }
+.warpath-boss > div { height: 8px; margin-top: 2px; border-radius: 4px; background: rgba(0, 0, 0, 0.7); border: 1px solid currentColor; overflow: hidden; }
+.warpath-boss > div > div { height: 100%; background: currentColor; }
+.warpath-auto { align-self: center; padding: 2px 10px; border-radius: 4px; background: rgba(179, 53, 43, 0.8); font-size: 0.8rem; font-weight: 700; }
+.warpath-stick { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.06); pointer-events: none; z-index: 61; }
+.warpath-stick-knob { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(255, 224, 138, 0.55); border: 2px solid rgba(255, 224, 138, 0.9); }
+.warpath-cards { z-index: 62; }
+.warpath-card-actions { position: relative; justify-content: center; flex-wrap: wrap; gap: 8px; }
+.warpath-back-cards { position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); left: 50%; translate: -50% 0; z-index: 62; }
+.warpath-menu { position: absolute; inset: 0; z-index: 63; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; background: rgba(6, 7, 9, 0.82); text-align: center; }
+.warpath-menu h2 { margin: 0; color: var(--gold); font-size: 2rem; }
+.warpath-menu button { min-width: 240px; }
+.warpath-menu p { max-width: 360px; }
+.warpath-start { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+.warpath-start h3 { margin: 0.8rem 0 0.4rem; }
+.warpath-start section > h3:first-child { margin-top: 0; }
+.warpath-heroes { display: flex; flex-direction: column; gap: 6px; max-height: 260px; overflow-y: auto; }
+.warpath-hero { display: flex; flex-direction: column; gap: 2px; padding: 6px 10px; border: 1px solid var(--line-2); border-radius: 6px; cursor: pointer; }
+.warpath-hero input { display: none; }
+.warpath-hero.on { border-color: var(--gold); background: rgba(201, 162, 74, 0.12); }
+.warpath-board { padding-left: 1.3rem; margin: 0.3rem 0; }
+.warpath-board li.me { color: var(--gold); }
+.warpath-summary-top { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 1.05rem; }
+.warpath-meter { display: flex; flex-direction: column; gap: 4px; }
+.warpath-meter-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1fr) auto; gap: 8px; align-items: center; font-size: 0.9rem; }
+.warpath-meter-bar { height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
+.warpath-meter-bar > div { height: 100%; background: linear-gradient(90deg, #c9a24a, #ffe08a); }
+.warpath-meter-n { font-variant-numeric: tabular-nums; color: var(--muted-2); font-size: 0.82rem; }
+.warpath-log { max-height: 240px; overflow-y: auto; padding-left: 1.2rem; }
+@media (max-width: 700px) {
+  .warpath-start { grid-template-columns: 1fr; }
+  .warpath-hud-row { gap: 6px 8px; font-size: 0.85rem; }
+  .warpath-hp { flex-basis: 100%; }
+  .warpath-pause { position: absolute; right: 10px; top: max(28px, calc(env(safe-area-inset-top) + 20px)); }
+  .warpath-cards .training-cards-row { flex-direction: column; align-items: center; }
+  .warpath-cards .training-card { width: min(320px, 90vw); min-height: 0; padding: 10px 12px; gap: 4px; }
+  .warpath-cards .training-cards-title h2 { font-size: 1.4rem; }
+}

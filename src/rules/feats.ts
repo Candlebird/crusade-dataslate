@@ -10,14 +10,17 @@ export type FeatId =
   | 'trainFinal50' | 'trainAllLords' | 'siege6' | 'siege10' | 'siege15' | 'siege20' | 'siege25'
   | 'hardCheck10' | 'hardCheck20' | 'hardCheck30' | 'hardDmg' | 'hardWin'
   | 'insaneCheck10' | 'insaneCheck20' | 'insaneCheck30' | 'insaneDmg' | 'insaneWin'
-  | 'sortieRepTop' | 'sortieRepWhole' | 'trainRep20' | 'trainRepLord' | 'trainRepWin' | 'siegeRep';
+  | 'sortieRepTop' | 'sortieRepWhole' | 'trainRep20' | 'trainRepLord' | 'trainRepWin' | 'siegeRep'
+  | 'warLord' | 'warKills10' | 'warKills50' | 'warKills100' | 'warPure' | 'warLone' | 'warSingle' | 'warMuster'
+  | 'warHardLord' | 'warHardKills10' | 'warHardKills50' | 'warHardKills100' | 'warHardPure' | 'warHardLone' | 'warHardSingle' | 'warHardMuster'
+  | 'warRepLord';
 
 /** What a feat pays: Requisition, Supply and Umbra Shards to the force, XP to each unit that took part, and a relic
  *  (by name: a Training-only one, RelicDef.training) any unit of the force may then take for free. */
 export interface FeatReward { rp?: number; supply?: number; us?: number; xp?: number; relic?: string }
 
 /** `hard`: listed under the hard feats. `repeat`: repeatable, once a round (rewards stay small: Umbra Shards only). */
-export interface Feat { id: FeatId; where: 'sortie' | 'training'; name: string; text: string; reward: FeatReward; hard?: boolean; repeat?: boolean }
+export interface Feat { id: FeatId; where: 'sortie' | 'training' | 'warpath'; name: string; text: string; reward: FeatReward; hard?: boolean; repeat?: boolean }
 
 export const FEATS: Feat[] = [
   { id: 'sortieTop', where: 'sortie', name: 'Peak of the Road', text: 'Win a Sortie at the top tier.', reward: { rp: 4, supply: 80 } },
@@ -51,12 +54,29 @@ export const FEATS: Feat[] = [
   { id: 'insaneCheck30', where: 'training', name: 'Beyond Reason', text: 'Reach the last damage check (wave 30) of a Weekly Siege on Insane.', reward: { rp: 8, supply: 800, us: 10, xp: 2 }, hard: true },
   { id: 'insaneDmg', where: 'training', name: 'Unthinkable', text: 'Deal 60,000 damage at the last damage check of a Weekly Siege on Insane.', reward: { rp: 5, us: 8 }, hard: true },
   { id: 'insaneWin', where: 'training', name: 'Insane Victory', text: 'Win a Final wave in a Training run on Insane.', reward: { rp: 7, supply: 400, us: 6 }, hard: true },
+  { id: 'warLord', where: 'warpath', name: 'Lord Slayer', text: 'Slay an Echo Lord in a Warpath run.', reward: { rp: 1 } },
+  { id: 'warKills10', where: 'warpath', name: 'Ten Thousand', text: 'Slay 10,000 enemies over your Warpath runs.', reward: { us: 1 } },
+  { id: 'warKills50', where: 'warpath', name: 'The Tide Turned', text: 'Slay 50,000 enemies over your Warpath runs.', reward: { us: 2 } },
+  { id: 'warKills100', where: 'warpath', name: 'Endless Slaughter', text: 'Slay 100,000 enemies over your Warpath runs.', reward: { us: 3 } },
+  { id: 'warPure', where: 'warpath', name: 'Pure Infantry', text: 'Slay 3 bosses in a run with only infantry beside the hero.', reward: { us: 2 } },
+  { id: 'warLone', where: 'warpath', name: 'Lone Hero', text: 'Slay 2 bosses in a run before calling in any unit.', reward: { us: 2 } },
+  { id: 'warSingle', where: 'warpath', name: 'One True Weapon', text: 'Slay 3 bosses in a run with the hero and at most one unit.', reward: { us: 2 } },
+  { id: 'warMuster', where: 'warpath', name: 'Full Muster', text: 'Field 1,450 pts or more before the second boss of a run falls.', reward: { us: 1 } },
+  { id: 'warHardLord', where: 'warpath', name: 'Hard Lord Slayer', text: 'Slay an Echo Lord in a Warpath run on Hard.', reward: { rp: 2, us: 2 }, hard: true },
+  { id: 'warHardKills10', where: 'warpath', name: 'Hard Ten Thousand', text: 'Slay 10,000 enemies over your Warpath runs on Hard.', reward: { us: 2 }, hard: true },
+  { id: 'warHardKills50', where: 'warpath', name: 'Hard Tide', text: 'Slay 50,000 enemies over your Warpath runs on Hard.', reward: { us: 3 }, hard: true },
+  { id: 'warHardKills100', where: 'warpath', name: 'Hard Slaughter', text: 'Slay 100,000 enemies over your Warpath runs on Hard.', reward: { us: 4 }, hard: true },
+  { id: 'warHardPure', where: 'warpath', name: 'Hard Infantry', text: 'Slay 3 bosses on Hard with only infantry beside the hero.', reward: { us: 3 }, hard: true },
+  { id: 'warHardLone', where: 'warpath', name: 'Hard Lone Hero', text: 'Slay 2 bosses on Hard before calling in any unit.', reward: { us: 3 }, hard: true },
+  { id: 'warHardSingle', where: 'warpath', name: 'Hard True Weapon', text: 'Slay 3 bosses on Hard with the hero and at most one unit.', reward: { us: 3 }, hard: true },
+  { id: 'warHardMuster', where: 'warpath', name: 'Hard Muster', text: 'Field 1,450 pts or more before the second boss of a Hard run falls.', reward: { us: 2 }, hard: true },
   { id: 'sortieRepTop', where: 'sortie', name: 'Glory Road', text: 'Win a Sortie at the top tier.', reward: { us: 2 }, repeat: true },
   { id: 'sortieRepWhole', where: 'sortie', name: 'All Come Home', text: 'Win a Sortie with no unit wiped out.', reward: { us: 1 }, repeat: true },
   { id: 'trainRep20', where: 'training', name: 'Hold Fast', text: 'Clear 20 waves in one training run.', reward: { us: 1 }, repeat: true },
   { id: 'trainRepLord', where: 'training', name: 'Crownbreaker', text: 'Slay an Echo Lord in a training run.', reward: { us: 1 }, repeat: true },
   { id: 'trainRepWin', where: 'training', name: 'Final Honours', text: 'Win a Final wave.', reward: { us: 1 }, repeat: true },
   { id: 'siegeRep', where: 'training', name: 'Siege Breaker', text: 'Deal 10,000 damage to the Weekly Siege’s colossus.', reward: { us: 2 }, repeat: true },
+  { id: 'warRepLord', where: 'warpath', name: 'Warpath Crown', text: 'Slay an Echo Lord in a Warpath run.', reward: { us: 1 }, repeat: true },
 ];
 
 export const featInfo = (id: string) => FEATS.find((f) => f.id === id);

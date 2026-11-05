@@ -12,6 +12,8 @@ import ExpeditionModal from './ExpeditionModal';
 import PatrolModal from './PatrolModal';
 import UnitTaskModal from './UnitTaskModal';
 import TrainingModal from './TrainingModal';
+import WarpathModal from './warpath/WarpathModal';
+import { useCloud } from '../cloud/CloudSync';
 import SortieModal from './SortieModal';
 import { Icon, type IconName } from './Icon';
 import { Panel, toast } from './ui';
@@ -48,7 +50,9 @@ export default function DowntimePanel({ f }: { f: Force }) {
   const c = state.campaign;
   const faction = c && f.nexus && c.factions.find((x) => x.id === f.nexus!.factionId);
   const nexus = faction ? c : undefined;
-  const [open, setOpen] = useState<'expedition' | 'task' | 'patrol' | 'training' | 'sortie' | null>(null);
+  const [open, setOpen] = useState<'expedition' | 'task' | 'patrol' | 'training' | 'sortie' | 'warpath' | null>(null);
+  // Warpath is GM-only until it has been played through.
+  const { isGm } = useCloud();
   const blocks = downtimeBlocks(f, nexus, state.forces);
   const tasks = nexus ? tasksOf(f, nexus) : {};
   const busy = Object.entries(tasks).flatMap(([id, t]) => {
@@ -109,6 +113,13 @@ export default function DowntimePanel({ f }: { f: Force }) {
         A party of 3 pushes through Echo fights, camps and shrines to an Echo lord. A free run earns up to {SORTIE.caps.free.short}–{SORTIE.caps.free.long} XP.
         A Shard run costs {SORTIE.cost} Umbra Shards, earns up to {SORTIE.caps.shard.long} XP and brings home Supply, RP and up to {SORTIE.haul.maxUs} shards.
       </Mode>
+      {isGm && (
+        <Mode icon="g:sprint" name="Warpath (GM preview)" button="Warpath…" onOpen={() => setOpen('warpath')}
+          status={f.warpath?.best?.normal ? `best ${f.warpath.best.normal.bosses} bosses` : undefined}>
+          Lead the force as its hero across an endless field: walk, and every unit you call in fights on its own. A captain every 5 minutes,
+          an Echo Lord every 15. Each boss slain is XP for the hero.
+        </Mode>
+      )}
       <p className="muted small" style={{ margin: '0.5rem 0 0' }}>
         <Icon name="g:upgrade" /> Training and free Sorties together bank at most {OFF_TABLE_XP.perWeek} XP per unit a week.
       </p>
@@ -118,6 +129,7 @@ export default function DowntimePanel({ f }: { f: Force }) {
       {open === 'patrol' && <PatrolModal force={f} onClose={close} />}
       {open === 'training' && <TrainingModal force={f} c={c} onClose={close} />}
       {open === 'sortie' && <SortieModal force={f} c={c} onClose={close} />}
+      {open === 'warpath' && <WarpathModal force={f} c={c} onClose={close} />}
     </Panel>
   );
 }

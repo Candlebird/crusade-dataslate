@@ -162,7 +162,7 @@ export type TerrainKind = 'block' | 'difficult' | 'dangerous' | 'cover';
 export interface Terrain { kind: TerrainKind; x: number; y: number; r: number; icon: number }
 
 /** Floating numbers and flashes (display only; not saved). */
-export interface Fx { kind: 'dmg' | 'shot' | 'melee' | 'heal' | 'boom' | 'land' | 'relic' | 'spell'; x: number; y: number; x2?: number; y2?: number; n?: number; t: number; crit?: boolean; hero?: boolean }
+export interface Fx { kind: 'dmg' | 'shot' | 'melee' | 'heal' | 'boom' | 'land' | 'relic' | 'spell'; x: number; y: number; x2?: number; y2?: number; n?: number; t: number; crit?: boolean; hero?: boolean; hurt?: boolean }
 
 /** The run's campaign lords (real Echo Lords take the 15-minute bosses in order; the generic lord after). */
 export interface WLord { key: string; name: string; trick: LordTrick; slain?: boolean }
@@ -220,6 +220,11 @@ export interface WarpathRun {
   score: number;
   /** Most points on the field before the second boss fell (Full Muster). */
   musterAtSecond?: number;
+  /** Bosses slain with only foot squads beside the hero (Pure Infantry), with the hero alone (Lone Hero), and with the
+   *  hero and at most one unit (One True Weapon). */
+  pure?: number;
+  lone?: number;
+  single?: number;
   /** Lines for the run's log (bosses, call-ins). */
   log: string[];
   /** Autoplayed by the bot (sims, debug): banks nothing. */

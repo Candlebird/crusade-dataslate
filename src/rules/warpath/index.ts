@@ -8,3 +8,7 @@ export { chunkTerrain, terrainNear } from './field';
 export { mods, heroMaxHp, minutes } from './mods';
 export { clock } from './loot';
 export { squadOf, enemyKindsOf, fieldPoints } from './roster';
+export { warpathXp, warpathFeats, warpathRepeats, bankRecords, weekBoard, hardOpen, bossesOf } from './bank';
+export { saveWarpath, loadWarpath, clearWarpath, readSaved, packRun, newerWarpath, warpathKey } from './save';
+export { DOCTRINES } from './data';
+export type { CloudWarpath } from './cloud';

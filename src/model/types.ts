@@ -5,6 +5,7 @@ import type { SymbolShape } from './emblemSymbols';
 import type { ZoneSave } from '../rules/zone/save';
 import type { Blueprint } from '../rules/training/blueprint';
 import type { CloudRun } from '../rules/training/cloudRun';
+import type { CloudWarpath } from '../rules/warpath/cloud';
 import type { RunMode } from '../rules/training/types';
 
 export interface WeaponTrait {
@@ -446,12 +447,30 @@ export interface Force {
   trainingRelics?: string[];
   /** Furthest any unit got on one Sortie: nodes cleared (rules/sortie.ts). */
   sortieBest?: number;
+  /** Warpath's records (rules/warpath/bank.ts): best runs, lifetime kills, Hard unlocked, this week's best. */
+  warpath?: ForceWarpath;
   /** What the force's Sorties are remembered for (rules/sortie.ts). */
   sortie?: ForceSortie;
   /** Version of the trait and relic names it was saved with (see rules/migrate.ts). */
   rulesVersion?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A Warpath run worth remembering. */
+export interface WarpathBest { t: number; bosses: number; kills: number; score: number; level: number; hero: string; date: string }
+
+/** Warpath's per-force records, by mode ('normal' | 'hard'). */
+export interface ForceWarpath {
+  best?: Partial<Record<'normal' | 'hard', WarpathBest>>;
+  kills?: Partial<Record<'normal' | 'hard', number>>;
+  runs?: number;
+  /** The date the first Echo Lord fell on Normal: Hard is open from then. */
+  hard?: string;
+  /** The week's best (bosses, then time) on its theme, for the weekly faction board. */
+  week?: { key: string; theme: string; bosses: number; t: number; mode: 'normal' | 'hard' };
+  /** Each unit's best run: most damage in one run, and its kills over every run. */
+  units?: Record<string, { best: number; kills: number }>;
 }
 
 export interface Settings {
@@ -1033,6 +1052,8 @@ export interface AppState {
   blueprints?: Blueprint[];
   /** Training runs in progress, one per force (synced, so they can be picked up on another device). */
   trainingRuns?: CloudRun[];
+  /** Warpath runs in progress, one per force (synced the same way). */
+  warpathRuns?: CloudWarpath[];
 }
 
 /** A side's pick when its detachment runs into another faction's on the map. */
