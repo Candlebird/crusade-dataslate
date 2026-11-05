@@ -126,18 +126,21 @@ export function siteStep(run: WarpathRun, dt: number): void {
         s.held = -1;
       }
     } else if (s.kind === 'cache') {
-      // Stepping on springs the ambush (the book's toughest kind, elite and tougher still); holding it open pays out.
+      // Stepping on springs the ambush; holding it open pays out. The ambush grows with the run: elites from the
+      // current mix, + a share of HP a minute (to ambushHp), and the book's toughest kind only once the top tier is in.
       if (on && !s.sprung) {
         s.sprung = true;
         banner(run, 'Ambush! Hold the cache open', 'warn');
         run.log.push(`${clock(run.t)} A supply cache: an ambush springs.`);
-        const kind = champKind(run);
+        const mins = run.t / 60;
+        const kind = run.t >= WARPATH.spawn.shiftEvery * 2 ? champKind(run) : pickKind(run);
+        const hpMul = Math.min(S.ambushHp, 1 + S.ambushHpPerMin * mins);
         for (let i = 0; i < S.ambush; i++) {
           const a = (i / S.ambush) * Math.PI * 2;
           const p = { x: s.x + Math.cos(a) * 10, y: s.y + Math.sin(a) * 10 };
           unblock(run.seed, p, 1);
           const e = spawnEnemy(run, kind, p.x, p.y, undefined, true);
-          e.hp = e.maxHp = e.maxHp * S.ambushHp;
+          e.hp = e.maxHp = e.maxHp * hpMul;
         }
       }
       s.held = on ? s.held + dt : Math.max(0, s.held - dt * 0.5);

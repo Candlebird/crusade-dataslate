@@ -124,3 +124,4 @@ Hard ends at 9–12 min for most runs (up to 22) and kills a lord 1 in 6.
 - Enemy HP grows 11% a minute (was 7%). Bosses grow with it.
 - The thumbstick stays where you first press. It no longer slides after your thumb.
 - Probe, Normal: runs end at about 11.8 min on average, and the lord falls 3 of 24 times. A few Hard runs end at 2–5 min.
+- Later fix: the cache ambush now grows with the run. It's 8 elites from the current mix, with +10% HP a minute (up to ×2.5 at 15 min). The book's toughest kind only joins from minute 10, when the top tier is in.
