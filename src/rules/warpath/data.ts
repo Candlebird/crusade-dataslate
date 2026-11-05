@@ -25,7 +25,7 @@ export const WARPATH = {
   },
   /** Squads as bodies: an enemy goes for a squad whose edge is within `aggro` and nearer than the hero. Wounds on a
    *  squad (x `squadDmg`) take its models by Tough; lost models come back one per `regen` s. */
-  losses: { aggro: 8, squadDmg: 1, regen: 10 },
+  losses: { aggro: 8, squadDmg: 1.25, regen: 10 },
   /** Aircraft fly loops this far out at this many inches a second. */
   air: { radius: 22, speed: 26 },
   /** Fortifications: land this far from the hero, hurt what they land on, come back after `respawn` + `perPts` × points
@@ -58,7 +58,7 @@ export const WARPATH = {
     /** Every 5 min the mix steps tougher; the tiers by points a model (cheapest third, middle, dearest). */
     shiftEvery: 300,
     /** Past this many minutes, wounds and damage grow by these shares a minute. */
-    lateFrom: 18, lateHp: 0.12, lateDmg: 0.08,
+    lateFrom: 16, lateHp: 0.14, lateDmg: 0.12,
   },
   /** Enemy bodies: HP an unsaved wound takes off the hero, inches a second per inch of Advance, how close counts as touching, attack clocks. */
   enemy: { dmgPerWound: 3, heroDeadlyCap: 2, heroBlowCap: 0.35, speedPer: 0.85, touch: 1.1, meleeEvery: 1.1, hpPerTough: 1, windUp: 0.9, shotSpeed: 22, shotRadius: 0.9, blastRadius: 3, blastFuse: 1.2, shooterShare: 0.18 },

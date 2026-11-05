@@ -9,7 +9,7 @@ import { autoplay, heroesOf, newRun, step } from './sim';
 import { hordeStep, siteStep } from './events';
 import { callLevel } from './levels';
 import { enemyKindsOf } from './roster';
-import { hurtSquad, spawnEnemy } from './enemies';
+import { hurtSquad, spawnEnemy, strikeSquad } from './enemies';
 import { woundsPer } from './mods';
 import { chunkTerrain, inCover } from './field';
 import { bankRenown, cantTake, laurelsFor, metaOf, nodeCost, nodeState, HONOURS, prestige, PRESTIGE, renownOf, resetTree, takeNode, TREE_FX } from './meta';
@@ -289,6 +289,22 @@ describe('Warpath', () => {
     expect(s.alive).toBe(s.size);
     hurtSquad(run, s, s.tough * 0.2 * k);
     expect(s.alive).toBe(s.size - 1);
+  });
+
+  it('late-game and elite damage on squads is more hits, never a bigger hit', () => {
+    let run = start(0);
+    for (let i = 0; i < 6 && !run.squads.some((q) => q.kind === 'foot'); i++) autoplay((run = start(i)), 180);
+    const s = run.squads.find((q) => q.kind === 'foot')!;
+    s.tough = 1;
+    s.level = 1;
+    s.defense = 6;
+    for (let i = 0; i < 300; i++) {
+      s.alive = s.size;
+      s.wounds = 0;
+      // At x4 damage, a quarter of an attack is one attack: one 1-wound hit, which a 2-wound model always survives.
+      strikeSquad(run, s, 0.25 / WARPATH.losses.squadDmg, 2, 4, 1, 4);
+      expect(s.alive).toBe(s.size);
+    }
   });
 
   it('infantry take cover near the hero and leave it when the hero moves on', () => {

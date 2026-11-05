@@ -203,10 +203,12 @@ const coverMod = (run: WarpathRun, x: number, y: number) => (inCover(run.seed, x
 const rollOnHero = (run: WarpathRun, attacks: number, quality: number, ap: number, deadly: number, mul: number) =>
   rollWounds(run, heroDef(run), coverMod(run, run.hx, run.hy), attacks, quality, ap, deadly, E.heroDeadlyCap) * mul * E.dmgPerWound;
 
-/** Attacks on a squad: wounds on its models (a fortification takes them as HP). */
-function strikeSquad(run: WarpathRun, s: Squad, attacks: number, quality: number, ap: number, deadly: number, mul: number): void {
-  const w = rollWounds(run, s.defense, coverMod(run, s.x, s.y), attacks, quality, ap, deadly, s.fort ? deadly : woundsPer(s));
-  if (w > 0) hurtSquad(run, s, w * mul * W.losses.squadDmg);
+/** Attacks on a squad: wounds on its models (a fortification takes them as HP). The clock's damage growth and an
+ *  elite's blows (`mul`) come as more attacks, not bigger ones: a hit still does its weapon's wounds (1, or Deadly), so
+ *  models with more wounds than that always survive a single hit. */
+export function strikeSquad(run: WarpathRun, s: Squad, attacks: number, quality: number, ap: number, deadly: number, mul: number): void {
+  const w = rollWounds(run, s.defense, coverMod(run, s.x, s.y), attacks * mul * W.losses.squadDmg, quality, ap, deadly, s.fort ? deadly : woundsPer(s));
+  if (w > 0) hurtSquad(run, s, w);
 }
 
 /** A missile lands on the hero (unless it's untouchable). */

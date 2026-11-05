@@ -221,3 +221,20 @@ The Armoury is now a real skill tree. There are 4 branches with 5 tiers each, an
   - Normal only, unless `WARPATH_MODES=all`.
   - `WARPATH_TUNE` and `WARPATH_META` env overrides.
   - A prestige 2 + prestige 10 pair takes about 4.5 min.
+
+## 2026-11-05: one hit can't kill a model it shouldn't
+
+- **Bug (the user found it in play):** 1-wound models still died to 1-damage attacks at levels 2–4.
+  - The cause: enemy damage growth and elite blows multiplied the wounds of each hit on a squad. A ×2.5 hit killed a 2-wound model outright.
+  - The fix: against squads, the multiplier now means more attacks (`strikeSquad`). Each hit does its weapon's wounds (1, or Deadly).
+  - A test fires 300 boosted 1-damage hits at a 2-wound unit and checks it never loses a model.
+- **Retune** (squads now last longer):
+  - Enemies get ×1.25 attacks against squads (`losses.squadDmg`).
+  - The late ramp starts at 16 min (was 18), at +14% HP and +12% damage a minute.
+- **Probe** (bot, Normal, 12 runs):
+
+| Build | Fell at | Reached 30 min |
+|---|---|---|
+| No meta | 6–18 min, mean about 11.5 (with ×1.25 squad hits and the old late ramp) | — |
+| Full tree, prestige 2 | 15–28 min | 1 of 12 |
+| Full tree, prestige 10 | 23–28 min | 4 of 12 |
