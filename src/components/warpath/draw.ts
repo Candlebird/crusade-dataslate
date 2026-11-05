@@ -1,7 +1,9 @@
 import { onField, terrainNear, WARPATH, type Squad, type WarpathRun } from '../../rules/warpath';
 import type { IconName } from '../iconData';
 import { ICONS } from '../iconData';
-import { alpha, bar, label } from '../training/art';
+import { alpha, bar } from '../training/art';
+import type { EmblemLayer } from '../../model/types';
+import { drawEmblem } from '../Emblem';
 
 // Warpath on a Canvas2D: the field (ground, grid, terrain), pickups, the enemy swarm, the force (each squad's models in
 // a loose cluster round its anchor), the hero, shots and blast markers, then floating numbers. Every body is a
@@ -11,7 +13,36 @@ import { alpha, bar, label } from '../training/art';
 /** The camera: centre in inches, pixels per inch, canvas size in CSS pixels. */
 export interface View { cx: number; cy: number; ppi: number; w: number; h: number }
 
-export interface Palette { own: string; foe: string }
+/** Colours, and the emblems the player made for each unit (by unit id), drawn in place of the stock icons. */
+export interface Palette { own: string; foe: string; faces?: Record<string, EmblemLayer[]> }
+
+const faces = new Map<string, HTMLCanvasElement>();
+
+/** A unit's emblem `px` across, drawn once per size and cached, on a dark disc so it reads on any ground. */
+function face(id: string, layers: EmblemLayer[], px: number): HTMLCanvasElement {
+  const size = Math.max(6, Math.round(px / 2) * 2);
+  const key = `${id}|${size}`;
+  let c = faces.get(key);
+  if (c) return c;
+  if (faces.size > 300) faces.clear();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  c = document.createElement('canvas');
+  c.width = c.height = Math.ceil(size * dpr);
+  const ctx = c.getContext('2d')!;
+  ctx.scale(dpr, dpr);
+  drawEmblem(ctx, layers, 0, 0, size);
+  faces.set(key, c);
+  return c;
+}
+
+/** Stamp a unit's emblem centred on (x, y), or its stock icon when it has none. */
+function stampUnit(ctx: CanvasRenderingContext2D, pal: Palette, s: Squad, icon: IconName, color: string, x: number, y: number, px: number, glow = 0) {
+  const layers = pal.faces?.[s.unitId];
+  if (!layers?.length) return stamp(ctx, icon, color, x, y, px, glow);
+  const c = face(s.unitId, layers, px);
+  const size = Math.max(6, Math.round(px / 2) * 2);
+  ctx.drawImage(c, x - size / 2, y - size / 2, size, size);
+}
 
 const sprites = new Map<string, HTMLCanvasElement>();
 const paths = new Map<IconName, Path2D>();
@@ -61,6 +92,20 @@ function stamp(ctx: CanvasRenderingContext2D, name: IconName, color: string, x: 
   const size = Math.max(4, Math.round(px / 2) * 2);
   const pad = Math.ceil(size * 0.15) + glow;
   ctx.drawImage(s, x - size / 2 - pad, y - size / 2 - pad, size + pad * 2, size + pad * 2);
+}
+
+/** A floating number: bold, with a dark outline so it reads over the swarm. */
+function number(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, px: number, color: string) {
+  const size = Math.round(px);
+  ctx.font = `bold ${size}px Rajdhani, 'Segoe UI', system-ui, sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(3, size / 5);
+  ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+  ctx.strokeText(text, x, y);
+  ctx.fillStyle = color;
+  ctx.fillText(text, x, y);
 }
 
 /** The icon a squad's models are drawn with. */
@@ -241,10 +286,10 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
         ctx.ellipse(sx(s.x), sy(s.y), 1.6 * ppi * k, 0.8 * ppi * k, 0, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(0,0,0,0.45)';
         ctx.fill();
-        stamp(ctx, icon, pal.own, sx(s.x), sy(s.y) - (1 - k) * h * 0.6, 3.2 * ppi);
+        stampUnit(ctx, pal, s, icon, pal.own, sx(s.x), sy(s.y) - (1 - k) * h * 0.6, 3.2 * ppi);
         continue;
       }
-      stamp(ctx, icon, pal.own, sx(s.x), sy(s.y), 3.2 * ppi, 4);
+      stampUnit(ctx, pal, s, icon, pal.own, sx(s.x), sy(s.y), 3.2 * ppi, 4);
       bar(ctx, sx(s.x) - 1.6 * ppi, sy(s.y) + 1.9 * ppi, 3.2 * ppi, f.hp / f.maxHp, undefined, 4);
       continue;
     }
@@ -256,7 +301,7 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
     for (let i = 0; i < s.alive && i < CLUSTER.length; i++) {
       const [ox, oy] = CLUSTER[i];
       top = Math.min(top, oy * spread);
-      stamp(ctx, icon, pal.own, sx(s.x + ox * spread), sy(s.y + oy * spread), px);
+      stampUnit(ctx, pal, s, icon, pal.own, sx(s.x + ox * spread), sy(s.y + oy * spread), px);
     }
     if (s.alive < s.size) {
       // Strength just above the topmost model standing.
@@ -323,7 +368,7 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   ctx.lineTo(hx + Math.cos(fa - 0.35) * 1.75 * ppi, hy + Math.sin(fa - 0.35) * 1.75 * ppi);
   ctx.closePath();
   ctx.fill();
-  stamp(ctx, squadIcon(run.squads[0]), hit ? '#ffffff' : '#ffe08a', hx, hy, 2.4 * ppi, 8);
+  stampUnit(ctx, pal, run.squads[0], squadIcon(run.squads[0]), hit ? '#ffffff' : '#ffe08a', hx, hy, 2.4 * ppi, 8);
   bar(ctx, hx - 1.6 * ppi, hy + 1.9 * ppi, 3.2 * ppi, run.hp / run.maxHp, undefined, 4);
 
   // Bosses off the screen: a pointer on the edge, toward them.
@@ -360,7 +405,7 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
     const a = Math.min(1, f.t * 3);
     ctx.globalAlpha = a;
     const col = f.kind === 'heal' ? '#7ee07e' : f.hurt ? '#ff5a4a' : f.crit ? '#ffd166' : f.hero ? '#ffe9a8' : '#e6e6e6';
-    label(ctx, f.kind === 'heal' ? `+${Math.round(f.n ?? 0)}` : `${f.hurt ? '-' : ''}${Math.round(f.n ?? 0)}`, sx(f.x), sy(f.y - rise), (f.hurt ? 1.1 : f.crit ? 0.9 : 0.65) * ppi, col);
+    number(ctx, f.kind === 'heal' ? `+${Math.round(f.n ?? 0)}` : `${f.hurt ? '-' : ''}${Math.round(f.n ?? 0)}`, sx(f.x), sy(f.y - rise), Math.max(f.hurt ? 18 : 13, (f.hurt ? 1.6 : f.crit ? 1.35 : 1) * ppi), col);
     ctx.globalAlpha = 1;
   }
 }

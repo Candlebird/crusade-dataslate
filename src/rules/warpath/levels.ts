@@ -3,7 +3,7 @@ import { DOCTRINE_IDS, DOCTRINES, WARPATH, type DoctrineId } from './data';
 import { heroMaxHp } from './mods';
 import type { Card, Squad, WarpathRun } from './types';
 
-// Level-ups: the XP curve (quick early, steeper late), three cards (call a unit in, drill one, or a doctrine), three
+// Level-ups: the XP curve (slow start, steeper late), three cards (call a unit in, drill one, or a doctrine), three
 // rerolls a run, skip for a heal. Once nothing is left to take, a level-up is score and a little healing.
 
 const X = WARPATH.xp;
@@ -24,10 +24,16 @@ export function gainXp(run: WarpathRun, n: number): void {
 /** Points left under the cap. */
 export const pointsLeft = (run: WarpathRun) => WARPATH.cap - run.points;
 
+/** Level-ups taken so far, counting the one open now (the run starts at level 1). */
+const levelUpNo = (run: WarpathRun) => run.level - run.queued - 1;
+
+/** Call-in cards come only on every `callEvery`-th level-up. */
+export const callLevel = (run: WarpathRun) => levelUpNo(run) > 0 && levelUpNo(run) % K.callEvery === 0;
+
 /** Every card that could be offered now. */
 export function candidates(run: WarpathRun): Card[] {
   const out: Card[] = [];
-  for (const s of run.bench) if (s.points <= pointsLeft(run)) out.push({ kind: 'call', unitId: s.unitId });
+  if (callLevel(run)) for (const s of run.bench) if (s.points <= pointsLeft(run)) out.push({ kind: 'call', unitId: s.unitId });
   for (const s of run.squads) if (s.level < s.maxLevel) out.push({ kind: 'drill', unitId: s.unitId });
   const held = DOCTRINE_IDS.filter((id) => (run.doctrines[id] ?? 0) > 0);
   for (const id of DOCTRINE_IDS) {
@@ -39,13 +45,20 @@ export function candidates(run: WarpathRun): Card[] {
 
 const same = (a: Card, b: Card) => a.kind === b.kind && (a.kind === 'doctrine' ? a.id === (b as typeof a).id : a.kind === 'score' || (a as { unitId: string }).unitId === (b as { unitId: string }).unitId);
 
-/** Three cards, drawn by kind (call-ins likelier while there's room, so the army fills out early), no two alike. */
+/** Three cards, drawn by kind (call-ins only every third level-up, and then at least one), no two alike. */
 export function drawOffer(run: WarpathRun): Card[] {
   const pool = candidates(run);
   if (!pool.length) return [{ kind: 'score' }];
   const weight = (c: Card) => (c.kind === 'call' ? 1.6 : c.kind === 'drill' ? 1 : 0.9 / Math.max(1, 0.5 * pool.filter((x) => x.kind === 'doctrine').length / 4));
   const out: Card[] = [];
   const left = [...pool];
+  // A call-in level always shows at least one unit to call in.
+  const calls = left.filter((c) => c.kind === 'call');
+  if (calls.length) {
+    const c = calls[Math.floor(rand(run) * calls.length)];
+    out.push(c);
+    left.splice(left.indexOf(c), 1);
+  }
   while (out.length < K.offer && left.length) {
     const total = left.reduce((n, c) => n + weight(c), 0);
     let x = rand(run) * total;

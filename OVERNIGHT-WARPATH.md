@@ -88,3 +88,12 @@ Hard ends at 9–12 min for most runs (up to 22) and kills a lord 1 in 6.
 1. **Hard mode** is quite a bit harder than Normal: runs mostly end at 9–12 min, and a lord dies 1 time in 6. Is that what you want, or should Hard aim for the lord about a third of the time?
 2. **The local test force** (Headhunter Spears, 1,385 pts with no veterans) falls at 3–10 min. Fresh, small forces will find Warpath hard until they call in more units. Is that fine?
 3. **Opening Warpath to players** is a one-line change in `DowntimePanel.tsx` once you've played it.
+
+## Follow-up (2026-11-05)
+
+- Damage numbers are bigger, with a dark outline.
+- A captain comes every 3 minutes (was 5). The Echo Lord still comes at 15.
+- Early levels are slower: XP need is 10 + 1.5n + 0.55n² (was 4 + 2.2n + 0.55n²). From level 10 on, it's about the same as before.
+- Call-in cards come only on every third level-up (the 3rd, 6th, 9th…). On those level-ups, at least one unit is always offered if one fits.
+- Your units, forts and hero are drawn with the emblems you made. Units without one keep the stock icon.
+- Re-probed all 6 forces. Lord HP went down from 420 to 350. On Normal, the lord falls 11 of 24 times and runs fall at about 16 min (median). Hive fleet hasn't killed a lord yet.

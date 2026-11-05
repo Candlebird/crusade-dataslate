@@ -24,8 +24,9 @@ export const WARPATH = {
    *  s, lift off past `leash` and drop again near the hero `redrop` s later (keeping their wounds). `hpPerTough`: their HP. */
   fort: { land: 8, impact: 4, impactRadius: 3.5, respawn: 10, perPts: 0.1, leash: 36, redrop: 3, hpPerTough: 15, surcharge: 1 },
   /** Level-ups. Need for level n (from 1): base + lin × n + sq × n². */
-  xp: { base: 4, lin: 2.2, sq: 0.55, gemMerge: 300 },
-  cards: { offer: 3, rerolls: 3, skipHeal: 0.2, healAtMax: 0.15 },
+  xp: { base: 10, lin: 1.5, sq: 0.55, gemMerge: 300 },
+  /** Call-in cards only on every `callEvery`-th level-up (and one is then always offered if a unit fits). */
+  cards: { callEvery: 3, offer: 3, rerolls: 3, skipHeal: 0.2, healAtMax: 0.15 },
   /** Units and the hero level to 5 (+1 a trait, −1 a scar); each level: attacks rate, reach, damage on even levels. */
   levels: { max: 5, rate: 0.14, reach: 0.1, dmgEvery: 2, hp: 0.12, speed: 0.03 },
   /** Doctrine slots and levels. */
@@ -50,8 +51,8 @@ export const WARPATH = {
   },
   /** Enemy bodies: HP an unsaved wound takes off the hero, inches a second per inch of Advance, how close counts as touching, attack clocks. */
   enemy: { dmgPerWound: 3, heroDeadlyCap: 2, heroBlowCap: 0.35, speedPer: 0.85, touch: 1.1, meleeEvery: 1.1, hpPerTough: 1, windUp: 0.9, shotSpeed: 22, shotRadius: 0.9, blastRadius: 3, blastFuse: 1.2, shooterShare: 0.18 },
-  /** Bosses: attacks × blows (a lord × lordBlows) every `every` × the usual clock; a captain every 5 min, an Echo Lord every 15 (wounds at minute 5, + a share a minute). */
-  bosses: { blows: 2, lordBlows: 3, every: 1.5, captainEvery: 300, lordEvery: 900, captainHp: 140, lordHp: 420, hpPerMin: 0.09, size: 3.2, lordSize: 4.4, drop: 1 },
+  /** Bosses: attacks × blows (a lord × lordBlows) every `every` × the usual clock; a captain every 3 min, an Echo Lord every 15 (wounds at minute 5, + a share a minute). */
+  bosses: { blows: 2, lordBlows: 3, every: 1.5, captainEvery: 180, lordEvery: 900, captainHp: 140, lordHp: 350, hpPerMin: 0.09, size: 3.2, lordSize: 4.4, drop: 1 },
   /** Hard mode: enemy wounds and damage, and how much faster they come. */
   hard: { hp: 1.5, dmg: 1.5, spawn: 1.3 },
   /** Score once everything is maxed. */

@@ -8,6 +8,7 @@ import { bankOffTableXp, offTableKey } from '../../rules/downtime';
 import { awardFeats, featFaction } from '../../rules/feats';
 import { weekKey } from '../../rules/sortie';
 import { unitName } from '../../rules/battle';
+import { unitPortrait } from '../../model/emblem';
 import {
   bankRecords, bossesOf, clearWarpath, clock, DOCTRINES, hardOpen, heroesOf, loadWarpath, newerWarpath, newRun, saveWarpath, warpathFeats, warpathRepeats,
   warpathXp, weekBoard, weekTheme, WARPATH, type WarpathMode, type WarpathRun,
@@ -43,7 +44,9 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
   const [replace, setReplace] = useState(false);
   const banked = useRef(false);
   const faction = c && force.nexus && c.factions.find((x) => x.id === force.nexus!.factionId);
-  const palette = useMemo(() => ({ own: faction?.color ?? '#8fc7ff', foe: theme.name.toLowerCase().includes('echo') ? '#b78cff' : '#ff8a6a' }), [faction?.color, theme.name]);
+  // Each unit is drawn with the emblem its player made for it (as on Training's board).
+  const faces = useMemo(() => Object.fromEntries(force.units.map((u) => [u.id, unitPortrait(u, force)])), [force]);
+  const palette = useMemo(() => ({ own: faction?.color ?? '#8fc7ff', foe: theme.name.toLowerCase().includes('echo') ? '#b78cff' : '#ff8a6a', faces }), [faction?.color, theme.name, faces]);
 
   const save = (r: WarpathRun) => {
     const s = saveWarpath(r);
@@ -142,8 +145,8 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
   return (
     <Modal title={<><Icon name="g:sprint" /> Warpath</>} onClose={onClose} wide>
       <p className="muted">
-        Your hero walks; the force fights on its own. Level up to call units in (up to {WARPATH.cap.toLocaleString()} pts on the field, the hero counted),
-        drill them or take doctrines. A captain comes every 5 minutes and an Echo Lord every 15. The run lasts until the hero falls.
+        Your hero walks; the force fights on its own. Every third level-up calls a unit in (up to {WARPATH.cap.toLocaleString()} pts on the field, the hero counted),
+        drill them or take doctrines. A captain comes every 3 minutes and an Echo Lord every 15. The run lasts until the hero falls.
       </p>
       <div className="warpath-start">
         <section>

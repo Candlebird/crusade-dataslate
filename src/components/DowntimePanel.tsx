@@ -116,7 +116,7 @@ export default function DowntimePanel({ f }: { f: Force }) {
       {(isGm || import.meta.env.DEV) && (
         <Mode icon="g:sprint" name="Warpath (GM preview)" button="Warpath…" onOpen={() => setOpen('warpath')}
           status={f.warpath?.best?.normal ? `best ${f.warpath.best.normal.bosses} bosses` : undefined}>
-          Lead the force as its hero across an endless field: walk, and every unit you call in fights on its own. A captain every 5 minutes,
+          Lead the force as its hero across an endless field: walk, and every unit you call in fights on its own. A captain every 3 minutes,
           an Echo Lord every 15. Each boss slain is XP for the hero.
         </Mode>
       )}

@@ -7,7 +7,7 @@ import { clock } from './loot';
 import type { Enemy, EnemyKind, Missile, WarpathRun } from './types';
 
 // The horde: packs come in from a ring past the screen edge, tougher every 5 minutes; a share stop at range and shoot
-// (telegraphed); a captain every 5 minutes, an Echo Lord every 15 with its trick. Blows on the hero spread model losses
+// (telegraphed); a captain every 3 minutes, an Echo Lord every 15 with its trick. Blows on the hero spread model losses
 // to the squads around it.
 
 const W = WARPATH;
