@@ -97,3 +97,17 @@ Hard ends at 9–12 min for most runs (up to 22) and kills a lord 1 in 6.
 - Call-in cards come only on every third level-up (the 3rd, 6th, 9th…). On those level-ups, at least one unit is always offered if one fits.
 - Your units, forts and hero are drawn with the emblems you made. Units without one keep the stock icon.
 - Re-probed all 6 forces. Lord HP went down from 420 to 350. On Normal, the lord falls 11 of 24 times and runs fall at about 16 min (median). Hive fleet hasn't killed a lord yet.
+
+## Follow-up 2 (2026-11-05)
+
+- 10% more enemies: spawns are 2.75/s (was 2.5).
+- Bosses have 25% more HP: captains 175 (was 140), lords 440 (was 350).
+- **Elites**, as in Training: from minute 1, 3% of spawns, rising 1.2% a minute to 17%. Elites have ×3 HP, deal ×1.5 damage, are ×1.35 size and drop ×5 XP. They have a gold rim and a gold HP bar.
+- **Hordes**: the first comes at 1:15, then one every 50–95 s. A banner gives 3 s of warning. Then either a two-deep ring closes in from every side, or a column charges from one direction. Each horde is one kind, about 9 s of spawns in one go, at least 24.
+- **Sites**: one turns up every 35 s (the first at 0:20), 34–60" away, with up to 3 at once. Edge pointers show the off-screen ones.
+  - **Shrine:** stand in it for 4 s for Battle Hymn, +40% fire rate for 40 s.
+  - **Supply cache:** a free level-up, but 8 elites spring an ambush.
+  - **Aid station:** heals 60%.
+  - **Champion:** the book's toughest kind, as an elite with ×6 HP. It holds its ground until the hero comes close, and drops 60 XP.
+  - Sites you leave 110" behind are gone.
+- Probe after these changes, Normal: the median run falls at about 12.5 min (was 16), and the lord falls 3 of 24 times (was 11). Hard ends at 6–13 min. I left it here because you asked for harder. The bot rarely uses sites well, so a person should do better.

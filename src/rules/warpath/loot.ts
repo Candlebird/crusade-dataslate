@@ -23,13 +23,22 @@ export function killed(run: WarpathRun, e: Enemy, si: number): void {
   const s = run.squads[si];
   const leech = s?.skills.find((x) => x.kind === 'leech');
   if (leech && leech.kind === 'leech') run.hp = Math.min(run.maxHp, run.hp + leech.n);
+  if (e.champ !== undefined) {
+    // A champion bursts into a ring of rich Shards.
+    const n = 8;
+    for (let i = 0; i < n; i++) drop(run, 'gem', e.x + Math.cos((i / n) * Math.PI * 2) * 1.5, e.y + Math.sin((i / n) * Math.PI * 2) * 1.5, WARPATH.sites.champXp / n);
+    run.fx.push({ kind: 'boom', x: e.x, y: e.y, n: e.size * 1.5, t: 0.8 });
+    run.log.push(`${clock(run.t)} A champion (${k.name}) slain by ${s?.name ?? 'the field'}.`);
+    return;
+  }
   if (!e.boss) {
+    const xp = gemXp(k.tier) * (e.elite ? WARPATH.elite.xp : 1);
     // Bodies past the merge count fold their Shard into the nearest one, so the field never fills with gems.
     if (run.pickups.length > WARPATH.xp.gemMerge) {
       const near = run.pickups.find((p) => p.kind === 'gem' && Math.abs(p.x - e.x) < 6 && Math.abs(p.y - e.y) < 6);
-      if (near) { near.xp += gemXp(k.tier); return; }
+      if (near) { near.xp += xp; return; }
     }
-    drop(run, 'gem', e.x, e.y, gemXp(k.tier));
+    drop(run, 'gem', e.x, e.y, xp);
     return;
   }
   drop(run, 'supply', e.x, e.y);

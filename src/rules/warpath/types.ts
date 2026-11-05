@@ -131,6 +131,12 @@ export interface Enemy {
   by: number;
   /** Stops at range and shoots (telegraphed), instead of rushing. */
   shoots: boolean;
+  /** An elite: more wounds, harder blows, a gold rim, a richer Shard. */
+  elite?: boolean;
+  /** A champion holding a site (by site id) until the hero comes near. */
+  guard?: number;
+  /** A champion: the site it was set to hold (its fall drops a heap of Shards). */
+  champ?: number;
 }
 
 /** A shot or blast marker an enemy has loosed: shots fly, blasts wait out a fuse. Either is rolled when it lands. */
@@ -149,6 +155,13 @@ export interface Missile {
 
 export type PickupKind = 'gem' | 'ration' | 'beacon' | 'supply';
 export interface Pickup { id: number; kind: PickupKind; x: number; y: number; xp: number; life: number; pulled?: boolean }
+
+/** A site on the map: a shrine to hold, a cache to open, a well to drink from, a champion to slay. */
+export type SiteKind = 'shrine' | 'cache' | 'well' | 'champion';
+export interface Site { id: number; kind: SiteKind; x: number; y: number; /** Seconds held (a shrine). */ held: number }
+
+/** A horde on its way: when it lands, a ring round the hero or a column from angle `a`. */
+export interface Horde { at: number; kind: 'ring' | 'column'; a: number }
 
 /** A level-up card. */
 export type Card =
@@ -206,6 +219,18 @@ export interface WarpathRun {
   nextBeacon: number;
   bossesDone: number;
   lords: WLord[];
+  /** Level-ups opened so far (call-in cards come every WARPATH.cards.callEvery-th). */
+  levelUps?: number;
+  /** Hordes: when the next is announced, and one on its way. */
+  nextHorde?: number;
+  horde?: Horde;
+  /** Sites on the map, and when the next turns up. */
+  sites?: Site[];
+  nextSite?: number;
+  /** A shrine's Battle Hymn runs until this time. */
+  hymnUntil?: number;
+  /** A line across the top of the screen (a horde coming, a site taken) and its seconds left. */
+  banner?: { text: string; t: number; tone: 'warn' | 'good' };
   /** Level, XP towards the next, level-ups waiting (a supply drop or a quick double), the offer on screen, rerolls left. */
   level: number;
   xp: number;

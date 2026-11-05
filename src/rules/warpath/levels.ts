@@ -24,11 +24,8 @@ export function gainXp(run: WarpathRun, n: number): void {
 /** Points left under the cap. */
 export const pointsLeft = (run: WarpathRun) => WARPATH.cap - run.points;
 
-/** Level-ups taken so far, counting the one open now (the run starts at level 1). */
-const levelUpNo = (run: WarpathRun) => run.level - run.queued - 1;
-
-/** Call-in cards come only on every `callEvery`-th level-up. */
-export const callLevel = (run: WarpathRun) => levelUpNo(run) > 0 && levelUpNo(run) % K.callEvery === 0;
+/** Call-in cards come only on every `callEvery`-th level-up (counting the one open now; supply drops count too). */
+export const callLevel = (run: WarpathRun) => (run.levelUps ?? 0) > 0 && (run.levelUps ?? 0) % K.callEvery === 0;
 
 /** Every card that could be offered now. */
 export function candidates(run: WarpathRun): Card[] {
@@ -74,6 +71,7 @@ export function drawOffer(run: WarpathRun): Card[] {
 export function openLevelUp(run: WarpathRun): boolean {
   if (run.queued <= 0 || run.phase !== 'play') return false;
   run.queued -= 1;
+  run.levelUps = (run.levelUps ?? 0) + 1;
   run.offer = drawOffer(run);
   run.phase = 'card';
   return true;

@@ -36,15 +36,19 @@ function pickKind(run: WarpathRun): number {
   return list[list.length - 1].i;
 }
 
-/** A body of `kind` at (x, y). */
-export function spawnEnemy(run: WarpathRun, kind: number, x: number, y: number, boss?: Enemy['boss']): Enemy {
+/** The share of the swarm that comes as elites now (none before elite.from). */
+export const eliteShare = (run: WarpathRun) =>
+  run.t < W.elite.from ? 0 : Math.min(W.elite.max, W.elite.share + W.elite.perMin * (run.t - W.elite.from) / 60);
+
+/** A body of `kind` at (x, y): an elite has more wounds and a bigger body. */
+export function spawnEnemy(run: WarpathRun, kind: number, x: number, y: number, boss?: Enemy['boss'], elite = false): Enemy {
   const k = run.enemyKinds[kind];
   const mul = enemyMul(run);
-  const hp = k.hp * mul.hp;
+  const hp = k.hp * mul.hp * (elite ? W.elite.hp : 1);
   const e: Enemy = {
     id: run.nextId++, kind, x, y, hp, maxHp: hp, cd: E.meleeEvery * rand(run), aim: 0, tx: 0, ty: 0, status: {},
-    size: k.size, armour: 0, by: -1, shoots: !!k.gun && !boss && rand(run) < E.shooterShare,
-    ...(boss ? { boss } : {}),
+    size: k.size * (elite ? W.elite.size : 1), armour: 0, by: -1, shoots: !!k.gun && !boss && rand(run) < E.shooterShare,
+    ...(boss ? { boss } : {}), ...(elite ? { elite } : {}),
   };
   run.enemies.push(e);
   return e;
@@ -69,7 +73,7 @@ export function spawnStep(run: WarpathRun, dt: number): void {
     for (let i = 0; i < n; i++) {
       const p = { x: cx + (rand(run) - 0.5) * 4, y: cy + (rand(run) - 0.5) * 4 };
       unblock(run.seed, p, k.size / 2);
-      spawnEnemy(run, kind, p.x, p.y);
+      spawnEnemy(run, kind, p.x, p.y, undefined, rand(run) < eliteShare(run));
     }
     run.owed -= n;
     live += n;
@@ -86,6 +90,9 @@ function bossKind(run: WarpathRun): number {
   });
   return best;
 }
+
+/** A kind to field (by the clock's tier weights). */
+export { pickKind };
 
 /** Bosses on the clock: a captain every captainEvery seconds; every lordEvery, an Echo Lord instead. */
 export function bossStep(run: WarpathRun): void {
@@ -262,6 +269,11 @@ export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Ene
     const k = run.enemyKinds[e.kind];
     if (!statusStep(e, dt, hurt) || e.hp <= 0) continue;
     trickStep(run, e, dt);
+    // A champion holds its site until the hero comes close.
+    if (e.guard !== undefined) {
+      if ((run.hx - e.x) ** 2 + (run.hy - e.y) ** 2 > W.sites.wake ** 2) continue;
+      delete e.guard;
+    }
     // Its mark: a landed fortification closer than the hero and within 8", else the hero.
     let tx = run.hx;
     let ty = run.hy;
@@ -334,7 +346,7 @@ export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Ene
       continue;
     }
     if (run.iframes > 0) continue;
-    const dmg = rollOnHero(run, attacks, k.quality, k.melee.ap, k.melee.deadly, mul.dmg);
+    const dmg = rollOnHero(run, attacks, k.quality, k.melee.ap, k.melee.deadly, mul.dmg * (e.elite ? W.elite.dmg : 1));
     if (dmg > 0) hurtHero(run, dmg);
   }
 }

@@ -10,6 +10,7 @@ import { Grid, unblock } from './field';
 import { enemyStep, feared, missileStep, spawnStep, bossStep, hurtHero } from './enemies';
 import { gainXp, openLevelUp, choose, candidates } from './levels';
 import { collect } from './loot';
+import { hordeStep, siteStep } from './events';
 import { heroMaxHp, mods } from './mods';
 import { enemyKindsOf, fieldPoints, squadOf } from './roster';
 import { heroSpeed, squadStep } from './squads';
@@ -107,6 +108,9 @@ export function step(run: WarpathRun, input: Input, dt = W.step): void {
   if (m.regen > 0) run.hp = Math.min(run.maxHp, run.hp + m.regen * dt);
   spawnStep(run, dt);
   bossStep(run);
+  hordeStep(run);
+  siteStep(run, dt);
+  if (run.banner && (run.banner.t -= dt) <= 0) run.banner = undefined;
   grid.build(run.enemies);
   squadStep(run, grid, dt);
   fireAll(run, grid, dt);
@@ -116,7 +120,7 @@ export function step(run: WarpathRun, input: Input, dt = W.step): void {
   // Stragglers left far behind come round again ahead of the hero (a boss a little closer, so it can't be outrun).
   const far = (W.spawn.ring * 1.6) ** 2;
   for (const e of run.enemies) {
-    if (e.hp <= 0 || (e.x - run.hx) ** 2 + (e.y - run.hy) ** 2 < (e.boss ? far / 2.56 : far)) continue;
+    if (e.hp <= 0 || e.guard !== undefined || (e.x - run.hx) ** 2 + (e.y - run.hy) ** 2 < (e.boss ? far / 2.56 : far)) continue;
     const a = run.face + (rand(run) - 0.5) * 1.8;
     const r = e.boss ? W.spawn.ring * 0.7 : W.spawn.ring;
     e.x = run.hx + Math.cos(a) * r;
@@ -163,6 +167,15 @@ export function botInput(run: WarpathRun): Input {
     const d2 = (p.x - run.hx) ** 2 + (p.y - run.hy) ** 2;
     const want = p.kind === 'ration' ? (run.hp < run.maxHp * 0.6 ? 0.2 : 9) : p.kind === 'gem' ? 1 : 0.5;
     if (d2 * want < best) { best = d2 * want; goal = p; }
+  }
+  // Nothing close to pick up and nothing pressing: go out to a site (an aid station only when hurt; champions are left).
+  if (!goal && press < 0.15) {
+    let bd = Infinity;
+    for (const s of run.sites ?? []) {
+      if (s.kind === 'champion' || (s.kind === 'well' && run.hp > run.maxHp * 0.7)) continue;
+      const d2 = (s.x - run.hx) ** 2 + (s.y - run.hy) ** 2;
+      if (d2 < bd) { bd = d2; goal = s; }
+    }
   }
   if (goal && press < 0.25) {
     const gx = goal.x - run.hx;

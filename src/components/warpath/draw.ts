@@ -1,4 +1,4 @@
-import { onField, terrainNear, WARPATH, type Squad, type WarpathRun } from '../../rules/warpath';
+import { hymn, onField, SITE_NAMES, terrainNear, WARPATH, type SiteKind, type Squad, type WarpathRun } from '../../rules/warpath';
 import type { IconName } from '../iconData';
 import { ICONS } from '../iconData';
 import { alpha, bar } from '../training/art';
@@ -125,6 +125,13 @@ const PICKUP: Record<string, [IconName, string]> = {
   beacon: ['g:radar-sweep', '#7fe0ff'],
   supply: ['g:wooden-crate', '#ffd166'],
 };
+const SITE: Record<SiteKind, [IconName, string]> = {
+  shrine: ['g:holy-symbol', '#c9a6ff'],
+  cache: ['g:open-treasure-chest', '#ffd166'],
+  well: ['g:medical-pack', '#7ee07e'],
+  champion: ['g:crossed-swords', '#ff8a5c'],
+};
+const ELITE = '#ffd34d';
 const GEM_COLOR = ['#6fd3ff', '#7ee07e', '#ffd166', '#ff7ad9'];
 const TERRAIN: Record<string, { fill: string; edge: string; icon: IconName; tint: string }> = {
   block: { fill: '#2b2a30', edge: '#5b5866', icon: 'g:rock', tint: '#77738a' },
@@ -177,6 +184,34 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       const [ox, oy] = n === 1 ? [0, 0] : CLUSTER[(i * 5 + t.icon) % 24];
       stamp(ctx, st.icon, st.tint, sx(t.x + ox * t.r * 0.6), sy(t.y + oy * t.r * 0.6), (t.kind === 'block' ? t.r * 1.3 : 2.2) * ppi);
     }
+  }
+
+  // Sites: a ring on the ground and the site's mark (a shrine fills as it's held).
+  for (const st of run.sites ?? []) {
+    if (!inView(st.x, st.y, 6)) continue;
+    const [icon, col] = SITE[st.kind];
+    const x = sx(st.x);
+    const y = sy(st.y);
+    const R = WARPATH.sites.radius * ppi;
+    const pulse = 0.5 + 0.5 * Math.sin(now * 2.5 + st.id);
+    ctx.beginPath();
+    ctx.arc(x, y, R, 0, Math.PI * 2);
+    ctx.fillStyle = alpha(col, 0.08 + 0.06 * pulse);
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+    ctx.strokeStyle = alpha(col, 0.75);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    if (st.kind === 'shrine' && st.held > 0) {
+      ctx.beginPath();
+      ctx.arc(x, y, R, -Math.PI / 2, -Math.PI / 2 + (st.held / WARPATH.sites.hold) * Math.PI * 2);
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = col;
+      ctx.stroke();
+    }
+    if (st.kind !== 'champion') stamp(ctx, icon, col, x, y - Math.sin(now * 3 + st.id) * 0.15 * ppi, 2.6 * ppi, 8);
+    number(ctx, st.kind === 'shrine' ? `${SITE_NAMES.shrine}: stand in it` : SITE_NAMES[st.kind], x, y + R + 10, 13, col);
   }
 
   // Pickups.
@@ -263,10 +298,20 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
         ctx.stroke();
       }
     }
+    if (e.elite) {
+      // An elite's gold rim (a champion's brighter, with a bar).
+      ctx.beginPath();
+      ctx.arc(x, y, px * 0.62, 0, Math.PI * 2);
+      ctx.fillStyle = alpha(ELITE, e.champ !== undefined ? 0.22 : 0.12);
+      ctx.fill();
+      ctx.lineWidth = e.champ !== undefined ? 3 : 2;
+      ctx.strokeStyle = alpha(ELITE, 0.9);
+      ctx.stroke();
+    }
     const col = e.boss === 'lord' ? '#ff7ae6' : e.boss ? '#ffc94d' : e.status.stun ? '#9fb4ff' : e.status.bleed ? '#ff6a6a' : pal.foe;
     stamp(ctx, (e.boss ? (e.boss === 'lord' ? 'g:dread-skull' : 'g:crowned-skull') : k.icon) as IconName, col, x, y, px, e.boss ? 10 : 0);
     if (e.boss || e.hp < e.maxHp) {
-      if (e.boss || px > 14) bar(ctx, x - px / 2, y + px * 0.55, px, e.hp / e.maxHp, e.boss ? '#ff5a4a' : undefined, e.boss ? 5 : 3);
+      if (e.boss || e.elite || px > 14) bar(ctx, x - px / 2, y + px * 0.55, px, e.hp / e.maxHp, e.boss ? '#ff5a4a' : e.elite ? ELITE : undefined, e.boss || e.champ !== undefined ? 5 : 3);
     }
   }
 
@@ -353,6 +398,13 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   ctx.lineWidth = 2;
   ctx.strokeStyle = 'rgba(255,215,90,0.75)';
   ctx.stroke();
+  if (hymn(run)) {
+    ctx.beginPath();
+    ctx.arc(hx, hy, (2.4 + 0.2 * Math.sin(now * 8)) * ppi, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(201,166,255,0.8)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
   if (run.shield && run.shield > 0) {
     ctx.beginPath();
     ctx.arc(hx, hy, 2 * ppi, 0, Math.PI * 2);
@@ -398,6 +450,46 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
     stamp(ctx, e.boss === 'lord' ? 'g:dread-skull' : 'g:crowned-skull', col, px - Math.cos(a) * 22, py - Math.sin(a) * 22, 22);
   }
 
+  // Sites off the screen: a small pointer on the edge in the site's colour, so there's somewhere to head for.
+  for (const st of run.sites ?? []) {
+    if (inView(st.x, st.y, -4)) continue;
+    const a = Math.atan2(st.y - v.cy, st.x - v.cx);
+    const m = 22;
+    const k = Math.min((w / 2 - m) / Math.max(1e-6, Math.abs(Math.cos(a))), (h / 2 - m) / Math.max(1e-6, Math.abs(Math.sin(a))));
+    const px = w / 2 + Math.cos(a) * k;
+    const py = h / 2 + Math.sin(a) * k;
+    const [icon, col] = SITE[st.kind];
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.moveTo(10, 0);
+    ctx.lineTo(-3, -7);
+    ctx.lineTo(-3, 7);
+    ctx.closePath();
+    ctx.fillStyle = col;
+    ctx.fill();
+    ctx.restore();
+    stamp(ctx, icon, col, px - Math.cos(a) * 17, py - Math.sin(a) * 17, 18);
+  }
+
+  // A column on its way: the edge it comes from glows red.
+  if (run.horde) {
+    const a = run.horde.a;
+    const k = 0.5 + 0.5 * Math.sin(now * 10);
+    if (run.horde.kind === 'ring') {
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = `rgba(255,60,40,${0.25 + 0.35 * k})`;
+      ctx.strokeRect(5, 5, w - 10, h - 10);
+    } else {
+      const g = ctx.createRadialGradient(w / 2 + Math.cos(a) * w * 0.6, h / 2 + Math.sin(a) * h * 0.6, 0, w / 2 + Math.cos(a) * w * 0.6, h / 2 + Math.sin(a) * h * 0.6, Math.max(w, h) * 0.45);
+      g.addColorStop(0, `rgba(255,60,40,${0.35 + 0.3 * k})`);
+      g.addColorStop(1, 'rgba(255,60,40,0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+
   // Floating numbers on top.
   for (const f of run.fx) {
     if ((f.kind !== 'dmg' && f.kind !== 'heal') || !inView(f.x, f.y)) continue;
@@ -406,6 +498,14 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
     ctx.globalAlpha = a;
     const col = f.kind === 'heal' ? '#7ee07e' : f.hurt ? '#ff5a4a' : f.crit ? '#ffd166' : f.hero ? '#ffe9a8' : '#e6e6e6';
     number(ctx, f.kind === 'heal' ? `+${Math.round(f.n ?? 0)}` : `${f.hurt ? '-' : ''}${Math.round(f.n ?? 0)}`, sx(f.x), sy(f.y - rise), Math.max(f.hurt ? 18 : 13, (f.hurt ? 1.6 : f.crit ? 1.35 : 1) * ppi), col);
+    ctx.globalAlpha = 1;
+  }
+
+  // The banner: a horde coming, a site taken.
+  if (run.banner) {
+    const b = run.banner;
+    ctx.globalAlpha = Math.min(1, b.t * 2);
+    number(ctx, b.text, w / 2, Math.min(130, h * 0.2), Math.max(18, Math.min(30, w / 34)), b.tone === 'warn' ? '#ff6a4a' : '#c9f5a0');
     ctx.globalAlpha = 1;
   }
 }

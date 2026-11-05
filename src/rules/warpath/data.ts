@@ -41,7 +41,7 @@ export const WARPATH = {
   pickups: { reach: 1.4, pull: 6, pullSpeed: 30, ration: 0.25, rationEvery: 45, beaconEvery: 110, gemLife: 120 },
   /** Enemy spawning: the ring they come from (beyond the screen), per second at the start, + each minute; a cap on the field. */
   spawn: {
-    ring: 42, perSec: 2.5, perMin: 0.95, maxField: 1400,
+    ring: 42, perSec: 2.75, perMin: 1.05, maxField: 1400,
     /** Wounds and damage grow by these shares each minute from the start. */
     hpPerMin: 0.07, dmgPerMin: 0.03,
     /** Every 5 min the mix steps tougher; the tiers by points a model (cheapest third, middle, dearest). */
@@ -52,7 +52,18 @@ export const WARPATH = {
   /** Enemy bodies: HP an unsaved wound takes off the hero, inches a second per inch of Advance, how close counts as touching, attack clocks. */
   enemy: { dmgPerWound: 3, heroDeadlyCap: 2, heroBlowCap: 0.35, speedPer: 0.85, touch: 1.1, meleeEvery: 1.1, hpPerTough: 1, windUp: 0.9, shotSpeed: 22, shotRadius: 0.9, blastRadius: 3, blastFuse: 1.2, shooterShare: 0.18 },
   /** Bosses: attacks × blows (a lord × lordBlows) every `every` × the usual clock; a captain every 3 min, an Echo Lord every 15 (wounds at minute 5, + a share a minute). */
-  bosses: { blows: 2, lordBlows: 3, every: 1.5, captainEvery: 180, lordEvery: 900, captainHp: 140, lordHp: 350, hpPerMin: 0.09, size: 3.2, lordSize: 4.4, drop: 1 },
+  bosses: { blows: 2, lordBlows: 3, every: 1.5, captainEvery: 180, lordEvery: 900, captainHp: 175, lordHp: 440, hpPerMin: 0.09, size: 3.2, lordSize: 4.4, drop: 1 },
+  /** Elites (as in Training): from `from` s, a share of the swarm (+ perMin a minute, to max) with more wounds, harder
+   *  blows, a bigger body and a gold rim; their Shard is worth `xp` times as much. */
+  elite: { from: 60, share: 0.03, perMin: 0.012, max: 0.17, hp: 3, dmg: 1.5, size: 1.35, xp: 5 },
+  /** Hordes: every `min`–`max` s (from `from`), after a `warn` s warning, a ring closes round the hero or a column
+   *  charges from one side: `secs` seconds of the spawn rate at once (at least `least`), over the field cap by `over`. */
+  horde: { from: 75, min: 50, max: 95, warn: 3, secs: 9, least: 24, over: 250, ringR: 30 },
+  /** Sites round the map, to go out to: up to `live` at once, a new one every `every` s, `near`–`far` from the hero,
+   *  gone past `lose`. A shrine is held `hold` s (within `radius`) for a Battle Hymn (fire `hymn` faster for `hymnSecs`);
+   *  a cache gives a level-up and springs an elite ambush of `ambush`; a well heals `heal`; a champion (an elite ×`champHp`
+   *  that holds its ground until the hero comes within `wake`) drops `champXp` XP of Shards. */
+  sites: { live: 3, every: 35, first: 20, near: 34, far: 60, lose: 110, radius: 3.5, hold: 4, hymn: 0.4, hymnSecs: 40, ambush: 8, heal: 0.6, champHp: 6, wake: 16, champXp: 60 },
   /** Hard mode: enemy wounds and damage, and how much faster they come. */
   hard: { hp: 1.5, dmg: 1.5, spawn: 1.3 },
   /** Score once everything is maxed. */

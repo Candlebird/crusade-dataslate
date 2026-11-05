@@ -10,9 +10,11 @@ export const doc = (run: WarpathRun, id: DoctrineId) => run.doctrines[id] ?? 0;
 export function mods(run: WarpathRun) {
   const D = DOCTRINES;
   const l = (id: DoctrineId) => doc(run, id);
+  // A shrine's Battle Hymn.
+  const hymn = (run.hymnUntil ?? 0) > run.t ? 1 + WARPATH.sites.hymn : 1;
   return {
-    shootRate: 1 + D.relentless.rate * l('relentless'),
-    meleeRate: 1 + D.furious.rate * l('furious'),
+    shootRate: (1 + D.relentless.rate * l('relentless')) * hymn,
+    meleeRate: (1 + D.furious.rate * l('furious')) * hymn,
     hit: D.goodShot.hit * l('goodShot'),
     heroDmg: 1 - D.holdLine.dmg * l('holdLine'),
     losses: 1 - D.holdLine.losses * l('holdLine'),

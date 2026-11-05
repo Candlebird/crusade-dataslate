@@ -6,6 +6,8 @@ import { FORCES } from '../training/testForces';
 import { WARPATH } from './data';
 import { choose, reroll, skip, xpNeed } from './levels';
 import { autoplay, heroesOf, newRun, step } from './sim';
+import { hordeStep, siteStep } from './events';
+import { callLevel } from './levels';
 import { enemyKindsOf } from './roster';
 
 const echoes = normalizeBook(JSON.parse(readFileSync('armies/void-echoes.gf.json', 'utf8')));
@@ -63,6 +65,75 @@ describe('Warpath', () => {
     step(run, { dx: 0, dy: 0 });
     choose(run, 0);
     expect(run.phase).toBe('play');
+  });
+
+  it('call-in cards only on every third level-up, and then at least one', () => {
+    const run = start(1);
+    for (let n = 1; n <= 6; n++) {
+      run.queued = 1;
+      step(run, { dx: 0, dy: 0 });
+      const calls = run.offer.filter((c) => c.kind === 'call').length;
+      expect(callLevel(run)).toBe(n % 3 === 0);
+      if (n % 3 === 0) expect(calls).toBeGreaterThan(0);
+      else expect(calls).toBe(0);
+      skip(run);
+    }
+  });
+
+  it('elites come after the first minute', () => {
+    const run = autoplay(start(2, 'el'), 240);
+    expect(run.enemies.some((e) => e.elite)).toBe(true);
+    const early = autoplay(start(2, 'el'), 50);
+    expect(early.enemies.some((e) => e.elite)).toBe(false);
+  });
+
+  it('a horde is announced, then lands all at once', () => {
+    const run = start(0, 'h');
+    run.t = WARPATH.horde.from;
+    hordeStep(run);
+    expect(run.horde).toBeDefined();
+    expect(run.banner?.tone).toBe('warn');
+    const before = run.enemies.length;
+    run.t = run.horde!.at;
+    hordeStep(run);
+    expect(run.horde).toBeUndefined();
+    expect(run.enemies.length - before).toBeGreaterThanOrEqual(WARPATH.horde.least);
+    expect(run.nextHorde).toBeGreaterThan(run.t + WARPATH.horde.min - 1);
+  });
+
+  it('sites: a shrine held gives the Battle Hymn, an aid station heals, a cache gives a level-up', () => {
+    const run = start(0, 'site');
+    run.sites = [
+      { id: 900, kind: 'shrine', x: 0, y: 0, held: 0 },
+      { id: 901, kind: 'well', x: 0, y: 0, held: 0 },
+      { id: 902, kind: 'cache', x: 0, y: 0, held: 0 },
+    ];
+    run.nextSite = 1e9;
+    run.hp = 10;
+    siteStep(run, 0.1);
+    expect(run.hp).toBeGreaterThan(10);
+    expect(run.queued).toBe(1);
+    expect(run.enemies.filter((e) => e.elite)).toHaveLength(WARPATH.sites.ambush);
+    for (let i = 0; i < 60 && (run.sites ?? []).length; i++) siteStep(run, 0.1);
+    expect(run.hymnUntil).toBeGreaterThan(run.t);
+    expect(run.sites).toHaveLength(0);
+  });
+
+  it('sites turn up out of sight, and a champion holds its ground', () => {
+    const run = start(0, 'champ');
+    for (let i = 0; i < 40 && !(run.sites ?? []).some((s) => s.kind === 'champion'); i++) {
+      run.t = (run.nextSite ?? 0);
+      run.sites = [];
+      siteStep(run, 0.1);
+    }
+    const site = run.sites!.find((s) => s.kind === 'champion')!;
+    expect(Math.hypot(site.x, site.y)).toBeGreaterThan(WARPATH.sites.near - 4);
+    const champ = run.enemies.find((e) => e.champ === site.id)!;
+    expect(champ.guard).toBe(site.id);
+    const at = { x: champ.x, y: champ.y };
+    for (let i = 0; i < 120; i++) step(run, { dx: 0, dy: 0 });
+    expect(champ.x).toBe(at.x);
+    expect(champ.y).toBe(at.y);
   });
 
   it('saves as plain JSON and plays on the same', () => {

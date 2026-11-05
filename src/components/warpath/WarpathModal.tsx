@@ -146,7 +146,7 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
     <Modal title={<><Icon name="g:sprint" /> Warpath</>} onClose={onClose} wide>
       <p className="muted">
         Your hero walks; the force fights on its own. Every third level-up calls a unit in (up to {WARPATH.cap.toLocaleString()} pts on the field, the hero counted),
-        drill them or take doctrines. A captain comes every 3 minutes and an Echo Lord every 15. The run lasts until the hero falls.
+        drill them or take doctrines. A captain comes every 3 minutes and an Echo Lord every 15. Hordes close in without much warning, gold-rimmed elites hit harder, and shrines, caches, aid stations and champions turn up out in the field. The run lasts until the hero falls.
       </p>
       <div className="warpath-start">
         <section>
