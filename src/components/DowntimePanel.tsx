@@ -113,7 +113,7 @@ export default function DowntimePanel({ f }: { f: Force }) {
         A party of 3 pushes through Echo fights, camps and shrines to an Echo lord. A free run earns up to {SORTIE.caps.free.short}–{SORTIE.caps.free.long} XP.
         A Shard run costs {SORTIE.cost} Umbra Shards, earns up to {SORTIE.caps.shard.long} XP and brings home Supply, RP and up to {SORTIE.haul.maxUs} shards.
       </Mode>
-      {isGm && (
+      {(isGm || import.meta.env.DEV) && (
         <Mode icon="g:sprint" name="Warpath (GM preview)" button="Warpath…" onOpen={() => setOpen('warpath')}
           status={f.warpath?.best?.normal ? `best ${f.warpath.best.normal.bosses} bosses` : undefined}>
           Lead the force as its hero across an endless field: walk, and every unit you call in fights on its own. A captain every 5 minutes,

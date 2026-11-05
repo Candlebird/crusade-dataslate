@@ -107,7 +107,8 @@ export function enemyKindsOf(book: CatalogBook): EnemyKind[] {
     const f = fighter(u, { id: u.id, name: cu.name, wounds: size * tough, maxWounds: size * tough }, 'echo', 'B');
     const melee = f.guns.filter((g) => g.melee);
     const ranged = f.guns.filter((g) => !g.melee && g.range >= 12).sort((a, b) => b.attacks * b.deadly - a.attacks * a.deadly)[0];
-    const hero = hasRule(u.rules, 'Hero');
+    // A lone named leader (Hero, or a lone Caster) only comes as a boss: as a common foe it one-shots a fresh hero.
+    const hero = hasRule(u.rules, 'Hero') || (size === 1 && hasRule(u.rules, 'Caster'));
     const air = hasRule(u.rules, 'Aircraft') || hasRule(u.rules, 'Flying');
     const big = tough >= 3;
     if (hasRule(u.rules, 'Immobile')) continue;

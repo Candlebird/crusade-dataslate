@@ -1716,19 +1716,21 @@ abbr.us-abbr { text-decoration: underline dotted; text-underline-offset: 2px; cu
 .warpath-hero.on { border-color: var(--gold); background: rgba(201, 162, 74, 0.12); }
 .warpath-board { padding-left: 1.3rem; margin: 0.3rem 0; }
 .warpath-board li.me { color: var(--gold); }
-.warpath-summary-top { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 1.05rem; }
-.warpath-meter { display: flex; flex-direction: column; gap: 4px; }
-.warpath-meter-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1fr) auto; gap: 8px; align-items: center; font-size: 0.9rem; }
+.warpath-summary-top { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; font-size: 1.05rem; margin-bottom: 14px; }
+.warpath-meter { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.warpath-meter-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1fr) 7.5em; gap: 8px; align-items: center; font-size: 0.9rem; }
+.warpath-meter-name { min-width: 0; line-height: 1.2; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.warpath-meter-name > .muted { display: block; }
 .warpath-meter-bar { height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); overflow: hidden; }
 .warpath-meter-bar > div { height: 100%; background: linear-gradient(90deg, #c9a24a, #ffe08a); }
-.warpath-meter-n { font-variant-numeric: tabular-nums; color: var(--muted-2); font-size: 0.82rem; }
+.warpath-meter-n { font-variant-numeric: tabular-nums; color: var(--muted-2); font-size: 0.82rem; text-align: right; }
 .warpath-log { max-height: 240px; overflow-y: auto; padding-left: 1.2rem; }
 @media (max-width: 700px) {
   .warpath-start { grid-template-columns: 1fr; }
   .warpath-hud-row { gap: 6px 8px; font-size: 0.85rem; }
   .warpath-hp { flex-basis: 100%; }
   .warpath-pause { position: absolute; right: 10px; top: max(28px, calc(env(safe-area-inset-top) + 20px)); }
-  .warpath-cards .training-cards-row { flex-direction: column; align-items: center; }
-  .warpath-cards .training-card { width: min(320px, 90vw); min-height: 0; padding: 10px 12px; gap: 4px; }
+  .warpath-cards .training-cards-row { flex-direction: column; align-items: center; gap: 10px; overflow: visible; scroll-snap-type: none; padding: 8px 0; }
+  .warpath-cards .training-card { flex: 0 0 auto; width: min(320px, 90vw); min-height: 0; padding: 10px 12px; gap: 4px; margin: 0; }
   .warpath-cards .training-cards-title h2 { font-size: 1.4rem; }
 }

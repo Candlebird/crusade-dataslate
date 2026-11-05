@@ -94,6 +94,13 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
     };
   }, [run]);
 
+  // The page behind doesn't scroll while the run is up.
+  useEffect(() => {
+    const was = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = was; };
+  }, []);
+
   // The tab hidden: pause and save.
   useEffect(() => {
     const vis = () => {
@@ -311,7 +318,7 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
           <p className="muted small">{clock(run.t)} · level {run.level} · {run.kills.toLocaleString()} kills · {bossesOf(run)} bosses</p>
           <button className="primary" onClick={() => { setQuitting(false); setPaused(false); }}><Icon name="l:play" /> Resume</button>
           <button onClick={() => onLeave(run)}><Icon name="l:save" /> Save and leave</button>
-          {onAuto && <button className="ghost" onClick={() => { onAuto(); setPaused(false); }}>{auto ? 'Stop auto' : 'Auto (debug: banks nothing)'}</button>}
+          {onAuto && <button onClick={() => { onAuto(); setPaused(false); }}>{auto ? 'Stop auto' : 'Auto (debug: banks nothing)'}</button>}
           {quitting
             ? <button className="danger" onClick={() => onQuit(run)}><Icon name="l:flag" /> Yes, end it here (banks what it earned)</button>
             : <button className="ghost danger" onClick={() => setQuitting(true)}><Icon name="l:flag" /> Give up the run</button>}

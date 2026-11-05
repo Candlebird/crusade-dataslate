@@ -17,7 +17,7 @@ const B = W.bosses;
 /** Tier weights now: the mix steps one tier tougher every shiftEvery seconds. */
 function tierWeights(run: WarpathRun): number[] {
   const s = Math.floor(run.t / W.spawn.shiftEvery);
-  return [Math.max(0.15, 1 - 0.28 * s), Math.min(1, 0.15 + 0.3 * s), Math.min(1, 0.04 + 0.18 * Math.max(0, s - 1))];
+  return [Math.max(0.15, 1 - 0.28 * s), Math.min(1, 0.15 + 0.3 * s), s < 1 ? 0 : Math.min(1, 0.04 + 0.18 * (s - 1))];
 }
 
 /** A kind to field: a tier by weight, then a datasheet of that tier (heroes only as bosses). */
@@ -25,9 +25,14 @@ function pickKind(run: WarpathRun): number {
   const w = tierWeights(run);
   const pool = run.enemyKinds.map((k, i) => ({ k, i })).filter((x) => !x.k.hero);
   const list = pool.length ? pool : run.enemyKinds.map((k, i) => ({ k, i }));
-  const total = list.reduce((n, x) => n + w[x.k.tier], 0);
+  // Weight per tier, shared among that tier's datasheets, so a book full of big kinds is not all big kinds.
+  const count = [0, 0, 0];
+  for (const x of list) count[x.k.tier]++;
+  const each = (t: number) => w[t] / Math.max(1, count[t]);
+  const total = list.reduce((n, x) => n + each(x.k.tier), 0);
+  if (total <= 0) return list[0].i;
   let r = rand(run) * total;
-  for (const x of list) if ((r -= w[x.k.tier]) < 0) return x.i;
+  for (const x of list) if ((r -= each(x.k.tier)) < 0) return x.i;
   return list[list.length - 1].i;
 }
 
@@ -111,7 +116,8 @@ const heroDef = (run: WarpathRun) => run.squads[0].defense;
 export function hurtHero(run: WarpathRun, dmg: number): void {
   if (dmg <= 0 || run.hp <= 0) return;
   const m = mods(run);
-  dmg *= m.heroDmg;
+  // No one blow (a lord's swing, a big blast) takes more than a share of the hero's HP: it can be dodged, not one-shot.
+  dmg = Math.min(dmg * m.heroDmg, run.maxHp * E.heroBlowCap);
   run.iframes = W.hero.iframes;
   const spread = dmg * W.losses.share * m.losses;
   if (run.shield && run.shield > 0) {
@@ -142,7 +148,7 @@ function rollOnHero(run: WarpathRun, attacks: number, quality: number, ap: numbe
   for (let i = 0; i < whole; i++) {
     if (rand(run) >= hitChance(quality, 0)) continue;
     if (rand(run) < saveChance(heroDef(run), ap)) continue;
-    dmg += deadly * mul * E.dmgPerWound;
+    dmg += Math.min(deadly, E.heroDeadlyCap) * mul * E.dmgPerWound;
   }
   return dmg;
 }

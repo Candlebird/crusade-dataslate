@@ -7,6 +7,7 @@ import { useCloud } from '../../cloud/CloudSync';
 import { bankOffTableXp, offTableKey } from '../../rules/downtime';
 import { awardFeats, featFaction } from '../../rules/feats';
 import { weekKey } from '../../rules/sortie';
+import { unitName } from '../../rules/battle';
 import {
   bankRecords, bossesOf, clearWarpath, clock, DOCTRINES, hardOpen, heroesOf, loadWarpath, newerWarpath, newRun, saveWarpath, warpathFeats, warpathRepeats,
   warpathXp, weekBoard, weekTheme, WARPATH, type WarpathMode, type WarpathRun,
@@ -92,7 +93,7 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
         const u = f.units.find((x) => x.id === id);
         if (!u) continue;
         const got = bankOffTableXp(u, n, key);
-        out.xp.push(`${u.name} +${got} XP${got < n ? ' (off-table limit)' : ''}`);
+        out.xp.push(`${unitName(u)} +${got} XP${got < n ? ' (off-table limit)' : ''}`);
       }
       out.records = bankRecords(f, r, date);
       const fac = featFaction(f, d.forces, !!c);
@@ -120,7 +121,7 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
         run={run}
         palette={palette}
         auto={auto}
-        onAuto={cloud.isGm ? () => { run.auto = true; setAuto(!auto); } : undefined}
+        onAuto={cloud.isGm || import.meta.env.DEV ? () => { run.auto = true; setAuto(!auto); } : undefined}
         onSave={save}
         onOver={finish}
         onLeave={(r) => { save(r); setRun(null); onClose(); }}
@@ -152,7 +153,7 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
             {heroes.map((u) => (
               <label key={u.id} className={`warpath-hero${u.id === heroId ? ' on' : ''}`}>
                 <input type="radio" name="warpath-hero" checked={u.id === heroId} onChange={() => setHeroId(u.id)} />
-                <b>{u.name}</b>
+                <b>{unitName(u)}</b>
                 <span className="muted small">Q{u.quality}+ D{u.defense}+{u.tough > 1 ? ` · Tough(${u.tough})` : ''} · {u.weapons.map((x) => x.name).join(', ')}</span>
               </label>
             ))}
@@ -221,14 +222,14 @@ function Summary({ run, news, onAgain, onClose }: { run: WarpathRun; news: News 
         <span><Icon name="g:crowned-skull" /> <b>{bossesOf(run)}</b> boss{bossesOf(run) === 1 ? '' : 'es'} ({run.lordKills} lord{run.lordKills === 1 ? '' : 's'})</span>
         <span><Icon name="g:skull-crossed-bones" /> <b>{run.kills.toLocaleString()}</b> kills</span>
         <span>Level <b>{run.level}</b></span>
-        <span>{run.points}/{WARPATH.cap} pts</span>
+        <span>{run.points.toLocaleString()} / {WARPATH.cap.toLocaleString()} pts on the field</span>
         {run.mode === 'hard' && <span className="tag red">Hard</span>}
       </div>
       <h3>Damage</h3>
       <div className="warpath-meter">
         {rows.map((s) => (
           <div key={s.unitId} className="warpath-meter-row">
-            <span className="grow">{s.name}{s.kind === 'hero' ? ' (hero)' : ''} <span className="muted small">lvl {s.level} · {s.kills.toLocaleString()} kills</span></span>
+            <span className="warpath-meter-name">{s.name}{s.kind === 'hero' ? ' (hero)' : ''}<span className="muted small">lvl {s.level} · {s.kills.toLocaleString()} kills</span></span>
             <div className="warpath-meter-bar"><div style={{ width: `${(s.dealt / total) * 100}%` }} /></div>
             <span className="warpath-meter-n">{Math.round(s.dealt).toLocaleString()} ({Math.round((s.dealt / total) * 100)}%)</span>
           </div>

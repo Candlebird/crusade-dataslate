@@ -44,7 +44,7 @@ function sprite(name: IconName, color: string, px: number, glow = 0): HTMLCanvas
   const p = pathOf(name);
   if (glow) {
     ctx.shadowColor = color;
-    ctx.shadowBlur = (glow * box) / size;
+    ctx.shadowBlur = glow * dpr; // shadowBlur ignores the transform: device pixels
   }
   ctx.lineWidth = (box / size) * 2.2;
   ctx.strokeStyle = 'rgba(0,0,0,0.85)';
@@ -252,14 +252,16 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
     const big = s.kind === 'heavy' || s.kind === 'artillery' || s.kind === 'air';
     const px = (big ? 2.4 : 1.25) * ppi;
     const spread = big ? 1.2 + s.size * 0.5 : 0.9 + Math.sqrt(s.size) * 0.75;
+    let top = 0;
     for (let i = 0; i < s.alive && i < CLUSTER.length; i++) {
       const [ox, oy] = CLUSTER[i];
+      top = Math.min(top, oy * spread);
       stamp(ctx, icon, pal.own, sx(s.x + ox * spread), sy(s.y + oy * spread), px);
     }
     if (s.alive < s.size) {
-      const x = sx(s.x);
-      const y = sy(s.y) - (spread + 1.2) * ppi;
-      bar(ctx, x - ppi * 1.5, y, ppi * 3, s.alive / s.size, '#8fc7ff', 3);
+      // Strength just above the topmost model standing.
+      const y = sy(s.y + top) - px / 2 - 6;
+      bar(ctx, sx(s.x) - ppi * 1.5, y, ppi * 3, s.alive / s.size, '#8fc7ff', 3);
     }
   }
 
@@ -301,7 +303,7 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   const hit = run.iframes > 0;
   ctx.beginPath();
   ctx.arc(hx, hy, 1.6 * ppi, 0, Math.PI * 2);
-  ctx.fillStyle = hit ? 'rgba(255,80,80,0.35)' : 'rgba(255,215,90,0.16)';
+  ctx.fillStyle = hit ? 'rgba(255,255,255,0.3)' : 'rgba(255,215,90,0.16)';
   ctx.fill();
   ctx.lineWidth = 2;
   ctx.strokeStyle = 'rgba(255,215,90,0.75)';
@@ -321,8 +323,35 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   ctx.lineTo(hx + Math.cos(fa - 0.35) * 1.75 * ppi, hy + Math.sin(fa - 0.35) * 1.75 * ppi);
   ctx.closePath();
   ctx.fill();
-  stamp(ctx, squadIcon(run.squads[0]), hit ? '#ff8a7a' : '#ffe08a', hx, hy, 2.4 * ppi, 8);
+  stamp(ctx, squadIcon(run.squads[0]), hit ? '#ffffff' : '#ffe08a', hx, hy, 2.4 * ppi, 8);
   bar(ctx, hx - 1.6 * ppi, hy + 1.9 * ppi, 3.2 * ppi, run.hp / run.maxHp, undefined, 4);
+
+  // Bosses off the screen: a pointer on the edge, toward them.
+  for (const e of run.enemies) {
+    if (!e.boss || inView(e.x, e.y, -4)) continue;
+    const dx = e.x - v.cx;
+    const dy = e.y - v.cy;
+    const a = Math.atan2(dy, dx);
+    const m = 26;
+    const k = Math.min((w / 2 - m) / Math.max(1e-6, Math.abs(Math.cos(a))), (h / 2 - m) / Math.max(1e-6, Math.abs(Math.sin(a))));
+    const px = w / 2 + Math.cos(a) * k;
+    const py = h / 2 + Math.sin(a) * k;
+    const col = e.boss === 'lord' ? '#ff7ae6' : '#ffc94d';
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(a);
+    ctx.beginPath();
+    ctx.moveTo(14, 0);
+    ctx.lineTo(-4, -10);
+    ctx.lineTo(-4, 10);
+    ctx.closePath();
+    ctx.fillStyle = col;
+    ctx.globalAlpha = 0.7 + 0.3 * Math.sin(now * 6);
+    ctx.fill();
+    ctx.restore();
+    ctx.globalAlpha = 1;
+    stamp(ctx, e.boss === 'lord' ? 'g:dread-skull' : 'g:crowned-skull', col, px - Math.cos(a) * 22, py - Math.sin(a) * 22, 22);
+  }
 
   // Floating numbers on top.
   for (const f of run.fx) {

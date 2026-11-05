@@ -34,12 +34,13 @@ export type Mods = ReturnType<typeof mods>;
 /** Minutes survived. */
 export const minutes = (run: WarpathRun) => run.t / 60;
 
-/** Enemy wounds and damage multipliers: Hard mode, then late growth past lateFrom minutes. */
+/** Enemy wounds and damage multipliers: Hard mode, growth every minute, and more past lateFrom minutes. */
 export function enemyMul(run: WarpathRun): { hp: number; dmg: number } {
   const S = WARPATH.spawn;
   const late = Math.max(0, minutes(run) - S.lateFrom);
   const hard = run.mode === 'hard' ? WARPATH.hard : { hp: 1, dmg: 1 };
-  return { hp: hard.hp * (1 + S.lateHp * late), dmg: hard.dmg * (1 + S.lateDmg * late) };
+  const m = minutes(run);
+  return { hp: hard.hp * (1 + S.hpPerMin * m) * (1 + S.lateHp * late), dmg: hard.dmg * (1 + S.dmgPerMin * m) * (1 + S.lateDmg * late) };
 }
 
 /** The hero's most HP: hpMin + Tough × hpPerTough, + a share a level. */

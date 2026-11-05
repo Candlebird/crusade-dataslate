@@ -13,7 +13,7 @@ export const WARPATH = {
   /** The volley clock (shots.ts), at Training's pace: a volley every this many seconds at rate 1. */
   pace: { shootEvery: 0.9, meleeEvery: 0.6, volleySpread: 0.5 },
   /** Hero: inches a second for each inch of Advance (6" → 7.2"/s); HP = hpMin + hpPerTough × Tough. */
-  hero: { speedPer: 1.2, hpPerTough: 5, hpMin: 40, iframes: 0.12 },
+  hero: { speedPer: 1.2, hpPerTough: 5, hpMin: 40, iframes: 0.3 },
   /** Followers: anchors trail the hero this far out (more for each squad), heavy ones turn this slowly. */
   follow: { ring: 5, ringPer: 0.9, lag: 4, heavyLag: 1.6, artilleryBack: 9, sallyMul: 0.5, sallyMin: 4 },
   /** Model losses: a share of each wound on the hero spreads to squads within `radius`. Models come back one per `regen` s. */
@@ -40,14 +40,16 @@ export const WARPATH = {
   pickups: { reach: 1.4, pull: 6, pullSpeed: 30, ration: 0.25, rationEvery: 45, beaconEvery: 110, gemLife: 120 },
   /** Enemy spawning: the ring they come from (beyond the screen), per second at the start, + each minute; a cap on the field. */
   spawn: {
-    ring: 42, perSec: 2.2, perMin: 0.8, maxField: 1400,
+    ring: 42, perSec: 2.5, perMin: 0.95, maxField: 1400,
+    /** Wounds and damage grow by these shares each minute from the start. */
+    hpPerMin: 0.07, dmgPerMin: 0.03,
     /** Every 5 min the mix steps tougher; the tiers by points a model (cheapest third, middle, dearest). */
     shiftEvery: 300,
     /** Past this many minutes, wounds and damage grow by these shares a minute. */
     lateFrom: 30, lateHp: 0.05, lateDmg: 0.035,
   },
   /** Enemy bodies: HP an unsaved wound takes off the hero, inches a second per inch of Advance, how close counts as touching, attack clocks. */
-  enemy: { dmgPerWound: 3, speedPer: 0.85, touch: 1.1, meleeEvery: 1.1, hpPerTough: 1, windUp: 0.9, shotSpeed: 22, shotRadius: 0.9, blastRadius: 3, blastFuse: 1.2, shooterShare: 0.18 },
+  enemy: { dmgPerWound: 3, heroDeadlyCap: 2, heroBlowCap: 0.35, speedPer: 0.85, touch: 1.1, meleeEvery: 1.1, hpPerTough: 1, windUp: 0.9, shotSpeed: 22, shotRadius: 0.9, blastRadius: 3, blastFuse: 1.2, shooterShare: 0.18 },
   /** Bosses: attacks × blows (a lord × lordBlows) every `every` × the usual clock; a captain every 5 min, an Echo Lord every 15 (wounds at minute 5, + a share a minute). */
   bosses: { blows: 2, lordBlows: 3, every: 1.5, captainEvery: 300, lordEvery: 900, captainHp: 140, lordHp: 420, hpPerMin: 0.09, size: 3.2, lordSize: 4.4, drop: 1 },
   /** Hard mode: enemy wounds and damage, and how much faster they come. */
