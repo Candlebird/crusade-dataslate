@@ -181,6 +181,8 @@ export interface Fx { kind: 'dmg' | 'shot' | 'melee' | 'heal' | 'boom' | 'land' 
 export interface WLord { key: string; name: string; trick: LordTrick; slain?: boolean }
 
 export interface WarpathRun {
+  /** The force's Armoury levels when the run began (rules/warpath/meta.ts). */
+  meta?: Partial<Record<string, number>>;
   v: number;
   forceId: string;
   mode: WarpathMode;

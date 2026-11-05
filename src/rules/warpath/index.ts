@@ -13,3 +13,4 @@ export { saveWarpath, loadWarpath, clearWarpath, readSaved, packRun, newerWarpat
 export { DOCTRINES } from './data';
 export type { CloudWarpath } from './cloud';
 export { SITE_NAMES, hymn, holdOf } from './events';
+export { UPGRADES, UPGRADE_IDS, RENOWN, PRESTIGE, metaOf, upgradeCost, cantBuy, buyUpgrade, renownOf, bankRenown, laurelsFor, prestige, renownLine, type UpgradeId } from './meta';

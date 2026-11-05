@@ -125,3 +125,15 @@ Hard ends at 9–12 min for most runs (up to 22) and kills a lord 1 in 6.
 - The thumbstick stays where you first press. It no longer slides after your thumb.
 - Probe, Normal: runs end at about 11.8 min on average, and the lord falls 3 of 24 times. A few Hard runs end at 2–5 min.
 - Later fix: the cache ambush now grows with the run. It's 8 elites from the current mix, with +10% HP a minute (up to ×2.5 at 15 min). The book's toughest kind only joins from minute 10, when the top tier is in.
+
+## Meta-progression: Armoury and prestige (2026-11-05)
+
+Each force has its own progression, and it only affects Warpath. It sits on the Warpath start screen.
+- **Renown:** every run earns it, except Auto runs. A run pays 8 a minute, 1 per 100 kills, 15 a captain and 60 a lord, ×1.5 on Hard.
+- **Armoury:** Renown buys upgrade levels, and each level costs more than the last (×1.35–2.5 per level).
+  - **Open from the start:** Vigour (hero HP +4%/lv), Drill Sergeants (rate +3%), Honed Edge (damage +3%), Forced March (speed +2%), Shard Lore (XP +4%), Lodestone (pickup reach +8%).
+  - **Prestige 1:** Warded Plate (−2% damage taken/lv), Reserves (+1 reroll), Forward Orders (a free level-up at the start).
+  - **Prestige 3:** Veteran Cadre (called-in units start 1–2 levels up), War College (+1 doctrine slot).
+- **Prestige:** you need 2,000 Renown earned in the cycle. Prestige wipes the Armoury and the Renown in hand for ⌊√(cycle/500)⌋ Laurels. Each Laurel gives +10% Renown for good.
+- **Pacing:** a typical 12-minute Normal run earns about 200 Renown. The first prestige is about 10 runs in. Maxing all six starting upgrades takes about 6,500 Renown.
+- **Snapshot:** a run takes a copy of the Armoury when it starts, so a resumed run plays the same.

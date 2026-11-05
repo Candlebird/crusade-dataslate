@@ -2,6 +2,7 @@ import { rand } from '../training/rng';
 import { DOCTRINE_IDS, DOCTRINES, WARPATH, type DoctrineId } from './data';
 import { heroMaxHp } from './mods';
 import type { Card, Squad, WarpathRun } from './types';
+import { metaLv } from './meta';
 
 // Level-ups: the XP curve (slow start, steeper late), three cards (call a unit in, drill one, or a doctrine), three
 // rerolls a run, skip for a heal. Once nothing is left to take, a level-up is score and a little healing.
@@ -35,7 +36,7 @@ export function candidates(run: WarpathRun): Card[] {
   const held = DOCTRINE_IDS.filter((id) => (run.doctrines[id] ?? 0) > 0);
   for (const id of DOCTRINE_IDS) {
     const l = run.doctrines[id] ?? 0;
-    if (l > 0 ? l < WARPATH.doctrines.max : held.length < WARPATH.doctrines.slots) out.push({ kind: 'doctrine', id });
+    if (l > 0 ? l < WARPATH.doctrines.max : held.length < WARPATH.doctrines.slots + metaLv(run, 'doctrine')) out.push({ kind: 'doctrine', id });
   }
   return out;
 }
@@ -92,6 +93,8 @@ export function callIn(run: WarpathRun, unitId: string): Squad | undefined {
     s.x = run.hx + Math.cos(a) * WARPATH.fort.land;
     s.y = run.hy + Math.sin(a) * WARPATH.fort.land;
   }
+  // Veteran Cadre: called in a level or two up (within the unit's own cap).
+  s.level = Math.min(s.maxLevel, s.level + metaLv(run, 'veterans'));
   run.squads.push(s);
   run.points += s.points;
   run.log.push(`${Math.floor(run.t / 60)}:${String(Math.floor(run.t % 60)).padStart(2, '0')} ${s.name} called in (${run.points}/${WARPATH.cap} pts).`);

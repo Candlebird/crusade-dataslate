@@ -12,6 +12,7 @@ import { unitPortrait } from '../../model/emblem';
 import {
   bankRecords, bossesOf, clearWarpath, clock, DOCTRINES, hardOpen, heroesOf, loadWarpath, newerWarpath, newRun, saveWarpath, warpathFeats, warpathRepeats,
   warpathXp, weekBoard, weekTheme, WARPATH, type WarpathMode, type WarpathRun,
+  UPGRADES, UPGRADE_IDS, RENOWN, PRESTIGE, metaOf, upgradeCost, cantBuy, buyUpgrade, bankRenown, laurelsFor, prestige, renownLine, type UpgradeId,
 } from '../../rules/warpath';
 import { FeatList } from '../Feats';
 import { Icon } from '../Icon';
@@ -99,6 +100,8 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
         out.xp.push(`${unitName(u)} +${got} XP${got < n ? ' (off-table limit)' : ''}`);
       }
       out.records = bankRecords(f, r, date);
+      const renown = bankRenown(f, r);
+      if (renown > 0) out.records.push(renownLine(renown, f.warpath?.meta?.laurels ?? 0));
       const fac = featFaction(f, d.forces, !!c);
       const ids = r.squads.map((s) => s.unitId);
       out.feats = [
@@ -209,6 +212,7 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
           </details>
         </section>
       </div>
+      <Armoury force={force} />
     </Modal>
   );
 }
@@ -252,5 +256,65 @@ function Summary({ run, news, onAgain, onClose }: { run: WarpathRun; news: News 
         <ul className="warpath-log">{run.log.map((l, i) => <li key={i}>{l}</li>)}</ul>
       </details>
     </Modal>
+  );
+}
+
+/** The Armoury: Renown buys small permanent upgrades for this force's Warpath runs; prestige trades them for Laurels. */
+function Armoury({ force }: { force: Force }) {
+  const { update } = useStore();
+  const m = metaOf(force);
+  const [sure, setSure] = useState(false);
+  const gain = laurelsFor(m.cycle);
+  const edit = (f: (x: Force) => void) => update((d) => {
+    const x = d.forces.find((y) => y.id === force.id);
+    if (!x) return;
+    f(x);
+    x.updatedAt = nowIso();
+  });
+  const buy = (id: UpgradeId) => edit((x) => { buyUpgrade(x, id); });
+  const doPrestige = () => {
+    setSure(false);
+    edit((x) => {
+      const n = prestige(x);
+      if (n) toast(`Prestige ${metaOf(x).prestige}: +${n} Laurel${n === 1 ? '' : 's'}. The Armoury starts over.`);
+    });
+  };
+  return (
+    <section className="warpath-armoury">
+      <h3><Icon name="g:anvil" /> Armoury</h3>
+      <p className="small">
+        <b>{m.renown.toLocaleString()} Renown</b>
+        {m.prestige > 0 && <> · Prestige {m.prestige} · {m.laurels} Laurel{m.laurels === 1 ? '' : 's'} (+{Math.round(RENOWN.laurel * m.laurels * 100)}% Renown)</>}
+        <span className="muted"> · Runs earn Renown by minutes, kills and bosses ({RENOWN.hard}× on Hard). Upgrades only touch this force's Warpath runs.</span>
+      </p>
+      <div className="warpath-upgrades">
+        {UPGRADE_IDS.map((id) => {
+          const u = UPGRADES[id];
+          const lv = m.levels[id] ?? 0;
+          const why = cantBuy(m, id);
+          const locked = m.prestige < u.tier;
+          return (
+            <div key={id} className={`warpath-upgrade${locked ? ' locked' : ''}`}>
+              <span className="warpath-upgrade-name"><Icon name={u.icon} /> <b>{u.name}</b> <span className="muted small">{lv}/{u.max}</span></span>
+              <span className="small">{locked ? <span className="muted">Opens at prestige {u.tier}</span> : lv > 0 ? u.text(lv) : <span className="muted">{u.text(1)} a level</span>}</span>
+              <button className="small" disabled={!!why} onClick={() => buy(id)} title={why || `Buy level ${lv + 1}`}>
+                {locked ? <Icon name="l:lock" /> : lv >= u.max ? 'Max' : <>{upgradeCost(id, lv).toLocaleString()}</>}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <p className="small">
+        <b>Prestige:</b> wipe the Armoury and the Renown in hand for Laurels. Each Laurel adds {Math.round(RENOWN.laurel * 100)}% to every run's Renown for good, and prestiges open deeper upgrades.
+        {' '}This cycle: {m.cycle.toLocaleString()} Renown earned{gain > 0 ? `, worth ${gain} Laurel${gain === 1 ? '' : 's'}` : ` (needs ${PRESTIGE.min.toLocaleString()})`}.
+      </p>
+      {gain > 0 && (
+        <div className="row">
+          {sure
+            ? <><button className="danger" onClick={doPrestige}>Prestige: lose the Armoury for {gain} Laurel{gain === 1 ? '' : 's'}</button><button onClick={() => setSure(false)}>Cancel</button></>
+            : <button onClick={() => setSure(true)}><Icon name="g:crown" /> Prestige</button>}
+        </div>
+      )}
+    </section>
   );
 }

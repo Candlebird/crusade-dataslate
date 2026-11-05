@@ -471,7 +471,12 @@ export interface ForceWarpath {
   week?: { key: string; theme: string; bosses: number; t: number; mode: 'normal' | 'hard' };
   /** Each unit's best run: most damage in one run, and its kills over every run. */
   units?: Record<string, { best: number; kills: number }>;
+  /** Warpath's own meta-progression (rules/warpath/meta.ts): Renown, the Armoury's levels, prestige. */
+  meta?: WarpathMeta;
 }
+
+/** Renown in hand, earned this cycle (since the last prestige) and ever; prestiges done, Laurels held; Armoury levels. */
+export interface WarpathMeta { renown: number; cycle: number; total: number; prestige: number; laurels: number; levels: Partial<Record<string, number>> }
 
 export interface Settings {
   supplyPerRp: number;

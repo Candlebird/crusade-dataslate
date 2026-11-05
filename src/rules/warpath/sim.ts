@@ -12,6 +12,7 @@ import { gainXp, openLevelUp, choose, candidates } from './levels';
 import { collect } from './loot';
 import { hordeStep, siteStep } from './events';
 import { heroMaxHp, mods } from './mods';
+import { metaLv } from './meta';
 import { enemyKindsOf, fieldPoints, squadOf } from './roster';
 import { heroSpeed, squadStep } from './squads';
 import type { Card, Enemy, WarpathMode, WarpathRun } from './types';
@@ -77,6 +78,9 @@ export function newRun(o: NewRun): WarpathRun {
     level: 1, xp: 0, queued: 0, offer: [], rerolls: W.cards.rerolls, doctrines: {}, kills: 0, captains: 0, lordKills: 0, score: 0,
     log: [`0:00 ${hero.name} leads ${o.force.name} against ${theme.name}${o.mode === 'hard' ? ' (Hard)' : ''}.`], fx: [],
   };
+  run.meta = { ...(o.force.warpath?.meta?.levels ?? {}) };
+  run.rerolls += metaLv(run, 'reserves');
+  run.queued += metaLv(run, 'orders');
   run.maxHp = run.hp = heroMaxHp(run);
   return run;
 }

@@ -9,6 +9,8 @@ import { autoplay, heroesOf, newRun, step } from './sim';
 import { hordeStep, siteStep } from './events';
 import { callLevel } from './levels';
 import { enemyKindsOf } from './roster';
+import { bankRenown, buyUpgrade, cantBuy, laurelsFor, metaOf, prestige, PRESTIGE, renownOf, upgradeCost } from './meta';
+import { mods } from './mods';
 
 const echoes = normalizeBook(JSON.parse(readFileSync('armies/void-echoes.gf.json', 'utf8')));
 const forceOf = (i: number): Force => ({ id: `f${i}`, name: FORCES[i].name, units: FORCES[i].units } as unknown as Force);
@@ -152,5 +154,47 @@ describe('Warpath', () => {
       step(run, { dx: 0, dy: 0 });
     }
     expect(run.phase).toBe('over');
+  });
+
+  it('meta: runs earn Renown, Renown buys Armoury levels, the run starts with them', () => {
+    const force = forceOf(2);
+    const base = start(2);
+    base.t = 600; base.kills = 3000; base.captains = 3;
+    const n = bankRenown(force, base);
+    expect(n).toBe(renownOf(base, 0));
+    expect(metaOf(force).renown).toBe(n);
+    base.auto = true;
+    expect(bankRenown(force, base)).toBe(0);
+    force.warpath!.meta!.renown = 10_000;
+    expect(buyUpgrade(force, 'vigour')).toBe(true);
+    expect(buyUpgrade(force, 'drill')).toBe(true);
+    expect(metaOf(force).renown).toBe(10_000 - upgradeCost('vigour', 0) - upgradeCost('drill', 0));
+    expect(cantBuy(metaOf(force), 'reserves')).toMatch(/Prestige/);
+    expect(buyUpgrade(force, 'reserves')).toBe(false);
+    const run = newRun({ force, heroId: heroesOf(force)[0].id, books: [echoes], mode: 'normal', date: '2026-11-04', seed: 's1', theme: echoes });
+    const plain = start(2);
+    expect(run.maxHp).toBeGreaterThan(plain.maxHp);
+    expect(mods(run).shootRate).toBeGreaterThan(mods(plain).shootRate);
+  });
+
+  it('meta: prestige wipes the Armoury for Laurels, which raise Renown and open deeper upgrades', () => {
+    const force = forceOf(2);
+    force.warpath = { meta: { renown: 900, cycle: PRESTIGE.min - 1, total: 5000, prestige: 0, laurels: 0, levels: { vigour: 4 } } };
+    expect(prestige(force)).toBe(0);
+    force.warpath.meta!.cycle = 4500;
+    const gain = laurelsFor(4500);
+    expect(gain).toBe(3);
+    expect(prestige(force)).toBe(gain);
+    const m = metaOf(force);
+    expect(m).toMatchObject({ renown: 0, cycle: 0, prestige: 1, laurels: 3, levels: {} });
+    expect(cantBuy(m, 'reserves')).toMatch(/Renown/);
+    m.renown = 1000;
+    expect(buyUpgrade(force, 'reserves')).toBe(true);
+    expect(buyUpgrade(force, 'orders')).toBe(true);
+    const run = newRun({ force, heroId: heroesOf(force)[0].id, books: [echoes], mode: 'normal', date: '2026-11-04', seed: 's1', theme: echoes });
+    expect(run.rerolls).toBe(WARPATH.cards.rerolls + 1);
+    expect(run.queued).toBe(1);
+    run.t = 600;
+    expect(renownOf(run, 3)).toBeGreaterThan(renownOf(run, 0));
   });
 });
