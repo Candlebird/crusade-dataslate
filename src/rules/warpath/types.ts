@@ -79,6 +79,8 @@ export interface Squad {
   fort?: { hp: number; maxHp: number; down: number; fall: number };
   /** Damage dealt this run (the run summary's meter), and kills. */
   dealt: number;
+  /** Hits landed, for Overcharge (every Nth is a crit). */
+  charge?: number;
   kills: number;
   /** Rules the run had to guess (the review list). */
   guessed: string[];
@@ -181,8 +183,10 @@ export interface Fx { kind: 'dmg' | 'shot' | 'melee' | 'heal' | 'boom' | 'land' 
 export interface WLord { key: string; name: string; trick: LordTrick; slain?: boolean }
 
 export interface WarpathRun {
-  /** The force's Armoury levels when the run began (rules/warpath/meta.ts). */
+  /** The force's War Council ranks when the run began (rules/warpath/meta.ts). */
   meta?: Partial<Record<string, number>>;
+  /** War Council clocks in the run: Wrath's and Bastion's next go, Second Wind spent. */
+  tree?: { wrath?: number; bastion?: number; wind?: boolean };
   v: number;
   forceId: string;
   mode: WarpathMode;

@@ -205,7 +205,7 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
     ctx.setLineDash([]);
     if (st.kind !== 'champion' && st.held > 0) {
       ctx.beginPath();
-      ctx.arc(x, y, R, -Math.PI / 2, -Math.PI / 2 + Math.min(1, st.held / holdOf(st.kind)) * Math.PI * 2);
+      ctx.arc(x, y, R, -Math.PI / 2, -Math.PI / 2 + Math.min(1, st.held / holdOf(st.kind, run)) * Math.PI * 2);
       ctx.lineWidth = 5;
       ctx.strokeStyle = col;
       ctx.stroke();

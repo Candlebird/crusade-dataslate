@@ -475,8 +475,9 @@ export interface ForceWarpath {
   meta?: WarpathMeta;
 }
 
-/** Renown in hand, earned this cycle (since the last prestige) and ever; prestiges done, Laurels held; Armoury levels. */
-export interface WarpathMeta { renown: number; cycle: number; total: number; prestige: number; laurels: number; levels: Partial<Record<string, number>> }
+/** Renown in hand, earned this cycle (since the last prestige) and ever; prestiges done, Laurels held; War Council
+ *  (skill tree) ranks. `levels`: the old Armoury's, refunded as Renown when next touched. */
+export interface WarpathMeta { renown: number; cycle: number; total: number; prestige: number; laurels: number; nodes?: Partial<Record<string, number>>; levels?: Partial<Record<string, number>> }
 
 export interface Settings {
   supplyPerRp: number;

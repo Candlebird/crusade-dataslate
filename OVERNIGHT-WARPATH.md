@@ -137,3 +137,37 @@ Each force has its own progression, and it only affects Warpath. It sits on the 
 - **Prestige:** you need 2,000 Renown earned in the cycle. Prestige wipes the Armoury and the Renown in hand for ⌊√(cycle/500)⌋ Laurels. Each Laurel gives +10% Renown for good.
 - **Pacing:** a typical 12-minute Normal run earns about 200 Renown. The first prestige is about 10 runs in. Maxing all six starting upgrades takes about 6,500 Renown.
 - **Snapshot:** a run takes a copy of the Armoury when it starts, so a resumed run plays the same.
+
+## War Council skill tree (2026-11-05)
+
+The Armoury is now a real skill tree. There are 4 branches with 5 tiers each, and its effects change how a run plays, not just how big the numbers are.
+- **Branches:**
+  - **Fire:** Honed Edge and Drill.
+    - Choice: Hail of Fire (+25% rate, −15% damage) or Big Guns (+1 AP).
+    - Keystones: Overcharge (every 6th shot ×3) or Wrath (a blast every 15 s).
+    - Capstone: Executioner (non-bosses under 20% HP die).
+  - **Guard:** Vigour and Warded Plate.
+    - Choice: Thorns or Bastion (a shield every 20 s).
+    - Keystone: Second Wind (once a run, back up at 40% HP).
+    - Capstone choice: Last Stand (+40% rate under 35% HP) or Unbreakable (no blow over 15% of max HP).
+  - **Command:** Shard Lore and Lodestone.
+    - Choice: Reserves or Forward Orders.
+    - Keystone: Muster (call-ins every 2nd level-up).
+    - Capstone choice: Veterans or War College (+1 doctrine slot, new doctrines at level 2).
+  - **Scout:** Forced March and Pathfinder (faster holds).
+    - Choice: Plunder (a cache gives 2 level-ups) or Pilgrim (a longer, stronger shrine).
+    - Keystone: Cartographer (more sites).
+    - Capstone choice: Scout's Warning (hordes are smaller and warned 6 s ahead) or Champion Hunter.
+- **Gating:** each tier needs a rank in the tier above. Keystones need prestige 1, capstones prestige 2.
+- **Choices:** taking one side of a choice shuts the other until a reset. A reset gives back 80% of the Renown spent.
+- **Old saves:** old Armoury levels come back as Renown.
+- **Numbers:** every effect number is in `TREE_FX` in meta.ts.
+- **Probe, Normal** (6 live forces, lord falls / time):
+
+| Build | Run ends at | Lords killed |
+|---|---|---|
+| No tree | about 11 min | 0 |
+| Mid build (about 1,200 Renown) | 12–16 min (median 13) | 3 |
+| Full prestige-2 build | 17–32 min (median 22) | 12 |
+
+  In the full build, one Cobalt Knights run reached the 30-min cap.

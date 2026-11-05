@@ -5,6 +5,7 @@ import { WARPATH } from './data';
 import { terrainAt, type Grid } from './field';
 import { mods, penalty, type Mods } from './mods';
 import { killed } from './loot';
+import { has, TREE_FX as T } from './meta';
 import type { Enemy, Squad, WarpathRun, WGun } from './types';
 
 // The force at work: every squad's guns on Training's volley clock (shots.ts), OPR rolls against the enemy's Defense,
@@ -59,6 +60,11 @@ export function hurtEnemy(run: WarpathRun, si: number, e: Enemy, dmg: number, cr
     if (dmg <= 0) return;
   }
   if (e.status.mark) dmg *= 1.25;
+  // Executioner: a hit that leaves a non-boss low finishes it.
+  if (!e.boss && e.hp - dmg > 0 && e.hp - dmg < e.maxHp * T.executeBelow && has(run, 'executioner')) {
+    dmg = e.hp;
+    crit = true;
+  }
   const dealt = Math.min(e.hp, dmg);
   e.hp -= dmg;
   e.by = si;
@@ -107,10 +113,13 @@ function strike(run: WarpathRun, grid: Grid, si: number, g: WGun, target: Enemy,
   const last = live.find((e) => e.kind === 'lastStand' && s.alive <= s.size / 2);
   const mul = m.dmg * (last && last.kind === 'lastStand' ? last.mul : 1);
   const raw = rawDamage(g.deadly, levelDmg + sixes.reduce((n, e) => n + (e.dmg ?? 0), 0)) * mul;
+  const over = has(run, 'overcharge');
   const saveOf = (e: Enemy) => saveChance(e.armour + run.enemyKinds[e.kind].defense, shot.ap);
   const hit = (e: Enemy, first: boolean) => {
     if (rand(run) < saveOf(e)) return;
-    hurtEnemy(run, si, e, raw, shot.six);
+    // Overcharge: every Nth hit the squad lands is a crit.
+    if (over && (s.charge = (s.charge ?? 0) + 1) % T.overchargeEvery === 0) hurtEnemy(run, si, e, raw * T.overchargeMul, true);
+    else hurtEnemy(run, si, e, raw, shot.six);
     if (first) for (const k of live) if (k.kind === 'onHit' && (!k.only || (k.only === 'melee') === g.melee) && rand(run) < k.chance) afflict(run, si, e, k.status);
   };
   hit(target, true);
@@ -160,6 +169,27 @@ export function fireAll(run: WarpathRun, grid: Grid, dt: number): void {
     }
     timedRules(run, grid, si, dt, m, aura);
   });
+  treeClocks(run, grid, dt);
+}
+
+/** The War Council's clocks: Wrath's burst round the hero, Bastion's shield. */
+function treeClocks(run: WarpathRun, grid: Grid, dt: number): void {
+  if (!has(run, 'wrath') && !has(run, 'bastion')) return;
+  const c = (run.tree ??= {});
+  if (has(run, 'wrath')) {
+    c.wrath = (c.wrath ?? T.wrathEvery) - dt;
+    if (c.wrath <= 0) {
+      c.wrath = T.wrathEvery;
+      blastAt(run, grid, 0, run.hx, run.hy, T.wrathRadius, T.wrathHits, T.wrathAp, Math.min(4, run.squads[0].quality), 'boom');
+    }
+  }
+  if (has(run, 'bastion')) {
+    c.bastion = (c.bastion ?? 0) - dt;
+    if (c.bastion <= 0) {
+      c.bastion = T.bastionEvery;
+      run.shield = Math.max(run.shield ?? 0, run.maxHp * T.bastion);
+    }
+  }
 }
 
 /** Heal, Shield, Barrage and Frenzy on their clocks; Caster(X) spells; relic volleys. Heals and shields land on the hero. */

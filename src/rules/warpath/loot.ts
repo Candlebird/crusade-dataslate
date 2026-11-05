@@ -2,6 +2,7 @@ import { rand } from '../training/rng';
 import { WARPATH } from './data';
 import { mods } from './mods';
 import { gainXp } from './levels';
+import { has } from './meta';
 import type { Enemy, PickupKind, WarpathRun } from './types';
 
 // What falls when an enemy does, and picking it up: Shard XP, rations, recall beacons and a boss's supply drop.
@@ -29,6 +30,11 @@ export function killed(run: WarpathRun, e: Enemy, si: number): void {
     for (let i = 0; i < n; i++) drop(run, 'gem', e.x + Math.cos((i / n) * Math.PI * 2) * 1.5, e.y + Math.sin((i / n) * Math.PI * 2) * 1.5, WARPATH.sites.champXp / n);
     run.fx.push({ kind: 'boom', x: e.x, y: e.y, n: e.size * 1.5, t: 0.8 });
     run.log.push(`${clock(run.t)} A champion (${k.name}) slain by ${s?.name ?? 'the field'}.`);
+    // Champion Hunter: its head is worth a level-up.
+    if (has(run, 'hunter')) {
+      run.queued += 1;
+      run.banner = { text: 'Champion slain: a free level-up', t: 3, tone: 'good' };
+    }
     return;
   }
   if (!e.boss) {

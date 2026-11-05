@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Campaign, Force } from '../../model/types';
 import { localDate } from '../../model/date';
 import { nowIso, uid } from '../../model/factory';
@@ -12,7 +12,8 @@ import { unitPortrait } from '../../model/emblem';
 import {
   bankRecords, bossesOf, clearWarpath, clock, DOCTRINES, hardOpen, heroesOf, loadWarpath, newerWarpath, newRun, saveWarpath, warpathFeats, warpathRepeats,
   warpathXp, weekBoard, weekTheme, WARPATH, type WarpathMode, type WarpathRun,
-  UPGRADES, UPGRADE_IDS, RENOWN, PRESTIGE, metaOf, upgradeCost, cantBuy, buyUpgrade, bankRenown, laurelsFor, prestige, renownLine, type UpgradeId,
+  BRANCHES, BRANCH_IDS, TREE, NODE_IDS, RENOWN, PRESTIGE, metaOf, nodeCost, nodeState, cantTake, takeNode, resetTree, resetValue, bankRenown, laurelsFor,
+  prestige, renownLine, type NodeId, type BranchId,
 } from '../../rules/warpath';
 import { FeatList } from '../Feats';
 import { Icon } from '../Icon';
@@ -259,62 +260,119 @@ function Summary({ run, news, onAgain, onClose }: { run: WarpathRun; news: News 
   );
 }
 
-/** The Armoury: Renown buys small permanent upgrades for this force's Warpath runs; prestige trades them for Laurels. */
+/** The tier captions down a branch. */
+const TIER_CAPTION = ['', 'Ranked', 'Ranked', 'Choose one', 'Keystone', 'Capstone · choose one'];
+
+/** The War Council: Renown buys nodes in a four-branch skill tree for this force's Warpath runs; prestige trades the
+ *  tree for Laurels and opens its deep tiers. */
 function Armoury({ force }: { force: Force }) {
   const { update } = useStore();
   const m = metaOf(force);
-  const [sure, setSure] = useState(false);
+  const [pick, setPick] = useState<NodeId>('edge');
+  const [sure, setSure] = useState<'' | 'prestige' | 'reset'>('');
   const gain = laurelsFor(m.cycle);
+  const back = resetValue(m);
   const edit = (f: (x: Force) => void) => update((d) => {
     const x = d.forces.find((y) => y.id === force.id);
     if (!x) return;
     f(x);
     x.updatedAt = nowIso();
   });
-  const buy = (id: UpgradeId) => edit((x) => { buyUpgrade(x, id); });
+  const take = (id: NodeId) => edit((x) => { takeNode(x, id); });
   const doPrestige = () => {
-    setSure(false);
+    setSure('');
     edit((x) => {
       const n = prestige(x);
-      if (n) toast(`Prestige ${metaOf(x).prestige}: +${n} Laurel${n === 1 ? '' : 's'}. The Armoury starts over.`);
+      if (n) toast(`Prestige ${metaOf(x).prestige}: +${n} Laurel${n === 1 ? '' : 's'}. The War Council starts over.`);
     });
   };
+  const doReset = () => {
+    setSure('');
+    edit((x) => { const n = resetTree(x); toast(`The tree is cleared: ${n.toLocaleString()} Renown back.`); });
+  };
+  const ranksIn = (b: BranchId) => NODE_IDS.filter((id) => TREE[id].branch === b).reduce((n, id) => n + (m.nodes[id] ?? 0), 0);
+  const tint = (b: BranchId) => ({ '--branch': BRANCHES[b].color }) as CSSProperties;
+  const node = (id: NodeId) => {
+    const t = TREE[id];
+    const st = nodeState(m, id);
+    const n = m.nodes[id] ?? 0;
+    return (
+      <button
+        type="button"
+        className={`wt-node st-${st}${t.key ? ' key' : ''}${pick === id ? ' picked' : ''}`}
+        onClick={() => setPick(id)}
+        title={`${t.name}: ${t.text(Math.max(1, n))}`}
+      >
+        <span className="wt-icon"><Icon name={st === 'sealed' ? 'l:lock' : t.icon} /></span>
+        <span className="wt-name">{t.name}</span>
+        {t.ranks > 1 && <span className="wt-pips">{Array.from({ length: t.ranks }, (_, i) => <i key={i} className={i < n ? 'on' : ''} />)}</span>}
+      </button>
+    );
+  };
+  const p = TREE[pick];
+  const pn = m.nodes[pick] ?? 0;
+  const why = cantTake(m, pick);
   return (
     <section className="warpath-armoury">
-      <h3><Icon name="g:anvil" /> Armoury</h3>
+      <h3><Icon name="g:knight-banner" /> War Council</h3>
       <p className="small">
         <b>{m.renown.toLocaleString()} Renown</b>
         {m.prestige > 0 && <> · Prestige {m.prestige} · {m.laurels} Laurel{m.laurels === 1 ? '' : 's'} (+{Math.round(RENOWN.laurel * m.laurels * 100)}% Renown)</>}
-        <span className="muted"> · Runs earn Renown by minutes, kills and bosses ({RENOWN.hard}× on Hard). Upgrades only touch this force's Warpath runs.</span>
+        <span className="muted"> · Runs earn Renown by minutes, kills and bosses ({RENOWN.hard}× on Hard). The tree only touches this force's Warpath runs.</span>
       </p>
-      <div className="warpath-upgrades">
-        {UPGRADE_IDS.map((id) => {
-          const u = UPGRADES[id];
-          const lv = m.levels[id] ?? 0;
-          const why = cantBuy(m, id);
-          const locked = m.prestige < u.tier;
-          return (
-            <div key={id} className={`warpath-upgrade${locked ? ' locked' : ''}`}>
-              <span className="warpath-upgrade-name"><Icon name={u.icon} /> <b>{u.name}</b> <span className="muted small">{lv}/{u.max}</span></span>
-              <span className="small">{locked ? <span className="muted">Opens at prestige {u.tier}</span> : lv > 0 ? u.text(lv) : <span className="muted">{u.text(1)} a level</span>}</span>
-              <button className="small" disabled={!!why} onClick={() => buy(id)} title={why || `Buy level ${lv + 1}`}>
-                {locked ? <Icon name="l:lock" /> : lv >= u.max ? 'Max' : <>{upgradeCost(id, lv).toLocaleString()}</>}
-              </button>
+      <div className="wt-tree">
+        {BRANCH_IDS.map((b) => (
+          <div key={b} className="wt-branch" style={tint(b)}>
+            <div className="wt-branch-head">
+              <Icon name={BRANCHES[b].icon} /> <b>{BRANCHES[b].name}</b>{ranksIn(b) > 0 && <span className="small"> · {ranksIn(b)}</span>}
+              <div className="muted small">{BRANCHES[b].text}</div>
             </div>
-          );
-        })}
+            {[1, 2, 3, 4, 5].map((tier) => {
+              const ids = NODE_IDS.filter((id) => TREE[id].branch === b && TREE[id].tier === tier);
+              const lit = NODE_IDS.some((id) => TREE[id].branch === b && TREE[id].tier === tier - 1 && (m.nodes[id] ?? 0) > 0);
+              return (
+                <div key={tier} className={`wt-tier${tier > 1 ? ' linked' : ''}${lit ? ' lit' : ''}`}>
+                  {tier >= 3 && <span className="wt-caption">{TIER_CAPTION[tier]}</span>}
+                  <div className="wt-row">
+                    {ids.map((id, i) => <span key={id} className="wt-slot">{i > 0 && <span className="wt-or">or</span>}{node(id)}</span>)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="wt-detail" style={tint(p.branch)}>
+        <div className="wt-detail-head">
+          <Icon name={p.icon} /> <b>{p.name}</b>
+          <span className="muted small"> · {BRANCHES[p.branch].name}, {TIER_CAPTION[p.tier].toLowerCase()}{p.ranks > 1 ? ` · rank ${pn}/${p.ranks}` : ''}</span>
+        </div>
+        <div>
+          {pn > 0 ? <>Now: <b>{p.text(pn)}</b>{pn < p.ranks && <>. Next rank: {p.text(pn + 1)}</>}.</> : <>{p.text(1)}{p.ranks > 1 ? ' (first rank)' : ''}.</>}
+        </div>
+        {p.rival && <div className="small muted">A choice: taking it shuts {TREE[p.rival].name} until the tree is reset.</div>}
+        <div className="row">
+          <button className="primary" disabled={!!why} onClick={() => take(pick)}>
+            {pn >= p.ranks ? 'Taken' : `Take for ${nodeCost(pick, pn).toLocaleString()} Renown`}
+          </button>
+          {why && pn < p.ranks && <span className="small muted">{why}</span>}
+        </div>
       </div>
       <p className="small">
-        <b>Prestige:</b> wipe the Armoury and the Renown in hand for Laurels. Each Laurel adds {Math.round(RENOWN.laurel * 100)}% to every run's Renown for good, and prestiges open deeper upgrades.
+        <b>Reset the tree</b> to choose again: {Math.round(PRESTIGE.refund * 100)}% of the Renown spent comes back{back > 0 ? ` (${back.toLocaleString()})` : ''}.
+        {' '}<b>Prestige:</b> wipe the tree and the Renown in hand for Laurels. Each Laurel adds {Math.round(RENOWN.laurel * 100)}% to every run's Renown for good; prestige 1 opens the keystones, prestige 2 the capstones.
         {' '}This cycle: {m.cycle.toLocaleString()} Renown earned{gain > 0 ? `, worth ${gain} Laurel${gain === 1 ? '' : 's'}` : ` (needs ${PRESTIGE.min.toLocaleString()})`}.
       </p>
-      {gain > 0 && (
-        <div className="row">
-          {sure
-            ? <><button className="danger" onClick={doPrestige}>Prestige: lose the Armoury for {gain} Laurel{gain === 1 ? '' : 's'}</button><button onClick={() => setSure(false)}>Cancel</button></>
-            : <button onClick={() => setSure(true)}><Icon name="g:crown" /> Prestige</button>}
-        </div>
-      )}
+      <div className="row">
+        {sure === 'reset'
+          ? <><button className="danger" onClick={doReset}>Clear the tree for {back.toLocaleString()} Renown</button><button onClick={() => setSure('')}>Cancel</button></>
+          : sure === 'prestige'
+            ? <><button className="danger" onClick={doPrestige}>Prestige: lose the tree and Renown for {gain} Laurel{gain === 1 ? '' : 's'}</button><button onClick={() => setSure('')}>Cancel</button></>
+            : <>
+              <button disabled={back <= 0} onClick={() => setSure('reset')}>Reset tree</button>
+              {gain > 0 && <button onClick={() => setSure('prestige')}><Icon name="g:crown" /> Prestige</button>}
+            </>}
+      </div>
     </section>
   );
 }

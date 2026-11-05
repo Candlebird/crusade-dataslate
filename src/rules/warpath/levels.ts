@@ -2,7 +2,7 @@ import { rand } from '../training/rng';
 import { DOCTRINE_IDS, DOCTRINES, WARPATH, type DoctrineId } from './data';
 import { heroMaxHp } from './mods';
 import type { Card, Squad, WarpathRun } from './types';
-import { metaLv } from './meta';
+import { has, TREE_FX } from './meta';
 
 // Level-ups: the XP curve (slow start, steeper late), three cards (call a unit in, drill one, or a doctrine), three
 // rerolls a run, skip for a heal. Once nothing is left to take, a level-up is score and a little healing.
@@ -26,7 +26,7 @@ export function gainXp(run: WarpathRun, n: number): void {
 export const pointsLeft = (run: WarpathRun) => WARPATH.cap - run.points;
 
 /** Call-in cards come only on every `callEvery`-th level-up (counting the one open now; supply drops count too). */
-export const callLevel = (run: WarpathRun) => (run.levelUps ?? 0) > 0 && (run.levelUps ?? 0) % K.callEvery === 0;
+export const callLevel = (run: WarpathRun) => (run.levelUps ?? 0) > 0 && (run.levelUps ?? 0) % (has(run, 'muster') ? TREE_FX.musterEvery : K.callEvery) === 0;
 
 /** Every card that could be offered now. */
 export function candidates(run: WarpathRun): Card[] {
@@ -36,7 +36,7 @@ export function candidates(run: WarpathRun): Card[] {
   const held = DOCTRINE_IDS.filter((id) => (run.doctrines[id] ?? 0) > 0);
   for (const id of DOCTRINE_IDS) {
     const l = run.doctrines[id] ?? 0;
-    if (l > 0 ? l < WARPATH.doctrines.max : held.length < WARPATH.doctrines.slots + metaLv(run, 'doctrine')) out.push({ kind: 'doctrine', id });
+    if (l > 0 ? l < WARPATH.doctrines.max : held.length < WARPATH.doctrines.slots + (has(run, 'college') ? 1 : 0)) out.push({ kind: 'doctrine', id });
   }
   return out;
 }
@@ -94,7 +94,7 @@ export function callIn(run: WarpathRun, unitId: string): Squad | undefined {
     s.y = run.hy + Math.sin(a) * WARPATH.fort.land;
   }
   // Veteran Cadre: called in a level or two up (within the unit's own cap).
-  s.level = Math.min(s.maxLevel, s.level + metaLv(run, 'veterans'));
+  if (has(run, 'veterans')) s.level = Math.min(s.maxLevel, s.level + TREE_FX.veterans);
   run.squads.push(s);
   run.points += s.points;
   run.log.push(`${Math.floor(run.t / 60)}:${String(Math.floor(run.t % 60)).padStart(2, '0')} ${s.name} called in (${run.points}/${WARPATH.cap} pts).`);
@@ -116,7 +116,11 @@ export function choose(run: WarpathRun, i: number): void {
         run.hp += run.maxHp - before;
       }
     }
-  } else if (c.kind === 'doctrine') run.doctrines[c.id] = Math.min(WARPATH.doctrines.max, (run.doctrines[c.id] ?? 0) + 1);
+  } else if (c.kind === 'doctrine') {
+    // War College: a new doctrine comes in at level 2.
+    const l = run.doctrines[c.id] ?? 0;
+    run.doctrines[c.id] = Math.min(WARPATH.doctrines.max, l + (l === 0 && has(run, 'college') ? 2 : 1));
+  }
   else {
     run.score += WARPATH.score.level;
     run.hp = Math.min(run.maxHp, run.hp + run.maxHp * K.healAtMax);
@@ -149,7 +153,7 @@ export function cardText(run: WarpathRun, c: Card): { title: string; text: strin
   if (c.kind === 'doctrine') {
     const d = DOCTRINES[c.id as DoctrineId];
     const l = run.doctrines[c.id] ?? 0;
-    return { title: d.name, text: d.text, tag: l ? `Doctrine ${l} → ${l + 1}` : 'New doctrine' };
+    return { title: d.name, text: d.text, tag: l ? `Doctrine ${l} → ${l + 1}` : has(run, 'college') ? 'New doctrine · level 2' : 'New doctrine' };
   }
   const s = c.kind === 'call' ? run.bench.find((x) => x.unitId === c.unitId) : run.squads.find((x) => x.unitId === c.unitId);
   if (!s) return { title: '?', text: '', tag: '' };

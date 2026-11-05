@@ -9,7 +9,8 @@ import { autoplay, heroesOf, newRun, step } from './sim';
 import { hordeStep, siteStep } from './events';
 import { callLevel } from './levels';
 import { enemyKindsOf } from './roster';
-import { bankRenown, buyUpgrade, cantBuy, laurelsFor, metaOf, prestige, PRESTIGE, renownOf, upgradeCost } from './meta';
+import { bankRenown, cantTake, laurelsFor, metaOf, nodeCost, nodeState, prestige, PRESTIGE, renownOf, resetTree, takeNode, TREE_FX } from './meta';
+import { hurtEnemy } from './combat';
 import { mods } from './mods';
 
 const echoes = normalizeBook(JSON.parse(readFileSync('armies/void-echoes.gf.json', 'utf8')));
@@ -156,7 +157,7 @@ describe('Warpath', () => {
     expect(run.phase).toBe('over');
   });
 
-  it('meta: runs earn Renown, Renown buys Armoury levels, the run starts with them', () => {
+  it('meta: runs earn Renown, Renown buys tree nodes down a branch, the run starts with them', () => {
     const force = forceOf(2);
     const base = start(2);
     base.t = 600; base.kills = 3000; base.captains = 3;
@@ -166,35 +167,77 @@ describe('Warpath', () => {
     base.auto = true;
     expect(bankRenown(force, base)).toBe(0);
     force.warpath!.meta!.renown = 10_000;
-    expect(buyUpgrade(force, 'vigour')).toBe(true);
-    expect(buyUpgrade(force, 'drill')).toBe(true);
-    expect(metaOf(force).renown).toBe(10_000 - upgradeCost('vigour', 0) - upgradeCost('drill', 0));
-    expect(cantBuy(metaOf(force), 'reserves')).toMatch(/Prestige/);
-    expect(buyUpgrade(force, 'reserves')).toBe(false);
+    // Tier 2 needs tier 1; keystones need prestige.
+    expect(cantTake(metaOf(force), 'drill')).toMatch(/tier above/);
+    expect(takeNode(force, 'edge')).toBe(true);
+    expect(takeNode(force, 'drill')).toBe(true);
+    expect(takeNode(force, 'vigour')).toBe(true);
+    expect(metaOf(force).renown).toBe(10_000 - nodeCost('edge', 0) - nodeCost('drill', 0) - nodeCost('vigour', 0));
+    expect(nodeState(metaOf(force), 'overcharge')).toBe('sealed');
+    expect(takeNode(force, 'overcharge')).toBe(false);
+    // A choice shuts its rival.
+    expect(takeNode(force, 'hail')).toBe(true);
+    expect(nodeState(metaOf(force), 'bigGuns')).toBe('shut');
+    expect(takeNode(force, 'bigGuns')).toBe(false);
     const run = newRun({ force, heroId: heroesOf(force)[0].id, books: [echoes], mode: 'normal', date: '2026-11-04', seed: 's1', theme: echoes });
     const plain = start(2);
     expect(run.maxHp).toBeGreaterThan(plain.maxHp);
-    expect(mods(run).shootRate).toBeGreaterThan(mods(plain).shootRate);
+    expect(mods(run).shootRate).toBeGreaterThan(mods(plain).shootRate * 1.25);
+    expect(mods(run).dmg).toBeLessThan(mods(plain).dmg);
+    // A reset gives most of it back and opens both sides again.
+    const before = metaOf(force).renown;
+    const back = resetTree(force);
+    expect(back).toBe(Math.floor((nodeCost('edge', 0) + nodeCost('drill', 0) + nodeCost('vigour', 0) + nodeCost('hail', 0)) * PRESTIGE.refund));
+    expect(metaOf(force).renown).toBe(before + back);
+    expect(nodeState(metaOf(force), 'bigGuns')).toBe('locked');
   });
 
-  it('meta: prestige wipes the Armoury for Laurels, which raise Renown and open deeper upgrades', () => {
+  it('meta: the old Armoury comes back as Renown; prestige wipes the tree for Laurels and opens keystones', () => {
     const force = forceOf(2);
-    force.warpath = { meta: { renown: 900, cycle: PRESTIGE.min - 1, total: 5000, prestige: 0, laurels: 0, levels: { vigour: 4 } } };
+    force.warpath = { meta: { renown: 900, cycle: PRESTIGE.min - 1, total: 5000, prestige: 0, laurels: 0, levels: { vigour: 2 } } };
+    expect(metaOf(force).renown).toBe(900 + 20 + 27);
     expect(prestige(force)).toBe(0);
+    expect(force.warpath.meta!.levels).toBeUndefined();
     force.warpath.meta!.cycle = 4500;
-    const gain = laurelsFor(4500);
-    expect(gain).toBe(3);
-    expect(prestige(force)).toBe(gain);
-    const m = metaOf(force);
-    expect(m).toMatchObject({ renown: 0, cycle: 0, prestige: 1, laurels: 3, levels: {} });
-    expect(cantBuy(m, 'reserves')).toMatch(/Renown/);
-    m.renown = 1000;
-    expect(buyUpgrade(force, 'reserves')).toBe(true);
-    expect(buyUpgrade(force, 'orders')).toBe(true);
+    expect(laurelsFor(4500)).toBe(3);
+    expect(prestige(force)).toBe(3);
+    expect(metaOf(force)).toMatchObject({ renown: 0, cycle: 0, prestige: 1, laurels: 3, nodes: {} });
+    force.warpath.meta!.renown = 5000;
+    for (const id of ['lore', 'lodestone', 'orders', 'muster'] as const) expect(takeNode(force, id)).toBe(true);
+    expect(cantTake(metaOf(force), 'veterans')).toMatch(/prestige 2/);
     const run = newRun({ force, heroId: heroesOf(force)[0].id, books: [echoes], mode: 'normal', date: '2026-11-04', seed: 's1', theme: echoes });
-    expect(run.rerolls).toBe(WARPATH.cards.rerolls + 1);
-    expect(run.queued).toBe(1);
+    expect(run.queued).toBe(TREE_FX.orders);
+    // Muster: call-in cards every 2nd level-up.
+    run.levelUps = 2;
+    expect(callLevel(run)).toBe(true);
     run.t = 600;
     expect(renownOf(run, 3)).toBeGreaterThan(renownOf(run, 0));
+  });
+
+  it('keystones change the run: Second Wind, Executioner, Plunder', () => {
+    const run = start(0, 'ks');
+    run.meta = { secondWind: 1, executioner: 1, plunder: 1 };
+    run.hp = -5;
+    step(run, { dx: 0, dy: 0 });
+    expect(run.phase).toBe('play');
+    expect(run.hp).toBeCloseTo(run.maxHp * TREE_FX.secondWind, 0);
+    run.hp = -5;
+    step(run, { dx: 0, dy: 0 });
+    expect(run.phase).toBe('over');
+    // Executioner: a hit that leaves a non-boss under a fifth of its HP kills it.
+    const r2 = start(0, 'ex');
+    r2.meta = { executioner: 1 };
+    for (let i = 0; i < 300 && !r2.enemies.length; i++) step(r2, { dx: 0, dy: 0 });
+    const e = r2.enemies[0];
+    e.hp = e.maxHp = 100;
+    hurtEnemy(r2, 0, e, 85);
+    expect(e.hp).toBeLessThanOrEqual(0);
+    // Plunder: a cache gives two level-ups.
+    const r3 = start(0, 'pl');
+    r3.meta = { plunder: 1 };
+    r3.sites = [{ id: 900, kind: 'cache', x: 0, y: 0, held: 0 }];
+    r3.nextSite = 1e9;
+    for (let i = 0; i < 80 && (r3.sites ?? []).length; i++) siteStep(r3, 0.1);
+    expect(r3.queued).toBe(TREE_FX.plunder);
   });
 });

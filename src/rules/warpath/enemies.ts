@@ -5,6 +5,7 @@ import { onField } from './combat';
 import { enemyMul, minutes, mods } from './mods';
 import { clock } from './loot';
 import type { Enemy, EnemyKind, Missile, WarpathRun } from './types';
+import { has, TREE_FX } from './meta';
 
 // The horde: packs come in from a ring past the screen edge, tougher every 5 minutes; a share stop at range and shoot
 // (telegraphed); a captain every 3 minutes, an Echo Lord every 15 with its trick. Blows on the hero spread model losses
@@ -124,7 +125,7 @@ export function hurtHero(run: WarpathRun, dmg: number): void {
   if (dmg <= 0 || run.hp <= 0) return;
   const m = mods(run);
   // No one blow (a lord's swing, a big blast) takes more than a share of the hero's HP: it can be dodged, not one-shot.
-  dmg = Math.min(dmg * m.heroDmg, run.maxHp * E.heroBlowCap);
+  dmg = Math.min(dmg * m.heroDmg, run.maxHp * (has(run, 'unbreakable') ? TREE_FX.unbreakable : E.heroBlowCap));
   run.iframes = W.hero.iframes;
   const spread = dmg * W.losses.share * m.losses;
   if (run.shield && run.shield > 0) {
@@ -347,6 +348,10 @@ export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Ene
     }
     if (run.iframes > 0) continue;
     const dmg = rollOnHero(run, attacks, k.quality, k.melee.ap, k.melee.deadly, mul.dmg * (e.elite ? W.elite.dmg : 1));
-    if (dmg > 0) hurtHero(run, dmg);
+    if (dmg > 0) {
+      hurtHero(run, dmg);
+      // Thorns: what wounds the hero in melee pays for it.
+      if (has(run, 'thorns')) hurt(e, e.maxHp * (e.boss ? TREE_FX.thornsBoss : TREE_FX.thorns));
+    }
   }
 }

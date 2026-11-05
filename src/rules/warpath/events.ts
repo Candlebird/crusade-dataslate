@@ -4,8 +4,10 @@ import { unblock } from './field';
 import { eliteShare, pickKind, spawnEnemy, spawnRate } from './enemies';
 
 /** How long a site must be held. */
-export const holdOf = (k: SiteKind) => (k === 'shrine' ? S.hold : k === 'cache' ? S.cacheHold : k === 'well' ? S.wellHold : 0);
+export const holdOf = (k: SiteKind, run?: WarpathRun) =>
+  (k === 'shrine' ? S.hold : k === 'cache' ? S.cacheHold : k === 'well' ? S.wellHold : 0) * (1 - T.pathfinder * (run ? metaLv(run, 'pathfinder') : 0));
 import { clock } from './loot';
+import { has, metaLv, TREE_FX as T } from './meta';
 import type { SiteKind, WarpathRun } from './types';
 
 // The run's surprises. Hordes: every so often, after a short warning, a ring of one kind closes round the hero or a
@@ -30,8 +32,9 @@ export function hordeStep(run: WarpathRun): void {
   if (!run.horde && run.t >= run.nextHorde) {
     const kind = rand(run) < 0.5 ? 'ring' : 'column';
     const a = run.face + (rand(run) - 0.5) * 2;
-    run.horde = { at: run.t + H.warn, kind, a };
-    banner(run, kind === 'ring' ? 'A horde closes in from every side!' : `A horde charges from the ${dirOf(a)}!`, 'warn', H.warn + 1);
+    const warn = has(run, 'warning') ? T.warnSecs : H.warn;
+    run.horde = { at: run.t + warn, kind, a };
+    banner(run, kind === 'ring' ? 'A horde closes in from every side!' : `A horde charges from the ${dirOf(a)}!`, 'warn', warn + 1);
     return;
   }
   if (!run.horde || run.t < run.horde.at) return;
@@ -40,7 +43,7 @@ export function hordeStep(run: WarpathRun): void {
   run.nextHorde = run.t + H.min + rand(run) * (H.max - H.min);
   let live = 0;
   for (const e of run.enemies) if (e.hp > 0) live++;
-  const n = Math.min(Math.max(H.least, Math.round(spawnRate(run) * H.secs)), WARPATH.spawn.maxField + H.over - live);
+  const n = Math.min(Math.round(Math.max(H.least, Math.round(spawnRate(run) * H.secs)) * (has(run, 'warning') ? T.warnSize : 1)), WARPATH.spawn.maxField + H.over - live);
   if (n <= 0) return;
   const kind = pickKind(run);
   const size = run.enemyKinds[kind].size;
@@ -89,8 +92,9 @@ export function siteStep(run: WarpathRun, dt: number): void {
   run.sites ??= [];
   run.nextSite ??= S.first;
   if (run.t >= run.nextSite) {
-    run.nextSite = run.t + S.every;
-    if (run.sites.length < S.live && run.enemyKinds.length) {
+    const carto = has(run, 'cartographer');
+    run.nextSite = run.t + (carto ? T.cartoEvery : S.every);
+    if (run.sites.length < (carto ? T.cartoLive : S.live) && run.enemyKinds.length) {
       const r = rand(run);
       const kind: SiteKind = r < 0.3 ? 'shrine' : r < 0.6 ? 'cache' : r < 0.8 ? 'champion' : 'well';
       const a = rand(run) * Math.PI * 2;
@@ -118,9 +122,11 @@ export function siteStep(run: WarpathRun, dt: number): void {
     const on = d2 < S.radius ** 2;
     if (s.kind === 'shrine') {
       s.held = on ? s.held + dt : Math.max(0, s.held - dt * 0.5);
-      if (s.held >= S.hold) {
-        run.hymnUntil = run.t + S.hymnSecs;
-        banner(run, `Battle Hymn: the force fires ${Math.round(S.hymn * 100)}% faster for ${S.hymnSecs}s`, 'good');
+      if (s.held >= holdOf('shrine', run)) {
+        const pilgrim = has(run, 'pilgrim');
+        const secs = pilgrim ? T.pilgrimSecs : S.hymnSecs;
+        run.hymnUntil = run.t + secs;
+        banner(run, `Battle Hymn: the force fires ${Math.round((pilgrim ? T.pilgrimHymn : S.hymn) * 100)}% faster for ${secs}s`, 'good');
         run.log.push(`${clock(run.t)} A shrine taken: Battle Hymn.`);
         run.fx.push({ kind: 'spell', x: s.x, y: s.y, n: S.radius * 2, t: 0.8 });
         s.held = -1;
@@ -144,15 +150,16 @@ export function siteStep(run: WarpathRun, dt: number): void {
         }
       }
       s.held = on ? s.held + dt : Math.max(0, s.held - dt * 0.5);
-      if (s.held >= S.cacheHold) {
-        run.queued += 1;
-        banner(run, 'Supply cache: a free level-up', 'good');
+      if (s.held >= holdOf('cache', run)) {
+        const n = has(run, 'plunder') ? T.plunder : 1;
+        run.queued += n;
+        banner(run, n > 1 ? `Supply cache: ${n} free level-ups` : 'Supply cache: a free level-up', 'good');
         run.log.push(`${clock(run.t)} A supply cache opened.`);
         s.held = -1;
       }
     } else if (s.kind === 'well') {
       s.held = on ? s.held + dt : Math.max(0, s.held - dt * 0.5);
-      if (s.held < S.wellHold) continue;
+      if (s.held < holdOf('well', run)) continue;
       const before = run.hp;
       run.hp = Math.min(run.maxHp, run.hp + run.maxHp * S.heal);
       if (run.fx.length < 700) run.fx.push({ kind: 'heal', x: run.hx, y: run.hy - 2, n: run.hp - before, t: 0.8 });

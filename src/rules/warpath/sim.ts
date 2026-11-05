@@ -12,7 +12,7 @@ import { gainXp, openLevelUp, choose, candidates } from './levels';
 import { collect } from './loot';
 import { hordeStep, siteStep } from './events';
 import { heroMaxHp, mods } from './mods';
-import { metaLv } from './meta';
+import { has, TREE_FX } from './meta';
 import { enemyKindsOf, fieldPoints, squadOf } from './roster';
 import { heroSpeed, squadStep } from './squads';
 import type { Card, Enemy, WarpathMode, WarpathRun } from './types';
@@ -78,9 +78,9 @@ export function newRun(o: NewRun): WarpathRun {
     level: 1, xp: 0, queued: 0, offer: [], rerolls: W.cards.rerolls, doctrines: {}, kills: 0, captains: 0, lordKills: 0, score: 0,
     log: [`0:00 ${hero.name} leads ${o.force.name} against ${theme.name}${o.mode === 'hard' ? ' (Hard)' : ''}.`], fx: [],
   };
-  run.meta = { ...(o.force.warpath?.meta?.levels ?? {}) };
-  run.rerolls += metaLv(run, 'reserves');
-  run.queued += metaLv(run, 'orders');
+  run.meta = { ...(o.force.warpath?.meta?.nodes ?? {}) };
+  if (has(run, 'reserves')) run.rerolls += TREE_FX.reserves;
+  if (has(run, 'orders')) run.queued += TREE_FX.orders;
   run.maxHp = run.hp = heroMaxHp(run);
   return run;
 }
@@ -133,6 +133,15 @@ export function step(run: WarpathRun, input: Input, dt = W.step): void {
   run.enemies = run.enemies.filter((e) => e.hp > 0);
   for (const f of run.fx) f.t -= dt;
   run.fx = run.fx.filter((f) => f.t > 0);
+  // Second Wind: once a run, the killing blow leaves the hero standing.
+  if (run.hp <= 0 && has(run, 'secondWind') && !run.tree?.wind) {
+    (run.tree ??= {}).wind = true;
+    run.hp = run.maxHp * TREE_FX.secondWind;
+    run.iframes = TREE_FX.windIframes;
+    run.banner = { text: 'Second Wind! The hero rises', t: 3, tone: 'good' };
+    run.fx.push({ kind: 'heal', x: run.hx, y: run.hy - 2, n: run.hp, t: 1 });
+    run.log.push(`${Math.floor(run.t / 60)}:${String(Math.floor(run.t % 60)).padStart(2, '0')} Second Wind.`);
+  }
   if (run.hp <= 0) {
     run.hp = 0;
     run.phase = 'over';
