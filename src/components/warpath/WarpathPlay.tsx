@@ -4,7 +4,7 @@ import {
 } from '../../rules/warpath';
 import { Icon } from '../Icon';
 import { RoleBadge, roleTint } from './RoleBadge';
-import { WarpathBuild } from './WarpathBuild';
+import { DoctrineSlots, WarpathBuild } from './WarpathBuild';
 import { checkSprites, drawWarpath, resetSprites, type Palette, type View } from './draw';
 
 // The run on screen: a full-screen canvas, the HUD, the level-up cards and the pause menu. The sim steps at a fixed 60 a
@@ -334,6 +334,7 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
             <h2>Level {run.level}</h2>
             <div className="training-cards-sub">Take one. The run is paused.</div>
           </div>
+          <DoctrineSlots run={run} />
           <div className="training-cards-row">
             {run.offer.map((c, i) => {
               const t = cardText(run, c);

@@ -1701,7 +1701,10 @@ abbr.us-abbr { text-decoration: underline dotted; text-underline-offset: 2px; cu
 .warpath-auto { align-self: center; padding: 2px 10px; border-radius: 4px; background: rgba(179, 53, 43, 0.8); font-size: 0.8rem; font-weight: 700; }
 .warpath-stick { position: fixed; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.06); pointer-events: none; z-index: 61; }
 .warpath-stick-knob { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(255, 224, 138, 0.55); border: 2px solid rgba(255, 224, 138, 0.9); }
-.warpath-cards { z-index: 62; }
+/* Pair boxes and the slot row can outgrow a short screen, so this one scrolls. The rays stay fixed to keep out of its height. */
+.warpath-cards { z-index: 62; justify-content: safe center; overflow-x: hidden; overflow-y: auto; }
+.warpath-cards::before { position: fixed; }
+.warpath-cards > * { flex: none; }
 /* A card and, under it, what it pairs with. Each slot shares the row's two tracks, so the cards stay level. */
 .warpath-cards .training-cards-row { display: grid; width: 100%; grid-template-columns: repeat(auto-fit, 210px); justify-content: center; }
 .warpath-card-slot { display: grid; grid-row: span 2; grid-template-rows: subgrid; row-gap: 8px; }
@@ -1727,6 +1730,14 @@ abbr.us-abbr { text-decoration: underline dotted; text-underline-offset: 2px; cu
 .warpath-build-pair.active, .warpath-build-pair.ready { border-color: var(--gold); }
 .warpath-build-pair.active .warpath-build-tag, .warpath-build-pair.ready .warpath-build-tag { color: var(--gold); }
 .warpath-build-unit { align-items: center; }
+.warpath-slots { position: relative; display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.warpath-slots li { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; gap: 3px; width: 84px; min-height: 76px; padding: 6px 4px; border: 1px solid var(--line-2); border-radius: 8px; background: rgba(18, 20, 24, 0.92); }
+.warpath-slots li > :first-child { flex: none; font-size: 1.2rem; color: var(--gold); }
+.warpath-slots li.empty { border-style: dashed; background: none; }
+.warpath-slot-name { flex: 1; color: var(--text); font-size: 0.68rem; line-height: 1.15; text-align: center; }
+.warpath-slot-pips { display: flex; gap: 2px; }
+.warpath-slot-pips i { width: 6px; height: 6px; border-radius: 50%; background: var(--line-2); }
+.warpath-slot-pips i.on { background: var(--gold); }
 .warpath-card-actions { position: relative; justify-content: center; flex-wrap: wrap; gap: 8px; }
 .warpath-back-cards { position: absolute; bottom: max(20px, env(safe-area-inset-bottom)); left: 50%; translate: -50% 0; z-index: 62; }
 .warpath-menu { position: absolute; inset: 0; z-index: 63; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px; background: rgba(6, 7, 9, 0.82); text-align: center; }
@@ -1818,5 +1829,10 @@ abbr.us-abbr { text-decoration: underline dotted; text-underline-offset: 2px; cu
   .warpath-cards .training-cards-row { display: flex; }
   .warpath-card-slot { display: flex; flex-direction: column; gap: 4px; }
   .warpath-card-pair { width: min(320px, 90vw); padding: 4px 10px; }
+  .warpath-slots { gap: 4px; }
+  .warpath-slots li { width: 38px; min-height: 0; padding: 4px 2px; }
+  .warpath-slot-name { display: none; }
+  .warpath-slot-pips { gap: 1px; }
+  .warpath-slot-pips i { width: 4px; height: 4px; }
   .warpath-cards .training-cards-title h2 { font-size: 1.4rem; }
 }

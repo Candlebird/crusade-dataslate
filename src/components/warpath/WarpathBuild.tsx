@@ -7,6 +7,26 @@ import { RoleBadge } from './RoleBadge';
 
 const STATUS = { active: 'Active', ready: 'Ready: watch the cards', building: 'Building' } as const;
 
+/** The run's doctrine slots, filled and empty, shown above the level-up cards. */
+export function DoctrineSlots({ run }: { run: WarpathRun }) {
+  const b = buildOf(run);
+  const empty = Math.max(0, b.slots - b.doctrines.length);
+  return (
+    <ul className="warpath-slots" aria-label={`${b.doctrines.length} of ${b.slots} doctrine slots filled`}>
+      {b.doctrines.map((d) => (
+        <li key={d.name} title={`${d.name}: level ${d.level}/${b.maxLevel}`}>
+          <Icon name={d.icon} />
+          <span className="warpath-slot-name">{d.name}</span>
+          <span className="warpath-slot-pips" role="img" aria-label={`Level ${d.level} of ${b.maxLevel}`}>
+            {Array.from({ length: b.maxLevel }, (_, i) => <i key={i} className={i < d.level ? 'on' : ''} />)}
+          </span>
+        </li>
+      ))}
+      {Array.from({ length: empty }, (_, i) => <li key={i} className="empty" title="Empty doctrine slot" />)}
+    </ul>
+  );
+}
+
 export function WarpathBuild({ run, onClose }: { run: WarpathRun; onClose: () => void }) {
   const b = buildOf(run);
   const taken = b.pairs.filter((p) => p.status === 'active').length;
