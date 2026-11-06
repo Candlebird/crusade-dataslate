@@ -1,8 +1,10 @@
 import { rand } from '../training/rng';
-import { DOCTRINE_IDS, DOCTRINES, WARPATH, type DoctrineId } from './data';
-import { heroMaxHp, woundsPer } from './mods';
-import type { Card, Squad, WarpathRun } from './types';
+import { DOCTRINE_IDS, DOCTRINES, ROLES, STRATAGEM_IDS, STRATAGEM_LEVEL, STRATAGEMS, WARPATH, type DoctrineId, type StratagemId } from './data';
+import { doc, heroMaxHp, woundsPer } from './mods';
+import type { IconName } from '../../components/Icon';
+import type { Card, Squad, SquadRole, WarpathRun } from './types';
 import { has, TREE_FX } from './meta';
+import { roleOf } from './traits';
 
 // Level-ups: the XP curve (slow start, steeper late), three cards (call a unit in, drill one, or a doctrine), three
 // rerolls a run, skip for a heal. Once nothing is left to take, a level-up is score and a little healing.
@@ -28,10 +30,25 @@ export const pointsLeft = (run: WarpathRun) => WARPATH.cap - run.points;
 /** Call-in cards come only on every `callEvery`-th level-up (counting the one open now; supply drops count too). */
 export const callLevel = (run: WarpathRun) => (run.levelUps ?? 0) > 0 && (run.levelUps ?? 0) % (has(run, 'muster') ? TREE_FX.musterEvery : K.callEvery) === 0;
 
+/** Stratagems whose two doctrines are high enough and which aren't taken yet. */
+export const plansOpen = (run: WarpathRun): StratagemId[] =>
+  STRATAGEM_IDS.filter((id) => !run.stratagems?.[id] && STRATAGEMS[id].needs.every((d) => doc(run, d) >= STRATAGEM_LEVEL));
+
+/** The stratagem a doctrine can still feed, and the doctrine it pairs with. */
+function pairOf(run: WarpathRun, id: DoctrineId): { plan: string; other: string } | undefined {
+  for (const k of STRATAGEM_IDS) {
+    const needs: readonly DoctrineId[] = STRATAGEMS[k].needs;
+    if (run.stratagems?.[k] || !needs.includes(id)) continue;
+    return { plan: STRATAGEMS[k].name, other: DOCTRINES[needs.find((d) => d !== id) ?? id].name };
+  }
+  return undefined;
+}
+
 /** Every card that could be offered now. */
 export function candidates(run: WarpathRun): Card[] {
   const out: Card[] = [];
   if (callLevel(run)) for (const s of run.bench) if (s.points <= pointsLeft(run)) out.push({ kind: 'call', unitId: s.unitId });
+  for (const id of plansOpen(run)) out.push({ kind: 'stratagem', id });
   for (const s of run.squads) if (s.level < s.maxLevel) out.push({ kind: 'drill', unitId: s.unitId });
   const held = DOCTRINE_IDS.filter((id) => (run.doctrines[id] ?? 0) > 0);
   for (const id of DOCTRINE_IDS) {
@@ -41,13 +58,13 @@ export function candidates(run: WarpathRun): Card[] {
   return out;
 }
 
-const same = (a: Card, b: Card) => a.kind === b.kind && (a.kind === 'doctrine' ? a.id === (b as typeof a).id : a.kind === 'score' || (a as { unitId: string }).unitId === (b as { unitId: string }).unitId);
+const same = (a: Card, b: Card) => a.kind === b.kind && (a.kind === 'doctrine' || a.kind === 'stratagem' ? a.id === (b as typeof a).id : a.kind === 'score' || (a as { unitId: string }).unitId === (b as { unitId: string }).unitId);
 
-/** Three cards, drawn by kind (call-ins only every third level-up, and then at least one), no two alike. */
+/** Three cards (four with Grand Strategy), drawn by kind (call-ins only every third level-up, and then at least one), no two alike. */
 export function drawOffer(run: WarpathRun): Card[] {
   const pool = candidates(run);
   if (!pool.length) return [{ kind: 'score' }];
-  const weight = (c: Card) => (c.kind === 'call' ? 1.6 : c.kind === 'drill' ? 1 : 0.9 / Math.max(1, 0.5 * pool.filter((x) => x.kind === 'doctrine').length / 4));
+  const weight = (c: Card) => (c.kind === 'stratagem' ? 6 : c.kind === 'call' ? 1.6 : c.kind === 'drill' ? 1 : 0.9 / Math.max(1, 0.5 * pool.filter((x) => x.kind === 'doctrine').length / 4));
   const out: Card[] = [];
   const left = [...pool];
   // A call-in level always shows at least one unit to call in.
@@ -57,7 +74,8 @@ export function drawOffer(run: WarpathRun): Card[] {
     out.push(c);
     left.splice(left.indexOf(c), 1);
   }
-  while (out.length < K.offer && left.length) {
+  const size = K.offer + (has(run, 'grandStrategy') ? 1 : 0);
+  while (out.length < size && left.length) {
     const total = left.reduce((n, c) => n + weight(c), 0);
     let x = rand(run) * total;
     let i = 0;
@@ -95,10 +113,26 @@ export function callIn(run: WarpathRun, unitId: string): Squad | undefined {
     s.x = run.hx + Math.cos(a) * WARPATH.fort.land;
     s.y = run.hy + Math.sin(a) * WARPATH.fort.land;
   }
+  // An Ambusher doesn't walk on: it picks its moment.
+  if (roleOf(s) === 'ambusher') s.reserve = WARPATH.roles.firstBlows;
   run.squads.push(s);
   run.points += s.points;
   run.log.push(`${Math.floor(run.t / 60)}:${String(Math.floor(run.t % 60)).padStart(2, '0')} ${s.name} called in (${run.points}/${WARPATH.cap} pts).`);
   return s;
+}
+
+/** One drill level on a squad, and what comes with it. */
+export function drillUp(run: WarpathRun, s: Squad): void {
+  s.level += 1;
+  if (s.fort) {
+    s.fort.maxHp *= WARPATH.levels.woundsMul;
+    s.fort.hp *= WARPATH.levels.woundsMul;
+  }
+  if (s.kind === 'hero') {
+    const before = run.maxHp;
+    run.maxHp = heroMaxHp(run);
+    run.hp += run.maxHp - before;
+  }
 }
 
 /** Take a card. */
@@ -108,18 +142,10 @@ export function choose(run: WarpathRun, i: number): void {
   if (c.kind === 'call') callIn(run, c.unitId);
   else if (c.kind === 'drill') {
     const s = run.squads.find((x) => x.unitId === c.unitId);
-    if (s && s.level < s.maxLevel) {
-      s.level += 1;
-      if (s.fort) {
-        s.fort.maxHp *= WARPATH.levels.woundsMul;
-        s.fort.hp *= WARPATH.levels.woundsMul;
-      }
-      if (s.kind === 'hero') {
-        const before = run.maxHp;
-        run.maxHp = heroMaxHp(run);
-        run.hp += run.maxHp - before;
-      }
-    }
+    if (s && s.level < s.maxLevel) drillUp(run, s);
+  } else if (c.kind === 'stratagem') {
+    (run.stratagems ??= {})[c.id] = true;
+    run.log.push(`Stratagem taken: ${STRATAGEMS[c.id].name}.`);
   } else if (c.kind === 'doctrine') {
     // War College: a new doctrine comes in at level 2.
     const l = run.doctrines[c.id] ?? 0;
@@ -145,30 +171,54 @@ export function reroll(run: WarpathRun): void {
   run.offer = drawOffer(run);
 }
 
+/** Rallying Cry: every level-up throws the crowd back and mends the hero. */
+function rally(run: WarpathRun) {
+  const l = doc(run, 'rallyingCry');
+  if (!l) return;
+  const R = DOCTRINES.rallyingCry;
+  for (const e of run.enemies) {
+    const d = Math.hypot(e.x - run.hx, e.y - run.hy);
+    if (e.boss || e.guard !== undefined || d > R.reach || d < 1e-6) continue;
+    e.x += ((e.x - run.hx) / d) * R.push * l;
+    e.y += ((e.y - run.hy) / d) * R.push * l;
+  }
+  run.hp = Math.min(run.maxHp, run.hp + run.maxHp * R.heal * l);
+  if (run.stratagems?.lastLine) run.shield = Math.max(run.shield ?? 0, run.maxHp * STRATAGEMS.lastLine.shield);
+  run.fx.push({ kind: 'land', x: run.hx, y: run.hy, n: R.reach, t: 0.6 });
+}
+
 function close(run: WarpathRun) {
   run.offer = [];
   run.phase = 'play';
+  run.fx.push({ kind: 'level', x: run.hx, y: run.hy, t: 0.9 });
+  rally(run);
   openLevelUp(run);
 }
 
 /** A card's title and text, for the offer. */
-export function cardText(run: WarpathRun, c: Card): { title: string; text: string; tag: string } {
+export function cardText(run: WarpathRun, c: Card): { title: string; text: string; tag: string; role?: SquadRole; icon?: IconName } {
   if (c.kind === 'score') return { title: 'Glory', text: `Everything is at its best: +${WARPATH.score.level} score and ${Math.round(K.healAtMax * 100)}% HP.`, tag: 'Score' };
+  if (c.kind === 'stratagem') {
+    const p = STRATAGEMS[c.id];
+    return { title: p.name, text: p.text, icon: p.icon, tag: 'Stratagem' };
+  }
   if (c.kind === 'doctrine') {
     const d = DOCTRINES[c.id as DoctrineId];
     const l = run.doctrines[c.id] ?? 0;
-    return { title: d.name, text: d.text, tag: l ? `Doctrine ${l} → ${l + 1}` : has(run, 'college') ? 'New doctrine · level 2' : 'New doctrine' };
+    const pair = pairOf(run, c.id);
+    const text = pair ? `${d.text} Pairs with ${pair.other} for ${pair.plan}.` : d.text;
+    return { title: d.name, text, icon: d.icon, tag: l ? `Doctrine ${l} → ${l + 1}` : has(run, 'college') ? 'New doctrine · level 2' : 'New doctrine' };
   }
   const s = c.kind === 'call' ? run.bench.find((x) => x.unitId === c.unitId) : run.squads.find((x) => x.unitId === c.unitId);
   if (!s) return { title: '?', text: '', tag: '' };
   if (c.kind === 'call') {
     const guns = s.guns.map((g) => g.name).join(', ');
-    return { title: s.name, text: `${s.size > 1 ? `${s.size} models, ` : ''}Q${s.quality}+ D${s.defense}+${s.kind === 'fort' ? ', drops in as a turret' : s.kind === 'air' ? ', flies strafing loops' : ''}. ${guns}.`, tag: `Call in · ${s.points} pts` };
+    return { title: s.name, text: `${ROLES[roleOf(s)].text} ${s.size > 1 ? `${s.size} models, ` : ''}Q${s.quality}+ D${s.defense}+. ${guns}.`, tag: `Call in · ${s.points} pts`, role: roleOf(s) };
   }
   const lines = s.kind === 'hero'
     ? 'faster attacks, longer reach, more HP and speed'
     : `faster attacks, longer reach, ${s.kind === 'fort' ? `×${WARPATH.levels.woundsMul} HP` : `${woundsPer(s) * WARPATH.levels.woundsMul} wounds a model`}`;
-  return { title: s.name, text: `Level ${s.level} → ${s.level + 1}: ${lines}${(s.level + 1) % WARPATH.levels.dmgEvery === 0 ? ', harder hits' : ''}.`, tag: `Drill · max ${s.maxLevel}` };
+  return { title: s.name, text: `Level ${s.level} → ${s.level + 1}: ${lines}${(s.level + 1) % WARPATH.levels.dmgEvery === 0 ? ', harder hits' : ''}.`, tag: `Drill · max ${s.maxLevel}`, role: roleOf(s) };
 }
 
 export { same as sameCard };

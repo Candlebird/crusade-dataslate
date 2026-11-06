@@ -5,7 +5,8 @@ import { weekKey, weekSeed } from '../sortie';
 import { nexusOf } from '../training/nexus';
 import { rand, seedOf } from '../training/rng';
 import { fireAll, hurtEnemy } from './combat';
-import { WARPATH } from './data';
+import { DOCTRINE_IDS, WARPATH } from './data';
+import { doctrineStep } from './doctrines';
 import { Grid, unblock } from './field';
 import { enemyStep, feared, missileStep, spawnStep, bossStep, hurtHero } from './enemies';
 import { gainXp, openLevelUp, choose, candidates } from './levels';
@@ -14,8 +15,8 @@ import { hordeStep, siteStep } from './events';
 import { heroMaxHp, mods } from './mods';
 import { has, TREE_FX } from './meta';
 import { enemyKindsOf, fieldPoints, squadOf } from './roster';
-import { heroSpeed, squadStep } from './squads';
-import type { Card, Enemy, WarpathMode, WarpathRun } from './types';
+import { heroAct, heroSpeed, squadStep } from './squads';
+import type { Card, Enemy, Squad, WarpathMode, WarpathRun } from './types';
 
 // A run from start to death: built from the force and the week's theme, then stepped at a fixed 60 a second.
 
@@ -25,9 +26,12 @@ export const WARPATH_VERSION = 1;
 /** Units that can play: active ones. */
 export const playable = (u: Unit) => u.status === 'active';
 
+/** Every unit a run can field. */
+export const rosterOf = (force: Force): Unit[] => force.units.filter(playable).filter((u) => fieldPoints(u) <= W.cap);
+
 /** Heroes the force can lead with (any active unit if it has no Hero). */
 export function heroesOf(force: Force): Unit[] {
-  const units = force.units.filter(playable).filter((u) => fieldPoints(u) <= W.cap);
+  const units = rosterOf(force);
   const heroes = units.filter((u) => hasRule(u.rules, 'Hero'));
   return heroes.length ? heroes : units;
 }
@@ -58,16 +62,27 @@ export interface NewRun {
   theme?: CatalogBook;
 }
 
+/** A save from before archetypes: its squads read their roles and rules from the force. Levels and losses stay. */
+export function freshenRun(run: WarpathRun, force: Force, books?: CatalogBook[]): WarpathRun {
+  const fill = (s: Squad, hero = false) => {
+    const u = !s.role && force.units.find((x) => x.id === s.unitId);
+    if (!u) return s;
+    const { role, body, traits, spells } = squadOf(u, hero, books);
+    return { ...s, role, ...(body ? { body } : {}), ...(traits ? { traits } : {}), ...(spells ? { spells } : {}) };
+  };
+  return { ...run, squads: run.squads.map((s, i) => fill(s, i === 0)), bench: run.bench.map((s) => fill(s)) };
+}
+
 export function newRun(o: NewRun): WarpathRun {
   const week = weekKey(o.date);
   const theme = o.theme ?? weekTheme(o.books, week);
   const seed = seedOf(o.seed ?? `${o.force.id}:${Date.now()}:${Math.random()}`);
   const heroUnit = o.force.units.find((u) => u.id === o.heroId) ?? heroesOf(o.force)[0];
-  const hero = squadOf(heroUnit, true);
+  const hero = squadOf(heroUnit, true, o.books);
   hero.points = fieldPoints(heroUnit);
   const bench = o.force.units
     .filter((u) => u.id !== heroUnit.id && playable(u))
-    .map((u) => ({ ...squadOf(u), points: fieldPoints(u) }))
+    .map((u) => ({ ...squadOf(u, false, o.books), points: fieldPoints(u) }))
     .filter((s) => s.points + hero.points <= W.cap);
   const lords = (nexusOf(o.campaign)?.lords ?? []).map((l) => ({ key: l.key, name: l.name, trick: l.trick }));
   const run: WarpathRun = {
@@ -81,12 +96,17 @@ export function newRun(o: NewRun): WarpathRun {
   run.meta = { ...(o.force.warpath?.meta?.nodes ?? {}), honours: o.force.warpath?.meta?.prestige ?? 0 };
   if (has(run, 'reserves')) run.rerolls += TREE_FX.reserves;
   if (has(run, 'orders')) run.queued += TREE_FX.orders;
+  // Advance Party: doctrines from the run's own dice.
+  if (has(run, 'advance')) {
+    const pool = [...DOCTRINE_IDS];
+    for (let i = 0; i < TREE_FX.advance; i++) run.doctrines[pool.splice(Math.floor(rand(run) * pool.length), 1)[0]] = 1;
+  }
   run.maxHp = run.hp = heroMaxHp(run);
   return run;
 }
 
-/** The input for one step: a direction (any length; it's normalised). */
-export interface Input { dx: number; dy: number }
+/** The input for one step: a direction (any length; it's normalised), and the hero's button (a charge, a blink). */
+export interface Input { dx: number; dy: number; act?: boolean }
 
 const grid = new Grid(4);
 
@@ -98,16 +118,22 @@ export function step(run: WarpathRun, input: Input, dt = W.step): void {
   const m = mods(run);
   // The hero moves.
   const len = Math.hypot(input.dx, input.dy);
-  if (len > 0.05) {
+  const hero = run.squads[0];
+  const stance = run.stance ?? 0;
+  run.stance = len > 0.05 ? Math.max(0, stance) + dt : Math.min(0, stance) - dt;
+  if (len > 0.05 && !hero.rush) {
     const k = Math.min(1, len) / len;
     const v = heroSpeed(run, feared(run));
     run.hx += input.dx * k * v * dt;
     run.hy += input.dy * k * v * dt;
     run.face = Math.atan2(input.dy, input.dx);
-    const p = { x: run.hx, y: run.hy };
-    unblock(run.seed, p, 0.8);
-    run.hx = p.x;
-    run.hy = p.y;
+    // Flyers go over what blocks everyone else.
+    if (!hero.body?.flying) {
+      const p = { x: run.hx, y: run.hy };
+      unblock(run.seed, p, 0.8);
+      run.hx = p.x;
+      run.hy = p.y;
+    }
   }
   if (m.regen > 0) run.hp = Math.min(run.maxHp, run.hp + m.regen * dt);
   spawnStep(run, dt);
@@ -116,8 +142,10 @@ export function step(run: WarpathRun, input: Input, dt = W.step): void {
   siteStep(run, dt);
   if (run.banner && (run.banner.t -= dt) <= 0) run.banner = undefined;
   grid.build(run.enemies);
+  heroAct(run, grid, input, dt);
   squadStep(run, grid, dt);
   fireAll(run, grid, dt);
+  doctrineStep(run, grid, dt);
   enemyStep(run, grid, dt, (e, n) => hurtEnemy(run, Math.max(0, e.by), e, n));
   missileStep(run, dt);
   collect(run, dt);
@@ -201,7 +229,7 @@ export function botInput(run: WarpathRun): Input {
   const a = run.t * 0.08;
   dx += Math.cos(a) * 0.12;
   dy += Math.sin(a) * 0.12;
-  return { dx, dy };
+  return { dx, dy, act: press > 0.3 };
 }
 
 /** The bot's card: call in the dearest unit that fits, else drill the hero then whoever dealt most, else a doctrine. */
@@ -212,6 +240,7 @@ export function botPick(run: WarpathRun): number {
       const s = run.squads.find((x) => x.unitId === c.unitId);
       return s?.kind === 'hero' ? 60 : 40 + (s ? s.dealt / Math.max(1, run.squads.reduce((n, x) => n + x.dealt, 0)) * 30 : 0);
     }
+    if (c.kind === 'stratagem') return 70;
     if (c.kind === 'doctrine') return 45 + (run.doctrines[c.id] ?? 0) * 3 + (['relentless', 'deadlyStrikes', 'holdLine', 'fieldMedics'].includes(c.id) ? 8 : 0);
     return 0;
   };

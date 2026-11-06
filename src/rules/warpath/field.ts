@@ -99,7 +99,7 @@ export class Grid {
     if (this.next.length < enemies.length) this.next = new Int32Array(enemies.length * 2);
     for (let i = 0; i < enemies.length; i++) {
       const e = enemies[i];
-      if (e.hp <= 0) continue;
+      if (e.hp <= 0 || e.emerge) continue;
       const k = this.key(Math.floor(e.x / this.cell), Math.floor(e.y / this.cell));
       this.next[i] = this.heads.get(k) ?? -1;
       this.heads.set(k, i);

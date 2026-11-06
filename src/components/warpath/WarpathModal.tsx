@@ -10,14 +10,15 @@ import { weekKey } from '../../rules/sortie';
 import { unitName } from '../../rules/battle';
 import { unitPortrait } from '../../model/emblem';
 import {
-  bankRecords, bossesOf, clearWarpath, clock, DOCTRINES, hardOpen, heroesOf, loadWarpath, newerWarpath, newRun, saveWarpath, warpathFeats, warpathRepeats,
+  bankRecords, bossesOf, clearWarpath, clock, DOCTRINES, STRATAGEM_LEVEL, STRATAGEMS, freshenRun, hardOpen, heroesOf, loadWarpath, newerWarpath, newRun, saveWarpath, warpathFeats, warpathRepeats,
   warpathXp, weekBoard, weekTheme, WARPATH, type WarpathMode, type WarpathRun,
   BRANCHES, BRANCH_IDS, TREE, NODE_IDS, RENOWN, PRESTIGE, HONOURS, metaOf, nodeCost, nodeState, cantTake, takeNode, resetTree, resetValue, bankRenown, laurelsFor,
-  prestige, renownLine, type NodeId, type BranchId,
+  prestige, renownLine, heroPowerOf, ROLES, roleOf, roleOfUnit, rosterOf, squadOf, type NodeId, type BranchId, type SquadRole,
 } from '../../rules/warpath';
 import { FeatList } from '../Feats';
 import { Icon } from '../Icon';
 import { Modal, toast } from '../ui';
+import { RoleBadge } from './RoleBadge';
 import { WarpathPlay } from './WarpathPlay';
 import { useWarpathCloud } from './useWarpathCloud';
 
@@ -68,7 +69,7 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
   const resume = () => {
     if (!saved) return;
     if (cloudRun.movedOn) toast('This run moved on on another device; picking up its newest save.');
-    const r = saved.run;
+    const r = freshenRun(saved.run, force, state.books);
     banked.current = !!r.banked;
     setAuto(!!r.auto);
     setRun(r);
@@ -160,8 +161,9 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
             {heroes.map((u) => (
               <label key={u.id} className={`warpath-hero${u.id === heroId ? ' on' : ''}`}>
                 <input type="radio" name="warpath-hero" checked={u.id === heroId} onChange={() => setHeroId(u.id)} />
-                <b>{unitName(u)}</b>
+                <span className="warpath-hero-head"><b>{unitName(u)}</b><RoleBadge role={roleOfUnit(u)} /></span>
                 <span className="muted small">Q{u.quality}+ D{u.defense}+{u.tough > 1 ? ` · Tough(${u.tough})` : ''} · {u.weapons.map((x) => x.name).join(', ')}</span>
+                {u.id === heroId && <HeroPower power={heroPowerOf(squadOf(u, true, state.books))} />}
               </label>
             ))}
           </div>
@@ -209,12 +211,45 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
             <summary>Doctrines</summary>
             <ul>
               {Object.values(DOCTRINES).map((d) => <li key={d.name}><b>{d.name}</b>: {d.text}</li>)}
+              {Object.values(STRATAGEMS).map((p) => <li key={p.name}><b>{p.name}</b> (stratagem: {p.needs.map((d) => DOCTRINES[d].name).join(' and ')} at level {STRATAGEM_LEVEL}): {p.text}</li>)}
             </ul>
           </details>
         </section>
       </div>
+      <Roster force={force} heroId={heroId} />
       <Armoury force={force} />
     </Modal>
+  );
+}
+
+/** The picked hero's button, if its rules give it one. */
+function HeroPower({ power }: { power?: 'rush' | 'blink' }) {
+  if (!power) return null;
+  return <span className="small">Button (Space): {power === 'rush' ? 'charge through the enemy, untouchable' : 'blink, hurting what stands at both ends'}.</span>;
+}
+
+/** What each unit will do in a run: the force by archetype. */
+function Roster({ force, heroId }: { force: Force; heroId: string }) {
+  const units = rosterOf(force).map((u) => ({ u, role: roleOfUnit(u) }));
+  const roles = (Object.keys(ROLES) as SquadRole[]).filter((r) => units.some((x) => x.role === r));
+  return (
+    <section className="warpath-roster">
+      <h3>Your roster</h3>
+      <p className="muted small">A unit's rules set how it fights in a run. Its other rules still work as written.</p>
+      <div className="warpath-roster-grid">
+        {roles.map((r) => (
+          <div key={r} className="warpath-roster-group">
+            <RoleBadge role={r} />
+            <p className="muted small">{ROLES[r].text}</p>
+            <ul>
+              {units.filter((x) => x.role === r).map(({ u }) => (
+                <li key={u.id} className={u.id === heroId ? 'me' : ''}>{unitName(u)}{u.id === heroId ? ' (hero)' : ''}</li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -237,7 +272,7 @@ function Summary({ run, news, onAgain, onClose }: { run: WarpathRun; news: News 
       <div className="warpath-meter">
         {rows.map((s) => (
           <div key={s.unitId} className="warpath-meter-row">
-            <span className="warpath-meter-name">{s.name}{s.kind === 'hero' ? ' (hero)' : ''}<span className="muted small">lvl {s.level} · {s.kills.toLocaleString()} kills</span></span>
+            <span className="warpath-meter-name"><RoleBadge role={roleOf(s)} bare /> {s.name}{s.kind === 'hero' ? ' (hero)' : ''}<span className="muted small">lvl {s.level} · {s.kills.toLocaleString()} kills</span></span>
             <div className="warpath-meter-bar"><div style={{ width: `${(s.dealt / total) * 100}%` }} /></div>
             <span className="warpath-meter-n">{Math.round(s.dealt).toLocaleString()} ({Math.round((s.dealt / total) * 100)}%)</span>
           </div>
@@ -261,7 +296,7 @@ function Summary({ run, news, onAgain, onClose }: { run: WarpathRun; news: News 
 }
 
 /** The tier captions down a branch. */
-const TIER_CAPTION = ['', 'Ranked', 'Ranked', 'Choose one', 'Keystone', 'Capstone · choose one'];
+const TIER_CAPTION = ['', 'Ranked', 'Ranked', 'Choose one', 'Keystone · choose one', 'Capstone · choose one', 'Legend'];
 
 /** The War Council: Renown buys nodes in a four-branch skill tree for this force's Warpath runs; prestige trades the
  *  tree for Laurels and opens its deep tiers. */
@@ -327,7 +362,7 @@ function Armoury({ force }: { force: Force }) {
               <Icon name={BRANCHES[b].icon} /> <b>{BRANCHES[b].name}</b>{ranksIn(b) > 0 && <span className="small"> · {ranksIn(b)}</span>}
               <div className="muted small">{BRANCHES[b].text}</div>
             </div>
-            {[1, 2, 3, 4, 5].map((tier) => {
+            {[1, 2, 3, 4, 5, 6].map((tier) => {
               const ids = NODE_IDS.filter((id) => TREE[id].branch === b && TREE[id].tier === tier);
               const lit = NODE_IDS.some((id) => TREE[id].branch === b && TREE[id].tier === tier - 1 && (m.nodes[id] ?? 0) > 0);
               return (

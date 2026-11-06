@@ -1,7 +1,7 @@
 import { rand } from '../training/rng';
-import { WARPATH } from './data';
+import { DOCTRINES, STRATAGEMS, WARPATH } from './data';
 import { mods } from './mods';
-import { gainXp } from './levels';
+import { drillUp, gainXp } from './levels';
 import { has } from './meta';
 import type { Enemy, PickupKind, WarpathRun } from './types';
 
@@ -22,8 +22,18 @@ export function killed(run: WarpathRun, e: Enemy, si: number): void {
   run.kills += 1;
   const k = run.enemyKinds[e.kind];
   const s = run.squads[si];
+  if (run.fx.length < 700) run.fx.push({ kind: 'pop', x: e.x, y: e.y, n: k.size, t: 0.4, crit: !!e.elite });
   const leech = s?.skills.find((x) => x.kind === 'leech');
   if (leech && leech.kind === 'leech') run.hp = Math.min(run.maxHp, run.hp + leech.n);
+  // Blood Tithe: the hero's kills mend it; Blood Frenzy: anyone's, for a share.
+  const tithe = (run.doctrines.bloodTithe ?? 0) * DOCTRINES.bloodTithe.heal * (si === 0 ? 1 : run.stratagems?.bloodFrenzy ? STRATAGEMS.bloodFrenzy.share : 0);
+  if (tithe > 0 && run.hp > 0) run.hp = Math.min(run.maxHp, run.hp + tithe);
+  // Killing Spree: the streak grows, or starts again if it went cold.
+  if (run.doctrines.killingSpree) {
+    const S = DOCTRINES.killingSpree;
+    run.spree = Math.min(S.stacks, (run.t - (run.spreeT ?? 0) <= S.secs ? run.spree ?? 0 : 0) + 1);
+    run.spreeT = run.t;
+  }
   if (e.champ !== undefined) {
     // A champion bursts into a ring of rich Shards.
     const n = 8;
@@ -49,6 +59,7 @@ export function killed(run: WarpathRun, e: Enemy, si: number): void {
   }
   drop(run, 'supply', e.x, e.y);
   run.fx.push({ kind: 'boom', x: e.x, y: e.y, n: e.size * 2, t: 0.9 });
+  run.fx.push({ kind: 'fall', x: e.x, y: e.y, n: e.size, t: 1.4, hurt: e.boss === 'lord' });
   const name = e.lord ? run.lords[e.lord.i]?.name ?? 'The Echo Lord' : `${k.name} (captain)`;
   if (e.boss === 'lord') {
     run.lordKills += 1;
@@ -61,6 +72,11 @@ export function killed(run: WarpathRun, e: Enemy, si: number): void {
   if (run.squads.length === 1) run.lone = (run.lone ?? 0) + 1;
   if (run.squads.length <= 2) run.single = (run.single ?? 0) + 1;
   run.log.push(`${clock(run.t)} ${name} slain by ${s?.name ?? 'the field'}.`);
+  // Field Promotion: the unit that felled it steps up.
+  if (s && has(run, 'promotion') && s.level < s.maxLevel) {
+    drillUp(run, s);
+    run.banner = { text: `Field Promotion: ${s.name} to level ${s.level}`, t: 3, tone: 'good' };
+  }
 }
 
 export const clock = (t: number) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
@@ -83,7 +99,10 @@ export function collect(run: WarpathRun, dt: number): void {
     if (Math.hypot(run.hx - p.x, run.hy - p.y) > P.reach) continue;
     p.life = -1;
     p.pulled = false;
-    if (p.kind === 'gem') gainXp(run, p.xp * m.xp);
+    if (p.kind === 'gem') {
+      gainXp(run, p.xp * m.xp);
+      if (run.doctrines.volatileShards) run.shardCharge = (run.shardCharge ?? 0) + 1;
+    }
     else if (p.kind === 'ration') run.hp = Math.min(run.maxHp, run.hp + run.maxHp * P.ration);
     else if (p.kind === 'beacon') beacon = true;
     else if (p.kind === 'supply') run.queued += WARPATH.bosses.drop;

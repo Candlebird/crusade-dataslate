@@ -7,6 +7,9 @@ import type { Enemy, Squad, WarpathRun } from './types';
 /** A doctrine's level (0 when not taken). */
 export const doc = (run: WarpathRun, id: DoctrineId) => run.doctrines[id] ?? 0;
 
+/** Is Fire at Will's window open? */
+export const atWill = (run: WarpathRun) => has(run, 'barrage') && run.t % T.barrageEvery < T.barrageSecs;
+
 /** Doctrine totals, per stat. */
 export function mods(run: WarpathRun) {
   const D = DOCTRINES;
@@ -16,15 +19,23 @@ export function mods(run: WarpathRun) {
   // The War Council: Drill and Hail of Fire speed every gun; Last Stand, when the hero is low.
   const tree = (1 + T.drill * metaLv(run, 'drill')) * (has(run, 'hail') ? 1 + T.hailRate : 1)
     * (has(run, 'lastStand') && run.hp > 0 && run.hp < run.maxHp * T.lastStandBelow ? 1 + T.lastStand : 1);
+  // Killing Spree and the moving half of Fire and Manoeuvre speed every attack; the still half guards the hero.
+  const hot = (run.spree ?? 0) > 0 && run.t - (run.spreeT ?? 0) <= D.killingSpree.secs;
+  const spree = hot ? 1 + D.killingSpree.rate * l('killingSpree') * (run.spree ?? 0) : 1;
+  const free = !!run.stratagems?.hitAndRun;
+  const stance = run.stance ?? 0;
+  const moving = free || stance >= D.manoeuvre.after ? 1 + D.manoeuvre.rate * l('manoeuvre') : 1;
+  const braced = free || stance <= -D.manoeuvre.after ? 1 - D.manoeuvre.guard * l('manoeuvre') : 1;
+  const all = hymn * tree * spree * moving * (atWill(run) ? 1 + T.barrageRate : 1);
   return {
-    shootRate: (1 + D.relentless.rate * l('relentless')) * hymn * tree,
-    meleeRate: (1 + D.furious.rate * l('furious')) * hymn * tree,
+    shootRate: (1 + D.relentless.rate * l('relentless')) * all,
+    meleeRate: (1 + D.furious.rate * l('furious')) * all,
     hit: D.goodShot.hit * l('goodShot'),
-    heroDmg: (1 - D.holdLine.dmg * l('holdLine')) * (1 - T.warded * metaLv(run, 'warded')),
-    losses: 1 - D.holdLine.losses * l('holdLine'),
+    heroDmg: (1 - D.holdLine.dmg * l('holdLine')) * (1 - T.warded * metaLv(run, 'warded')) * braced,
+    losses: (1 - D.holdLine.losses * l('holdLine')) * (has(run, 'legion') ? 1 - T.legion : 1),
     speed: (1 + D.rapidAdvance.speed * l('rapidAdvance')) * (1 + T.march * metaLv(run, 'march')),
     regen: D.fieldMedics.regen * l('fieldMedics'),
-    modelRegen: 1 / (1 + D.reinforcements.regen * l('reinforcements')),
+    modelRegen: (1 / (1 + D.reinforcements.regen * l('reinforcements'))) * (has(run, 'legion') ? T.legionRegen : 1),
     splash: D.shrapnel.splash * l('shrapnel'),
     ap: D.armourPiercing.ap * l('armourPiercing') + (has(run, 'bigGuns') ? 1 : 0),
     dmg: (1 + D.deadlyStrikes.dmg * l('deadlyStrikes')) * (1 + T.edge * metaLv(run, 'edge')) * (has(run, 'hail') ? 1 - T.hailDmg : 1)

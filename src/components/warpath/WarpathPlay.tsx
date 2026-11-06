@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  bossesOf, botInput, botPick, cardText, choose, clock, reroll, skip, step, WARPATH, xpNeed, type Input, type WarpathRun,
+  DOCTRINE_IDS, DOCTRINES, STRATAGEM_IDS, STRATAGEMS,
+  bossesOf, botInput, botPick, cardText, choose, clock, heroCooldown, reroll, ROLES, roleOf, skip, step, WARPATH, xpNeed, type Input, type SquadRole, type WarpathRun,
 } from '../../rules/warpath';
 import { Icon } from '../Icon';
+import { RoleBadge, roleTint } from './RoleBadge';
 import { checkSprites, drawWarpath, resetSprites, type Palette, type View } from './draw';
 
 // The run on screen: a full-screen canvas, the HUD, the level-up cards and the pause menu. The sim steps at a fixed 60 a
@@ -25,12 +27,17 @@ function readZoom(): number {
   }
 }
 
-interface Hud { hp: number; maxHp: number; xp: number; need: number; level: number; t: number; kills: number; points: number; bosses: number; boss?: { name: string; share: number; lord: boolean } }
+interface Hud { hp: number; maxHp: number; xp: number; need: number; level: number; t: number; kills: number; points: number; bosses: number; boss?: { name: string; share: number; lord: boolean }; squads: { id: string; name: string; role: SquadRole; share: number; away: boolean; level: number }[]; power?: { power: 'rush' | 'blink'; left: number } }
 
 const hudOf = (run: WarpathRun): Hud => {
   const b = run.enemies.find((e) => e.boss === 'lord') ?? run.enemies.find((e) => e.boss);
   return {
     hp: run.hp, maxHp: run.maxHp, xp: run.xp, need: xpNeed(run.level), level: run.level, t: run.t, kills: run.kills, points: run.points, bosses: bossesOf(run),
+    squads: run.squads.slice(1).map((s) => ({
+      id: s.unitId, name: s.name, role: roleOf(s), level: s.level, away: !!s.reserve || !!s.fort?.down,
+      share: s.fort ? s.fort.hp / Math.max(1, s.fort.maxHp) : s.alive / s.size,
+    })),
+    power: heroCooldown(run),
     boss: b && { name: b.lord ? run.lords[b.lord.i]?.name ?? 'Echo Lord' : `${run.enemyKinds[b.kind].name}${b.boss === 'lord' ? ' (Echo Lord)' : ' (captain)'}`, share: b.hp / b.maxHp, lord: b.boss === 'lord' },
   };
 };
@@ -50,9 +57,23 @@ export interface PlayProps {
   onQuit: (run: WarpathRun) => void;
 }
 
+/** The doctrines and stratagems a run holds, for the pause menu. */
+function HeldRules({ run }: { run: WarpathRun }) {
+  const docs = DOCTRINE_IDS.filter((id) => run.doctrines[id]);
+  const plans = STRATAGEM_IDS.filter((id) => run.stratagems?.[id]);
+  if (!docs.length && !plans.length) return null;
+  return (
+    <ul className="warpath-held" aria-label="Doctrines and stratagems held">
+      {plans.map((id) => <li key={id} className="plan" title={STRATAGEMS[id].text}><Icon name={STRATAGEMS[id].icon} /> {STRATAGEMS[id].name}</li>)}
+      {docs.map((id) => <li key={id} title={DOCTRINES[id].text}><Icon name={DOCTRINES[id].icon} /> {DOCTRINES[id].name} {run.doctrines[id]}</li>)}
+    </ul>
+  );
+}
+
 export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeave, onQuit }: PlayProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const keys = useRef(new Set<string>());
+  const actRef = useRef(false);
   const stick = useRef<{ id: number; ox: number; oy: number; dx: number; dy: number } | null>(null);
   const [stickView, setStickView] = useState<{ ox: number; oy: number; dx: number; dy: number } | null>(null);
   const [paused, setPaused] = useState(false);
@@ -69,7 +90,7 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
   const cbs = useRef({ onSave, onOver });
   cbs.current = { onSave, onOver };
 
-  // Keys: WASD and arrows move, P or Escape pauses.
+  // Keys: WASD and arrows move, Space is the hero's button, P or Escape pauses.
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
@@ -79,7 +100,8 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
         if (run.phase === 'play') setPaused((p) => !p);
         return;
       }
-      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+      if (k === ' ' && run.phase !== 'play') return;
+      if (['w', 'a', 's', 'd', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', ' '].includes(k)) {
         e.preventDefault();
         keys.current.add(k);
       }
@@ -133,7 +155,7 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
         dx = s.dx / STICK;
         dy = s.dy / STICK;
       }
-      return { dx, dy };
+      return { dx, dy, act: k.has(' ') || actRef.current };
     };
     const frame = (now: number) => {
       raf = requestAnimationFrame(frame);
@@ -244,6 +266,8 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
     setPhase(run.phase);
   };
   const hpShare = hud.hp / Math.max(1, hud.maxHp);
+  const heroRole = roleOf(run.squads[0]);
+  const press = (on: boolean) => (e: React.PointerEvent) => { e.preventDefault(); actRef.current = on; };
 
   return (
     <div className="warpath-screen">
@@ -272,6 +296,7 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
             <div style={{ width: `${hpShare * 100}%`, background: hpShare > 0.6 ? '#5cc06a' : hpShare > 0.3 ? '#e0b030' : '#e0483a' }} />
             <span>{Math.ceil(hud.hp)} / {Math.round(hud.maxHp)}</span>
           </div>
+          <RoleBadge role={heroRole} />
           <span className="warpath-stat warpath-time"><Icon name="g:sands-of-time" /> {clock(hud.t)}</span>
           <span className="warpath-stat" title="Kills"><Icon name="g:skull-crossed-bones" /> {hud.kills.toLocaleString()}</span>
           <span className="warpath-stat" title="Bosses slain"><Icon name="g:crowned-skull" /> {hud.bosses}</span>
@@ -287,6 +312,25 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
         {auto && <div className="warpath-auto">AUTO: the bot is playing. Nothing banks.</div>}
       </div>
 
+      {hud.squads.length > 0 && (
+        <div className="warpath-squads" aria-label="Your squads">
+          {hud.squads.map((s) => (
+            <span key={s.id} className={`warpath-squad${s.share <= 0 ? ' down' : ''}${s.away ? ' away' : ''}`} style={roleTint(s.role)} title={`${s.name} · ${ROLES[s.role].name}, level ${s.level}`}>
+              <Icon name={ROLES[s.role].icon} />
+              <i style={{ width: `${s.share * 100}%` }} />
+            </span>
+          ))}
+        </div>
+      )}
+      {hud.power && (
+        <button className={`warpath-act${hud.power.left <= 0 ? ' ready' : ''}`} style={{ ...roleTint(heroRole), '--cd': `${hud.power.left * 360}deg` } as React.CSSProperties}
+          onPointerDown={press(true)} onPointerUp={press(false)} onPointerCancel={press(false)} onPointerLeave={press(false)} onContextMenu={(e) => e.preventDefault()}
+          aria-label={hud.power.power === 'rush' ? 'Charge' : 'Blink'} title={`${hud.power.power === 'rush' ? 'Charge: rush through the enemy, untouchable' : 'Blink: jump, hurting what is at both ends'} (Space)`}>
+          <Icon name={ROLES[heroRole].icon} />
+          <span>{hud.power.power === 'rush' ? 'Charge' : 'Blink'}</span>
+        </button>
+      )}
+
       {phase === 'card' && !peek && run.phase === 'card' && (
         <div className="training-cards warpath-cards" role="dialog" aria-label="Level up">
           <div className="training-cards-title">
@@ -298,11 +342,13 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
             {run.offer.map((c, i) => {
               const t = cardText(run, c);
               return (
-                <button key={`${run.level}:${run.rerolls}:${i}`} className={`training-card ${c.kind === 'call' ? 'legendary' : c.kind === 'doctrine' ? 'rare' : ''}`} style={{ animationDelay: `${0.05 + i * 0.1}s` }}
+                <button key={`${run.level}:${run.rerolls}:${i}`} className={`training-card ${c.kind === 'call' || c.kind === 'stratagem' ? 'legendary' : c.kind === 'doctrine' ? 'rare' : ''}`} style={{ animationDelay: `${0.05 + i * 0.1}s` }}
                   disabled={auto} onClick={act(() => choose(run, i))}>
                   <span className="training-card-shine" aria-hidden />
-                  <span className={`tag ${c.kind === 'call' ? 'gold' : c.kind === 'doctrine' ? 'red' : ''}`}>{t.tag}</span>
+                  <span className={`tag ${c.kind === 'call' || c.kind === 'stratagem' ? 'gold' : c.kind === 'doctrine' ? 'red' : ''}`}>{t.tag}</span>
+                  {t.icon && <Icon name={t.icon} className="warpath-card-icon" />}
                   <span className="training-card-name">{t.title}</span>
+                  {t.role && <RoleBadge role={t.role} />}
                   <span className="training-card-text">{t.text}</span>
                 </button>
               );
@@ -323,13 +369,14 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
         <div className="warpath-menu" role="dialog" aria-label="Paused">
           <h2>Paused</h2>
           <p className="muted small">{clock(run.t)} · level {run.level} · {run.kills.toLocaleString()} kills · {bossesOf(run)} bosses</p>
+          <HeldRules run={run} />
           <button className="primary" onClick={() => { setQuitting(false); setPaused(false); }}><Icon name="l:play" /> Resume</button>
           <button onClick={() => onLeave(run)}><Icon name="l:save" /> Save and leave</button>
           {onAuto && <button onClick={() => { onAuto(); setPaused(false); }}>{auto ? 'Stop auto' : 'Auto (debug: banks nothing)'}</button>}
           {quitting
             ? <button className="danger" onClick={() => onQuit(run)}><Icon name="l:flag" /> Yes, end it here (banks what it earned)</button>
             : <button className="ghost danger" onClick={() => setQuitting(true)}><Icon name="l:flag" /> Give up the run</button>}
-          <p className="muted small">Move with WASD, the arrow keys or by dragging anywhere. Scroll to zoom. P or Esc pauses.</p>
+          <p className="muted small">Move with WASD, the arrow keys or by dragging anywhere. Scroll to zoom. P or Esc pauses.{hud.power ? ` Space or the round button: ${hud.power.power === 'rush' ? 'charge' : 'blink'}.` : ''}</p>
         </div>
       )}
     </div>

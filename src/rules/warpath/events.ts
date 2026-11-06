@@ -6,9 +6,10 @@ import { eliteShare, pickKind, spawnEnemy, spawnRate } from './enemies';
 /** How long a site must be held. */
 export const holdOf = (k: SiteKind, run?: WarpathRun) =>
   (k === 'shrine' ? S.hold : k === 'cache' ? S.cacheHold : k === 'well' ? S.wellHold : 0) * (1 - T.pathfinder * (run ? metaLv(run, 'pathfinder') : 0));
-import { clock } from './loot';
+import { xpNeed } from './levels';
+import { clock, drop } from './loot';
 import { has, metaLv, TREE_FX as T } from './meta';
-import type { HordeLanding, SiteKind, WarpathRun } from './types';
+import type { HordeLanding, Site, SiteKind, WarpathRun } from './types';
 
 // The run's surprises. Hordes: every so often, after a short warning, a ring of one kind closes round the hero or a
 // column charges in from one side. Sites: a shrine to hold, a cache to open, an aid station, a champion holding its
@@ -139,6 +140,7 @@ export function siteStep(run: WarpathRun, dt: number): void {
         banner(run, `Battle Hymn: the force fires ${Math.round((pilgrim ? T.pilgrimHymn : S.hymn) * 100)}% faster for ${secs}s`, 'good');
         run.log.push(`${clock(run.t)} A shrine taken: Battle Hymn.`);
         run.fx.push({ kind: 'spell', x: s.x, y: s.y, n: S.radius * 2, t: 0.8 });
+        forage(run, s);
         s.held = -1;
       }
     } else if (s.kind === 'cache') {
@@ -165,6 +167,7 @@ export function siteStep(run: WarpathRun, dt: number): void {
         run.queued += n;
         banner(run, n > 1 ? `Supply cache: ${n} free level-ups` : 'Supply cache: a free level-up', 'good');
         run.log.push(`${clock(run.t)} A supply cache opened.`);
+        forage(run, s);
         s.held = -1;
       }
     } else if (s.kind === 'well') {
@@ -174,10 +177,21 @@ export function siteStep(run: WarpathRun, dt: number): void {
       run.hp = Math.min(run.maxHp, run.hp + run.maxHp * S.heal);
       if (run.fx.length < 700) run.fx.push({ kind: 'heal', x: run.hx, y: run.hy - 2, n: run.hp - before, t: 0.8 });
       banner(run, 'Aid station: the hero is patched up', 'good');
+      forage(run, s);
       s.held = -1;
     } else if (s.kind === 'champion' && !run.enemies.some((e) => e.champ === s.id && e.hp > 0)) s.held = -1;
   }
   run.sites = run.sites.filter((s) => s.held >= 0);
+}
+
+/** Forager: a site taken leaves a ring of Shards. */
+function forage(run: WarpathRun, s: Site): void {
+  if (!has(run, 'forager')) return;
+  const n = T.foragerGems;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2;
+    drop(run, 'gem', s.x + Math.cos(a) * 3, s.y + Math.sin(a) * 3, (xpNeed(run.level) * T.foragerShare) / n);
+  }
 }
 
 /** Is the Battle Hymn on? */

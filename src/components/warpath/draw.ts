@@ -1,9 +1,10 @@
-import { holdOf, hymn, inCover, onField, SITE_NAMES, terrainNear, WARPATH, type SiteKind, type Squad, type WarpathRun } from '../../rules/warpath';
+import { atWill, holdOf, hymn, inCover, onField, ROLES, roleOf, SITE_NAMES, terrainNear, WARPATH, type SiteKind, type Squad, type WarpathRun } from '../../rules/warpath';
 import type { IconName } from '../iconData';
 import { ICONS } from '../iconData';
 import { alpha, bar } from '../training/art';
 import type { EmblemLayer } from '../../model/types';
 import { drawEmblem } from '../Emblem';
+import { blades, blastCore, bossFall, dusk, heroAura, levelBurst, lowHp, motes, pops, shakeOf, spreeArc } from './vfx';
 
 // Warpath on a Canvas2D: the field (ground, grid, terrain), pickups, the enemy swarm, the force (each squad's models in
 // a loose cluster round its anchor), the hero, shots and blast markers, then floating numbers. Every body is a
@@ -172,6 +173,10 @@ const CLUSTER = Array.from({ length: 24 }, (_, i) => {
 });
 
 /** Draw one frame. `blend` (0–1) eases the hero between steps; `now` is wall seconds (for pulsing). */
+/** Seconds a body flashes white when hit, and the colour of a kill's sparks. */
+const HIT_FLASH = 0.09;
+const FOE_SPARK = '255,120,90';
+
 export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: View, pal: Palette, now: number) {
   const { ppi, w, h } = v;
   const sx = (x: number) => (x - v.cx) * ppi + w / 2;
@@ -180,9 +185,15 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   const halfH = h / 2 / ppi + 4;
   const inView = (x: number, y: number, pad = 0) => Math.abs(x - v.cx) < halfW + pad && Math.abs(y - v.cy) < halfH + pad;
 
+  // Everything on the field shakes with it; pointers, numbers and the banner hold still.
+  const jolt = shakeOf(run, now);
+  ctx.save();
+  ctx.translate(jolt.x, jolt.y);
+
   // Ground and a 6" grid, so moving reads even on open ground.
   ctx.fillStyle = '#16171c';
-  ctx.fillRect(0, 0, w, h);
+  ctx.fillRect(-20, -20, w + 40, h + 40);
+  dusk(ctx, run, w, h);
   ctx.strokeStyle = 'rgba(255,255,255,0.045)';
   ctx.lineWidth = 1;
   ctx.beginPath();
@@ -209,6 +220,8 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       stamp(ctx, st.icon, st.tint, sx(t.x + ox * t.r * 0.6), sy(t.y + oy * t.r * 0.6), (t.kind === 'block' ? t.r * 1.3 : 2.2) * ppi);
     }
   }
+
+  motes(ctx, run, v.cx * ppi, v.cy * ppi, w, h, now);
 
   // Sites: a ring on the ground and the site's mark (a shrine fills as it's held).
   for (const st of run.sites ?? []) {
@@ -246,9 +259,21 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       const r = (0.32 + tier * 0.08) * ppi;
       const x = sx(p.x);
       const y = sy(p.y);
+      const shine = 1.75 + 0.3 * Math.sin(now * 5 + p.id);
       ctx.fillStyle = GEM_COLOR[tier];
+      ctx.globalAlpha = 0.2;
+      ctx.beginPath();
+      ctx.moveTo(x, y - r * 1.3 * shine); ctx.lineTo(x + r * shine, y); ctx.lineTo(x, y + r * 1.3 * shine); ctx.lineTo(x - r * shine, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 1;
       ctx.beginPath();
       ctx.moveTo(x, y - r * 1.3); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r * 1.3); ctx.lineTo(x - r, y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.beginPath();
+      ctx.moveTo(x, y - r * 1.1); ctx.lineTo(x + r * 0.45, y - r * 0.15); ctx.lineTo(x - r * 0.45, y - r * 0.15);
       ctx.closePath();
       ctx.fill();
     } else {
@@ -263,7 +288,7 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
     if (!inView(m.x, m.y, 4)) continue;
     if (m.blast) {
       const R = (m.radius ?? WARPATH.enemy.blastRadius) * ppi;
-      const k = 1 - Math.max(0, m.life) / WARPATH.enemy.blastFuse;
+      const k = 1 - Math.max(0, m.life) / (m.fuse ?? WARPATH.enemy.blastFuse);
       ctx.beginPath();
       ctx.arc(sx(m.x), sy(m.y), R, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(255,70,50,${0.1 + 0.25 * k})`;
@@ -294,12 +319,69 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
 
   // The swarm: shooters winding up show a line to where they aim; hurt bodies flash pale.
   const kinds = run.enemyKinds;
+  // Shells on the way down: a crosshair closing on where they land.
+  for (const sh of run.shells ?? []) {
+    if (!inView(sh.x, sh.y, 4)) continue;
+    const k = 1 - sh.t / WARPATH.roles.shellTime;
+    const r = (1.6 - k) * ppi;
+    const x = sx(sh.x);
+    const y = sy(sh.y);
+    ctx.strokeStyle = `rgba(255,179,71,${0.35 + 0.5 * k})`;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.moveTo(x - r * 1.3, y);
+    ctx.lineTo(x + r * 1.3, y);
+    ctx.moveTo(x, y - r * 1.3);
+    ctx.lineTo(x, y + r * 1.3);
+    ctx.stroke();
+  }
+
   for (const e of run.enemies) {
     if (!inView(e.x, e.y, e.size)) continue;
     const k = kinds[e.kind];
     const px = (e.boss ? e.size : k.size) * ppi;
     const x = sx(e.x);
     const y = sy(e.y);
+    // Coming out of the ground: a ring closes, then it's there.
+    if (e.emerge) {
+      const q = 1 - e.emerge / WARPATH.foes.emerge;
+      ctx.beginPath();
+      ctx.arc(x, y, px * (1.6 - q), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(255,90,70,${0.4 + 0.5 * q})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 0.25 + 0.5 * q;
+      stamp(ctx, k.icon as IconName, pal.foe, x, y, px * Math.max(0.3, q), 0);
+      ctx.globalAlpha = 1;
+      continue;
+    }
+    // A lunge winding up: a wedge along the path it's about to take.
+    if (e.dash && !e.dash.go) {
+      const a = Math.atan2(e.dash.y - e.y, e.dash.x - e.x);
+      const len = Math.hypot(e.dash.x - e.x, e.dash.y - e.y) * ppi;
+      const q = Math.max(0, 1 - e.dash.t / WARPATH.foes.lungeWind);
+      ctx.fillStyle = `rgba(255,80,60,${0.12 + 0.3 * q})`;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(a + 0.14) * len, y + Math.sin(a + 0.14) * len);
+      ctx.lineTo(x + Math.cos(a - 0.14) * len, y + Math.sin(a - 0.14) * len);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // Fliers cast a shadow; fuses flicker.
+    if (k.ways?.flies) {
+      ctx.beginPath();
+      ctx.ellipse(x + px * 0.2, y + px * 0.55, px * 0.42, px * 0.2, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fill();
+    }
+    if (k.ways?.fuse && !e.boss && Math.sin(now * 12 + e.id) > 0.3) {
+      ctx.beginPath();
+      ctx.arc(x, y, px * 0.6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255,160,60,0.3)';
+      ctx.fill();
+    }
     if (e.aim > 0) {
       ctx.strokeStyle = `rgba(255,120,80,${0.25 + 0.5 * (1 - e.aim / WARPATH.enemy.windUp)})`;
       ctx.lineWidth = 1.5;
@@ -333,7 +415,14 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       ctx.stroke();
     }
     const col = e.boss === 'lord' ? '#ff7ae6' : e.boss ? '#ffc94d' : e.status.stun ? '#9fb4ff' : e.status.bleed ? '#ff6a6a' : pal.foe;
-    stamp(ctx, (e.boss ? (e.boss === 'lord' ? 'g:dread-skull' : 'g:crowned-skull') : k.icon) as IconName, col, x, y, px, e.boss ? 10 : 0);
+    const look = (e.boss ? (e.boss === 'lord' ? 'g:dread-skull' : 'g:crowned-skull') : k.icon) as IconName;
+    stamp(ctx, look, col, x, y, px, e.boss ? 10 : 0);
+    // Just hit: a white flash.
+    if (e.hitT !== undefined && run.t - e.hitT < HIT_FLASH) {
+      ctx.globalAlpha = 0.7 * (1 - (run.t - e.hitT) / HIT_FLASH);
+      stamp(ctx, look, '#ffffff', x, y, px, 0);
+      ctx.globalAlpha = 1;
+    }
     if (e.boss || e.hp < e.maxHp) {
       if (e.boss || e.elite || px > 14) bar(ctx, x - px / 2, y + px * 0.55, px, e.hp / e.maxHp, e.boss ? '#ff5a4a' : e.elite ? ELITE : undefined, e.boss || e.champ !== undefined ? 5 : 3);
     }
@@ -363,6 +452,33 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       continue;
     }
     if (!onField(s)) continue;
+    const roleId = roleOf(s);
+    const role = ROLES[roleId];
+    // What it's up to: a streak on a charge, a shadow under a flyer, a glow on a boon.
+    if (s.rush) {
+      const a = Math.atan2(s.rush.y - s.y, s.rush.x - s.x);
+      ctx.strokeStyle = alpha(role.color, 0.55);
+      ctx.lineCap = 'round';
+      ctx.lineWidth = 2.4 * ppi;
+      ctx.beginPath();
+      ctx.moveTo(sx(s.x), sy(s.y));
+      ctx.lineTo(sx(s.x) - Math.cos(a) * 5 * ppi, sy(s.y) - Math.sin(a) * 5 * ppi);
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+    }
+    if (roleId === 'flyer') {
+      ctx.beginPath();
+      ctx.ellipse(sx(s.x) + ppi, sy(s.y) + 1.6 * ppi, 1.7 * ppi, 0.7 * ppi, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.35)';
+      ctx.fill();
+    }
+    if (s.boon && Object.values(s.boon).some((t) => (t ?? 0) > 0)) {
+      ctx.beginPath();
+      ctx.arc(sx(s.x), sy(s.y), (2.6 + 0.2 * Math.sin(now * 5)) * ppi, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(126,224,126,0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
     const big = s.kind === 'heavy' || s.kind === 'artillery' || s.kind === 'air';
     const px = (big ? 2.4 : 1.25) * ppi;
     const spread = big ? 1.2 + s.size * 0.5 : 0.9 + Math.sqrt(s.size) * 0.75;
@@ -377,6 +493,11 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       ctx.stroke();
       ctx.restore();
     }
+    // Its archetype's colour on the ground, so a glance tells them apart.
+    ctx.beginPath();
+    ctx.ellipse(sx(s.x), sy(s.y) + spread * ppi * 0.15, (spread + 0.7) * ppi, (spread + 0.7) * ppi * 0.72, 0, 0, Math.PI * 2);
+    ctx.fillStyle = alpha(role.color, (s.held ?? 0) >= WARPATH.roles.holdAfter ? 0.2 : 0.11);
+    ctx.fill();
     let top = 0;
     for (let i = 0; i < s.alive && i < CLUSTER.length; i++) {
       const [ox, oy] = CLUSTER[i];
@@ -402,6 +523,17 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       ctx.moveTo(x, y);
       ctx.lineTo(sx(f.x2), sy(f.y2));
       ctx.stroke();
+      // A soft glow down the tracer and a spark where it lands.
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.28;
+      ctx.lineWidth = f.crit ? 7 : 4;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.beginPath();
+      ctx.arc(sx(f.x2), sy(f.y2), Math.max(2, ppi * (f.crit ? 0.3 : 0.18)), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
     } else if (f.kind === 'melee' && f.x2 !== undefined && f.y2 !== undefined) {
       // A blow, as in Training: a yellow half-circle swipe across the target from the striker's side, with sparks
       // flying on through it.
@@ -438,13 +570,61 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       ctx.lineWidth = 2;
       ctx.strokeStyle = `rgba(${col},${0.8 * (1 - k)})`;
       ctx.stroke();
+      blastCore(ctx, f, x, y, ppi);
+    } else if (f.kind === 'dash' && f.x2 !== undefined && f.y2 !== undefined) {
+      ctx.strokeStyle = `rgba(255,170,100,${Math.min(0.6, f.t * 2)})`;
+      ctx.lineWidth = 1.4 * ppi * Math.min(1, f.t * 3);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(sx(f.x2), sy(f.y2));
+      ctx.stroke();
+      ctx.lineCap = 'butt';
+    } else if (f.kind === 'boon') {
+      const k = 1 - f.t / 0.6;
+      ctx.beginPath();
+      ctx.arc(x, y, (f.n ?? 2) * ppi * (0.5 + k), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(150,240,150,${0.8 * (1 - k)})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    } else if (f.kind === 'ward') {
+      // A hit shrugged off: a small shield glint.
+      const k = 1 - f.t / 0.3;
+      ctx.beginPath();
+      ctx.arc(x, y - ppi * 0.4, ppi * (0.5 + 0.4 * k), -2.4, -0.7);
+      ctx.strokeStyle = `rgba(170,225,255,${1 - k})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
     }
   }
+
+  pops(ctx, run, sx, sy, (x, y) => inView(x, y, 2), ppi, FOE_SPARK);
 
   // The hero: a ring, its facing, the icon, and a pickup-reach hint.
   const hx = sx(run.hx);
   const hy = sy(run.hy);
   const hit = run.iframes > 0;
+  const rushing = run.squads[0].rush;
+  if (rushing) {
+    const a = Math.atan2(rushing.y - run.hy, rushing.x - run.hx);
+    ctx.strokeStyle = 'rgba(255,215,90,0.5)';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 3 * ppi;
+    ctx.beginPath();
+    ctx.moveTo(hx, hy);
+    ctx.lineTo(hx - Math.cos(a) * 6 * ppi, hy - Math.sin(a) * 6 * ppi);
+    ctx.stroke();
+    ctx.lineCap = 'butt';
+    // Afterimages down the line of the charge.
+    for (let i = 3; i >= 1; i--) {
+      ctx.globalAlpha = 0.34 - i * 0.08;
+      stampUnit(ctx, pal, run.squads[0], squadIcon(run.squads[0]), '#ffe08a', hx - Math.cos(a) * i * 1.8 * ppi, hy - Math.sin(a) * i * 1.8 * ppi, 2.4 * ppi, 0);
+    }
+    ctx.globalAlpha = 1;
+  }
+  heroAura(ctx, hx, hy, ppi, atWill(run) ? '#ffd166' : ROLES[roleOf(run.squads[0])].color, now);
+  spreeArc(ctx, run, hx, hy, ppi);
+  blades(ctx, run, sx, sy, ppi, now);
   ctx.beginPath();
   ctx.arc(hx, hy, 1.6 * ppi, 0, Math.PI * 2);
   ctx.fillStyle = hit ? 'rgba(255,255,255,0.3)' : 'rgba(255,215,90,0.16)';
@@ -476,6 +656,14 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   ctx.fill();
   stampUnit(ctx, pal, run.squads[0], squadIcon(run.squads[0]), hit ? '#ffffff' : '#ffe08a', hx, hy, 2.4 * ppi, 8);
   bar(ctx, hx - 1.6 * ppi, hy + 1.9 * ppi, 3.2 * ppi, run.hp / run.maxHp, undefined, 4);
+
+  // The big moments, over everything on the field.
+  for (const f of run.fx) {
+    if (f.kind === 'level') levelBurst(ctx, f, hx, hy, ppi);
+    else if (f.kind === 'fall') bossFall(ctx, f, sx(f.x), sy(f.y), ppi, w, h);
+  }
+  ctx.restore();
+  lowHp(ctx, run, w, h, now);
 
   // Bosses off the screen: a pointer on the edge, toward them.
   for (const e of run.enemies) {

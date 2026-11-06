@@ -1,13 +1,16 @@
 // Warpath: a horde-survivor run. Pick a hero; it moves, the force fights on its own, the week's theme book comes in waves.
 export * from './data';
 export * from './types';
-export { newRun, step, autoplay, botInput, botPick, heroesOf, themeBooks, weekTheme, playable, WARPATH_VERSION, type Input, type NewRun } from './sim';
+export { newRun, freshenRun, step, autoplay, botInput, botPick, heroesOf, rosterOf, themeBooks, weekTheme, playable, WARPATH_VERSION, type Input, type NewRun } from './sim';
 export { choose, skip, reroll, cardText, xpNeed, pointsLeft, openLevelUp } from './levels';
 export { onField, originOf, reachOf } from './combat';
 export { chunkTerrain, inCover, terrainNear } from './field';
-export { mods, heroMaxHp, minutes } from './mods';
+export { atWill, mods, heroMaxHp, minutes } from './mods';
+export { bladesOf } from './doctrines';
 export { clock } from './loot';
 export { squadOf, enemyKindsOf, fieldPoints } from './roster';
+export { roleOf, roleOfUnit, heroPowerOf } from './traits';
+export { heroCooldown } from './squads';
 export { warpathXp, warpathFeats, warpathRepeats, bankRecords, weekBoard, hardOpen, bossesOf } from './bank';
 export { saveWarpath, loadWarpath, clearWarpath, readSaved, packRun, newerWarpath, warpathKey } from './save';
 export { DOCTRINES } from './data';
