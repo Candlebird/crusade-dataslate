@@ -9,12 +9,12 @@ import { autoplay, heroesOf, newRun, step } from './sim';
 import { hordeStep, siteStep } from './events';
 import { callLevel } from './levels';
 import { enemyKindsOf } from './roster';
-import { hurtSquad, spawnEnemy, strikeSquad } from './enemies';
-import { woundsPer } from './mods';
+import { hurtSquad, missileStep, spawnEnemy, strikeSquad } from './enemies';
+import { blastRadius, guardianMul, softDeadly, woundsPer } from './mods';
 import { chunkTerrain, Grid, inCover } from './field';
 import { squadStep } from './squads';
 import { bankRenown, cantTake, laurelsFor, metaOf, nodeCost, nodeState, HONOURS, prestige, PRESTIGE, renownOf, resetTree, takeNode, TREE_FX } from './meta';
-import { hurtEnemy } from './combat';
+import { hurtEnemy, strike } from './combat';
 import { mods } from './mods';
 
 const echoes = normalizeBook(JSON.parse(readFileSync('armies/void-echoes.gf.json', 'utf8')));
@@ -385,5 +385,60 @@ describe('Warpath', () => {
     r3.nextSite = 1e9;
     for (let i = 0; i < 80 && (r3.sites ?? []).length; i++) siteStep(r3, 0.1);
     expect(r3.queued).toBe(TREE_FX.plunder);
+  });
+
+  it('a Blast gun hits everything inside a radius set by its value, and nothing past it', () => {
+    const shoot = (blast: number) => {
+      const run = start(0, 'bl');
+      run.enemies = [];
+      run.squads[0].quality = 2;
+      const at = [0, 2.5, 5.5, 8];
+      const es = at.map((x) => { const e = spawnEnemy(run, 0, 100 + x, 100); e.hp = e.maxHp = 1000; return e; });
+      run.enemyKinds[0].defense = 7; // Never saves.
+      const grid = new Grid(4);
+      grid.build(run.enemies);
+      const g = { ...run.squads[0].guns[0], melee: false, blast, reliable: true, hitMod: 0 };
+      // Hits are rolled: shoot until one lands.
+      for (let i = 0; i < 40 && es[0].hp === 1000; i++) strike(run, grid, 0, g, es[0], mods(run), { hit: 0, reach: 0, rate: 0 } as never, false);
+      return es.map((e) => e.hp < 1000);
+    };
+    expect(blastRadius(3)).toBe(3);
+    expect(blastRadius(6)).toBe(6);
+    expect(shoot(3)).toEqual([true, true, false, false]);
+    expect(shoot(6)).toEqual([true, true, true, false]);
+  });
+
+  it('an enemy blast marker reaches as far as its radius', () => {
+    const landed = (radius: number) => {
+      const run = start(0, 'bm');
+      run.squads[0].defense = 7;
+      run.hx = run.hy = 0;
+      run.iframes = 0;
+      run.missiles = [{ x: 5, y: 0, vx: 0, vy: 0, life: 0.001, blast: true, radius, quality: 2, ap: 0, dmg: 1, attacks: 40 }];
+      const hp = run.hp;
+      missileStep(run, 0.1);
+      return run.hp < hp;
+    };
+    expect(landed(3)).toBe(false);
+    expect(landed(6)).toBe(true);
+  });
+
+  it('champions and captains grow into their blows; lords and the swarm hit in full', () => {
+    const run = start(0, 'gd');
+    const champ = spawnEnemy(run, 0, 0, 0, undefined, true);
+    champ.champ = 1;
+    const captain = spawnEnemy(run, 0, 0, 0, 'captain');
+    const lord = spawnEnemy(run, 0, 0, 0, 'lord');
+    const common = spawnEnemy(run, 0, 0, 0);
+    run.t = 0;
+    expect(guardianMul(run, champ)).toBe(WARPATH.guardian.from);
+    expect(guardianMul(run, captain)).toBe(WARPATH.guardian.from);
+    expect(guardianMul(run, lord)).toBe(1);
+    expect(guardianMul(run, common)).toBe(1);
+    run.t = WARPATH.guardian.fullAt * 60;
+    expect(guardianMul(run, champ)).toBe(1);
+    expect(softDeadly(6, 0.25)).toBe(2);
+    expect(softDeadly(1, 0.25)).toBe(1);
+    expect(softDeadly(6, 1)).toBe(6);
   });
 });

@@ -262,7 +262,7 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   for (const m of run.missiles) {
     if (!inView(m.x, m.y, 4)) continue;
     if (m.blast) {
-      const R = WARPATH.enemy.blastRadius * ppi;
+      const R = (m.radius ?? WARPATH.enemy.blastRadius) * ppi;
       const k = 1 - Math.max(0, m.life) / WARPATH.enemy.blastFuse;
       ctx.beginPath();
       ctx.arc(sx(m.x), sy(m.y), R, 0, Math.PI * 2);

@@ -65,6 +65,12 @@ export const WARPATH = {
   },
   /** Enemy bodies: HP an unsaved wound takes off the hero, inches a second per inch of Advance, how close counts as touching, attack clocks. */
   enemy: { dmgPerWound: 3, heroDeadlyCap: 2, heroBlowCap: 0.35, speedPer: 0.85, touch: 1.1, meleeEvery: 1.1, hpPerTough: 1, windUp: 0.9, shotSpeed: 22, shotRadius: 0.9, blastRadius: 3, blastFuse: 1.2, shooterShare: 0.18 },
+  /** Blast(X) covers a circle of X × `perX` inches radius (a gun's hit lands on everything inside, each saving on its
+   *  own; an enemy's is its marker). Shrapnel splashes within `splash`. */
+  blast: { perX: 1, splash: 2.2 },
+  /** Site champions and captains come in softer: their attacks and Deadly start at `from` of full and reach it at
+   *  `fullAt` minutes. Lords always hit in full. */
+  guardian: { from: 0.25, fullAt: 12 },
   /** Bosses: attacks × blows (a lord × lordBlows) every `every` × the usual clock; a captain every 3 min, an Echo Lord every 15 (wounds at minute 5, + a share a minute). */
   bosses: { blows: 2, lordBlows: 3, every: 1.5, captainEvery: 180, lordEvery: 900, captainHp: 175, lordHp: 440, hpPerMin: 0.09, size: 3.2, lordSize: 4.4, drop: 1 },
   /** Elites (as in Training): from `from` s, a share of the swarm (+ perMin a minute, to max) with more wounds, harder

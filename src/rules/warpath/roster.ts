@@ -6,6 +6,7 @@ import { fighter, type Gun } from '../autoBattle';
 import { unitName } from '../battle';
 import { hasRule, ruleRating } from '../engine';
 import { WARPATH } from './data';
+import { blastRadius } from './mods';
 import type { EnemyKind, Squad, SquadKind, WGun } from './types';
 
 // Who fights: the force's units as Warpath squads (the hero first), and the week's theme book as enemy datasheets.
@@ -120,7 +121,7 @@ export function enemyKindsOf(book: CatalogBook): EnemyKind[] {
       melee: {
         attacks: Math.max(1, melee.reduce((n, g) => n + g.attacks, 0) / size), ap: Math.max(0, ...melee.map((g) => g.ap)), deadly: Math.max(1, ...melee.map((g) => g.deadly)),
       },
-      ...(ranged ? { gun: { reach: gunReach(ranged.range, 6), attacks: Math.max(1, ranged.attacks / size), ap: ranged.ap, deadly: Math.max(1, ranged.deadly), blast: ranged.blast > 1 } } : {}),
+      ...(ranged ? { gun: { reach: gunReach(ranged.range, 6), attacks: Math.max(1, ranged.attacks / size), ap: ranged.ap, deadly: Math.max(1, ranged.deadly), blast: ranged.blast > 1, ...(ranged.blast > 1 ? { radius: blastRadius(ranged.blast) } : {}) } } : {}),
       size: Math.min(3, 1.1 * (1 + 0.3 * Math.log2(tough))) * (hero ? 1.2 : 1), hero,
     });
   }

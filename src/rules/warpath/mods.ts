@@ -1,6 +1,6 @@
 import { DOCTRINES, WARPATH, type DoctrineId } from './data';
 import { has, HONOURS, honoursOf, metaLv, TREE_FX as T } from './meta';
-import type { Squad, WarpathRun } from './types';
+import type { Enemy, Squad, WarpathRun } from './types';
 
 // What doctrines, levels and the clock add up to, read wherever combat needs them.
 
@@ -49,6 +49,19 @@ export function enemyMul(run: WarpathRun): { hp: number; dmg: number } {
   const m = minutes(run);
   return { hp: hard.hp * (1 + S.hpPerMin * m) * (1 + S.lateHp * late), dmg: hard.dmg * (1 + S.dmgPerMin * m) * (1 + S.lateDmg * late) };
 }
+
+/** How far a Blast(X) reaches. */
+export const blastRadius = (x: number) => x * WARPATH.blast.perX;
+
+/** The share of its full blows a champion or captain lands now (1 for anything else): it grows with the clock. */
+export function guardianMul(run: WarpathRun, e: Enemy): number {
+  if (e.champ === undefined && e.boss !== 'captain') return 1;
+  const G = WARPATH.guardian;
+  return Math.min(1, G.from + (1 - G.from) * (minutes(run) / G.fullAt));
+}
+
+/** A Deadly value at that share (never under 1). */
+export const softDeadly = (deadly: number, mul: number) => Math.max(1, Math.round(1 + (deadly - 1) * mul));
 
 /** The hero's most HP: hpMin + Tough × hpPerTough, + a share a level. */
 /** Wounds a model in this squad takes to fall: its Tough, doubled by each drill level. */

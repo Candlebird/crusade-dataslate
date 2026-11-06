@@ -171,7 +171,7 @@ export function botInput(run: WarpathRun): Input {
     const ex = run.hx - m.x;
     const ey = run.hy - m.y;
     const d2 = ex * ex + ey * ey;
-    if (d2 < 16) { dx += ex * 2; dy += ey * 2; }
+    if (d2 < ((m.radius ?? WARPATH.enemy.blastRadius) + 1) ** 2) { dx += ex * 2; dy += ey * 2; }
   }
   const press = Math.hypot(dx, dy);
   let goal: { x: number; y: number } | undefined;

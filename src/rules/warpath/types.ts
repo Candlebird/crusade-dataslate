@@ -106,7 +106,7 @@ export interface EnemyKind {
   /** Models that come together. */
   pack: number;
   melee: { attacks: number; ap: number; deadly: number };
-  gun?: { reach: number; attacks: number; ap: number; deadly: number; blast: boolean };
+  gun?: { reach: number; attacks: number; ap: number; deadly: number; blast: boolean; radius?: number };
   /** Size on screen (inches across). */
   size: number;
   hero: boolean;
@@ -153,6 +153,8 @@ export interface Missile {
   vy: number;
   life: number;
   blast: boolean;
+  /** A blast's radius (none: the default, enemy.blastRadius). */
+  radius?: number;
   quality: number;
   ap: number;
   dmg: number;

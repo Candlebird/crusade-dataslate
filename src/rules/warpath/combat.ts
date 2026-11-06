@@ -3,7 +3,7 @@ import { rawDamage, readShot, runVolley } from '../shots';
 import { hitChance, rand, saveChance } from '../training/rng';
 import { WARPATH } from './data';
 import { terrainAt, type Grid } from './field';
-import { mods, penalty, type Mods } from './mods';
+import { blastRadius, mods, penalty, type Mods } from './mods';
 import { killed } from './loot';
 import { has, TREE_FX as T } from './meta';
 import type { Enemy, Squad, WarpathRun, WGun } from './types';
@@ -96,7 +96,7 @@ export function afflict(run: WarpathRun, si: number, e: Enemy, st: Status): void
 }
 
 /** One attack from a squad's gun at `target`, rolled OPR-style. `relic`: a golden relic shot. */
-function strike(run: WarpathRun, grid: Grid, si: number, g: WGun, target: Enemy, m: Mods, aura: Auras, relic = false): void {
+export function strike(run: WarpathRun, grid: Grid, si: number, g: WGun, target: Enemy, m: Mods, aura: Auras, relic = false): void {
   const s = run.squads[si];
   const o = originOf(run, s);
   const cover = !g.melee && !g.indirect && terrainAt(run.seed, target.x, target.y)?.kind === 'cover' ? -1 : 0;
@@ -123,14 +123,20 @@ function strike(run: WarpathRun, grid: Grid, si: number, g: WGun, target: Enemy,
     if (first) for (const k of live) if (k.kind === 'onHit' && (!k.only || (k.only === 'melee') === g.melee) && rand(run) < k.chance) afflict(run, si, e, k.status);
   };
   hit(target, true);
-  // Blast(X): spills onto up to X−1 others close by; Shrapnel sometimes onto one more. Each saves on its own.
-  const more = Math.max(0, g.blast - 1) + (m.splash > 0 && rand(run) < m.splash ? 1 : 0);
-  if (more > 0) {
-    let n = 0;
-    grid.near(target.x, target.y, 2.2, (e) => {
+  // Blast(X): lands on everything within its radius, each saving on its own.
+  if (g.blast > 1) {
+    const radius = blastRadius(g.blast);
+    if (run.fx.length < 700) run.fx.push({ kind: 'boom', x: target.x, y: target.y, n: radius, t: 0.3 });
+    grid.near(target.x, target.y, radius, (e) => {
+      if (e !== target) hit(e, false);
+    });
+  }
+  // Shrapnel sometimes splashes one more.
+  if (m.splash > 0 && rand(run) < m.splash) {
+    grid.near(target.x, target.y, W.blast.splash, (e) => {
       if (e === target) return;
       hit(e, false);
-      return ++n >= more;
+      return true;
     });
   }
   if (sixes.some((e) => e.again) && target.hp > 0) strike(run, grid, si, { ...g, ap: g.ap }, target, m, { ...aura }, relic);

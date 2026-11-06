@@ -2,7 +2,7 @@ import { hitChance, rand, saveChance } from '../training/rng';
 import { DOCTRINES, WARPATH } from './data';
 import { inCover, terrainAt, unblock, type Grid } from './field';
 import { onField } from './combat';
-import { enemyMul, minutes, mods, woundsPer } from './mods';
+import { enemyMul, guardianMul, minutes, mods, softDeadly, woundsPer } from './mods';
 import { clock } from './loot';
 import type { Enemy, EnemyKind, Missile, Squad, WarpathRun } from './types';
 import { has, TREE_FX } from './meta';
@@ -230,9 +230,10 @@ export function missileStep(run: WarpathRun, dt: number): void {
     m.life -= dt;
     if (m.blast) {
       if (m.life <= 0) {
-        run.fx.push({ kind: 'boom', x: m.x, y: m.y, n: E.blastRadius, t: 0.4 });
-        if ((run.hx - m.x) ** 2 + (run.hy - m.y) ** 2 < E.blastRadius ** 2) land(run, m);
-        for (const s of ground) if ((s.x - m.x) ** 2 + (s.y - m.y) ** 2 < (E.blastRadius + bodyOf(s) * 0.5) ** 2) landOn(run, s, m);
+        const r = m.radius ?? E.blastRadius;
+        run.fx.push({ kind: 'boom', x: m.x, y: m.y, n: r, t: 0.4 });
+        if ((run.hx - m.x) ** 2 + (run.hy - m.y) ** 2 < r ** 2) land(run, m);
+        for (const s of ground) if ((s.x - m.x) ** 2 + (s.y - m.y) ** 2 < (r + bodyOf(s) * 0.5) ** 2) landOn(run, s, m);
       }
       continue;
     }
@@ -256,12 +257,14 @@ export function missileStep(run: WarpathRun, dt: number): void {
 /** Loose a shot or blast marker at (tx, ty). */
 function loose(run: WarpathRun, e: Enemy, k: EnemyKind): void {
   const g = k.gun!;
+  const soft = guardianMul(run, e);
+  const dmg = softDeadly(g.deadly, soft);
   if (g.blast) {
-    run.missiles.push({ x: e.tx, y: e.ty, vx: 0, vy: 0, life: E.blastFuse, blast: true, quality: k.quality, ap: g.ap, dmg: g.deadly, attacks: g.attacks * 1.5 });
+    run.missiles.push({ x: e.tx, y: e.ty, vx: 0, vy: 0, life: E.blastFuse, blast: true, ...(g.radius ? { radius: g.radius } : {}), quality: k.quality, ap: g.ap, dmg, attacks: g.attacks * 1.5 * soft });
     return;
   }
   const d = Math.hypot(e.tx - e.x, e.ty - e.y) || 1;
-  run.missiles.push({ x: e.x, y: e.y, vx: ((e.tx - e.x) / d) * E.shotSpeed, vy: ((e.ty - e.y) / d) * E.shotSpeed, life: (g.reach * 1.3) / E.shotSpeed, blast: false, quality: k.quality, ap: g.ap, dmg: g.deadly, attacks: g.attacks });
+  run.missiles.push({ x: e.x, y: e.y, vx: ((e.tx - e.x) / d) * E.shotSpeed, vy: ((e.ty - e.y) / d) * E.shotSpeed, life: (g.reach * 1.3) / E.shotSpeed, blast: false, quality: k.quality, ap: g.ap, dmg, attacks: g.attacks * soft });
 }
 
 /** Statuses wear off; bleed hurts. Returns whether it can act this step. */
@@ -394,13 +397,15 @@ export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Ene
     e.cd -= dt;
     if (e.cd > 0) continue;
     e.cd = E.meleeEvery * (e.boss ? B.every : 1) * (e.status.daze ? 1.4 : 1);
-    const attacks = k.melee.attacks * (e.boss === 'lord' ? B.lordBlows : e.boss ? B.blows : 1);
+    const soft = guardianMul(run, e);
+    const attacks = k.melee.attacks * (e.boss === 'lord' ? B.lordBlows : e.boss ? B.blows : 1) * soft;
+    const deadly = softDeadly(k.melee.deadly, soft);
     if (mark) {
-      strikeSquad(run, mark, attacks, k.quality, k.melee.ap, k.melee.deadly, mul.dmg * (e.elite ? W.elite.dmg : 1));
+      strikeSquad(run, mark, attacks, k.quality, k.melee.ap, deadly, mul.dmg * (e.elite ? W.elite.dmg : 1));
       continue;
     }
     if (run.iframes > 0) continue;
-    const dmg = rollOnHero(run, attacks, k.quality, k.melee.ap, k.melee.deadly, mul.dmg * (e.elite ? W.elite.dmg : 1));
+    const dmg = rollOnHero(run, attacks, k.quality, k.melee.ap, deadly, mul.dmg * (e.elite ? W.elite.dmg : 1));
     if (dmg > 0) {
       hurtHero(run, dmg);
       // Thorns: what wounds the hero in melee pays for it.
