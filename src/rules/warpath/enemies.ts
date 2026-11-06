@@ -138,7 +138,8 @@ export const bodyOf = (s: Squad) =>
 /** Squads the swarm can hit: on the field and on the ground (not aircraft). */
 const groundSquads = (run: WarpathRun) => run.squads.filter((s, i) => i > 0 && s.kind !== 'air' && onField(s));
 
-/** Wounds onto a squad: a fortification loses HP; anything else loses models by Tough (Hold the Line shrugs some off). */
+/** One strike's wounds onto a squad: a fortification loses HP; anything else loses at most one model, however big the
+ *  strike (Hold the Line shrugs some off). */
 export function hurtSquad(run: WarpathRun, s: Squad, wounds: number): void {
   if (wounds <= 0 || !onField(s)) return;
   if (s.fort) {
@@ -152,15 +153,10 @@ export function hurtSquad(run: WarpathRun, s: Squad, wounds: number): void {
     return;
   }
   s.wounds += wounds * mods(run).losses;
-  let lost = 0;
-  const per = woundsPer(s);
-  while (s.wounds >= per && s.alive > 0) {
-    s.wounds -= per;
-    s.alive -= 1;
-    lost += 1;
-  }
-  if (!lost) return;
-  if (run.fx.length < 700) run.fx.push({ kind: 'dmg', x: s.x, y: s.y - bodyOf(s), n: lost, t: 0.8, hurt: true });
+  if (s.wounds < woundsPer(s) || s.alive <= 0) return;
+  s.wounds = 0;
+  s.alive -= 1;
+  if (run.fx.length < 700) run.fx.push({ kind: 'dmg', x: s.x, y: s.y - bodyOf(s), n: 1, t: 0.8, hurt: true });
   if (s.alive <= 0) {
     s.wounds = 0;
     run.log.push(`${clock(run.t)} ${s.name} is cut down; it regroups.`);

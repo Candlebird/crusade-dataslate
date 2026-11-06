@@ -64,8 +64,8 @@ export function guardianMul(run: WarpathRun, e: Enemy): number {
 export const softDeadly = (deadly: number, mul: number) => Math.max(1, Math.round(1 + (deadly - 1) * mul));
 
 /** The hero's most HP: hpMin + Tough × hpPerTough, + a share a level. */
-/** Wounds a model in this squad takes to fall: its Tough, doubled by each drill level. */
-export const woundsPer = (s: Squad) => s.tough * WARPATH.levels.woundsMul ** s.level;
+/** Wounds a model in this squad takes to fall: its Tough x squadHp, doubled by each drill level. */
+export const woundsPer = (s: Squad) => s.tough * WARPATH.losses.squadHp * WARPATH.levels.woundsMul ** s.level;
 
 export function heroMaxHp(run: WarpathRun): number {
   const h = run.squads[0];

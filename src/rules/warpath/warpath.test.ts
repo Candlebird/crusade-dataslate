@@ -282,13 +282,30 @@ describe('Warpath', () => {
     s.alive = s.size;
     s.wounds = 0;
     s.level = 0;
-    expect(woundsPer(s)).toBe(s.tough);
+    const base = s.tough * WARPATH.losses.squadHp;
+    expect(woundsPer(s)).toBe(base);
     s.level = 2;
-    expect(woundsPer(s)).toBe(s.tough * 4);
+    expect(woundsPer(s)).toBe(base * 4);
     const k = 1 / mods(run).losses;
-    hurtSquad(run, s, s.tough * 3.9 * k);
+    hurtSquad(run, s, base * 3.9 * k);
     expect(s.alive).toBe(s.size);
-    hurtSquad(run, s, s.tough * 0.2 * k);
+    hurtSquad(run, s, base * 0.2 * k);
+    expect(s.alive).toBe(s.size - 1);
+  });
+
+  it('one strike fells at most one model, however big, and the overkill is lost', () => {
+    let run = start(0);
+    for (let i = 0; i < 6 && !run.squads.some((q) => q.kind === 'foot' && q.size > 1); i++) autoplay((run = start(i)), 180);
+    const s = run.squads.find((q) => q.kind === 'foot' && q.size > 1)!;
+    s.alive = s.size;
+    s.wounds = 0;
+    s.level = 0;
+    s.tough = 1;
+    hurtSquad(run, s, 500);
+    expect(s.alive).toBe(s.size - 1);
+    expect(s.wounds).toBe(0);
+    // The next model is whole, so a 1-wound hit leaves it standing.
+    hurtSquad(run, s, 1 / mods(run).losses);
     expect(s.alive).toBe(s.size - 1);
   });
 
@@ -320,10 +337,16 @@ describe('Warpath', () => {
       s.tough = 1;
       s.level = 0;
       s.defense = 6;
-      s.size = s.alive = 400;
-      s.wounds = 0;
-      strikeSquad(run, s, 400 / WARPATH.losses.squadDmg, 3, 0, 1, 1);
-      return 400 - s.alive;
+      s.size = 5;
+      // 400 single attacks, each on a model one wound from falling: how many land.
+      let n = 0;
+      for (let i = 0; i < 400; i++) {
+        s.alive = 5;
+        s.wounds = woundsPer(s) - 1;
+        strikeSquad(run, s, 1 / WARPATH.losses.squadDmg, 3, 0, 1, 1);
+        n += 5 - s.alive;
+      }
+      return n;
     };
     const open = lost(t!.x + 500, t!.y + 500);
     const covered = lost(t!.x, t!.y);

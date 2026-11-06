@@ -27,8 +27,9 @@ export const WARPATH = {
     coverSeek: 12, coverLeash: 18, coverShare: 3, coverDef: 1, coverHit: 0.2,
   },
   /** Squads as bodies: an enemy goes for a squad whose edge is within `aggro` and nearer than the hero. Wounds on a
-   *  squad (x `squadDmg`) take its models by Tough; lost models come back one per `regen` s. */
-  losses: { aggro: 8, squadDmg: 1.25, regen: 10 },
+   *  squad (x `squadDmg`) take its models, each with Tough x `squadHp` wounds; one strike fells at most one model, and
+   *  what's left of it is lost. Lost models come back one per `regen` s. */
+  losses: { aggro: 8, squadDmg: 1.25, squadHp: 2, regen: 10 },
   /** Aircraft fly loops this far out at this many inches a second. */
   air: { radius: 22, speed: 26 },
   /** Fortifications: land this far from the hero, hurt what they land on, come back after `respawn` + `perPts` × points
