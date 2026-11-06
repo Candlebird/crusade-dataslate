@@ -6,6 +6,8 @@ import { bladesOf, DOCTRINES, type WarpathRun } from '../../rules/warpath';
 type Ctx = CanvasRenderingContext2D;
 type Burst = NonNullable<WarpathRun['fx']>[number];
 
+/** Every effect is drawn at this opacity, so the units stay the loudest thing on the field. */
+export const FX = 0.8;
 /** Most small kill bursts drawn in a frame. */
 const POP_CAP = 160;
 /** The run's minute at which the field has turned fully to dusk. */
@@ -173,7 +175,7 @@ export function heroAura(ctx: Ctx, hx: number, hy: number, ppi: number, color: s
   ctx.setLineDash([ppi * 0.9, ppi * 1.35]);
   ctx.lineWidth = 2;
   ctx.strokeStyle = color;
-  ctx.globalAlpha = 0.55;
+  ctx.globalAlpha = 0.55 * FX;
   ctx.stroke();
   ctx.restore();
 }

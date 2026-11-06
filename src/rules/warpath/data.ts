@@ -129,7 +129,7 @@ export const WARPATH = {
   horde: { from: 75, min: 50, max: 95, warn: 3, secs: 9, least: 24, over: 150, ringR: 30, batch: 40 },
   /** Sites round the map, to go out to: up to `live` at once, a new one every `every` s, `near`–`far` from the hero,
    *  gone past `lose`. A shrine is held `hold` s (within `radius`) for a Battle Hymn (fire `hymn` faster for `hymnSecs`);
-   *  a cache gives a level-up and springs an elite ambush of `ambush`; a well heals `heal`; a champion (an elite ×`champHp`
+   *  a cache gives a level-up and springs an elite ambush of `ambush`; a well heals the hero `heal` and brings every unit back to full strength; a champion (an elite ×`champHp`
    *  that holds its ground until the hero comes within `wake`) drops `champXp` XP of Shards. */
   sites: { live: 3, every: 35, first: 20, near: 34, far: 60, lose: 110, radius: 3.5, hold: 8, cacheHold: 5, wellHold: 3, hymn: 0.4, hymnSecs: 40, ambush: 8, ambushHpPerMin: 0.1, ambushHp: 2.5, heal: 0.6, champHp: 6, wake: 16, champXp: 60 },
   /** Hard mode: enemy wounds and damage, and how much faster they come. */

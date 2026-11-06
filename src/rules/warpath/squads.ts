@@ -319,6 +319,41 @@ function tick(s: Squad, dt: number): void {
   if (s.rushCd) s.rushCd = Math.max(0, s.rushCd - dt);
 }
 
+/** A wiped squad comes back at the hero's side, not where it fell. */
+function regroup(run: WarpathRun, s: Squad): void {
+  const a = rand(run) * Math.PI * 2;
+  s.x = run.hx + Math.cos(a) * F.ring;
+  s.y = run.hy + Math.sin(a) * F.ring;
+  unblock(run.seed, s, 1.2);
+  delete s.wander;
+  delete s.cover;
+  delete s.rush;
+  delete s.pass;
+  delete s.knot;
+}
+
+/** Every unit back to full strength: lost models stand again, wiped squads regroup, a wrecked fort drops back in.
+ *  Returns how many units it brought back. */
+export function reviveAll(run: WarpathRun): number {
+  const regen = W.losses.regen * mods(run).modelRegen;
+  let n = 0;
+  for (const s of run.squads.slice(1)) {
+    if (s.fort) {
+      if (s.fort.hp < s.fort.maxHp) n++;
+      if (s.fort.hp <= 0) s.fort.down = Math.min(s.fort.down, 0.01);
+      s.fort.hp = s.fort.maxHp;
+    }
+    if (s.alive >= s.size && !s.wounds) continue;
+    if (!s.fort) n++;
+    if (s.alive <= 0 && s.kind !== 'air' && !s.fort) regroup(run, s);
+    s.alive = s.size;
+    s.wounds = 0;
+    s.regen = regen;
+    if (!s.reserve && run.fx.length < 700) run.fx.push({ kind: 'boon', x: s.x, y: s.y, n: 2, t: 0.6 });
+  }
+  return n;
+}
+
 /** Squads move, forts drop, and lost models come back. */
 export function squadStep(run: WarpathRun, grid: Grid, dt: number): void {
   const m = mods(run);
@@ -332,18 +367,7 @@ export function squadStep(run: WarpathRun, grid: Grid, dt: number): void {
       const ferry = ferries.some((f) => f !== s && dist2(f, s.x, s.y) < R.ferryReach ** 2);
       s.regen -= dt * (ferry ? R.ferryRate : 1);
       if (s.regen <= 0) {
-        // A wiped squad regroups at the hero's side, not where it fell.
-        if (s.alive <= 0 && s.kind !== 'air') {
-          const a = rand(run) * Math.PI * 2;
-          s.x = run.hx + Math.cos(a) * F.ring;
-          s.y = run.hy + Math.sin(a) * F.ring;
-          unblock(run.seed, s, 1.2);
-          delete s.wander;
-          delete s.cover;
-          delete s.rush;
-          delete s.pass;
-          delete s.knot;
-        }
+        if (s.alive <= 0 && s.kind !== 'air') regroup(run, s);
         s.alive += 1;
         s.regen = W.losses.regen * m.modelRegen;
       }

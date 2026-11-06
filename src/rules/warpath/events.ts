@@ -9,6 +9,7 @@ export const holdOf = (k: SiteKind, run?: WarpathRun) =>
 import { xpNeed } from './levels';
 import { clock, drop } from './loot';
 import { has, metaLv, TREE_FX as T } from './meta';
+import { reviveAll } from './squads';
 import type { HordeLanding, Site, SiteKind, WarpathRun } from './types';
 
 // The run's surprises. Hordes: every so often, after a short warning, a ring of one kind closes round the hero or a
@@ -176,7 +177,8 @@ export function siteStep(run: WarpathRun, dt: number): void {
       const before = run.hp;
       run.hp = Math.min(run.maxHp, run.hp + run.maxHp * S.heal);
       if (run.fx.length < 700) run.fx.push({ kind: 'heal', x: run.hx, y: run.hy - 2, n: run.hp - before, t: 0.8 });
-      banner(run, 'Aid station: the hero is patched up', 'good');
+      const back = reviveAll(run);
+      banner(run, back ? `Aid station: hero patched up, ${back} unit${back > 1 ? 's' : ''} back on their feet` : 'Aid station: the hero is patched up', 'good');
       forage(run, s);
       s.held = -1;
     } else if (s.kind === 'champion' && !run.enemies.some((e) => e.champ === s.id && e.hp > 0)) s.held = -1;

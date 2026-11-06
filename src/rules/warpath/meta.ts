@@ -46,8 +46,8 @@ export interface TreeNode {
   key?: boolean;
 }
 
-const RANKED_1 = [25, 40, 60];
-const RANKED_2 = [60, 90, 130];
+const RANKED_1 = [25, 40, 60, 85, 115];
+const RANKED_2 = [60, 90, 130, 180, 240];
 const CHOICE = [200];
 const KEYSTONE = [450];
 const CAPSTONE = [900];
@@ -69,8 +69,8 @@ const F = TREE_FX;
 
 export const TREE: Record<NodeId, TreeNode> = {
   // Firepower
-  edge: { name: 'Honed Edge', icon: 'g:broadsword', branch: 'fire', tier: 1, ranks: 3, cost: RANKED_1, prestige: 0, text: (n) => `Damage +${pct(F.edge * n)}` },
-  drill: { name: 'Drill Sergeants', icon: 'g:sands-of-time', branch: 'fire', tier: 2, ranks: 3, cost: RANKED_2, prestige: 0, text: (n) => `Fire and strike ${pct(F.drill * n)} faster` },
+  edge: { name: 'Honed Edge', icon: 'g:broadsword', branch: 'fire', tier: 1, ranks: 5, cost: RANKED_1, prestige: 0, text: (n) => `Damage +${pct(F.edge * n)}` },
+  drill: { name: 'Drill Sergeants', icon: 'g:sands-of-time', branch: 'fire', tier: 2, ranks: 5, cost: RANKED_2, prestige: 0, text: (n) => `Fire and strike ${pct(F.drill * n)} faster` },
   bigGuns: { name: 'Big Guns', icon: 'g:bullets', branch: 'fire', tier: 3, ranks: 1, cost: CHOICE, rival: 'hail', prestige: 0, text: () => 'Every weapon gains AP +1: armour stops far less' },
   hail: { name: 'Hail of Fire', icon: 'g:archery-target', branch: 'fire', tier: 3, ranks: 1, cost: CHOICE, rival: 'bigGuns', prestige: 0, text: () => `Fire ${pct(F.hailRate)} faster, but each hit does ${pct(F.hailDmg)} less` },
   overcharge: { name: 'Overcharge', icon: 'g:power-lightning', branch: 'fire', tier: 4, ranks: 1, cost: KEYSTONE, rival: 'ricochet', prestige: 1, key: true, text: () => `Every ${F.overchargeEvery}th hit each unit lands is a crit for ×${F.overchargeMul} damage` },
@@ -79,8 +79,8 @@ export const TREE: Record<NodeId, TreeNode> = {
   executioner: { name: 'Executioner', icon: 'g:skull-crossed-bones', branch: 'fire', tier: 5, ranks: 1, cost: CAPSTONE, rival: 'wrath', prestige: 2, key: true, text: () => `Any hit that leaves a non-boss under ${pct(F.executeBelow)} HP kills it` },
   barrage: { name: 'Fire at Will', icon: 'g:cannon', branch: 'fire', tier: 6, ranks: 1, cost: LEGEND, prestige: 3, key: true, text: () => `For ${F.barrageSecs}s of every ${F.barrageEvery}s every attack comes ${pct(F.barrageRate)} faster` },
   // Bulwark
-  vigour: { name: 'Vigour', icon: 'g:crowned-heart', branch: 'guard', tier: 1, ranks: 3, cost: RANKED_1, prestige: 0, text: (n) => `Hero HP +${pct(F.vigour * n)}` },
-  warded: { name: 'Warded Plate', icon: 'g:checked-shield', branch: 'guard', tier: 2, ranks: 3, cost: RANKED_2, prestige: 0, text: (n) => `The hero takes ${pct(F.warded * n)} less damage` },
+  vigour: { name: 'Vigour', icon: 'g:crowned-heart', branch: 'guard', tier: 1, ranks: 5, cost: RANKED_1, prestige: 0, text: (n) => `Hero HP +${pct(F.vigour * n)}` },
+  warded: { name: 'Warded Plate', icon: 'g:checked-shield', branch: 'guard', tier: 2, ranks: 5, cost: RANKED_2, prestige: 0, text: (n) => `The hero takes ${pct(F.warded * n)} less damage` },
   thorns: { name: 'Thorns', icon: 'g:pierced-body', branch: 'guard', tier: 3, ranks: 1, cost: CHOICE, rival: 'bastion', prestige: 0, text: () => `An enemy that wounds the hero in melee loses ${pct(F.thorns)} of its HP (a boss ${pct(F.thornsBoss)})` },
   bastion: { name: 'Bastion', icon: 'g:energy-shield', branch: 'guard', tier: 3, ranks: 1, cost: CHOICE, rival: 'thorns', prestige: 0, text: () => `Every ${F.bastionEvery}s the hero gains a shield of ${pct(F.bastion)} HP` },
   secondWind: { name: 'Second Wind', icon: 'g:medical-pack', branch: 'guard', tier: 4, ranks: 1, cost: KEYSTONE, rival: 'shockwave', prestige: 1, key: true, text: () => `Once a run, a killing blow leaves the hero at ${pct(F.secondWind)} HP, untouchable for ${F.windIframes}s` },
@@ -89,8 +89,8 @@ export const TREE: Record<NodeId, TreeNode> = {
   unbreakable: { name: 'Unbreakable', icon: 'g:shield', branch: 'guard', tier: 5, ranks: 1, cost: CAPSTONE, rival: 'lastStand', prestige: 2, key: true, text: () => `No single blow takes more than ${pct(F.unbreakable)} of the hero's HP (was 35%)` },
   legion: { name: 'Iron Legion', icon: 'g:roman-shield', branch: 'guard', tier: 6, ranks: 1, cost: LEGEND, prestige: 3, key: true, text: () => `Squads shrug off ${pct(F.legion)} of wounds and lost models come back twice as fast` },
   // Command
-  lore: { name: 'Shard Lore', icon: 'g:crystal-growth', branch: 'command', tier: 1, ranks: 3, cost: RANKED_1, prestige: 0, text: (n) => `Shard XP +${pct(F.lore * n)}` },
-  lodestone: { name: 'Lodestone', icon: 'g:magnet', branch: 'command', tier: 2, ranks: 3, cost: RANKED_2, prestige: 0, text: (n) => `Pickup reach +${pct(F.lodestone * n)}` },
+  lore: { name: 'Shard Lore', icon: 'g:crystal-growth', branch: 'command', tier: 1, ranks: 5, cost: RANKED_1, prestige: 0, text: (n) => `Shard XP +${pct(F.lore * n)}` },
+  lodestone: { name: 'Lodestone', icon: 'g:magnet', branch: 'command', tier: 2, ranks: 5, cost: RANKED_2, prestige: 0, text: (n) => `Pickup reach +${pct(F.lodestone * n)}` },
   reserves: { name: 'Reserves', icon: 'g:perspective-dice-six-faces-six', branch: 'command', tier: 3, ranks: 1, cost: CHOICE, rival: 'orders', prestige: 0, text: () => `+${F.reserves} rerolls a run` },
   orders: { name: 'Forward Orders', icon: 'g:scroll-unfurled', branch: 'command', tier: 3, ranks: 1, cost: CHOICE, rival: 'reserves', prestige: 0, text: () => `Start every run with ${F.orders} free level-ups` },
   muster: { name: 'Muster', icon: 'g:knight-banner', branch: 'command', tier: 4, ranks: 1, cost: KEYSTONE, rival: 'promotion', prestige: 1, key: true, text: () => `Call-in cards every ${F.musterEvery}nd level-up instead of every 3rd` },
@@ -99,8 +99,8 @@ export const TREE: Record<NodeId, TreeNode> = {
   college: { name: 'War College', icon: 'g:bookshelf', branch: 'command', tier: 5, ranks: 1, cost: CAPSTONE, rival: 'veterans', prestige: 2, key: true, text: () => '+1 doctrine slot, and each new doctrine comes in at level 2' },
   grandStrategy: { name: 'Grand Strategy', icon: 'g:chess-queen', branch: 'command', tier: 6, ranks: 1, cost: LEGEND, prestige: 3, key: true, text: () => 'Four cards at every level-up, not three' },
   // Scouting
-  march: { name: 'Forced March', icon: 'g:sprint', branch: 'scout', tier: 1, ranks: 3, cost: RANKED_1, prestige: 0, text: (n) => `Hero speed +${pct(F.march * n)}` },
-  pathfinder: { name: 'Pathfinder', icon: 'g:telescope', branch: 'scout', tier: 2, ranks: 3, cost: RANKED_2, prestige: 0, text: (n) => `Sites take ${pct(F.pathfinder * n)} less time to hold` },
+  march: { name: 'Forced March', icon: 'g:sprint', branch: 'scout', tier: 1, ranks: 5, cost: RANKED_1, prestige: 0, text: (n) => `Hero speed +${pct(F.march * n)}` },
+  pathfinder: { name: 'Pathfinder', icon: 'g:telescope', branch: 'scout', tier: 2, ranks: 5, cost: RANKED_2, prestige: 0, text: (n) => `Sites take ${pct(F.pathfinder * n)} less time to hold` },
   plunder: { name: 'Plunder', icon: 'g:open-treasure-chest', branch: 'scout', tier: 3, ranks: 1, cost: CHOICE, rival: 'pilgrim', prestige: 0, text: () => `Supply caches give ${F.plunder} level-ups` },
   pilgrim: { name: 'Pilgrim', icon: 'g:holy-symbol', branch: 'scout', tier: 3, ranks: 1, cost: CHOICE, rival: 'plunder', prestige: 0, text: () => `Battle Hymn: +${pct(F.pilgrimHymn)} fire rate for ${F.pilgrimSecs}s (was +40% for 40s)` },
   cartographer: { name: 'Cartographer', icon: 'g:radar-sweep', branch: 'scout', tier: 4, ranks: 1, cost: KEYSTONE, rival: 'forager', prestige: 1, key: true, text: () => `Up to ${F.cartoLive} sites at once, a new one every ${F.cartoEvery}s` },

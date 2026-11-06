@@ -805,6 +805,37 @@ describe('Warpath', () => {
     }
   });
 
+  it('an aid station heals the hero and brings every unit back to full strength', () => {
+    const run = start(0, 'aid');
+    const u = run.squads[0];
+    const foot = { ...u, kind: 'foot' as const, unitId: 'a', x: 90, y: 90, size: 5, alive: 2, wounds: 1, tough: 1 };
+    const wiped = { ...u, kind: 'foot' as const, unitId: 'b', x: 90, y: 90, size: 5, alive: 0, wounds: 0, tough: 1 };
+    const fort = { ...u, kind: 'fort' as const, unitId: 'c', x: 2, y: 2, size: 1, alive: 1, wounds: 0, tough: 1, fort: { hp: 0, maxHp: 50, down: 60, fall: 0 } };
+    run.squads.push(foot, wiped, fort);
+    run.hp = 10;
+    run.pickups = [];
+    run.sites = [{ id: 902, kind: 'well', x: run.hx, y: run.hy, held: 1e6 }];
+    run.nextSite = 1e9;
+    siteStep(run, 0.1);
+    expect(run.hp).toBeCloseTo(10 + run.maxHp * WARPATH.sites.heal);
+    expect([foot.alive, foot.wounds, wiped.alive]).toEqual([5, 0, 5]);
+    expect(Math.hypot(wiped.x - run.hx, wiped.y - run.hy)).toBeLessThan(40);
+    expect(fort.fort.hp).toBe(50);
+    expect(fort.fort.down).toBeLessThan(1);
+    expect(run.banner?.text).toContain('3 units');
+    expect(run.sites).toHaveLength(0);
+  });
+
+  it('the first two tiers of every branch go to five ranks, each dearer than the last', () => {
+    const low = NODE_IDS.filter((id) => TREE[id].tier <= 2);
+    expect(low).toHaveLength(8);
+    for (const id of low) {
+      expect(TREE[id].ranks).toBe(5);
+      expect(TREE[id].cost).toHaveLength(5);
+      for (let i = 1; i < 5; i++) expect(nodeCost(id, i)).toBeGreaterThan(nodeCost(id, i - 1));
+    }
+  });
+
   it('a run with the new doctrines survives a save round trip and stays deterministic', () => {
     const go = () => {
       const run = start(1, 'rt');

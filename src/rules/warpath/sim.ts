@@ -209,11 +209,12 @@ export function botInput(run: WarpathRun): Input {
     const want = p.kind === 'ration' ? (run.hp < run.maxHp * 0.6 ? 0.2 : 9) : p.kind === 'gem' ? 1 : 0.5;
     if (d2 * want < best) { best = d2 * want; goal = p; }
   }
-  // Nothing close to pick up and nothing pressing: go out to a site (an aid station only when hurt; champions are left).
+  // Nothing close to pick up and nothing pressing: go out to a site (an aid station only when the hero is hurt or a unit has lost half its models; champions are left).
   if (!goal && press < 0.15) {
     let bd = Infinity;
+    const hurt = run.hp <= run.maxHp * 0.7 || run.squads.some((q, i) => i > 0 && q.alive * 2 <= q.size);
     for (const s of run.sites ?? []) {
-      if (s.kind === 'champion' || (s.kind === 'well' && run.hp > run.maxHp * 0.7)) continue;
+      if (s.kind === 'champion' || (s.kind === 'well' && !hurt)) continue;
       const d2 = (s.x - run.hx) ** 2 + (s.y - run.hy) ** 2;
       if (d2 < bd) { bd = d2; goal = s; }
     }
