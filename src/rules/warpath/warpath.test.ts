@@ -11,7 +11,8 @@ import { callLevel } from './levels';
 import { enemyKindsOf } from './roster';
 import { hurtSquad, spawnEnemy, strikeSquad } from './enemies';
 import { woundsPer } from './mods';
-import { chunkTerrain, inCover } from './field';
+import { chunkTerrain, Grid, inCover } from './field';
+import { squadStep } from './squads';
 import { bankRenown, cantTake, laurelsFor, metaOf, nodeCost, nodeState, HONOURS, prestige, PRESTIGE, renownOf, resetTree, takeNode, TREE_FX } from './meta';
 import { hurtEnemy } from './combat';
 import { mods } from './mods';
@@ -305,6 +306,36 @@ describe('Warpath', () => {
       strikeSquad(run, s, 0.25 / WARPATH.losses.squadDmg, 2, 4, 1, 4);
       expect(s.alive).toBe(s.size);
     }
+  });
+
+  it('a squad in cover is hit far less often, and a wiped squad regroups at the hero', () => {
+    let run = start(0);
+    for (let i = 0; i < 6 && !run.squads.some((q) => q.kind === 'foot'); i++) autoplay((run = start(i)), 180);
+    const s = run.squads.find((q) => q.kind === 'foot')!;
+    let t;
+    for (let c = 1; c < 40 && !t; c++) t = chunkTerrain(run.seed, c, 0).find((x) => x.kind === 'cover');
+    const lost = (x: number, y: number) => {
+      s.x = x;
+      s.y = y;
+      s.tough = 1;
+      s.level = 0;
+      s.defense = 6;
+      s.size = s.alive = 400;
+      s.wounds = 0;
+      strikeSquad(run, s, 400 / WARPATH.losses.squadDmg, 3, 0, 1, 1);
+      return 400 - s.alive;
+    };
+    const open = lost(t!.x + 500, t!.y + 500);
+    const covered = lost(t!.x, t!.y);
+    expect(covered).toBeLessThan(open * 0.35);
+    // Wiped far from the hero: the first model back comes in at the hero's side.
+    s.size = 5;
+    s.alive = 0;
+    s.x = run.hx + 30;
+    s.regen = 0.001;
+    squadStep(run, new Grid(), 0.01);
+    expect(s.alive).toBe(1);
+    expect(Math.hypot(s.x - run.hx, s.y - run.hy)).toBeLessThan(WARPATH.follow.ring + 2);
   });
 
   it('infantry take cover near the hero and leave it when the hero moves on', () => {

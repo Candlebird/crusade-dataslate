@@ -185,11 +185,11 @@ export function hurtHero(run: WarpathRun, dmg: number): void {
 
 /** Wounds from attacks: OPR to-hit and saves against `def` (+`mod`: cover); Deadly per wound, up to `cap` (it doesn't
  *  carry over). */
-function rollWounds(run: WarpathRun, def: number, mod: number, attacks: number, quality: number, ap: number, deadly: number, cap: number): number {
+function rollWounds(run: WarpathRun, def: number, mod: number, attacks: number, quality: number, ap: number, deadly: number, cap: number, hitMul = 1): number {
   let w = 0;
   const whole = Math.floor(attacks) + (rand(run) < attacks % 1 ? 1 : 0);
   for (let i = 0; i < whole; i++) {
-    if (rand(run) >= hitChance(quality, 0)) continue;
+    if (rand(run) >= hitChance(quality, 0) * hitMul) continue;
     if (rand(run) < saveChance(def, ap, mod)) continue;
     w += Math.min(deadly, cap);
   }
@@ -207,7 +207,9 @@ const rollOnHero = (run: WarpathRun, attacks: number, quality: number, ap: numbe
  *  elite's blows (`mul`) come as more attacks, not bigger ones: a hit still does its weapon's wounds (1, or Deadly), so
  *  models with more wounds than that always survive a single hit. */
 export function strikeSquad(run: WarpathRun, s: Squad, attacks: number, quality: number, ap: number, deadly: number, mul: number): void {
-  const w = rollWounds(run, s.defense, coverMod(run, s.x, s.y), attacks * mul * W.losses.squadDmg, quality, ap, deadly, s.fort ? deadly : woundsPer(s));
+  // In cover: +1 Defense, and hits land only rarely.
+  const cover = !s.fort && inCover(run.seed, s.x, s.y);
+  const w = rollWounds(run, s.defense, cover ? W.follow.coverDef : 0, attacks * mul * W.losses.squadDmg, quality, ap, deadly, s.fort ? deadly : woundsPer(s), cover ? W.follow.coverHit : 1);
   if (w > 0) hurtSquad(run, s, w);
 }
 

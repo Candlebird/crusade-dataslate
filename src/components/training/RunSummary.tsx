@@ -115,7 +115,7 @@ export function RunSummary({ run, best, force, news }: RunSummaryProps) {
         </ul>
       )}
       {capped.length > 0 && (
-        <div className="muted">Off-table limit: {capped.map((g) => `${g.name} banked ${g.got} of ${g.earned} XP this sitting`).join(', ')} (each unit banks at most {OFF_TABLE_XP.perWeek} off-table XP a week from Training and free Sorties together).</div>
+        <div className="muted">Off-table limit: {capped.map((g) => `${g.name} banked ${g.got} of ${g.earned} XP this sitting`).join(', ')} (each unit banks at most {OFF_TABLE_XP.perWeek} off-table XP a week from Training, free Sorties and Warpath together).</div>
       )}
       {news && (news.finale.length > 0 || news.feats.length > 0) && (
         <ul className="training-shared">

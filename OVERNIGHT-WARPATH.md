@@ -87,7 +87,7 @@ Hard ends at 9–12 min for most runs (up to 22) and kills a lord 1 in 6.
 
 1. **Hard mode** is quite a bit harder than Normal: runs mostly end at 9–12 min, and a lord dies 1 time in 6. Is that what you want, or should Hard aim for the lord about a third of the time?
 2. **The local test force** (Headhunter Spears, 1,385 pts with no veterans) falls at 3–10 min. Fresh, small forces will find Warpath hard until they call in more units. Is that fine?
-3. **Opening Warpath to players** is a one-line change in `DowntimePanel.tsx` once you've played it.
+3. **Opening Warpath to players**: done 2026-11-05; the Downtime panel shows it to everyone. GM Auto stays GM-only.
 
 ## Follow-up (2026-11-05)
 

@@ -16,12 +16,15 @@ export const WARPATH = {
   hero: { speedPer: 1.2, hpPerTough: 5, hpMin: 40, iframes: 0.3 },
   /** Followers: anchors trail the hero this far out (more for each squad), heavy ones turn this slowly. */
   follow: {
-    ring: 5, ringPer: 0.9, lag: 4, heavyLag: 1.6, artilleryBack: 9, sallyMul: 0.5, sallyMin: 4,
+    ring: 3, ringPer: 0.55, lag: 4, heavyLag: 1.6, artilleryBack: 6, sallyMul: 0.5, sallyMin: 4,
     /** Squads drift: a new spot every `wanderMin`-`wanderMax` s, up to `wanderSway` radians off their slot, `wanderIn`-`wanderOut` x its ring. */
-    wanderMin: 2, wanderMax: 5, wanderSway: 0.8, wanderIn: 0.6, wanderOut: 1.5,
+    wanderMin: 2, wanderMax: 5, wanderSway: 0.8, wanderIn: 0.7, wanderOut: 1.15,
+    /** Melee squads charge only enemies within `sallyLeash` of the hero. */
+    sallyLeash: 7,
     /** Infantry and lone heroes take cover within `coverSeek` of the hero (at most `coverShare` squads to a feature) and
-     *  leave it once the hero is `coverLeash` away. Any body standing in cover gets +`coverDef` Defense. */
-    coverSeek: 12, coverLeash: 18, coverShare: 2, coverDef: 1,
+     *  leave it once the hero is `coverLeash` away. Any body standing in cover gets +`coverDef` Defense; a squad in cover
+     *  is also hit only `coverHit` as often. */
+    coverSeek: 12, coverLeash: 18, coverShare: 3, coverDef: 1, coverHit: 0.2,
   },
   /** Squads as bodies: an enemy goes for a squad whose edge is within `aggro` and nearer than the hero. Wounds on a
    *  squad (x `squadDmg`) take its models by Tough; lost models come back one per `regen` s. */

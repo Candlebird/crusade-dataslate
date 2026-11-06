@@ -106,6 +106,15 @@ export function squadStep(run: WarpathRun, grid: Grid, dt: number): void {
     if (s.alive < s.size && s.kind !== 'fort') {
       s.regen -= dt;
       if (s.regen <= 0) {
+        // A wiped squad regroups at the hero's side, not where it fell.
+        if (s.alive <= 0 && s.kind !== 'air') {
+          const a = rand(run) * Math.PI * 2;
+          s.x = run.hx + Math.cos(a) * F.ring;
+          s.y = run.hy + Math.sin(a) * F.ring;
+          unblock(run.seed, s, 1.2);
+          delete s.wander;
+          delete s.cover;
+        }
         s.alive += 1;
         s.regen = W.losses.regen * m.modelRegen;
       }
@@ -121,7 +130,7 @@ export function squadStep(run: WarpathRun, grid: Grid, dt: number): void {
     if (brawler(s)) {
       const reach = Math.max(...s.guns.map((g) => g.reach)) + 4;
       const foe = grid.pick(goal.x, goal.y, reach);
-      if (foe) goal = { x: foe.x, y: foe.y };
+      if (foe && (foe.x - run.hx) ** 2 + (foe.y - run.hy) ** 2 < F.sallyLeash ** 2) goal = { x: foe.x, y: foe.y };
     }
     const dx = goal.x - s.x;
     const dy = goal.y - s.y;
