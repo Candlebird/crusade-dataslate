@@ -2,7 +2,7 @@
 export * from './data';
 export * from './types';
 export { newRun, freshenRun, step, autoplay, botInput, botPick, heroesOf, rosterOf, themeBooks, weekTheme, playable, WARPATH_VERSION, type Input, type NewRun } from './sim';
-export { choose, skip, reroll, cardText, xpNeed, pointsLeft, openLevelUp } from './levels';
+export { buildOf, choose, skip, reroll, cardText, xpNeed, pointsLeft, openLevelUp } from './levels';
 export { onField, originOf, reachOf } from './combat';
 export { chunkTerrain, inCover, terrainNear } from './field';
 export { atWill, mods, heroMaxHp, minutes } from './mods';

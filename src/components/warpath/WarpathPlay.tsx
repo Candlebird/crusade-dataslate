@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  DOCTRINE_IDS, DOCTRINES, STRATAGEM_IDS, STRATAGEMS,
   bossesOf, botInput, botPick, cardText, choose, clock, heroCooldown, reroll, ROLES, roleOf, skip, step, WARPATH, xpNeed, type Input, type SquadRole, type WarpathRun,
 } from '../../rules/warpath';
 import { Icon } from '../Icon';
 import { RoleBadge, roleTint } from './RoleBadge';
+import { WarpathBuild } from './WarpathBuild';
 import { checkSprites, drawWarpath, resetSprites, type Palette, type View } from './draw';
 
 // The run on screen: a full-screen canvas, the HUD, the level-up cards and the pause menu. The sim steps at a fixed 60 a
@@ -57,19 +57,6 @@ export interface PlayProps {
   onQuit: (run: WarpathRun) => void;
 }
 
-/** The doctrines and stratagems a run holds, for the pause menu. */
-function HeldRules({ run }: { run: WarpathRun }) {
-  const docs = DOCTRINE_IDS.filter((id) => run.doctrines[id]);
-  const plans = STRATAGEM_IDS.filter((id) => run.stratagems?.[id]);
-  if (!docs.length && !plans.length) return null;
-  return (
-    <ul className="warpath-held" aria-label="Doctrines and stratagems held">
-      {plans.map((id) => <li key={id} className="plan" title={STRATAGEMS[id].text}><Icon name={STRATAGEMS[id].icon} /> {STRATAGEMS[id].name}</li>)}
-      {docs.map((id) => <li key={id} title={DOCTRINES[id].text}><Icon name={DOCTRINES[id].icon} /> {DOCTRINES[id].name} {run.doctrines[id]}</li>)}
-    </ul>
-  );
-}
-
 export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeave, onQuit }: PlayProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
   const keys = useRef(new Set<string>());
@@ -77,8 +64,11 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
   const stick = useRef<{ id: number; ox: number; oy: number; dx: number; dy: number } | null>(null);
   const [stickView, setStickView] = useState<{ ox: number; oy: number; dx: number; dy: number } | null>(null);
   const [paused, setPaused] = useState(false);
+  const [build, setBuild] = useState(false);
+  const buildRef = useRef(false);
+  buildRef.current = build;
   const pausedRef = useRef(false);
-  pausedRef.current = paused;
+  pausedRef.current = paused || build;
   const autoRef = useRef(auto);
   autoRef.current = auto;
   const [hud, setHud] = useState(() => hudOf(run));
@@ -90,14 +80,20 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
   const cbs = useRef({ onSave, onOver });
   cbs.current = { onSave, onOver };
 
-  // Keys: WASD and arrows move, Space is the hero's button, P or Escape pauses.
+  // Keys: WASD and arrows move, Space is the hero's button, P or Escape pauses, B shows the build.
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       const k = e.key.toLowerCase();
+      if (k === 'b' && run.phase !== 'over') {
+        e.preventDefault();
+        setBuild((b) => !b);
+        return;
+      }
       if (k === 'p' || k === 'escape') {
         e.preventDefault();
         e.stopPropagation();
-        if (run.phase === 'play') setPaused((p) => !p);
+        if (buildRef.current) setBuild(false);
+        else if (run.phase === 'play') setPaused((p) => !p);
         return;
       }
       if (k === ' ' && run.phase !== 'play') return;
@@ -341,16 +337,25 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
           <div className="training-cards-row">
             {run.offer.map((c, i) => {
               const t = cardText(run, c);
+              const delay = { animationDelay: `${0.05 + i * 0.1}s` };
               return (
-                <button key={`${run.level}:${run.rerolls}:${i}`} className={`training-card ${c.kind === 'call' || c.kind === 'stratagem' ? 'legendary' : c.kind === 'doctrine' ? 'rare' : ''}`} style={{ animationDelay: `${0.05 + i * 0.1}s` }}
-                  disabled={auto} onClick={act(() => choose(run, i))}>
-                  <span className="training-card-shine" aria-hidden />
-                  <span className={`tag ${c.kind === 'call' || c.kind === 'stratagem' ? 'gold' : c.kind === 'doctrine' ? 'red' : ''}`}>{t.tag}</span>
-                  {t.icon && <Icon name={t.icon} className="warpath-card-icon" />}
-                  <span className="training-card-name">{t.title}</span>
-                  {t.role && <RoleBadge role={t.role} />}
-                  <span className="training-card-text">{t.text}</span>
-                </button>
+                <div key={`${run.level}:${run.rerolls}:${i}`} className="warpath-card-slot">
+                  <button className={`training-card ${c.kind === 'call' || c.kind === 'stratagem' ? 'legendary' : c.kind === 'doctrine' ? 'rare' : ''}`} style={delay}
+                    disabled={auto} onClick={act(() => choose(run, i))}>
+                    <span className="training-card-shine" aria-hidden />
+                    <span className={`tag ${c.kind === 'call' || c.kind === 'stratagem' ? 'gold' : c.kind === 'doctrine' ? 'red' : ''}`}>{t.tag}</span>
+                    {t.icon && <Icon name={t.icon} className="warpath-card-icon" />}
+                    <span className="training-card-name">{t.title}</span>
+                    {t.role && <RoleBadge role={t.role} />}
+                    <span className="training-card-text">{t.text}</span>
+                  </button>
+                  {t.pair && (
+                    <div className={`warpath-card-pair${t.pair.held ? ' held' : ''}`} style={delay}>
+                      <span>Pairs with <b>{t.pair.other} ({t.pair.held})</b>{t.pair.held ? '' : ": won't pair yet"}</span>
+                      <span><b className="plan">{t.pair.plan}:</b> {t.pair.text}</span>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -358,6 +363,7 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
             <button className="ghost" disabled={auto || run.rerolls <= 0} onClick={act(() => reroll(run))}><Icon name="l:refresh-cw" /> Reroll ({run.rerolls})</button>
             <button className="ghost" disabled={auto} onClick={act(() => skip(run))}><Icon name="g:meat" /> Skip: heal {Math.round(WARPATH.cards.skipHeal * 100)}%</button>
             <button className="ghost" onClick={() => setPeek(true)}><Icon name="l:eye" /> Look</button>
+            <button className="ghost" onClick={() => setBuild(true)}><Icon name="l:file-text" /> Build</button>
           </div>
         </div>
       )}
@@ -369,16 +375,17 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
         <div className="warpath-menu" role="dialog" aria-label="Paused">
           <h2>Paused</h2>
           <p className="muted small">{clock(run.t)} · level {run.level} · {run.kills.toLocaleString()} kills · {bossesOf(run)} bosses</p>
-          <HeldRules run={run} />
           <button className="primary" onClick={() => { setQuitting(false); setPaused(false); }}><Icon name="l:play" /> Resume</button>
+          <button onClick={() => setBuild(true)}><Icon name="l:file-text" /> Your build</button>
           <button onClick={() => onLeave(run)}><Icon name="l:save" /> Save and leave</button>
           {onAuto && <button onClick={() => { onAuto(); setPaused(false); }}>{auto ? 'Stop auto' : 'Auto (debug: banks nothing)'}</button>}
           {quitting
             ? <button className="danger" onClick={() => onQuit(run)}><Icon name="l:flag" /> Yes, end it here (banks what it earned)</button>
             : <button className="ghost danger" onClick={() => setQuitting(true)}><Icon name="l:flag" /> Give up the run</button>}
-          <p className="muted small">Move with WASD, the arrow keys or by dragging anywhere. Scroll to zoom. P or Esc pauses.{hud.power ? ` Space or the round button: ${hud.power.power === 'rush' ? 'charge' : 'blink'}.` : ''}</p>
+          <p className="muted small">Move with WASD, the arrow keys or by dragging anywhere. Scroll to zoom. P or Esc pauses, B shows your build.{hud.power ? ` Space or the round button: ${hud.power.power === 'rush' ? 'charge' : 'blink'}.` : ''}</p>
         </div>
       )}
+      {build && run.phase !== 'over' && <WarpathBuild run={run} onClose={() => setBuild(false)} />}
     </div>
   );
 }

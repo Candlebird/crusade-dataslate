@@ -5,7 +5,7 @@ import type { Force } from '../../model/types';
 import { FORCES } from '../training/testForces';
 import { DOCTRINE_IDS, DOCTRINES, ROLES, STRATAGEM_IDS, STRATAGEM_LEVEL, STRATAGEMS, WARPATH } from './data';
 import { bladesOf, doctrineStep } from './doctrines';
-import { candidates, cardText, choose, drawOffer, reroll, skip, xpNeed } from './levels';
+import { buildOf, candidates, cardText, choose, drawOffer, reroll, skip, xpNeed } from './levels';
 import { autoplay, freshenRun, heroesOf, newRun, step } from './sim';
 import { hordeStep, siteStep } from './events';
 import { callIn, callLevel } from './levels';
@@ -727,7 +727,7 @@ describe('Warpath', () => {
     run.doctrines[a] = STRATAGEM_LEVEL;
     run.doctrines[b] = STRATAGEM_LEVEL - 1;
     expect(open()).toBe(false);
-    expect(cardText(run, { kind: 'doctrine', id: b }).text).toContain(STRATAGEMS[id].name);
+    expect(cardText(run, { kind: 'doctrine', id: b }).pair?.plan).toBe(STRATAGEMS[id].name);
     run.doctrines[b] = STRATAGEM_LEVEL;
     expect(open()).toBe(true);
     run.offer = [{ kind: 'stratagem', id }];
@@ -824,6 +824,33 @@ describe('Warpath', () => {
     expect(fort.fort.down).toBeLessThan(1);
     expect(run.banner?.text).toContain('3 units');
     expect(run.sites).toHaveLength(0);
+  });
+
+  it('a doctrine card says how many cards of its pair the run already holds', () => {
+    const run = start(0, 'pair');
+    const card = { kind: 'doctrine' as const, id: 'whirlingBlades' as const };
+    expect(cardText(run, card).pair).toEqual({ plan: 'Storm of Steel', text: STRATAGEMS.stormOfSteel.text, other: DOCTRINES.relentless.name, held: 0 });
+    expect(cardText(run, card).text).toBe(DOCTRINES.whirlingBlades.text);
+    run.doctrines.relentless = 2;
+    expect(cardText(run, card).pair?.held).toBe(2);
+    run.stratagems = { stormOfSteel: true };
+    expect(cardText(run, card).pair).toBeUndefined();
+  });
+
+  it('the build lists pairs taken, ready and under way, with the doctrines behind them', () => {
+    const run = start(0, 'build');
+    expect(buildOf(run).pairs).toEqual([]);
+    run.doctrines.relentless = 1;
+    run.doctrines.giantSlayer = STRATAGEM_LEVEL;
+    run.doctrines.armourPiercing = STRATAGEM_LEVEL + 1;
+    run.doctrines.fireMission = 2;
+    run.stratagems = { dangerClose: true };
+    const b = buildOf(run);
+    expect(b.pairs.map((p) => [p.name, p.status])).toEqual([['Danger Close', 'active'], ['Giant Killer', 'ready'], ['Storm of Steel', 'building']]);
+    expect(b.pairs[1].needs.map((n) => n.level)).toEqual([STRATAGEM_LEVEL, STRATAGEM_LEVEL]);
+    expect(b.pairs[2].needs.map((n) => n.level)).toEqual([0, 1]);
+    expect(b.doctrines[0].name).toBe(DOCTRINES.armourPiercing.name);
+    expect(b.units[0].id).toBe(run.squads[0].unitId);
   });
 
   it('the first two tiers of every branch go to five ranks, each dearer than the last', () => {

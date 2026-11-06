@@ -3,7 +3,7 @@ import { DOCTRINE_IDS, DOCTRINES, ROLES, STRATAGEM_IDS, STRATAGEM_LEVEL, STRATAG
 import { doc, heroMaxHp, woundsPer } from './mods';
 import type { IconName } from '../../components/Icon';
 import type { Card, Squad, SquadRole, WarpathRun } from './types';
-import { has, TREE_FX } from './meta';
+import { has, NODE_IDS, TREE, TREE_FX } from './meta';
 import { roleOf } from './traits';
 
 // Level-ups: the XP curve (slow start, steeper late), three cards (call a unit in, drill one, or a doctrine), three
@@ -34,14 +34,41 @@ export const callLevel = (run: WarpathRun) => (run.levelUps ?? 0) > 0 && (run.le
 export const plansOpen = (run: WarpathRun): StratagemId[] =>
   STRATAGEM_IDS.filter((id) => !run.stratagems?.[id] && STRATAGEMS[id].needs.every((d) => doc(run, d) >= STRATAGEM_LEVEL));
 
+/** What a doctrine card pairs with: the stratagem and what it does, the other doctrine and how many of its cards the run already holds. */
+export interface CardPair { plan: string; text: string; other: string; held: number }
+
 /** The stratagem a doctrine can still feed, and the doctrine it pairs with. */
-function pairOf(run: WarpathRun, id: DoctrineId): { plan: string; other: string } | undefined {
+function pairOf(run: WarpathRun, id: DoctrineId): CardPair | undefined {
   for (const k of STRATAGEM_IDS) {
     const needs: readonly DoctrineId[] = STRATAGEMS[k].needs;
     if (run.stratagems?.[k] || !needs.includes(id)) continue;
-    return { plan: STRATAGEMS[k].name, other: DOCTRINES[needs.find((d) => d !== id) ?? id].name };
+    const other = needs.find((d) => d !== id) ?? id;
+    return { plan: STRATAGEMS[k].name, text: STRATAGEMS[k].text, other: DOCTRINES[other].name, held: doc(run, other) };
   }
   return undefined;
+}
+
+/** A run's build at a glance: its pairs (taken, ready, then under way), doctrines, units and the tree's big rules. */
+export function buildOf(run: WarpathRun) {
+  const rank = { active: 0, ready: 1, building: 2 };
+  const pairs = STRATAGEM_IDS.flatMap((id) => {
+    const p = STRATAGEMS[id];
+    const levels = p.needs.map((d) => doc(run, d));
+    if (!run.stratagems?.[id] && !levels.some((l) => l > 0)) return [];
+    const status: keyof typeof rank = run.stratagems?.[id] ? 'active' : levels.every((l) => l >= STRATAGEM_LEVEL) ? 'ready' : 'building';
+    return [{ name: p.name as string, icon: p.icon as IconName, text: p.text as string, status, needs: p.needs.map((d, i) => ({ name: DOCTRINES[d].name as string, level: Math.min(levels[i], STRATAGEM_LEVEL) })) }];
+  }).sort((a, b) => rank[a.status] - rank[b.status]);
+  return {
+    pairs,
+    pairLevel: STRATAGEM_LEVEL,
+    maxLevel: WARPATH.doctrines.max,
+    slots: WARPATH.doctrines.slots + (has(run, 'college') ? 1 : 0),
+    doctrines: DOCTRINE_IDS.filter((id) => doc(run, id) > 0)
+      .map((id) => ({ name: DOCTRINES[id].name as string, icon: DOCTRINES[id].icon as IconName, text: DOCTRINES[id].text as string, level: doc(run, id) }))
+      .sort((a, b) => b.level - a.level),
+    units: run.squads.map((s) => ({ id: s.unitId, name: s.name, role: roleOf(s), level: s.level, max: s.maxLevel })),
+    tree: NODE_IDS.filter((id) => TREE[id].key && has(run, id)).map((id) => ({ name: TREE[id].name, icon: TREE[id].icon, text: TREE[id].text(1) })),
+  };
 }
 
 /** Every card that could be offered now. */
@@ -196,7 +223,7 @@ function close(run: WarpathRun) {
 }
 
 /** A card's title and text, for the offer. */
-export function cardText(run: WarpathRun, c: Card): { title: string; text: string; tag: string; role?: SquadRole; icon?: IconName } {
+export function cardText(run: WarpathRun, c: Card): { title: string; text: string; tag: string; role?: SquadRole; icon?: IconName; pair?: CardPair } {
   if (c.kind === 'score') return { title: 'Glory', text: `Everything is at its best: +${WARPATH.score.level} score and ${Math.round(K.healAtMax * 100)}% HP.`, tag: 'Score' };
   if (c.kind === 'stratagem') {
     const p = STRATAGEMS[c.id];
@@ -205,9 +232,7 @@ export function cardText(run: WarpathRun, c: Card): { title: string; text: strin
   if (c.kind === 'doctrine') {
     const d = DOCTRINES[c.id as DoctrineId];
     const l = run.doctrines[c.id] ?? 0;
-    const pair = pairOf(run, c.id);
-    const text = pair ? `${d.text} Pairs with ${pair.other} for ${pair.plan}.` : d.text;
-    return { title: d.name, text, icon: d.icon, tag: l ? `Doctrine ${l} → ${l + 1}` : has(run, 'college') ? 'New doctrine · level 2' : 'New doctrine' };
+    return { title: d.name, text: d.text, pair: pairOf(run, c.id), icon: d.icon, tag: l ? `Doctrine ${l} → ${l + 1}` : has(run, 'college') ? 'New doctrine · level 2' : 'New doctrine' };
   }
   const s = c.kind === 'call' ? run.bench.find((x) => x.unitId === c.unitId) : run.squads.find((x) => x.unitId === c.unitId);
   if (!s) return { title: '?', text: '', tag: '' };
