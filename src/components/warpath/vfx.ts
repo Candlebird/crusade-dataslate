@@ -117,6 +117,52 @@ export function pops(ctx: Ctx, run: WarpathRun, sx: (x: number) => number, sy: (
   ctx.globalCompositeOperation = 'source-over';
 }
 
+const TILE = 512;
+/** Inches of field one ground tile covers. */
+const TILE_INCHES = 60;
+let soil: HTMLCanvasElement | undefined;
+
+/** One seamless tile of ground: soft patches and grit, drawn once. Its own little generator: the sim's dice stay out of it. */
+function soilTile(): HTMLCanvasElement {
+  if (soil) return soil;
+  const c = document.createElement('canvas');
+  c.width = c.height = TILE;
+  const ctx = c.getContext('2d')!;
+  let n = 7;
+  const roll = () => (n = (n * 16807) % 2147483647) / 2147483647;
+  for (let i = 0; i < 26; i++) {
+    const [x, y, r] = [roll() * TILE, roll() * TILE, 40 + roll() * 90];
+    const tone = roll() < 0.5 ? '255,245,225' : '0,0,0';
+    const peak = tone === '0,0,0' ? 0.16 : 0.035;
+    for (const ox of [-TILE, 0, TILE]) for (const oy of [-TILE, 0, TILE]) {
+      const g = ctx.createRadialGradient(x + ox, y + oy, 0, x + ox, y + oy, r);
+      g.addColorStop(0, `rgba(${tone},${peak})`);
+      g.addColorStop(1, `rgba(${tone},0)`);
+      ctx.fillStyle = g;
+      ctx.fillRect(x + ox - r, y + oy - r, r * 2, r * 2);
+    }
+  }
+  for (let i = 0; i < 1400; i++) {
+    ctx.fillStyle = roll() < 0.25 ? 'rgba(255,245,225,0.025)' : 'rgba(0,0,0,0.14)';
+    ctx.fillRect(roll() * TILE, roll() * TILE, 1 + roll() * 1.5, 1 + roll() * 1.5);
+  }
+  return (soil = c);
+}
+
+/** The ground's texture, fixed to the field so it slides under the camera and shows you moving. */
+export function ground(ctx: Ctx, cx: number, cy: number, ppi: number, w: number, h: number): void {
+  const fill = ctx.createPattern(soilTile(), 'repeat');
+  if (!fill) return;
+  const k = (ppi * TILE_INCHES) / TILE;
+  const [ox, oy] = [w / 2 - cx * ppi, h / 2 - cy * ppi];
+  ctx.save();
+  ctx.translate(ox, oy);
+  ctx.scale(k, k);
+  ctx.fillStyle = fill;
+  ctx.fillRect((-20 - ox) / k, (-20 - oy) / k, (w + 40) / k, (h + 40) / k);
+  ctx.restore();
+}
+
 /** A level gained: rings and rays burst from the hero. */
 export function levelBurst(ctx: Ctx, f: Burst, hx: number, hy: number, ppi: number): void {
   const k = 1 - f.t / 0.9;

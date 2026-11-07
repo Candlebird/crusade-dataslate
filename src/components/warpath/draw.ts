@@ -4,7 +4,7 @@ import { ICONS } from '../iconData';
 import { alpha, bar } from '../training/art';
 import type { EmblemLayer } from '../../model/types';
 import { drawEmblem } from '../Emblem';
-import { blades, blastCore, bossFall, dusk, FX, heroAura, levelBurst, lowHp, motes, pops, shakeOf, spreeArc } from './vfx';
+import { blades, blastCore, bossFall, dusk, FX, ground, heroAura, levelBurst, lowHp, motes, pops, shakeOf, spreeArc } from './vfx';
 
 // Warpath on a Canvas2D: the field (ground, grid, terrain), pickups, the enemy swarm, the force (each squad's models in
 // a loose cluster round its anchor), the hero, shots and blast markers, then floating numbers. Every body is a
@@ -119,10 +119,12 @@ function stamp(ctx: CanvasRenderingContext2D, name: IconName, color: string, x: 
   ctx.drawImage(s, x - size / 2 - pad, y - size / 2 - pad, size + pad * 2, size + pad * 2);
 }
 
+const fontOf = (size: number) => `bold ${size}px Rajdhani, 'Segoe UI', system-ui, sans-serif`;
+
 /** A floating number: bold, with a dark outline so it reads over the swarm. */
 function number(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, px: number, color: string) {
   const size = Math.round(px);
-  ctx.font = `bold ${size}px Rajdhani, 'Segoe UI', system-ui, sans-serif`;
+  ctx.font = fontOf(size);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.lineJoin = 'round';
@@ -131,6 +133,54 @@ function number(ctx: CanvasRenderingContext2D, text: string, x: number, y: numbe
   ctx.strokeText(text, x, y);
   ctx.fillStyle = color;
   ctx.fillText(text, x, y);
+}
+
+/** A message on a dark plate, centred on `x` with its top at `y`, wrapped to fit `room`. */
+function plate(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, px: number, color: string, room: number) {
+  const size = Math.round(px);
+  ctx.font = fontOf(size);
+  const lines: string[] = [];
+  for (const word of text.split(' ')) {
+    const last = lines[lines.length - 1];
+    if (last !== undefined && ctx.measureText(`${last} ${word}`).width <= room) lines[lines.length - 1] = `${last} ${word}`;
+    else lines.push(word);
+  }
+  const lead = size * 1.2;
+  const wide = Math.max(...lines.map((l) => ctx.measureText(l).width)) + size * 1.4;
+  const tall = lines.length * lead + size * 0.5;
+  ctx.beginPath();
+  ctx.roundRect(x - wide / 2, y, wide, tall, 8);
+  ctx.fillStyle = 'rgba(12,13,17,0.82)';
+  ctx.fill();
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = alpha(color, 0.55);
+  ctx.stroke();
+  lines.forEach((l, i) => number(ctx, l, x, y + size * 0.25 + lead * (i + 0.5), size, color));
+}
+
+/** A rough outline round (x, y): `wobble` of the radius in or out, the same every frame for a given `seed`. `sharp` leaves
+ *  the corners in, for rock; otherwise it rounds them off. */
+function blob(ctx: CanvasRenderingContext2D, x: number, y: number, r: number, seed: number, wobble: number, sharp = false) {
+  const n = sharp ? 9 : 16;
+  const at = (i: number): [number, number] => {
+    const a = (i / n) * Math.PI * 2;
+    const k = r * (1 + wobble * (Math.sin(a * 3 + seed) + 0.6 * Math.sin(a * 5 + seed * 1.7)) / 1.6);
+    return [x + Math.cos(a) * k, y + Math.sin(a) * k];
+  };
+  ctx.beginPath();
+  if (sharp) {
+    for (let i = 0; i < n; i++) ctx.lineTo(...at(i));
+  } else {
+    const [ax, ay] = at(0);
+    const [bx, by] = at(n - 1);
+    ctx.moveTo((ax + bx) / 2, (ay + by) / 2);
+    for (let i = 0; i < n; i++) {
+      const [px, py] = at(i);
+      const [qx, qy] = at(i + 1);
+      ctx.quadraticCurveTo(px, py, (px + qx) / 2, (py + qy) / 2);
+    }
+  }
+  ctx.closePath();
 }
 
 /** The icon a squad's models are drawn with. */
@@ -157,12 +207,14 @@ const SITE: Record<SiteKind, [IconName, string]> = {
   champion: ['g:crossed-swords', '#ff8a5c'],
 };
 const ELITE = '#ffd34d';
+/** Foes that shoot lean toward the colour of their shots. */
+const SHOOTER = '#ffb347';
 const GEM_COLOR = ['#6fd3ff', '#7ee07e', '#ffd166', '#ff7ad9'];
 const TERRAIN: Record<string, { fill: string; edge: string; icon: IconName; tint: string }> = {
-  block: { fill: '#2b2a30', edge: '#5b5866', icon: 'g:rock', tint: '#77738a' },
+  block: { fill: '#2f2e36', edge: '#17171b', icon: 'g:rock', tint: '#46444f' },
   cover: { fill: 'rgba(60,110,60,0.35)', edge: 'rgba(120,190,110,0.55)', icon: 'g:berry-bush', tint: '#6fae66' },
   difficult: { fill: 'rgba(110,90,50,0.32)', edge: 'rgba(170,140,80,0.45)', icon: 'g:swamp', tint: '#a68a52' },
-  dangerous: { fill: 'rgba(150,40,30,0.30)', edge: 'rgba(240,90,60,0.6)', icon: 'g:fire', tint: '#e0603c' },
+  dangerous: { fill: 'rgba(150,40,30,0.2)', edge: 'rgba(240,90,60,0.6)', icon: 'g:fire', tint: '#e0603c' },
 };
 
 /** Golden-angle offsets for a squad's models (unit circle), so a cluster always looks the same. */
@@ -182,6 +234,20 @@ const CLUSTER = Array.from({ length: 24 }, (_, i) => {
 const HIT_FLASH = 0.09;
 const FOE_SPARK = '255,120,90';
 
+/** A hex colour `k` of the way to another. */
+function blend(a: string, b: string, k: number): string {
+  const [p, q] = [parseInt(a.slice(1), 16), parseInt(b.slice(1), 16)];
+  const c = (s: number) => Math.round(((p >> s) & 255) + (((q >> s) & 255) - ((p >> s) & 255)) * k);
+  return `#${((c(16) << 16) | (c(8) << 8) | c(0)).toString(16).padStart(6, '0')}`;
+}
+
+/** The swarm's colours by tier, plain and shooting: the book's colour, then hotter as the mix steps tougher, so the field
+ *  itself shows harder bodies arriving. */
+function foeTints(foe: string): { melee: string[]; shoots: string[] } {
+  const melee = [foe, '#ee5cb4', '#ff4242'];
+  return { melee, shoots: melee.map((c) => blend(c, SHOOTER, 0.35)) };
+}
+
 export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: View, pal: Palette, now: number) {
   const { ppi, w, h } = v;
   const sx = (x: number) => (x - v.cx) * ppi + w / 2;
@@ -198,10 +264,11 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   // Ground and a 6" grid, so moving reads even on open ground.
   ctx.fillStyle = '#16171c';
   ctx.fillRect(-20, -20, w + 40, h + 40);
+  ground(ctx, v.cx, v.cy, ppi, w, h);
   ctx.globalAlpha = FX;
   dusk(ctx, run, w, h);
   ctx.globalAlpha = 1;
-  ctx.strokeStyle = 'rgba(255,255,255,0.045)';
+  ctx.strokeStyle = 'rgba(255,255,255,0.03)';
   ctx.lineWidth = 1;
   ctx.beginPath();
   const g = 6;
@@ -212,20 +279,39 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   // Terrain.
   for (const t of terrainNear(run.seed, v.cx - halfW - 8, v.cy - halfH - 8, v.cx + halfW + 8, v.cy + halfH + 8)) {
     const st = TERRAIN[t.kind];
-    ctx.beginPath();
-    ctx.arc(sx(t.x), sy(t.y), t.r * ppi, 0, Math.PI * 2);
+    const x = sx(t.x);
+    const y = sy(t.y);
+    const R = t.r * ppi;
+    const seed = t.x * 0.37 + t.y * 0.61;
+    if (t.kind === 'block') {
+      // A boulder: a shadow, the rock, and a paler top. It fills the circle bodies stop at.
+      blob(ctx, x + R * 0.06, y + R * 0.14, R, seed, 0.07, true);
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fill();
+      blob(ctx, x, y, R, seed, 0.07, true);
+      ctx.fillStyle = st.fill;
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = st.edge;
+      ctx.stroke();
+      blob(ctx, x - R * 0.1, y - R * 0.14, R * 0.68, seed + 2, 0.1, true);
+      ctx.fillStyle = st.tint;
+      ctx.fill();
+      continue;
+    }
+    blob(ctx, x, y, R, seed, 0.06);
     ctx.fillStyle = st.fill;
     ctx.fill();
-    ctx.lineWidth = t.kind === 'block' ? 3 : 1.5;
-    ctx.setLineDash(t.kind === 'block' ? [] : [6, 5]);
+    ctx.lineWidth = 1.5;
     ctx.strokeStyle = st.edge;
     ctx.stroke();
-    ctx.setLineDash([]);
-    const n = t.kind === 'block' ? 1 : Math.min(4, Math.round(t.r / 2));
+    const n = Math.min(4, Math.round(t.r / 2));
+    ctx.globalAlpha = 0.75;
     for (let i = 0; i < n; i++) {
       const [ox, oy] = n === 1 ? [0, 0] : CLUSTER[(i * 5 + t.icon) % 24];
-      stamp(ctx, st.icon, st.tint, sx(t.x + ox * t.r * 0.6), sy(t.y + oy * t.r * 0.6), (t.kind === 'block' ? t.r * 1.3 : 2.2) * ppi);
+      stamp(ctx, st.icon, st.tint, sx(t.x + ox * t.r * 0.6), sy(t.y + oy * t.r * 0.6), 2.2 * ppi);
     }
+    ctx.globalAlpha = 1;
   }
 
   ctx.globalAlpha = FX;
@@ -328,6 +414,7 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
 
   // The swarm: shooters winding up show a line to where they aim; hurt bodies flash pale.
   const kinds = run.enemyKinds;
+  const tints = foeTints(pal.foe);
   // Shells on the way down: a crosshair closing on where they land.
   for (const sh of run.shells ?? []) {
     if (!inView(sh.x, sh.y, 4)) continue;
@@ -361,22 +448,24 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.globalAlpha = 0.25 + 0.5 * q;
-      stamp(ctx, k.icon as IconName, pal.foe, x, y, px * Math.max(0.3, q), 0);
+      stamp(ctx, k.icon as IconName, tints.melee[k.tier] ?? pal.foe, x, y, px * Math.max(0.3, q), 0);
       ctx.globalAlpha = 1;
       continue;
     }
-    // A lunge winding up: a wedge along the path it's about to take.
+    // A lunge winding up: a thin lane along its path, filling from the body as the moment comes.
     if (e.dash && !e.dash.go) {
-      const a = Math.atan2(e.dash.y - e.y, e.dash.x - e.x);
       const len = Math.hypot(e.dash.x - e.x, e.dash.y - e.y) * ppi;
       const q = Math.max(0, 1 - e.dash.t / WARPATH.foes.lungeWind);
-      ctx.fillStyle = `rgba(255,80,60,${0.12 + 0.3 * q})`;
-      ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + Math.cos(a + 0.14) * len, y + Math.sin(a + 0.14) * len);
-      ctx.lineTo(x + Math.cos(a - 0.14) * len, y + Math.sin(a - 0.14) * len);
-      ctx.closePath();
-      ctx.fill();
+      const half = Math.max(2.5, px * 0.26);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(Math.atan2(e.dash.y - e.y, e.dash.x - e.x));
+      ctx.fillStyle = `rgba(255,90,60,${0.14 + 0.2 * q})`;
+      ctx.fillRect(0, -half, len * q, half * 2);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = `rgba(255,120,90,${0.3 + 0.4 * q})`;
+      ctx.strokeRect(0, -half, len, half * 2);
+      ctx.restore();
     }
     // Fliers cast a shadow; fuses flicker.
     if (k.ways?.flies) {
@@ -413,17 +502,23 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
         ctx.stroke();
       }
     }
-    if (e.elite) {
-      // An elite's gold rim (a champion's brighter, with a bar).
+    if (e.champ !== undefined) {
+      // A champion's gold ring. Plain elites come in hundreds late on, so theirs is only a hairline.
       ctx.beginPath();
       ctx.arc(x, y, px * 0.62, 0, Math.PI * 2);
-      ctx.fillStyle = alpha(ELITE, e.champ !== undefined ? 0.22 : 0.12);
+      ctx.fillStyle = alpha(ELITE, 0.22);
       ctx.fill();
-      ctx.lineWidth = e.champ !== undefined ? 3 : 2;
+      ctx.lineWidth = 3;
       ctx.strokeStyle = alpha(ELITE, 0.9);
       ctx.stroke();
+    } else if (e.elite) {
+      ctx.beginPath();
+      ctx.arc(x, y, px * 0.56, 0, Math.PI * 2);
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = alpha(ELITE, 0.25);
+      ctx.stroke();
     }
-    const col = e.boss === 'lord' ? '#ff7ae6' : e.boss ? '#ffc94d' : e.status.stun ? '#9fb4ff' : e.status.bleed ? '#ff6a6a' : pal.foe;
+    const col = e.boss === 'lord' ? '#ff7ae6' : e.boss ? '#ffc94d' : e.status.stun ? '#9fb4ff' : e.status.bleed ? '#ff6a6a' : (e.shoots ? tints.shoots : tints.melee)[k.tier] ?? pal.foe;
     const look = (e.boss ? (e.boss === 'lord' ? 'g:dread-skull' : 'g:crowned-skull') : k.icon) as IconName;
     stamp(ctx, look, col, x, y, px, e.boss ? 10 : 0);
     // Just hit: a white flash.
@@ -433,7 +528,8 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       ctx.globalAlpha = 1;
     }
     if (e.boss || e.hp < e.maxHp) {
-      if (e.boss || e.elite || px > 14) bar(ctx, x - px / 2, y + px * 0.55, px, e.hp / e.maxHp, e.boss ? '#ff5a4a' : e.elite ? ELITE : undefined, e.boss || e.champ !== undefined ? 5 : 3);
+      const named = e.boss || e.champ !== undefined;
+      if (named || e.elite || px > 14) bar(ctx, x - px / 2, y + px * 0.55, px, e.hp / e.maxHp, e.boss ? '#ff5a4a' : named ? ELITE : '#c8c8d0', named ? 5 : 2);
     }
   }
 
@@ -456,6 +552,13 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
         stampUnit(ctx, pal, s, icon, pal.own, sx(s.x), sy(s.y) - (1 - k) * h * 0.6, 3.2 * UNIT * ppi);
         continue;
       }
+      ctx.beginPath();
+      ctx.arc(sx(s.x), sy(s.y), 2.4 * UNIT * ppi, 0, Math.PI * 2);
+      ctx.fillStyle = alpha(ROLES.fortress.color, 0.16);
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = alpha(ROLES.fortress.color, 0.7);
+      ctx.stroke();
       stampUnit(ctx, pal, s, icon, pal.own, sx(s.x), sy(s.y), 3.2 * UNIT * ppi, 4);
       bar(ctx, sx(s.x) - 1.6 * UNIT * ppi, sy(s.y) + 1.9 * UNIT * ppi, 3.2 * UNIT * ppi, f.hp / f.maxHp, undefined, 4);
       continue;
@@ -502,11 +605,17 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       ctx.stroke();
       ctx.restore();
     }
-    // Its archetype's colour on the ground, so a glance tells them apart.
+    // Its archetype on the ground: a base in its colour and its mark on the rim, so a glance tells them apart.
+    const steady = (s.held ?? 0) >= WARPATH.roles.holdAfter;
+    const base = Math.sqrt((Math.min(s.alive, CLUSTER.length) - 0.5) / CLUSTER.length) * spread * ppi + px * 0.75;
+    const baseAt = sy(s.y);
     ctx.beginPath();
-    ctx.ellipse(sx(s.x), sy(s.y) + spread * ppi * 0.15, (spread + 0.7) * ppi, (spread + 0.7) * ppi * 0.72, 0, 0, Math.PI * 2);
-    ctx.fillStyle = alpha(role.color, (s.held ?? 0) >= WARPATH.roles.holdAfter ? 0.2 : 0.11);
+    ctx.arc(sx(s.x), baseAt, base, 0, Math.PI * 2);
+    ctx.fillStyle = alpha(role.color, steady ? 0.26 : 0.16);
     ctx.fill();
+    ctx.lineWidth = steady ? 2.5 : 1.5;
+    ctx.strokeStyle = alpha(role.color, steady ? 0.95 : 0.7);
+    ctx.stroke();
     let top = 0;
     for (let i = 0; i < s.alive && i < CLUSTER.length; i++) {
       const [ox, oy] = CLUSTER[i];
@@ -518,6 +627,18 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
       const y = sy(s.y + top) - px / 2 - 6;
       bar(ctx, sx(s.x) - ppi * 1.5, y, ppi * 3, s.alive / s.size, '#8fc7ff', 3);
     }
+    // Its mark: a small badge on the base's rim, dark so it can't be taken for a model.
+    const mark = Math.max(13, 1.05 * ppi);
+    const markX = sx(s.x) + base * 0.72;
+    const markY = baseAt + base * 0.72;
+    ctx.beginPath();
+    ctx.arc(markX, markY, mark * 0.68, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(12,13,17,0.9)';
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = role.color;
+    ctx.stroke();
+    stamp(ctx, role.icon as IconName, role.color, markX, markY, mark * 0.9);
   }
 
   // Fx under the hero: shot lines, melee arcs, rings.
@@ -753,9 +874,11 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   for (const f of run.fx) {
     if ((f.kind !== 'dmg' && f.kind !== 'heal') || !inView(f.x, f.y)) continue;
     const rise = (0.8 - f.t) * 2.5;
-    ctx.globalAlpha = Math.min(1, f.t * 3) * FX;
+    // Chip damage stays on but steps back, so the hits that matter stand out of the stack.
+    const chip = f.kind === 'dmg' && !f.hurt && !f.crit && !f.hero && (f.n ?? 0) < 3;
+    ctx.globalAlpha = Math.min(1, f.t * 3) * FX * (chip ? 0.6 : 1);
     const col = f.kind === 'heal' ? '#7ee07e' : f.hurt ? '#ff5a4a' : f.crit ? '#ffd166' : f.hero ? '#ffe9a8' : '#e6e6e6';
-    number(ctx, f.kind === 'heal' ? `+${Math.round(f.n ?? 0)}` : `${f.hurt ? '-' : ''}${Math.round(f.n ?? 0)}`, sx(f.x), sy(f.y - rise), Math.max(f.hurt ? 18 : 13, (f.hurt ? 1.6 : f.crit ? 1.35 : 1) * ppi), col);
+    number(ctx, f.kind === 'heal' ? `+${Math.round(f.n ?? 0)}` : `${f.hurt ? '-' : ''}${Math.round(f.n ?? 0)}`, sx(f.x), sy(f.y - rise), chip ? Math.max(10, 0.7 * ppi) : Math.max(f.hurt ? 18 : 13, (f.hurt ? 1.6 : f.crit ? 1.35 : 1) * ppi), col);
     ctx.globalAlpha = 1;
   }
 
@@ -763,7 +886,7 @@ export function drawWarpath(ctx: CanvasRenderingContext2D, run: WarpathRun, v: V
   if (run.banner) {
     const b = run.banner;
     ctx.globalAlpha = Math.min(1, b.t * 2);
-    number(ctx, b.text, w / 2, Math.min(130, h * 0.2), Math.max(18, Math.min(30, w / 34)), b.tone === 'warn' ? '#ff6a4a' : '#c9f5a0');
+    plate(ctx, b.text, w / 2, Math.min(150, h * 0.22), Math.max(17, Math.min(26, w / 38)), b.tone === 'warn' ? '#ff8a6a' : '#c9f5a0', Math.min(w - 48, 680));
     ctx.globalAlpha = 1;
   }
 }

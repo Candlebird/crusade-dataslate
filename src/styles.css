@@ -1764,7 +1764,7 @@ abbr.us-abbr { text-decoration: underline dotted; text-underline-offset: 2px; cu
 .warpath-roster-group p { margin: 0; line-height: 1.3; }
 .warpath-roster-group ul { margin: 0; padding: 0; list-style: none; font-size: 0.9rem; }
 .warpath-roster-group li.me { color: var(--gold); }
-.warpath-squads { position: absolute; left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); right: 96px; display: flex; flex-wrap: wrap; gap: 5px; pointer-events: none; }
+.warpath-squads { position: absolute; left: 10px; bottom: max(10px, env(safe-area-inset-bottom)); width: fit-content; max-width: calc(100% - 106px); box-sizing: border-box; display: flex; flex-wrap: wrap; gap: 5px; padding: 5px; border-radius: 11px; background: rgba(12, 13, 17, 0.72); border: 1px solid rgba(255, 255, 255, 0.08); pointer-events: none; }
 .warpath-squad { position: relative; display: grid; place-items: center; width: 34px; height: 34px; padding-bottom: 3px; font-size: 20px; border-radius: 7px; overflow: hidden; color: var(--role); background: rgba(0, 0, 0, 0.6); border: 1px solid color-mix(in srgb, var(--role) 55%, transparent); pointer-events: auto; }
 .warpath-squad > i { position: absolute; left: 0; bottom: 0; height: 3px; background: var(--role); transition: width 0.15s linear; }
 .warpath-squad.away { opacity: 0.55; border-style: dashed; }
