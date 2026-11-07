@@ -41,6 +41,10 @@ export interface BotOut {
   checks?: number;
   /** It won its Final. */
   won?: boolean;
+  /** The run's stratagems and trophies taken, and its crafted units that picked a specialisation (balance probes). */
+  stratagems?: string[];
+  trophies?: string[];
+  specs?: number;
 }
 
 export function playJob(job: BotJob): BotOut {
@@ -57,5 +61,7 @@ export function playJob(job: BotJob): BotOut {
     cleared: run.cleared, crafted: run.crafted.length, luck: run.luck, endless: inEndless(run) ? endlessDepth(run) : null,
     ms: performance.now() - t0, probe: p?.done(run), ...(job.siege ? { dmg: siegeDmg(run), checks: run.checks?.length ?? 0 } : {}),
     won: runWon(run),
+    stratagems: run.stratagems ?? [], trophies: run.trophies ?? [],
+    specs: run.pieces.filter((x) => 'spec' in x && x.spec).length,
   };
 }

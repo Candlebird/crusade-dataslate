@@ -6,7 +6,7 @@ import { newUnit } from '../model/factory';
 import { SORTIE_BOONS, SORTIE_SPECS, SORTIE_SPEC_AT, type SortieBoonId } from './downtimeData';
 import {
   autoSpec, autoStep, createRun, enterNode, isSpecial, meterOf, pairsOf, pickSpec, previewOf, reachable, rerollOffer, specChoices, specDue,
-  startCombat, stratagemsDue, trophyOf, unitSheet, type SortieRun,
+  partnersWanted, startCombat, stratagemsDue, trophyOf, unitSheet, type SortieRun,
 } from './sortie';
 import { buildOf } from './sortieBuild';
 
@@ -178,5 +178,25 @@ describe('Sortie damage meter and build panel', () => {
     expect(b.lord.sig).toBeTruthy();
     give(run, 'cells');
     expect(buildOf(run).pairs.find((p) => p.id === 'killzone')?.status).toBe('ready');
+  });
+});
+
+describe('Sortie pair nudge', () => {
+  it('wants the other half of an open stratagem once one half is held', () => {
+    const run = createRun(party(), 7, 'free', 'short');
+    give(run, 'wall');
+    expect(partnersWanted(run)).toContain('holdline');
+    give(run, 'holdline');
+    expect(partnersWanted(run)).not.toContain('holdline');
+  });
+
+  it('autopilot takes a stratagem on offer rather than patching up', () => {
+    const run = createRun(party(), 11, 'free', 'short');
+    give(run, 'wall', 'holdline');
+    toReward(run);
+    expect(run.screen).toBe('reward');
+    expect(run.offer!.boons.some((d) => d.id === 'ironwall')).toBe(true);
+    autoStep(run, book);
+    expect(run.boons).toContain('ironwall');
   });
 });

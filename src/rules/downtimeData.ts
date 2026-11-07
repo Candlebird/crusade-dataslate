@@ -358,6 +358,8 @@ export const TRAINING = {
    */
   cards: {
     every: 5, offer: 3, odds: { Legendary: 0.1, Rare: 0.3 },
+    /** Pair nudge: with one half of a stratagem held, an offer shows the other half (in place of its last card) this often. */
+    pairNudge: 0.4,
     /** Pack tactics counts the other crafted units this near (centre to centre, so a diagonal neighbour counts). */
     pack: { radius: 3, max: 4 },
     /** Kill chain: a kill's speed-up lasts this long, and stacks this many times. */
@@ -982,6 +984,8 @@ export const SORTIE = {
   aim: [3, 2, 1],
   /** Each boon offered draws its rarity with these odds (Legendary first, the rest Common); an elite always offers a Rare or better. */
   boonOdds: { Legendary: 0.1, Rare: 0.3 },
+  /** Pair nudge: with one half of an open stratagem held, a plain offer shows the other half (in place of its last boon) this often. */
+  pairNudge: 0.75,
   ranks: 3,
   /** Initiative is a d6 a model, +`fast` for Fast or Flying, −`slow` for Slow (or slowed). */
   fast: 2,

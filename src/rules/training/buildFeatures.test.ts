@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TRAINING } from '../downtimeData';
-import { cardById, offerCards, pickCard, rerollCards } from './cards';
+import { cardById, offerCards, partnersWanted, pickCard, rerollCards } from './cards';
 import { rateOf } from './combat';
 import { buildOf } from './buildView';
 import { aceSteps, cardMul, chainMax, hurt } from './harm';
@@ -192,5 +192,31 @@ describe('next boss', () => {
     const b = nextBoss(run)!;
     expect(b).toMatchObject({ wave: at.wave, name: 'Gorrak', trophy: { name: 'Living Heart' } });
     expect(b.trick).toMatch(/^.+: /);
+  });
+});
+
+describe('pair nudge', () => {
+  it('wants the other half of a stratagem once one half is held, and nothing once both are', () => {
+    const run = withUnits();
+    const s = STRATAGEMS[0];
+    run.cards.push(held(s.needs[0]));
+    expect(partnersWanted(run)).toContain(s.needs[1]);
+    run.cards.push(held(s.needs[1]));
+    expect(partnersWanted(run)).not.toContain(s.needs[1]);
+  });
+
+  it('shows a wanted partner in about TRAINING.cards.pairNudge of offers, and the bot takes it', () => {
+    let shown = 0;
+    const N = 400;
+    for (let seed = 1; seed <= N; seed++) {
+      const run = withUnits(2);
+      run.rng = seed;
+      run.cards.push(held('whet'));
+      offerCards(run);
+      const k = run.offer!.findIndex((d) => d.id === 'deadly');
+      if (k >= 0) { shown++; expect(botCard(run)).toBe(k); }
+      expect(run.offer!.length).toBeLessThanOrEqual(TRAINING.cards.offer);
+    }
+    expect(shown / N).toBeGreaterThan(TRAINING.cards.pairNudge * 0.7);
   });
 });

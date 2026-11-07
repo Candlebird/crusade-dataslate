@@ -1009,7 +1009,29 @@ function boonOffer(run: SortieRun, n: number, kind: 'any' | 'rare' | 'curse' = '
     const unit = SORTIE_BOONS[id].unit ? run.boonUnit?.[id] ?? units[Math.floor(rand(run) * units.length)] : undefined;
     out.push(unit === undefined ? { id, tier } : { id, tier, unit });
   }
+  // Pair nudge: now and then, one boon that would finish a stratagem in place of the last.
+  if (kind === 'any' && out.length && !out.some((d) => partnersWanted(run).includes(d.id)) && rand(run) < SORTIE.pairNudge) {
+    const ids = partnersWanted(run).filter((id) => pool.includes(id));
+    if (ids.length) {
+      const id = ids[Math.floor(rand(run) * ids.length)];
+      const tier = BOON_TIERS.find((t) => open(id, t))!;
+      const units = SORTIE_BOONS[id].unit ? boonUnits(run, id) : [];
+      const unit = SORTIE_BOONS[id].unit ? run.boonUnit?.[id] ?? units[Math.floor(rand(run) * units.length)] : undefined;
+      out[out.length - 1] = unit === undefined ? { id, tier } : { id, tier, unit };
+    }
+  }
   return out;
+}
+
+/** The boons that would finish a stratagem: the other half of an open one (unlocked, fitting the weapons, not taken
+ *  nor offered yet) whose first half the party holds. */
+export function partnersWanted(run: SortieRun): SortieBoonId[] {
+  return (Object.keys(SORTIE_BOONS) as SortieBoonId[]).flatMap((id) => {
+    const b = SORTIE_BOONS[id];
+    if (!b.pair || has(run, id) || run.paired?.includes(id) || (run.unlocked && !run.unlocked.includes(id)) || (!run.ranged && b.ranged) || (!run.melee && b.melee)) return [];
+    const held = b.pair.filter((x) => has(run, x));
+    return held.length === 1 ? b.pair.filter((x) => !has(run, x)) : [];
+  });
 }
 
 /** A stratagem or an elite trophy: these come only in place of a card, never in the draw. */
@@ -2999,10 +3021,12 @@ export function autoStep(run: SortieRun, book: CatalogBook) {
       if (run.combat?.over) return leaveCombat(run);
       return autoMove(run);
     case 'reward': {
-      if (run.offer?.patch && hurtShare(run) > 0.25) return patchUp(run);
-      // A stratagem or a trophy beats a plain card.
+      // A stratagem or a trophy beats patching up (it comes once) and a plain card.
       const special = run.offer?.boons.findIndex((d) => isSpecial(d.id)) ?? -1;
-      return pickBoon(run, special >= 0 ? special : run.offer?.boons.length ? 0 : null);
+      if (special < 0 && run.offer?.patch && hurtShare(run) > 0.25) return patchUp(run);
+      const want = partnersWanted(run);
+      const pair = run.offer?.boons.findIndex((d) => want.includes(d.id)) ?? -1;
+      return pickBoon(run, special >= 0 ? special : pair >= 0 ? pair : run.offer?.boons.length ? 0 : null);
     }
     case 'camp':
       return campRest(run);

@@ -5,7 +5,7 @@ import { packMates, unitTowers } from './board';
 import { cardOpen, rerollsOf } from './drill';
 import { applyLevel } from './economy';
 import { pick, rand } from './rng';
-import { readyStrats, STRAT_PREFIX, stratById } from './stratagems';
+import { heldCount, readyStrats, STRAT_PREFIX, STRATAGEMS, stratById, stratStatus } from './stratagems';
 import { TROPHY_PREFIX, trophyById } from './trophies';
 import type { CardDraw, DefaultTower, TrainingRun, UnitTower } from './types';
 
@@ -203,9 +203,32 @@ export function drawCards(run: TrainingRun, n: number = C.offer): CardDraw[] {
     if (!found) break;
     const c = pick(run, found.pool);
     const to = c.fits ? pick(run, ts.filter((t) => c.fits!(t, run))) : undefined;
-    out.push({ id: c.id, rarity: found.x, ...(to ? (isUnit(to) ? { unitId: to.unitId } : { pieceId: to.id }) : {}) });
+    out.push(drawOf(c, found.x, to));
   }
-  return out;
+  return nudgePair(run, out);
+}
+
+const drawOf = (c: TrainingCard, rarity: RelicTier, to?: CardTower): CardDraw =>
+  ({ id: c.id, rarity, ...(to ? (isUnit(to) ? { unitId: to.unitId } : { pieceId: to.id }) : {}) });
+
+/** The cards that would finish a stratagem: the other half of one not yet taken whose first half the run holds. */
+export const partnersWanted = (run: TrainingRun): string[] =>
+  STRATAGEMS.filter((s) => stratStatus(run, s) === 'building' && s.needs.some((c) => heldCount(run, c) > 0))
+    .map((s) => s.needs.find((c) => !heldCount(run, c))!);
+
+/** Pair nudge (TRAINING.cards.pairNudge of the time): put one wanted partner (partnersWanted), useful and not already
+ *  drawn, in place of the last card, at that card's rarity or the nearest below it the partner comes in (else its lowest). */
+function nudgePair(run: TrainingRun, out: CardDraw[]): CardDraw[] {
+  if (!out.length || out.some((d) => partnersWanted(run).includes(d.id)) || rand(run) >= C.pairNudge) return out;
+  const ids = partnersWanted(run).filter((id) => !out.some((d) => d.id === id));
+  const cs = ids.map(cardById).filter((c): c is TrainingCard => !!c && cardUseful(run, c));
+  if (!cs.length) return out;
+  const c = pick(run, cs);
+  const last = out[out.length - 1];
+  const tiers = (['Legendary', 'Rare', 'Common'] as RelicTier[]).filter((x) => c.tiers[x] !== undefined);
+  const rarity = tiers.find((x) => RANK[x] <= RANK[last.rarity]) ?? tiers[tiers.length - 1];
+  const to = c.fits ? pick(run, cardTowers(run).filter((t) => c.fits!(t, run))) : undefined;
+  return [...out.slice(0, -1), drawOf(c, rarity, to)];
 }
 
 /** Is a draw a stratagem or a trophy rather than a boss card? */

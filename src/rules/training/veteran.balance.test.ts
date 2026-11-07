@@ -9,7 +9,8 @@ const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
 
 describe('veteran balance (bot)', () => {
   it('a veteran force goes a few waves further than fresh, a scarred one a few less', async () => {
-    const cases = FORCES.flatMap((f) => SEEDS.map((seed) => ({ f, seed })));
+    // Twice the usual seeds: the fresh-vs-scarred gap is only a couple of waves, about one reshuffle of the draws.
+    const cases = FORCES.flatMap((f) => [...SEEDS, ...SEEDS.map((s) => s + 100)].map((seed) => ({ f, seed })));
     const outs = await runBots(cases.flatMap(({ f, seed }) => [f.units, f.units.map(veteran), f.units.map(scarred)]
       .map((units) => ({ units, seed, maxWaves: 60 }))));
     const fresh = cases.map((_, k) => outs[3 * k].cleared);
