@@ -6,6 +6,8 @@ import { PieceActions, type MoveRule } from './PieceActions';
 import { HabitBadges, RecordBadges, RelicList } from './RecordBadges';
 import { xpShown } from '../../rules/engine';
 import { ShardBadge } from './ShardBadge';
+import { buildOf } from '../../rules/training/buildView';
+import { TowerBuild } from './TrainingBuild';
 
 export interface PieceInfoProps {
   run: TrainingRun;
@@ -53,10 +55,18 @@ export function PieceInfo({ run, piece, record, onClose, onChange, onMove }: Pie
       {piece.kind === 'default' && <div className="muted">{defaultByKey(piece.key)?.text} No XP, levels, traits or relics.</div>}
       {piece.guns.map((g, i) => <div key={i}>{gunLine(piece, g)}</div>)}
       {unit?.skills.map((k, i) => <div key={`k${i}`} className="muted">{k.gun ? `${k.gun} · ` : ''}{k.source}: {describe(k.effect)}</div>)}
+      {piece.kind !== 'shard' && <HeldBuild run={run} id={piece.id} onChange={onChange} />}
       {unit && record && <RecordBadges unit={record} full />}
       {unit && <HabitBadges unit={unit} />}
       {unit?.relics?.length ? <RelicList relics={unit.relics} /> : null}
       <div className="muted">Quality {piece.quality}+ · {piece.kills} kill{piece.kills === 1 ? '' : 's'} · {Math.round(piece.dealt)} damage{unit ? ` · ${xpShown(unit.xp)} XP` : ''}</div>
     </div>
   );
+}
+
+/** A defence's spec (and its pick when due), held boss cards with their numbers, live card lines and auras. */
+function HeldBuild({ run, id, onChange }: { run: TrainingRun; id: number; onChange: () => void }) {
+  const t = buildOf(run).towers.find((x) => x.id === id);
+  if (!t) return null;
+  return <TowerBuild run={run} t={t} onChange={onChange} compact />;
 }

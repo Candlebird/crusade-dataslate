@@ -359,11 +359,11 @@ export const TRAINING = {
   cards: {
     every: 5, offer: 3, odds: { Legendary: 0.1, Rare: 0.3 },
     /** Pack tactics counts the other crafted units this near (centre to centre, so a diagonal neighbour counts). */
-    pack: { radius: 3 },
+    pack: { radius: 3, max: 4 },
     /** Kill chain: a kill's speed-up lasts this long, and stacks this many times. */
     chain: { secs: 3, max: 5 },
-    /** Ace: its bonus counts once for every this many kills this run. */
-    ace: { per: 10 },
+    /** Ace: its bonus counts once for every this many kills this run, at most `max` times (so a higher rarity tops out higher). */
+    ace: { per: 10, max: 8 },
   },
   /** Seconds in an ability round: an ability that comes back every 2 rounds comes back every 12 seconds. */
   abilityRound: 6,
@@ -1129,8 +1129,17 @@ export const SORTIE = {
   },
   /** Boons a force's parties are offered from the start; the rest unlock one by one as its runs reach `unlocks` goals.
    * Curses are always on offer, and the weekly challenge offers every boon. */
-  boonsAtStart: ['scope', 'blades', 'bayonets', 'medic', 'drill', 'trophy', 'stims', 'wall', 'relay', 'dressing', 'grit', 'veteran', 'holdline'] as string[],
+  boonsAtStart: ['scope', 'blades', 'bayonets', 'medic', 'drill', 'trophy', 'stims', 'wall', 'relay', 'dressing', 'grit', 'veteran', 'holdline',
+    // Two stratagems whose pairs are both open from the start, and the elite trophies (only ever won off an elite).
+    'ironwall', 'harvest', 'plate', 'quick', 'core', 'seal', 'fang', 'veil'] as string[],
   unlocks: {
+    blitz: { goal: 'wins', n: 2 },
+    redharvest: { goal: 'wins', n: 4 },
+    killzone: { goal: 'beasts', n: 6 },
+    crossfire: { goal: 'lore', n: 4 },
+    secondwind: { goal: 'runs', n: 5 },
+    steelnerve: { goal: 'flawless', n: 2 },
+    deadeye: { goal: 'deepest', n: 6 },
     rally: { goal: 'runs', n: 2 },
     salvo: { goal: 'wins', n: 1 },
     hymn: { goal: 'lore', n: 3 },
@@ -1184,7 +1193,9 @@ export type SortieLength = 'short' | 'long';
 export type SortieBoonId = 'scope' | 'blades' | 'ward' | 'medic' | 'drill' | 'cells' | 'packs' | 'hide' | 'trophy' | 'banner' | 'bayonets' | 'stims'
   | 'wall' | 'relay' | 'dressing' | 'salvo' | 'grit' | 'rally' | 'rounds' | 'scavenge'
   | 'pact' | 'fury' | 'adrenal' | 'hymn' | 'respite' | 'lantern'
-  | 'veteran' | 'signature' | 'bodyguard' | 'hunter' | 'holdline' | 'rotation' | 'momentum' | 'pinning';
+  | 'veteran' | 'signature' | 'bodyguard' | 'hunter' | 'holdline' | 'rotation' | 'momentum' | 'pinning'
+  | 'killzone' | 'crossfire' | 'redharvest' | 'ironwall' | 'secondwind' | 'steelnerve' | 'blitz' | 'harvest' | 'deadeye'
+  | 'plate' | 'quick' | 'core' | 'seal' | 'fang' | 'veil';
 
 export type SortieBoonTier = 'Common' | 'Rare' | 'Legendary';
 export const BOON_TIERS: SortieBoonTier[] = ['Common', 'Rare', 'Legendary'];
@@ -1206,6 +1217,10 @@ export const SORTIE_BOONS: Record<SortieBoonId, {
   unit?: boolean;
   /** Strong with a cost, and only ever from a shrine. */
   curse?: boolean;
+  /** A stratagem: offered once, in the offer after the party holds both of these boons, in place of a card. */
+  pair?: [SortieBoonId, SortieBoonId];
+  /** An elite trophy: offered in place of a card after beating an elite with this affix. */
+  spoil?: SortieAffix;
 }> = {
   scope: { name: 'Targeting Scope', ranged: true, tiers: { Common: 'Re-roll 1s to hit when shooting at Far range.', Rare: '+1 to hit when shooting at Far range.', Legendary: '+1 to hit and re-roll 1s when shooting at Far range.' } },
   cells: { name: 'Overcharged Cells', ranged: true, tiers: { Common: "The Back unit's guns reach one step further.", Rare: "The Back and Middle units' guns reach one step further.", Legendary: 'Every ranged weapon reaches one step further.' } },
@@ -1241,6 +1256,62 @@ export const SORTIE_BOONS: Record<SortieBoonId, {
   pact: { curse: true, name: 'Void Pact', tiers: { Common: '+1 to hit with everything, but every fight opens with each model losing a sixth of its wounds (never the last).' } },
   fury: { curse: true, name: 'Berserk Rite', melee: true, tiers: { Common: 'Melee weapons get +2 AP, but every unit has -1 Defense.' } },
   adrenal: { curse: true, name: 'Adrenal Surge', tiers: { Common: '+3 initiative for every model, but -1 to every morale test.' } },
+  // Stratagems: one rarity, never upgraded.
+  killzone: { name: 'Killing Ground', ranged: true, pair: ['scope', 'cells'], tiers: { Legendary: 'Shots at Far range get +1 AP.' } },
+  crossfire: { name: 'Crossfire', pair: ['salvo', 'relay'], tiers: { Legendary: 'In the first round of every fight, shots get Rending (a 6 to hit gets AP(4)).' } },
+  redharvest: { name: 'Red Harvest', melee: true, pair: ['blades', 'bayonets'], tiers: { Legendary: 'In melee, a 6 to hit deals 1 more wound.' } },
+  ironwall: { name: 'Iron Wall', pair: ['wall', 'holdline'], tiers: { Legendary: 'The Front unit gets +1 Defense against melee.' } },
+  secondwind: { name: 'Second Wind', pair: ['medic', 'dressing'], tiers: { Legendary: 'After each fight won, every model standing mends a sixth of its wounds.' } },
+  steelnerve: { name: 'Nerves of Steel', pair: ['stims', 'rally'], tiers: { Legendary: 'Once a fight, the first party unit to fail a morale test passes it instead.' } },
+  blitz: { name: 'Blitz', pair: ['drill', 'momentum'], tiers: { Legendary: '+2 initiative for every model in the first round of every fight.' } },
+  harvest: { name: 'Grim Harvest', pair: ['trophy', 'grit'], tiers: { Legendary: 'Every Echo a unit kills mends 1 more wound on it, or 2 more if the unit is at half strength or less.' } },
+  deadeye: { name: 'Deadeye', pair: ['veteran', 'signature'], tiers: { Legendary: 'The units with Veteran’s Mark and Signature Weapon get Rending (a 6 to hit gets AP(4)).' } },
+  // Elite trophies: one rarity, won off an elite of their affix.
+  plate: { name: 'Armoured Plate', spoil: 'armoured', tiers: { Rare: 'The Back unit gets +1 Defense.' } },
+  quick: { name: 'Quicksilver Gland', spoil: 'swift', tiers: { Rare: '+1 initiative for every model.' } },
+  core: { name: 'Mending Core', spoil: 'regenerating', tiers: { Rare: 'At the start of every round, each party unit in the line mends 3 wounds.' } },
+  seal: { name: 'Vengeance Seal', spoil: 'vengeful', tiers: { Rare: 'When an Echo fells a party model, that Echo squad takes 3 wounds back.' } },
+  fang: { name: 'Frenzied Fang', spoil: 'frenzied', tiers: { Rare: 'A unit at half strength or less makes a quarter more attacks.' } },
+  veil: { name: 'Shroud Veil', spoil: 'shrouded', tiers: { Rare: 'Echoes get -1 to hit the Back unit when they shoot.' } },
+};
+
+/** Rerolls of a boon offer, unlocked by a goal: each run gets `n`. A reroll redraws every card but a stratagem or trophy. */
+export const SORTIE_REROLLS = { n: 2, goal: 'runs' as SortieGoal, need: 3 };
+
+/** A party unit picks a speciality after this many fights won with it still standing. */
+export const SORTIE_SPEC_AT = 2;
+
+/**
+ * Specialisations: two per archetype (the Warpath roles), picked once a run per unit. `auto` marks the one the
+ * auto-player takes. Per speciality, the rule lives in sortie.ts under its id.
+ */
+export const SORTIE_SPECS: Record<string, { role: string; name: string; text: string; auto?: boolean }> = {
+  firingLine: { role: 'gunline', name: 'Firing Line', text: '+1 to hit when shooting from the Middle or Back.', auto: true },
+  suppressing: { role: 'gunline', name: 'Suppressing Fire', text: 'Any shot that wounds leaves its target slowed for a round.' },
+  creeping: { role: 'artillery', name: 'Creeping Barrage', text: 'Blast weapons hit 1 more model.' },
+  heavyShells: { role: 'artillery', name: 'Heavy Shells', text: 'Ranged weapons get +1 AP.', auto: true },
+  overwatch: { role: 'fortress', name: 'Overwatch', text: 'Guns reach one step further.', auto: true },
+  strongpoint: { role: 'fortress', name: 'Strongpoint', text: 'Starts every fight with a shield of a fifth of its wounds, for two rounds.' },
+  gunship: { role: 'flyer', name: 'Gunship', text: 'A quarter more shooting attacks.', auto: true },
+  bombRun: { role: 'flyer', name: 'Bomb Run', text: '+1 to hit and +1 AP in the first round of every fight.' },
+  onslaught: { role: 'charger', name: 'Onslaught', text: '+1 to hit in the round it charges.', auto: true },
+  trample: { role: 'charger', name: 'Trample', text: 'Melee weapons get +1 AP.' },
+  reaper: { role: 'phantom', name: 'Reaper', text: 'Its attacks get Rending (a 6 to hit gets AP(4)).', auto: true },
+  wraith: { role: 'phantom', name: 'Wraith', text: 'Echoes get -1 to hit it.' },
+  deepStrike: { role: 'ambusher', name: 'Deep Strike', text: '+2 initiative for every model.' },
+  alphaStrike: { role: 'ambusher', name: 'Alpha Strike', text: 'Half again as many attacks in the first round of every fight.', auto: true },
+  adept: { role: 'mystic', name: 'Adept', text: 'Its abilities are ready a round sooner.', auto: true },
+  massSpell: { role: 'mystic', name: 'Mass Spell', text: 'Its heals, shields and barrages are half again as strong.' },
+  fieldSurgeon: { role: 'support', name: 'Field Surgeon', text: 'After each fight won, one fallen model in the party gets back up.', auto: true },
+  warBanner: { role: 'support', name: 'War Banner', text: 'While it stands, every party unit gets +1 to morale tests.' },
+  marksman: { role: 'hunter', name: 'Marksman', text: '+1 AP against elites and lords.', auto: true },
+  spotter: { role: 'hunter', name: 'Spotter', text: 'A squad it wounds is marked (+1 to hit for everyone) for the rest of the round.' },
+  outrider: { role: 'skirmisher', name: 'Outrider', text: '+1 initiative, and no -1 to hit shooting fresh from melee.' },
+  harrier: { role: 'skirmisher', name: 'Harrier', text: 'Re-rolls 1s to hit when shooting.', auto: true },
+  shieldWall: { role: 'bulwark', name: 'Shield Wall', text: '+1 Defense while at the Front.', auto: true },
+  retribution: { role: 'bulwark', name: 'Retribution', text: 'An Echo squad that wounds it in melee takes 3 wounds back.' },
+  bloodbath: { role: 'reaver', name: 'Bloodbath', text: 'Every Echo it kills mends 2 wounds on it.', auto: true },
+  frenzy: { role: 'reaver', name: 'Frenzy', text: 'A quarter more melee attacks.' },
 };
 
 /** What a boon does at a rarity (its lowest, if it doesn't come at that one); a unit boon's text names the unit. */

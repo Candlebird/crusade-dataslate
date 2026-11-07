@@ -6,11 +6,12 @@ import {
   type Phase, type RunMode, type SavedRun, type Tile, type TrainingRun,
 } from '../../rules/training';
 import { TRAINING } from '../../rules/downtimeData';
-import { BOT_CARD } from '../../rules/training/bot';
+import { botCard } from '../../rules/training/bot';
 import { Modal, confirmAction, toast } from '../ui';
 import { act } from './act';
 import { CardOffer } from './CardOffer';
-import { DamageMeter } from './DamageMeter';
+import { DamageMeter, WaveMeter } from './DamageMeter';
+import { TrainingBuild } from './TrainingBuild';
 import { HudBar, type Speed } from './HudBar';
 import { MapView } from './MapView';
 import type { MoveRule } from './PieceActions';
@@ -62,6 +63,22 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
   const [, setTick] = useState(0);
   const [speed, setSpeed] = useState<Speed>(1);
   const [paused, setPaused] = useState(false);
+  /** The build panel (B): open, it holds a wave still. */
+  const [showBuild, setShowBuild] = useState(false);
+  /** The per-wave damage meter, remembered on this device. */
+  const [meter, setMeter] = useState(() => { try { return localStorage.getItem('training.meter') === '1'; } catch { return false; } });
+  const toggleMeter = () => setMeter((m) => { try { localStorage.setItem('training.meter', m ? '0' : '1'); } catch { /* no storage */ } return !m; });
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (e.key !== 'b' && e.key !== 'B') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      setShowBuild((v) => !v);
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, []);
   // Hide the card offer for a look at the field.
   const [peek, setPeek] = useState(false);
   // The hand Shard the next tap places; a craft waiting for its Shard; pieces a hovered keep option lights; the piece picked.
@@ -152,7 +169,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
       setAuto(false);
     }
   };
-  useRunLoop(run, { speed, paused, onTick: () => setTick((n) => n + 1), onPhase });
+  useRunLoop(run, { speed, paused: paused || showBuild, onTick: () => setTick((n) => n + 1), onPhase });
   const start = () => {
     if (!run) return;
     setCrafting(null);
@@ -165,7 +182,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
     if (!wideSide()) setTab('wave');
   };
   useAuto(run, {
-    on: auto, speed, paused, units: force.units,
+    on: auto, speed, paused: paused || showBuild, units: force.units,
     onMove: () => refresh(),
     onStart: () => start(),
     onStuck: (why) => {
@@ -293,11 +310,13 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
           <HudBar
             run={run} best={best.current} speed={speed} onSpeed={setSpeed} onStart={start} onQuit={quit} paused={paused} onPause={() => setPaused(!paused)}
             auto={TRAINING.debugAuto ? auto : undefined} onAuto={toggleAuto}
+            onBuild={() => setShowBuild(true)} meter={meter} onMeter={toggleMeter}
           />
           <div className="training-board">
             <MapView run={run} portraits={portraits} glow={glow} selected={sel ?? undefined} placing={placing} placeWhy={scoutWhy} paused={paused} onCell={onCell}
               blueprint={blueprint && !bpHidden && run.phase === 'build' ? { spots: blueprint.spots } : undefined} />
             <DamageMeter run={run} />
+            {meter && !over && <WaveMeter run={run} />}
             {blueprint && run.phase === 'build' && (
               <button type="button" className={`training-bp-toggle small${bpHidden ? '' : ' on'}`} aria-pressed={!bpHidden}
                 data-tip={`${bpHidden ? 'Show' : 'Hide'} your blueprint, ${blueprint.name} (pick another on the start screen's Blueprints tab)`}
@@ -354,12 +373,13 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
         <SidePanel
           run={run} units={force.units} portraits={portraits} tab={tab} onTab={setTab} pick={pick} onPick={setPick} sel={sel} onFocus={setFocus}
           crafting={craftNow} onCraft={(cr) => { craftMode(cr); if (cr && !wideSide()) setTab('draft'); }} peek={peek} onUnpeek={() => setPeek(false)} onChange={refresh}
-          hpLost={hpLost.current}
+          hpLost={hpLost.current} onBuild={() => setShowBuild(true)}
         />
         {/* On a phone held upright End run sits at the foot of the page, under the panels, instead of in the HUD. */}
         {run.phase !== 'over' && <button className="training-foot-quit" onClick={quit}>End run</button>}
       </div>
-      {build && !victory && run.offer && !peek && <CardOffer run={run} offer={run.offer} portraits={portraits} auto={auto} autoPick={BOT_CARD} onPick={take} onPeek={() => setPeek(true)} onReroll={() => act(() => rerollCards(run), refresh)} />}
+      {showBuild && run.phase !== 'over' && <TrainingBuild run={run} portraits={portraits} onClose={() => setShowBuild(false)} onChange={refresh} />}
+      {build && !victory && run.offer && !peek && <CardOffer run={run} offer={run.offer} portraits={portraits} auto={auto} autoPick={botCard(run)} onPick={take} onPeek={() => setPeek(true)} onReroll={() => act(() => rerollCards(run), refresh)} />}
     </Modal>
   );
 }

@@ -11,7 +11,7 @@ import { squadPower } from './training/economy';
 import { shownTitle } from './training/titles';
 import { unitName } from './battle';
 import {
-  SORTIE, SORTIE_BOONS, BOON_TIERS, boonText, type SortieBoonTier, SORTIE_EVENTS, SORTIE_QUIRKS, TRAINING, type SortieGoal,
+  SORTIE, SORTIE_BOONS, BOON_TIERS, boonText, type SortieBoonTier, SORTIE_SPECS, SORTIE_SPEC_AT, SORTIE_REROLLS, SORTIE_EVENTS, SORTIE_QUIRKS, TRAINING, type SortieGoal,
   type SortieAffix, type SortieBoonId, type SortieChoice, type SortieEvent, type SortieLength, type SortieMode, type SortieOutcome,
   type SortieCurseId, type SortieMarkId, type SortieScarId,
 } from './downtimeData';
@@ -19,6 +19,7 @@ import { NEXUS_LORE, SORTIE_BOSSES, SORTIE_LORE, SORTIE_LORE_DEFAULT, SORTIE_REG
 import { RELICS, type RelicDef } from './data';
 import { ECHO_LORDS } from './nexusData';
 import { pickRaiders, raidBand, type Raider } from './raiders';
+import { roleOfUnit } from './warpath/traits';
 
 // Sortie: a party of three units sets out across a branching map, Darkest Dungeon style. Fights are turn based. The
 // party stands in a line of three slots, front, middle and back (a Fortification always at the back), and every round
@@ -105,6 +106,8 @@ export interface SortieSquad {
   /** The last round a party unit charged, and the last round Rally Cry steadied it. */
   chargedAt?: number;
   rallied?: number;
+  /** A party unit's speciality (SORTIE_SPECS), from its member. */
+  spec?: string;
 }
 
 export type SortieTone = 'good' | 'bad' | 'info';
@@ -200,6 +203,10 @@ export interface SortieCombat {
   upFront?: string;
   /** The Front unit holding the line against a charge (Hold the Line), and the boon's level. */
   holding?: { key: string; lv: number };
+  /** Wounds each squad dealt and took this fight, by squad key (the damage meter). */
+  meter?: Record<string, { dealt: number; taken: number }>;
+  /** Nerves of Steel has turned a failed morale test this fight. */
+  steeled?: boolean;
 }
 
 /** A tell: a signature that goes off next round, the party unit it means (if one), and how to answer it. */
@@ -244,6 +251,10 @@ export interface SortieMember {
   stress?: number;
   /** Battle scars earned this run (SORTIE.scars). */
   scars?: SortieScarId[];
+  /** Fights won with the unit still standing, toward its speciality (SORTIE_SPEC_AT). */
+  wins?: number;
+  /** Its speciality for the run (SORTIE_SPECS). */
+  spec?: string;
 }
 
 export interface SortieRun {
@@ -291,8 +302,16 @@ export interface SortieRun {
   depth: number;
   screen: SortieScreen;
   combat?: SortieCombat;
-  /** Boons to pick from; `patch` offers patching up instead. */
-  offer?: { boons: SortieBoonDraw[]; patch?: boolean };
+  /** Boons to pick from; `patch` offers patching up instead; `rare`: an elite's offer (its first card Rare or better). */
+  offer?: { boons: SortieBoonDraw[]; patch?: boolean; rare?: boolean };
+  /** The run's starting dice, so a fight node's Echoes can be known before the party gets there (see previewOf). */
+  seed?: number;
+  /** Stratagems already offered this run: each comes once. */
+  paired?: SortieBoonId[];
+  /** Rerolls of a boon offer left this run (SORTIE_REROLLS). */
+  rerolls?: number;
+  /** Wounds each party unit (by index) dealt and took this run (the damage meter). */
+  meter?: Record<number, { dealt: number; taken: number }>;
   event?: { id: string; result?: string; then?: 'fight' };
   /** fell: wiped out. broke: the last models routed. home: headed home from a camp. */
   over?: 'fell' | 'broke' | 'won' | 'quit' | 'home';
@@ -442,15 +461,16 @@ export function createRun(
   units: Unit[], seed: number, mode: SortieMode = 'free', length: SortieLength = 'short',
   opts: {
     nemesis?: Record<string, number>; deep?: string[]; tier?: number; weekly?: string; ascension?: number; slain?: Record<string, number>; boons?: string[];
-    marks?: SortieMarkId[]; raiders?: Raider[]; bled?: Record<string, number>;
+    marks?: SortieMarkId[]; raiders?: Raider[]; bled?: Record<string, number>; rerolls?: number;
   } = {},
 ): SortieRun {
   const line = [...units.filter((u) => !isFort(u)), ...units.filter(isFort)];
   const run: SortieRun = {
     rng: seed | 0, party: [], mode, length, ranged: false, melee: false, power: squadPower(units), map: [], row: -1, col: 0,
     tough: 0, boons: [], won: 0, xp: 0, haul: { supply: 0, rp: 0, us: 0 }, bossDown: false, depth: 0, screen: 'map', journal: [],
-    region: 'ashfields', boss: '', flags: [], seen: [], weaken: 0,
+    region: 'ashfields', boss: '', flags: [], seen: [], weaken: 0, seed: seed | 0,
   };
+  if (opts.rerolls) run.rerolls = opts.rerolls;
   run.region = pickOf(run, SORTIE_REGIONS).id;
   run.boss = pickOf(run, SORTIE_BOSSES).id;
   // A force with deep regions unlocked can go deep into one of them; a lord with a grudge often waits for it.
@@ -834,6 +854,22 @@ export function reveal(run: SortieRun) {
   }
 }
 
+/** A fight node's own dice: its Echoes are known before the party gets there. None on an old save. */
+const nodeSeed = (run: SortieRun, node: SortieNode) => (run.seed === undefined ? undefined : (Math.imul(run.seed ^ 0x5bd1e995, 31) + node.row * 977 + node.col * 131) | 0);
+function nodeDice(seed: number): () => number {
+  const st = { rng: seed };
+  return () => rand(st);
+}
+
+/** What waits at a fight or elite node the party can see: its Echo squads, sized and trimmed as the fight will have
+ *  them (Marauders may still come instead). Hidden nodes, other kinds and old saves show nothing. */
+export function previewOf(run: SortieRun, book: CatalogBook, node: SortieNode): { name: string; n: number; unit: Unit }[] | undefined {
+  if (node.hidden || (node.kind !== 'fight' && node.kind !== 'elite')) return undefined;
+  const seed = nodeSeed(run, node);
+  if (seed === undefined) return undefined;
+  return echoSquads(book, fightBudget(run, book, node.kind, node.row), node.kind, nodeDice(seed)).map((u) => ({ name: u.unitType, n: u.size, unit: u }));
+}
+
 export function enterNode(run: SortieRun, book: CatalogBook, node: SortieNode) {
   if (!reachable(run).includes(node)) throw new Error('Not a step you can take from here.');
   run.row = node.row;
@@ -849,14 +885,14 @@ export function enterNode(run: SortieRun, book: CatalogBook, node: SortieNode) {
     const odds = node.veiled ? ambushOdds(run) : 0;
     const ambush = odds > 0 && rand(run) < odds;
     const raid = !!run.raiders?.length && rand(run) < (ambush ? SORTIE.raiders.ambush : SORTIE.raiders.odds);
-    return startCombat(run, book, node.kind, node.affix, ambush, raid);
+    return startCombat(run, book, node.kind, node.affix, ambush, raid, nodeSeed(run, node));
   }
   if (node.kind === 'boss') return startCombat(run, book, node.kind, node.affix);
   if (node.kind === 'camp') return void (run.screen = 'camp');
   if (node.kind === 'shop') return openShop(run);
   if (node.kind === 'cache') {
     gain(run, SORTIE.haul.cache);
-    run.offer = { boons: boonOffer(run, 3) };
+    run.offer = { boons: specials(run, boonOffer(run, 3)) };
     run.screen = 'reward';
     return note(run, `${run.scene} A cache of old supplies (+${SORTIE.haul.cache.supply} Supply).`, 'info');
   }
@@ -950,7 +986,7 @@ function boonOffer(run: SortieRun, n: number, kind: 'any' | 'rare' | 'curse' = '
   const open = (id: SortieBoonId, t: SortieBoonTier) => SORTIE_BOONS[id].tiers[t] !== undefined && TIER_LV[t] > lv(run, id);
   const pool = (Object.keys(SORTIE_BOONS) as SortieBoonId[]).filter((id) => {
     const b = SORTIE_BOONS[id];
-    return (b.curse || !run.unlocked || run.unlocked.includes(id)) && (run.ranged || !b.ranged) && (run.melee || !b.melee) && (run.mode === 'shard' || !b.shard)
+    return !b.pair && !b.spoil && (b.curse || !run.unlocked || run.unlocked.includes(id)) && (run.ranged || !b.ranged) && (run.melee || !b.melee) && (run.mode === 'shard' || !b.shard)
       && !b.curse === (kind !== 'curse') && (!b.unit || run.boonUnit?.[id] !== undefined || boonUnits(run, id).length > 0) && BOON_TIERS.some((t) => open(id, t));
   });
   const out: SortieBoonDraw[] = [];
@@ -975,6 +1011,82 @@ function boonOffer(run: SortieRun, n: number, kind: 'any' | 'rare' | 'curse' = '
   }
   return out;
 }
+
+/** A stratagem or an elite trophy: these come only in place of a card, never in the draw. */
+export const isSpecial = (id: SortieBoonId) => !!SORTIE_BOONS[id].pair || !!SORTIE_BOONS[id].spoil;
+
+/** The stratagems whose pair the party holds, open to it (unlocked, fitting its weapons) and not offered yet this run. */
+export function stratagemsDue(run: SortieRun): SortieBoonId[] {
+  return (Object.keys(SORTIE_BOONS) as SortieBoonId[]).filter((id) => {
+    const b = SORTIE_BOONS[id];
+    return !!b.pair && b.pair.every((x) => has(run, x)) && !has(run, id) && !run.paired?.includes(id)
+      && (!run.unlocked || run.unlocked.includes(id)) && (run.ranged || !b.ranged) && (run.melee || !b.melee);
+  });
+}
+
+/** The trophy an elite of this affix gives. */
+export const trophyOf = (affix: SortieAffix | undefined): SortieBoonId | undefined =>
+  affix ? (Object.keys(SORTIE_BOONS) as SortieBoonId[]).find((id) => SORTIE_BOONS[id].spoil === affix) : undefined;
+
+/** The stratagems a boon is half of, with the other half. */
+export const pairsOf = (id: SortieBoonId): { strat: SortieBoonId; other: SortieBoonId }[] =>
+  (Object.keys(SORTIE_BOONS) as SortieBoonId[]).flatMap((strat) => {
+    const p = SORTIE_BOONS[strat].pair;
+    return p?.includes(id) ? [{ strat, other: p[0] === id ? p[1] : p[0] }] : [];
+  });
+
+/** Put a stratagem that's due, and an elite's trophy, in place of the offer's last plain cards. The offer never grows. */
+function specials(run: SortieRun, out: SortieBoonDraw[], affix?: SortieAffix): SortieBoonDraw[] {
+  const swap = (d: SortieBoonDraw) => {
+    for (let i = out.length - 1; i >= 0; i--) if (!isSpecial(out[i].id)) return void (out[i] = d);
+  };
+  const strat = stratagemsDue(run)[0];
+  if (strat && out.some((d) => !isSpecial(d.id))) {
+    swap({ id: strat, tier: 'Legendary' });
+    (run.paired ??= []).push(strat);
+  }
+  const trophy = trophyOf(affix);
+  if (trophy && !has(run, trophy)) swap({ id: trophy, tier: 'Rare' });
+  return out;
+}
+
+/** Redraw an offer's plain cards (a stratagem or trophy stays), for one of the run's rerolls. */
+export function rerollOffer(run: SortieRun) {
+  const o = run.offer;
+  if (run.screen !== 'reward' || !o || !(run.rerolls ?? 0)) return;
+  const plain = o.boons.filter((d) => !isSpecial(d.id)).length;
+  if (!plain) return;
+  const fresh = boonOffer(run, plain, o.rare ? 'rare' : 'any');
+  o.boons = o.boons.map((d) => (isSpecial(d.id) ? d : fresh.shift() ?? d));
+  run.rerolls = (run.rerolls ?? 0) - 1;
+}
+
+/** How many rerolls a force's runs start with: none until it reaches the goal (SORTIE_REROLLS). */
+export const rerollsFor = (story: ForceSortie | undefined) => (goalProgress(story, SORTIE_REROLLS.goal) >= SORTIE_REROLLS.need ? SORTIE_REROLLS.n : 0);
+
+/** A party unit's archetype (the Warpath roles). */
+export const roleOfMember = (m: SortieMember) => roleOfUnit(m.unit);
+
+/** The two specialities open to a party unit. */
+export const specChoices = (m: SortieMember): string[] => Object.keys(SORTIE_SPECS).filter((id) => SORTIE_SPECS[id].role === roleOfMember(m));
+
+/** The first party unit owed a speciality: still standing, SORTIE_SPEC_AT fights won, none picked yet. */
+export function specDue(run: SortieRun): number | undefined {
+  if (run.over) return undefined;
+  const i = run.party.findIndex((m) => !m.spec && memberUp(m) && (m.wins ?? 0) >= SORTIE_SPEC_AT && specChoices(m).length > 0);
+  return i < 0 ? undefined : i;
+}
+
+/** Give a party unit its speciality, for the rest of the run. */
+export function pickSpec(run: SortieRun, i: number, id: string) {
+  const m = run.party[i];
+  if (!m || m.spec || !specChoices(m).includes(id)) return;
+  m.spec = id;
+  note(run, `${memberName(m)} specialise: ${SORTIE_SPECS[id].name}. ${SORTIE_SPECS[id].text}`, 'good');
+}
+
+/** The speciality the auto-player picks. */
+export const autoSpec = (m: SortieMember) => specChoices(m).find((id) => SORTIE_SPECS[id].auto) ?? specChoices(m)[0];
 
 /** Take a boon, or upgrade one the party holds to the draw's rarity. */
 function addBoon(run: SortieRun, d: SortieBoonDraw) {
@@ -1278,6 +1390,8 @@ const lordScale = (budget: number, cost: number) => clamp((budget * SORTIE.lordS
 
 const log = (c: SortieCombat, text: string, tone: SortieTone = 'info') => c.log.push({ text, tone });
 const has = (run: SortieRun, b: SortieBoonId) => run.boons.includes(b);
+/** A party unit with this speciality. */
+const spec = (s: SortieSquad, id: string) => !s.echo && s.spec === id;
 const statusOn = (c: SortieCombat, s: SortieSquad, st: Status) => (s.status[st] ?? -1) >= c.round;
 /** The Echo squads on the field, closest first. */
 export const onField = (c: SortieCombat) => c.enemies.filter((e) => standing(e) && !e.arrives).sort((a, b) => distOf(a) - distOf(b));
@@ -1307,7 +1421,8 @@ export function gunReach(run: SortieRun, s: SortieSquad, g: Gun): number {
   const band = SORTIE.ranges.find(([r]) => g.range <= r)?.[1] ?? SORTIE.ranks;
   if (s.echo) return band;
   // Any gun reaches Close from the Middle, so a 12" one isn't dead weight there.
-  return clamp(Math.max(slotOf(s) === 1 ? 1 : 0, band + (lv(run, 'cells') && slotOf(s) >= 3 - lv(run, 'cells') ? 1 : 0) - slotOf(s)), 0, SORTIE.ranks);
+  const more = (lv(run, 'cells') && slotOf(s) >= 3 - lv(run, 'cells') ? 1 : 0) + (spec(s, 'overwatch') ? 1 : 0);
+  return clamp(Math.max(slotOf(s) === 1 ? 1 : 0, band + more - slotOf(s)), 0, SORTIE.ranks);
 }
 export const chargeReach = (run: SortieRun, s: SortieSquad) => SORTIE.chargeReach + (!s.echo && has(run, 'packs') ? 1 : 0);
 
@@ -1321,19 +1436,26 @@ const signed = (run: SortieRun, s: SortieSquad, g: Gun) => ulv(run, s, 'signatur
 const hunting = (run: SortieRun, att: SortieSquad, def: SortieSquad) => ulv(run, att, 'hunter') > 0 && (run.combat?.kind === 'elite' || def.key === run.combat?.lord);
 
 /** A weapon's AP on a target, boons and Fortified counted. */
-function apOf(run: SortieRun, att: SortieSquad, def: SortieSquad, g: Gun, melee: boolean): number {
+function apOf(run: SortieRun, att: SortieSquad, def: SortieSquad, g: Gun, melee: boolean, dist = 1): number {
   const mine = !att.echo;
+  const c = run.combat;
   return g.ap + (melee && mine ? lv(run, 'blades') + (has(run, 'fury') ? 2 : 0) : 0)
+    + (mine && !melee && dist >= 3 && has(run, 'killzone') ? 1 : 0)
+    + (melee ? (spec(att, 'trample') ? 1 : 0) : spec(att, 'heavyShells') ? 1 : 0)
+    + (spec(att, 'bombRun') && c?.round === 1 ? 1 : 0)
+    + (spec(att, 'marksman') && (c?.kind === 'elite' || def.key === c?.lord) ? 1 : 0)
     + (mine && signed(run, att, g) ? (ulv(run, att, 'signature') >= 3 ? 2 : 1) : 0)
     + (mine && hunting(run, att, def) ? (ulv(run, att, 'hunter') >= 3 ? 2 : 1) : 0)
     - (def.fortified ? 1 : 0);
 }
 
-const healOf = (s: SortieSquad) => SORTIE.hpMul * Math.max(1, effects(s.abilities, 'heal').reduce((n, e) => n + e.n, 0)) * 2;
-const shieldOf = (s: SortieSquad) => SORTIE.hpMul * Math.max(1, effects(s.abilities, 'shield').reduce((n, e) => n + e.n, 0)) + active(s).length;
+/** Mass Spell: a mystic's heals, shields and barrages are half again as strong. */
+const massOf = (s: SortieSquad) => (spec(s, 'massSpell') ? 1.5 : 1);
+const healOf = (s: SortieSquad) => Math.round(SORTIE.hpMul * Math.max(1, effects(s.abilities, 'heal').reduce((n, e) => n + e.n, 0)) * 2 * massOf(s));
+const shieldOf = (s: SortieSquad) => Math.round((SORTIE.hpMul * Math.max(1, effects(s.abilities, 'shield').reduce((n, e) => n + e.n, 0)) + active(s).length) * massOf(s));
 const barrageOf = (s: SortieSquad) => {
   const list = effects(s.abilities, 'barrage');
-  return { hits: Math.max(2, 2 * list.reduce((n, e) => n + e.hits, 0)), ap: Math.max(0, ...list.map((e) => e.ap)) };
+  return { hits: Math.round(Math.max(2, 2 * list.reduce((n, e) => n + e.hits, 0)) * massOf(s)), ap: Math.max(0, ...list.map((e) => e.ap)) };
 };
 const fieldOf = (s: SortieSquad): 'slow' | 'daze' => effects(s.abilities, 'field')[0]?.status ?? 'daze';
 const sourceOf = (s: SortieSquad, k: 'heal' | 'shield' | 'barrage' | 'field' | 'redeploy') => effects(s.abilities, k)[0]?.source;
@@ -1380,18 +1502,20 @@ export function moveMember(run: SortieRun, i: number, dir: -1 | 1): boolean {
   return true;
 }
 
-export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFightKind, affix?: SortieAffix, ambush = false, raid = false) {
+export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFightKind, affix?: SortieAffix, ambush = false, raid = false, seed?: number) {
   const budget = fightBudget(run, book, kind);
   const boss = kind === 'boss' ? bossOf(run) : undefined;
   // Marauders: a band out of the other armies in the app instead of the Echoes (never the lord's fight).
   const band = raid && kind !== 'boss' && run.raiders?.length ? raidBand(run.raiders, budget, SORTIE.squads, () => rand(run)) : [];
-  const echoes = band.length ? band.map((b) => b.unit) : echoSquads(book, budget, kind, () => rand(run), boss?.unit);
+  const dice = seed === undefined ? () => rand(run) : nodeDice(seed);
+  const echoes = band.length ? band.map((b) => b.unit) : echoSquads(book, budget, kind, dice, boss?.unit);
   const party = run.party.map((mem, i) => {
     const s = squadOf(mem.unit, `p${i}`, { extraTough: run.tough + (mem.scars?.includes('survivor') ? SORTIE.hpMul : 0) });
     if (mem.scars?.includes('headhunter')) s.atkBonus *= SORTIE.scars.headhunter.mul!;
     s.models.forEach((m, j) => (m.hp = mem.models[j]?.hp ?? m.max));
     s.member = i;
     s.slot = i;
+    if (mem.spec) s.spec = mem.spec;
     return s;
   });
   const enemies = echoes.map((u, i) => {
@@ -1470,6 +1594,10 @@ export function startCombat(run: SortieRun, book: CatalogBook, kind: SortieFight
     note(run, `Ambushed by ${listText([...new Set(enemies.map((e) => e.name))])}.`, 'bad');
   }
   if (has(run, 'banner')) for (const p of partyLine(c)) p.shield = active(p).length * lv(run, 'banner');
+  for (const p of partyLine(c)) if (spec(p, 'strongpoint')) {
+    p.shield += Math.ceil(hpOf(p) / 5);
+    p.shieldUntil = 2;
+  }
   if (has(run, 'pact')) {
     for (const m of partyLine(c).flatMap(active)) m.hp = Math.max(1, m.hp - Math.ceil(m.max / 6));
     log(c, 'The Void Pact takes its due.', 'bad');
@@ -1601,6 +1729,7 @@ function newRound(run: SortieRun) {
   signature(run, prev);
   checkEnd(run);
   if (c.over) return;
+  if (has(run, 'core')) for (const p of partyLine(c)) mend(p, SORTIE.hpMul);
   if (c.affix === 'regenerating') for (const e of onField(c)) {
     const n = mend(e, Math.ceil(maxOf(e) * 0.08));
     if (n) log(c, `${e.name} regenerate: mended ${n}.`, 'bad');
@@ -1619,7 +1748,9 @@ function newRound(run: SortieRun) {
   for (const s of [...partyLine(c), ...onField(c)]) {
     if (refusing(c, s)) continue;
     const mod = (s.fast ? SORTIE.fast : 0) - (s.slow || statusOn(c, s, 'slow') ? SORTIE.slow : 0) + (s.echo ? 0 : lv(run, 'drill') + (has(run, 'adrenal') ? 3 : 0) + (has(run, 'momentum') ? Math.min(run.streak ?? 0, lv(run, 'momentum') + 1) : 0))
-      + (quirk(s, 'quick') ? 1 : 0) - (quirk(s, 'jumpy') && c.round === 1 ? 2 : 0) + (s.echo && c.ambush && c.round === 1 ? SORTIE.ambush.init : 0);
+      + (quirk(s, 'quick') ? 1 : 0) - (quirk(s, 'jumpy') && c.round === 1 ? 2 : 0) + (s.echo && c.ambush && c.round === 1 ? SORTIE.ambush.init : 0)
+      + (s.echo ? 0 : (has(run, 'quick') ? 1 : 0) + (has(run, 'blitz') && c.round === 1 ? 2 : 0))
+      + (spec(s, 'deepStrike') ? 2 : 0) + (spec(s, 'outrider') ? 1 : 0);
     if (standing(s)) turns.push({ key: s.key, init: d6(run) + mod + rand(run) * 0.1 });
   }
   c.queue = turns.sort((a, b) => b.init - a.init);
@@ -1761,6 +1892,7 @@ function wound(run: SortieRun, s: SortieSquad, n: number, why: string) {
     if (s.shield > 0) { s.shield--; continue; }
     m.hp--;
     lost++;
+    meter(run, s, 'taken', 1);
     if (m.hp <= 0) fell(run, s, false);
   }
   if (run.combat && lost) log(run.combat, `${why}: ${lost} wound${lost === 1 ? '' : 's'} on ${s.name}.`, s.echo ? 'good' : 'bad');
@@ -1782,10 +1914,11 @@ function fell(run: SortieRun, s: SortieSquad, front: boolean, by?: SortieSquad) 
   if (s.echo) {
     c.kills++;
     if (by && !by.echo) {
-      const leech = effects(by.abilities, 'leech').reduce((n, e) => n + e.n, 0) + lv(run, 'trophy');
+      const leech = effects(by.abilities, 'leech').reduce((n, e) => n + e.n, 0) + lv(run, 'trophy')
+        + (has(run, 'harvest') ? (atHalf(by) ? 2 : 1) : 0) + (spec(by, 'bloodbath') ? 2 : 0);
       if (leech) mend(by, leech);
     }
-  }
+  } else if (by?.echo && has(run, 'seal') && standing(by)) wound(run, by, SORTIE.hpMul, 'Vengeance Seal');
   if (alive(s).length) return;
   const rev = effects(s.abilities, 'revive')[0];
   if (rev && !s.revived) {
@@ -1871,13 +2004,19 @@ function hitMod(run: SortieRun, att: SortieSquad, def: SortieSquad, g: Gun, a: S
     if (lv(run, 'packs') >= 2 && att.chargedAt === c.round) mod += 1;
     if (lv(run, 'rally') >= 3 && att.rallied === c.round) mod += 1;
     if (c.holding && c.holding.key === att.key && c.holding.lv >= 2) mod += 1;
+    if (!a.melee && spec(att, 'firingLine') && slotOf(att) >= 1) mod += 1;
+    if (spec(att, 'bombRun') && c.round === 1) mod += 1;
+    if (spec(att, 'onslaught') && att.chargedAt === c.round) mod += 1;
+  } else {
+    if (spec(def, 'wraith')) mod -= 1;
+    if (!a.melee && has(run, 'veil') && slotOf(def) === 2) mod -= 1;
   }
   if (a.melee) mod += (quirk(att, 'brute') ? 1 : 0) - (quirk(att, 'clumsy') ? 1 : 0);
   else mod += (quirk(att, 'eagle') ? 1 : 0) - (quirk(att, 'myopic') && a.dist >= 3 ? 1 : 0);
   if (quirkHere(run, att, 'haunted')) mod -= 1;
   if (att.crack?.round === c.round && att.crack.kind === 'wild') mod -= 1;
   // Fresh from melee, guns are hard to bring to bear.
-  if (!a.melee && att.engaged >= c.round - 1) mod -= 1;
+  if (!a.melee && att.engaged >= c.round - 1 && !spec(att, 'outrider')) mod -= 1;
   return mod;
 }
 
@@ -1888,11 +2027,11 @@ function rerollHit(run: SortieRun, att: SortieSquad, a: Strike): boolean {
   const odd = (n: number) => n === 1 || n === 3;
   return (!a.melee && a.dist >= 3 && odd(lv(run, 'scope'))) || (lv(run, 'salvo') === 1 && c.round === 1) || (lv(run, 'relay') === 1 && slotOf(att) === 1)
     || (a.melee && lv(run, 'bayonets') === 2) || odd(ulv(run, att, 'veteran')) || (lv(run, 'rotation') === 1 && c.upFront === att.key)
-    || (lv(run, 'packs') >= 3 && att.chargedAt === c.round);
+    || (lv(run, 'packs') >= 3 && att.chargedAt === c.round) || (!a.melee && spec(att, 'harrier'));
 }
 
 /** The Defense a party unit's boons add to one model's save (Berserk Rite takes one off). */
-function boonCover(run: SortieRun, def: SortieSquad, target: SortieModel): number {
+function boonCover(run: SortieRun, def: SortieSquad, target: SortieModel, melee = false): number {
   const c = run.combat!;
   const half = target.hp * 2 <= target.max;
   return (lv(run, 'ward') >= 2 && c.round <= lv(run, 'ward') - 1 ? 1 : 0)
@@ -1900,6 +2039,9 @@ function boonCover(run: SortieRun, def: SortieSquad, target: SortieModel): numbe
     + (half && lv(run, 'grit') >= 2 ? lv(run, 'grit') - 1 : 0)
     + (ulv(run, def, 'bodyguard') >= 3 && slotOf(def) === 0 ? 1 : 0)
     + (lv(run, 'rotation') >= 3 && c.upFront === def.key ? 1 : 0)
+    + (melee && has(run, 'ironwall') && slotOf(def) === 0 ? 1 : 0)
+    + (has(run, 'plate') && slotOf(def) === 2 ? 1 : 0)
+    + (spec(def, 'shieldWall') && slotOf(def) === 0 ? 1 : 0)
     - (has(run, 'fury') ? 1 : 0);
 }
 
@@ -1908,6 +2050,24 @@ function rerollSave(run: SortieRun, def: SortieSquad, target: SortieModel): bool
   const c = run.combat!;
   return (lv(run, 'ward') === 1 && c.round === 1) || (lv(run, 'wall') === 1 && slotOf(def) === 0) || (lv(run, 'grit') === 1 && target.hp * 2 <= target.max)
     || (ulv(run, def, 'bodyguard') === 2 && slotOf(def) === 0) || (!!c.holding && c.holding.key === def.key && c.holding.lv >= 3);
+}
+
+/** How many more attacks a party unit makes: Frenzied Fang, and the Gunship, Alpha Strike and Frenzy specialities. */
+function strikeMul(run: SortieRun, att: SortieSquad, a: Strike): number {
+  const c = run.combat!;
+  return (has(run, 'fang') && atHalf(att) ? 1.25 : 1) * (!a.melee && spec(att, 'gunship') ? 1.25 : 1) * (a.melee && spec(att, 'frenzy') ? 1.25 : 1)
+    * (c.round === 1 && spec(att, 'alphaStrike') ? 1.5 : 1);
+}
+
+/** A party unit's 6s to hit get Rending: Crossfire in round 1 (shooting), Deadeye on its units, and the Reaper. */
+const rends = (run: SortieRun, att: SortieSquad, a: Strike) =>
+  (!a.melee && has(run, 'crossfire') && run.combat!.round === 1) || (has(run, 'deadeye') && (ulv(run, att, 'veteran') > 0 || ulv(run, att, 'signature') > 0)) || spec(att, 'reaper');
+
+/** Count wounds into the fight's damage meter. */
+function meter(run: SortieRun, s: SortieSquad, k: 'dealt' | 'taken', n: number) {
+  const c = run.combat;
+  if (!c || !n) return;
+  ((c.meter ??= {})[s.key] ??= { dealt: 0, taken: 0 })[k] += n;
 }
 
 /** One model's attack on a squad, dice by dice. Returns wounds dealt. */
@@ -1919,7 +2079,7 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
   const mine = !att.echo;
   let dealt = 0;
   let hits = 0;
-  const mul = att.atkBonus * fury(c, att);
+  const mul = att.atkBonus * fury(c, att) * (mine ? strikeMul(run, att, a) : 1);
   const sixes = effects(att.abilities, 'sixes');
   for (const g of a.guns) {
     const bayonets = a.melee && mine ? lv(run, 'bayonets') : 0;
@@ -1938,15 +2098,15 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
       const six = r === 6;
       const six6 = six ? sixes.filter((e) => appliesTo(e, g)) : [];
       if (six6.some((e) => e.again)) n++;
-      const rend = (six && (g.rending || six6.some((e) => e.rend))) || (!!rounds && (rounds >= 2 || slotOf(att) === 2) && r >= (rounds >= 3 ? 5 : 6));
-      const extra = six6.reduce((x, e) => x + (e.dmg ?? 0), 0);
-      const blast = blastOn(g, def);
+      const rend = (six && (g.rending || six6.some((e) => e.rend) || (mine && rends(run, att, a)))) || (!!rounds && (rounds >= 2 || slotOf(att) === 2) && r >= (rounds >= 3 ? 5 : 6));
+      const extra = six6.reduce((x, e) => x + (e.dmg ?? 0), 0) + (six && mine && a.melee && has(run, 'redharvest') ? 1 : 0);
+      const blast = blastOn(spec(att, 'creeping') && g.blast > 1 ? { ...g, blast: g.blast + 1 } : g, def);
       for (let b = 0; b < blast; b++) {
         const target = pickHurt(def);
         if (!target) break;
         hits++;
-        const ap = apOf(run, att, def, g, a.melee) + (rend ? 4 : 0);
-        const cover = -(target.shaken ? 1 : 0) + (def.echo ? 0 : boonCover(run, def, target) + (quirkHere(run, def, 'native') ? 1 : 0));
+        const ap = apOf(run, att, def, g, a.melee, a.dist) + (rend ? 4 : 0);
+        const cover = -(target.shaken ? 1 : 0) + (def.echo ? 0 : boonCover(run, def, target, a.melee) + (quirkHere(run, def, 'native') ? 1 : 0));
         const save = clamp(def.defense + whole(run, Math.max(0, ap) - def.defMod) - cover, 2, 7);
         if (save < 7) {
           let roll = d6(run);
@@ -1963,11 +2123,18 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
         const lost = Math.min(target.hp, w - soak);
         target.hp -= lost;
         dealt += lost;
+        if (lost) meter(run, def, 'taken', lost);
         if (pin && lost && (pin >= 2 || six)) def.status.slow = Math.max(def.status.slow ?? 0, c.round + (pin >= 3 ? 2 : 1));
         if (target.hp <= 0) fell(run, def, front, att);
       }
     }
   }
+  if (dealt) meter(run, att, 'dealt', dealt);
+  if (dealt && mine && def.echo) {
+    if (!a.melee && spec(att, 'suppressing')) def.status.slow = Math.max(def.status.slow ?? 0, c.round + 1);
+    if (spec(att, 'spotter')) def.status.mark = Math.max(def.status.mark ?? 0, c.round);
+  }
+  if (dealt && att.echo && a.melee && spec(def, 'retribution') && standing(att)) wound(run, att, SORTIE.hpMul, 'Retribution');
   const kills = before - alive(def).length;
   const label = a.label ? ` (${a.label})` : '';
   log(c, `${att.name}${label} → ${def.name}: ${hits} hit${hits === 1 ? '' : 's'}, ${dealt} wound${dealt === 1 ? '' : 's'}${kills > 0 ? `, ${kills} ${def.echo ? 'Echo' : 'model'}${kills === 1 ? '' : def.echo ? 'es' : 's'} down` : ''}.`, mine ? (dealt ? 'good' : 'info') : dealt ? 'bad' : 'info');
@@ -2002,11 +2169,17 @@ function morale(run: SortieRun, s: SortieSquad, why: string, rout = true): boole
   const c = run.combat!;
   if (!standing(s) || lastStanding(c, s) || (!s.echo && lv(run, 'stims') >= 3)) return false;
   const bonus = (s.hero ? SORTIE.heroMorale : 0) + (s.echo ? 0 : lv(run, 'stims') * SORTIE.heroMorale - (has(run, 'adrenal') ? 1 : 0))
-    + (quirk(s, 'steady') ? 1 : 0) - (quirk(s, 'shaky') ? 1 : 0) + (scarred(run, s, 'blooded') ? 1 : 0);
+    + (quirk(s, 'steady') ? 1 : 0) - (quirk(s, 'shaky') ? 1 : 0) + (scarred(run, s, 'blooded') ? 1 : 0)
+    + (!s.echo && c.party.some((p) => spec(p, 'warBanner') && standing(p)) ? 1 : 0);
   const need = clamp(s.quality - bonus, 2, 6);
   const r = d6(run);
   if (r !== 1 && (r === 6 || r >= need)) return false;
   if (s.fearless && d6(run) >= 4) return false;
+  if (!s.echo && has(run, 'steelnerve') && !c.steeled) {
+    c.steeled = true;
+    log(c, `Nerves of Steel: ${s.name} hold firm.`, 'good');
+    return false;
+  }
   const up = active(s);
   if (rout && atHalf(s)) {
     for (const m of up) m.routed = true;
@@ -2069,7 +2242,10 @@ function charge(run: SortieRun, att: SortieSquad, def: SortieSquad) {
 
 const ready = (c: SortieCombat, s: SortieSquad, id: string) => (s.cooldowns[id] ?? 0) <= c.round;
 const waitOf = (c: SortieCombat, s: SortieSquad, id: string) => Math.max(0, (s.cooldowns[id] ?? 0) - c.round);
-const cool = (c: SortieCombat, s: SortieSquad, id: string, cd: number) => (s.cooldowns[id] = c.round + 1 + cd);
+const ABILITIES = ['heal', 'shield', 'barrage', 'field', 'outflank'];
+/** An ability's cooldown for this squad: the Adept's are a round shorter. */
+const cdOf = (s: SortieSquad, id: string, cd: number) => Math.max(0, cd - (spec(s, 'adept') && ABILITIES.includes(id) ? 1 : 0));
+const cool = (c: SortieCombat, s: SortieSquad, id: string, cd: number) => (s.cooldowns[id] = c.round + 1 + cdOf(s, id, cd));
 
 const weaponText = (g: Gun) =>
   [g.melee ? 'Melee' : `${g.range}"`, `A${+(g.attacks).toFixed(2)}`, g.ap ? `AP(${g.ap})` : '', g.blast > 1 ? `Blast(${g.blast})` : '', g.deadly > 1 ? `Deadly(${g.deadly})` : '', g.rending ? 'Rending' : '', g.reliable ? 'Reliable' : '', g.bane ? 'Bane' : ''].filter(Boolean).join(', ');
@@ -2133,7 +2309,7 @@ function skillsFor(run: SortieRun, me: SortieSquad): SortieSkill[] {
   for (const [kind, src, text, reach] of abil) if (src) {
     // Outflanking only changes how the unit's own guns reach, so it's free: the unit still takes its order after.
     const free = kind === 'outflank';
-    out.push({ id: kind, kind, name: src, text: `${text}${free ? ' A free action: the unit still takes its order after.' : rest} Cooldown ${SORTIE.cooldown[kind]}.`, reach, wait: waitOf(c, me, kind), free: free || undefined });
+    out.push({ id: kind, kind, name: src, text: `${text}${free ? ' A free action: the unit still takes its order after.' : rest} Cooldown ${cdOf(me, kind, SORTIE.cooldown[kind])}.`, reach, wait: waitOf(c, me, kind), free: free || undefined });
   }
   return out;
 }
@@ -2328,7 +2504,7 @@ function expect(run: SortieRun, att: SortieSquad, guns: Gun[], def: SortieSquad,
     const a: Strike = { melee, guns: [g], dist, loose };
     const once = g.reliable ? 5 / 6 : clamp((7 - att.quality + hitMod(run, att, def, g, a)) / 6, 1 / 6, 5 / 6);
     const hit = SORTIE.hitTwice ? 1 - (1 - once) ** 2 : once;
-    const ap = apOf(run, att, def, g, melee);
+    const ap = apOf(run, att, def, g, melee, dist);
     const fail = 1 - clamp((7 - def.defense - Math.max(0, ap) + def.defMod) / 6, 0, 5 / 6);
     const per = Math.min(g.deadly, def.models[0]?.max ?? 1);
     n += g.attacks * att.atkBonus * hit * blastOn(g, def) * fail * per * (1 - def.ignore);
@@ -2492,6 +2668,14 @@ function finish(run: SortieRun, how: 'won' | 'lost' | 'broke') {
   c.need = undefined;
   c.acting = undefined;
   c.queue = [];
+  // The damage meter, into the run's.
+  for (const p of c.party) {
+    const m = c.meter?.[p.key];
+    if (!m || p.member === undefined) continue;
+    const r = ((run.meter ??= {})[p.member] ??= { dealt: 0, taken: 0 });
+    r.dealt += m.dealt;
+    r.taken += m.taken;
+  }
   // Wounds carry back, and the share of its wounds a fight cost a unit stresses it.
   const sum = (ms: { hp: number }[]) => ms.reduce((n, m) => n + Math.max(0, m.hp), 0);
   for (const p of c.party) {
@@ -2521,6 +2705,9 @@ function finish(run: SortieRun, how: 'won' | 'lost' | 'broke') {
   const lost = c.party.filter((p) => !alive(p).length).map((p) => p.name);
   note(run, `Beat ${fightTitle[c.kind].toLowerCase()}: ${c.kills} kill${c.kills === 1 ? '' : 's'}.${lost.length ? ` ${listText(lost)} fell.` : ''}`, lost.length ? 'bad' : 'good');
   earnScars(run, c);
+  for (const p of c.party) if (alive(p).length && p.member !== undefined) run.party[p.member].wins = (run.party[p.member].wins ?? 0) + 1;
+  if (has(run, 'secondwind')) heal(run, 1 / 6);
+  if (c.party.some((p) => spec(p, 'fieldSurgeon') && alive(p).length) && revive(run, 1)) log(c, 'Field Surgeon: a fallen model gets back up.', 'good');
   const medic = lv(run, 'medic');
   if (medic) {
     const want = medic >= 2 ? 2 : 1;
@@ -2574,7 +2761,9 @@ export function leaveCombat(run: SortieRun) {
     return endRun(run, 'won');
   }
   const lean = cursed(run, 'lean') ? 1 : 0;
-  run.offer = c.kind === 'elite' ? { boons: boonOffer(run, 3 - lean, 'rare') } : { boons: boonOffer(run, 2 - lean), patch: true };
+  run.offer = c.kind === 'elite'
+    ? { boons: specials(run, boonOffer(run, 3 - lean, 'rare'), c.affix), rare: true }
+    : { boons: specials(run, boonOffer(run, 2 - lean)), patch: true };
   run.screen = 'reward';
 }
 
@@ -2639,6 +2828,94 @@ export const fallenUnits = (run: SortieRun): Unit[] => (run.mode === 'shard' && 
 /** Any active unit can go on a free run. */
 export const canSortie = (u: Unit) => u.status === 'active';
 
+// --- The build panel: a party unit's numbers with its boons on ----------------------------------------------------
+
+export interface SortieSheetGun { name: string; melee: boolean; reach: string; attacks: number; ap: number; tags: string[] }
+export interface SortieSheet {
+  name: string;
+  slot: string;
+  up: number;
+  models: number;
+  hp: number;
+  max: number;
+  /** To hit, shooting and in melee, and the Defense save, with the boons that always count. */
+  shoot: number;
+  melee: number;
+  defense: number;
+  /** Initiative bonus. */
+  init: number;
+  guns: SortieSheetGun[];
+  /** Abilities and the charge, with cooldowns (and rounds left, in a fight). */
+  skills: { name: string; cd: number; wait: number }[];
+  /** Unit boons it holds, as text. */
+  boons: string[];
+  spec?: { id: string; name: string; text: string };
+}
+
+/** A party unit's numbers as they stand, boons and speciality on: in a fight its squad there, else at its place in line. */
+export function unitSheet(run: SortieRun, i: number): SortieSheet {
+  const mem = run.party[i];
+  const live = run.combat?.party.find((p) => p.member === i);
+  const s = live ?? squadOf(mem.unit, `p${i}`, { extraTough: run.tough + (mem.scars?.includes('survivor') ? SORTIE.hpMul : 0) });
+  if (!live) {
+    s.models.forEach((m, j) => (m.hp = mem.models[j]?.hp ?? m.max));
+    s.member = i;
+    s.slot = i;
+    if (mem.spec) s.spec = mem.spec;
+  }
+  const slot = slotOf(s);
+  const c = run.combat;
+  const both = (has(run, 'pact') ? 1 : 0) + (ulv(run, s, 'veteran') >= 2 ? 1 : 0) - (quirkHere(run, s, 'haunted') ? 1 : 0);
+  const shootMod = s.hitShoot + both + (spec(s, 'firingLine') && slot >= 1 ? 1 : 0) + (quirk(s, 'eagle') ? 1 : 0);
+  const meleeMod = s.hitMelee + both + (quirk(s, 'brute') ? 1 : 0) - (quirk(s, 'clumsy') ? 1 : 0);
+  const wall = lv(run, 'wall');
+  const cover = (wall >= 2 && (slot === 0 || (wall >= 3 && slot === 1)) ? 1 : 0) + (ulv(run, s, 'bodyguard') >= 3 && slot === 0 ? 1 : 0)
+    + (has(run, 'plate') && slot === 2 ? 1 : 0) + (spec(s, 'shieldWall') && slot === 0 ? 1 : 0) - (has(run, 'fury') ? 1 : 0) + (quirkHere(run, s, 'native') ? 1 : 0);
+  const init = (s.fast ? SORTIE.fast : 0) - (s.slow ? SORTIE.slow : 0) + lv(run, 'drill') + (has(run, 'adrenal') ? 3 : 0) + (has(run, 'quick') ? 1 : 0)
+    + (spec(s, 'deepStrike') ? 2 : 0) + (spec(s, 'outrider') ? 1 : 0) + (quirk(s, 'quick') ? 1 : 0);
+  const target = { ...s, echo: true, fortified: false, key: '' };
+  const guns = new Map<string, SortieSheetGun>();
+  for (const m of active(s)) for (const g of m.guns) {
+    const key = `${g.name}|${g.melee}`;
+    const a: Strike = { melee: g.melee, guns: [g], dist: 1 };
+    const more = s.atkBonus * strikeMul({ ...run, combat: run.combat ?? ({ round: 2 } as SortieCombat) }, s, a);
+    const bay = g.melee ? lv(run, 'bayonets') : 0;
+    const n = g.attacks * more + (bay >= 3 ? 2 : bay ? 1 : 0) + (ulv(run, s, 'signature') >= 2 && signed(run, s, g) ? 1 : 0);
+    const was = guns.get(key);
+    if (was) { was.attacks += n; continue; }
+    const reach = gunReach(run, s, g);
+    const tags = [
+      g.blast > 1 ? `Blast(${g.blast + (spec(s, 'creeping') ? 1 : 0)})` : '', g.deadly > 1 ? `Deadly(${g.deadly})` : '',
+      g.rending || spec(s, 'reaper') || (has(run, 'deadeye') && (ulv(run, s, 'veteran') > 0 || ulv(run, s, 'signature') > 0)) ? 'Rending' : '',
+      g.reliable ? 'Reliable' : '', g.bane ? 'Bane' : '', !g.melee && has(run, 'killzone') ? '+1 AP at Far' : '', signed(run, s, g) ? 'Signature' : '',
+    ].filter(Boolean);
+    guns.set(key, { name: g.name, melee: g.melee, reach: g.melee ? (reach ? 'Close, from the Front' : 'Front only') : reach ? reachText(reach) : 'nothing from here', attacks: n, ap: apOf(run, s, target, g, g.melee), tags });
+  }
+  const skills: SortieSheet['skills'] = [];
+  for (const k of ABILITIES) {
+    const src = sourceOf(s, k === 'outflank' ? 'redeploy' : (k as 'heal'));
+    if (src) skills.push({ name: src, cd: cdOf(s, k, SORTIE.cooldown[k]), wait: c ? waitOf(c, s, k) : 0 });
+  }
+  if (hasBlade(s)) skills.push({ name: 'Charge', cd: s.fast ? 1 : SORTIE.cooldown.charge, wait: c ? waitOf(c, s, 'charge') : 0 });
+  skills.push({ name: 'Regroup', cd: SORTIE.cooldown.regroup, wait: c ? waitOf(c, s, 'regroup') : 0 });
+  const boons = run.boons.filter((id) => SORTIE_BOONS[id].unit && run.boonUnit?.[id] === i).map((id) => `${boonLabel(run, heldBoon(run, id))}: ${boonDrawText(run, heldBoon(run, id))}`);
+  return {
+    name: memberName(mem), slot: SLOTS[slot] ?? 'Out', up: active(s).length, models: s.models.length,
+    hp: active(s).reduce((n, m) => n + Math.max(0, m.hp), 0), max: maxOf(s),
+    shoot: clamp(s.quality - Math.round(shootMod), 2, 6), melee: clamp(s.quality - Math.round(meleeMod), 2, 6), defense: clamp(s.defense - cover, 2, 6),
+    init, guns: [...guns.values()], skills, boons,
+    ...(mem.spec && SORTIE_SPECS[mem.spec] ? { spec: { id: mem.spec, name: SORTIE_SPECS[mem.spec].name, text: SORTIE_SPECS[mem.spec].text } } : {}),
+  };
+}
+
+/** Each party unit's wounds dealt and taken: this fight's, else the run's. */
+export function meterOf(run: SortieRun, fight = !!run.combat): { name: string; dealt: number; taken: number }[] {
+  return run.party.map((m, i) => {
+    const r = fight ? run.combat?.meter?.[`p${i}`] : run.meter?.[i];
+    return { name: memberName(m), dealt: r?.dealt ?? 0, taken: r?.taken ?? 0 };
+  });
+}
+
 // --- Auto-play: the balance tests and the Auto button --------------------------------------------------------------
 
 /** The best order for the unit the game waits on, and its target. */
@@ -2688,7 +2965,8 @@ export function autoChoice(run: SortieRun): { id: string; target?: string } | nu
 export function autoBrace(run: SortieRun): SortieSignature {
   const opts = run.combat?.brace?.options ?? [];
   const own = bossOf(run).sig.id;
-  return omensRead(run) >= 2 && opts.includes(own) ? own : pickOf(run, opts);
+  // The lord's own signature is known from the start of the run.
+  return opts.includes(own) ? own : pickOf(run, opts);
 }
 
 /** Make the choice the game is waiting on with autoChoice. */
@@ -2708,6 +2986,8 @@ const hurtShare = (run: SortieRun) => allModels(run).reduce((n, m) => n + m.max 
 /** One step of a whole run on autopilot: the tests use it to play runs to the end. */
 export function autoStep(run: SortieRun, book: CatalogBook) {
   if (run.over) return;
+  const due = (run.screen === 'map' || run.screen === 'reward') ? specDue(run) : undefined;
+  if (due !== undefined) return pickSpec(run, due, autoSpec(run.party[due]));
   switch (run.screen) {
     case 'map': {
       const next = reachable(run);
@@ -2720,7 +3000,9 @@ export function autoStep(run: SortieRun, book: CatalogBook) {
       return autoMove(run);
     case 'reward': {
       if (run.offer?.patch && hurtShare(run) > 0.25) return patchUp(run);
-      return pickBoon(run, run.offer?.boons.length ? 0 : null);
+      // A stratagem or a trophy beats a plain card.
+      const special = run.offer?.boons.findIndex((d) => isSpecial(d.id)) ?? -1;
+      return pickBoon(run, special >= 0 ? special : run.offer?.boons.length ? 0 : null);
     }
     case 'camp':
       return campRest(run);

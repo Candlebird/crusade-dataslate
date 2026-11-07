@@ -1,14 +1,16 @@
 import type { Unit } from '../../model/types';
 import { SHARD_TYPES, TRAINING, type ShardType } from '../downtimeData';
 import { centreOf, placeProblem, routeOf, shardsOnMap, unitTowers } from './board';
-import { pickCard } from './cards';
+import { isSpecial, pickCard } from './cards';
+import { pickSpec, roleOfTower, specDue, specsOf, type TrainingSpec } from './specs';
+import { TROPHY_PREFIX } from './trophies';
 import { buyLevel, buyLuck, buyMend, levelCost, levelProblem, luckProblem, mendProblem } from './economy';
 import { N } from './map';
 import { craftDefault, defaultByKey, defaultUpgradeCost, defaultUpgradeProblem, readyDefaults, upgradeDefault } from './emplacements';
 import { readyRecipes } from './recipes';
 import { continueEndless, craft, createRun, endRun, startWave, step } from './run';
 import { keep, keepOptions, placeDraft, shardGun } from './shards';
-import type { DefaultTower, Grade, KeepOption, RunDrill, RunNexus, ShardPiece, Tile, TrainingRun } from './types';
+import type { DefaultTower, Grade, KeepOption, RunDrill, RunNexus, ShardPiece, Tile, TrainingRun, UnitTower } from './types';
 
 // The balance bot: plays a whole run headless for the tests, and a move at a time for the app's Auto (debug) button
 // (botMoves). index.ts leaves it out: the app imports it from here.
@@ -184,17 +186,43 @@ function* spend(run: TrainingRun): Generator<string, void> {
   }
 }
 
-/** The card the bot takes from an offer. */
-export const BOT_CARD = 0;
+/** The card the bot takes from an offer: a trophy, else a stratagem, else the first. */
+export function botCard(run: TrainingRun): number {
+  const o = run.offer ?? [];
+  const t = o.findIndex((d) => d.id.startsWith(TROPHY_PREFIX));
+  if (t >= 0) return t;
+  const s = o.findIndex(isSpecial);
+  return s >= 0 ? s : 0;
+}
+
+/** The spec the bot picks for a unit: one that works on holds only if the unit holds (grounded, Tough 2+), else the
+ *  first of its two. */
+export function botSpec(t: UnitTower): TrainingSpec | undefined {
+  const holds = t.category !== 'Aircraft' && t.tough > 1;
+  const opts = specsOf(roleOfTower(t));
+  const needsHold = (s: TrainingSpec) => s.rateWhen === 'holding' || s.vs === 'held' || !!s.tough;
+  return opts.find((s) => holds || !needsHold(s)) ?? opts[0];
+}
+
+/** Every unit due a spec takes the bot's pick. */
+function* specAll(run: TrainingRun): Generator<string> {
+  for (const t of specDue(run)) {
+    const s = botSpec(t);
+    if (!s) continue;
+    pickSpec(run, t.id, s.id);
+    yield `specialises ${t.name}`;
+  }
+}
 
 /** One build phase as the bot plays it, a move at a time (each yield is one move done, said in a few words): picks a
  *  card, places the hand at the next legal maze spots from `cursor`, keeps, crafts, spends. Returns the cursor moved on.
  *  Every loop looks at the run afresh after each move, so the player may act between moves. */
 export function* botMoves(run: TrainingRun, units: Unit[], maze: MazeSpot[], cursor: number): Generator<string, number> {
   if (run.offer?.length) {
-    pickCard(run, BOT_CARD);
+    pickCard(run, botCard(run));
     yield 'takes a card';
   }
+  yield* specAll(run);
   yield* craftAll(run, units);
   // On the opening waves the best gun against walkers goes on the first (best) maze spot: it is the one kept.
   const opening = run.cleared < 2 && !unitTowers(run).length;
@@ -220,6 +248,7 @@ export function* botMoves(run: TrainingRun, units: Unit[], maze: MazeSpot[], cur
   }
   yield* craftAll(run, units);
   yield* spend(run);
+  yield* specAll(run);
   return cursor;
 }
 

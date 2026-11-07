@@ -76,6 +76,8 @@ export interface Armed {
   chain?: { per: number; stacks: number; left: number };
   kills: number;
   dealt: number;
+  /** Damage dealt in the current (or last) wave, for the damage meter; reset when a wave starts. */
+  waveDealt?: number;
 }
 
 export interface ShardPiece extends PieceBase, Armed {
@@ -120,8 +122,11 @@ export interface UnitTower extends PieceBase, Armed {
   skills: TowerSkill[];
   /** The Pack tactics card: a share more damage per other crafted unit near it. */
   pack?: number;
-  /** The Ace card: a share more damage per TRAINING.cards.ace.per kills this run. */
+  /** The Ace card: a share more damage per TRAINING.cards.ace.per kills this run (at most ace.max times). */
   ace?: number;
+  /** Its Warpath archetype (specs.ts; set at its craft) and the specialisation it picked, for good. */
+  role?: import('../warpath/types').SquadRole;
+  spec?: string;
   /** Level-ups bought this run, and the most it may have (by its points). */
   up: number;
   cap: number;
@@ -363,6 +368,11 @@ export interface TrainingRun {
   modeHp?: number;
   /** Test-only: a flat multiplier on every wave's wounds (the balance bot's stand-in for a stronger force). */
   hpFlat?: number;
+  /** Stratagems taken (stratagems.ts ids) and trophies won (trophies.ts ids), oldest first; the trophy the next
+   *  card offer holds (a boss with a trick just fell). */
+  stratagems?: string[];
+  trophies?: string[];
+  trophyDue?: CardDraw;
   /** Card offers re-drawn this run (cards.ts rerollCards). */
   rerolls?: number;
   /** The Drill Honours this run earned, banked into the force once (drillBank.ts bankDrill). */

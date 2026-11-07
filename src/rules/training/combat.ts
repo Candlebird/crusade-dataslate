@@ -6,6 +6,7 @@ import {
   terrainHit, towerById, unsaved,
 } from './harm';
 import { lordHit } from './lords';
+import { specRate } from './specs';
 import { hitChance, rand } from './rng';
 import { rawDamage, readShot, runVolley, throughArmour } from '../shots';
 import type { Enemy, Tower, TowerGun, TowerSkill, TrainingRun } from './types';
@@ -32,7 +33,7 @@ export function rateOf(run: TrainingRun, t: Tower): number {
   if (!isUnit(t)) return base;
   const H = TRAINING.habits;
   const habit = Math.max(0.5, 1 + H.rate * t.init) * (t.jumpy && run.t < H.jumpySecs ? H.jumpyMul : 1);
-  return base * (1 + TRAINING.levels.rate * t.up) * (t.frenzy > 0 ? t.frenzyMul : 1) * habit;
+  return base * (1 + TRAINING.levels.rate * t.up) * (t.frenzy > 0 ? t.frenzyMul : 1) * habit * (1 + specRate(run, t));
 }
 
 /**

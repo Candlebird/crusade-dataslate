@@ -1,6 +1,7 @@
 import type { ForceSortie, Unit } from '../../model/types';
 import { TRAINING, TRAINING_ENEMIES } from '../downtimeData';
 import { pieceById, unitTowers } from './board';
+import { roleFor } from './specs';
 import { abilities, auras, fireAll, holds, reap, tickEnemies } from './combat';
 import { trainPoints, waveCredits } from './economy';
 import { canTrain, recipesFor, recipeUses, unitTower } from './recipes';
@@ -79,6 +80,7 @@ export function startWave(run: TrainingRun): void {
     p.guns.forEach((g) => Object.assign(g, { cd: 0, pending: 0, next: 0 }));
     p.dmgBoost = { mul: 0, left: 0 };
     p.rush = undefined;
+    p.waveDealt = 0;
     if (p.kind === 'unit') {
       p.skills.forEach((s) => { s.cd = 0; });
       Object.assign(p, { frenzy: 0, frenzyMul: 1, holding: undefined, holdLeft: 0, brace: 0 });
@@ -196,7 +198,7 @@ export function craft(run: TrainingRun, unit: Unit, uses: number[], onId: number
   if (why) throw new Error(why);
   const used = uses.map((id) => pieceById(run, id) as ShardPiece);
   const on = used.find((p) => p.id === onId)!;
-  const t = unitTower(unit, on.id, on, run.cleared);
+  const t: UnitTower = { ...unitTower(unit, on.id, on, run.cleared), role: roleFor(unit) };
   run.pieces[run.pieces.indexOf(on)] = t;
   toRubble(run, uses.filter((id) => id !== onId));
   if (used.some((p) => p.draft)) crumbleDraft(run, []);

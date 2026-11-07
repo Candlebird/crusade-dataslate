@@ -5,6 +5,8 @@ import { packMates, unitTowers } from './board';
 import { cardOpen, rerollsOf } from './drill';
 import { applyLevel } from './economy';
 import { pick, rand } from './rng';
+import { readyStrats, STRAT_PREFIX, stratById } from './stratagems';
+import { TROPHY_PREFIX, trophyById } from './trophies';
 import type { CardDraw, DefaultTower, TrainingRun, UnitTower } from './types';
 
 // Boss-kill cards: always pick one of three. Most go to one tower on the field, named on the card: a crafted unit,
@@ -127,13 +129,13 @@ export const CARDS: TrainingCard[] = [
     (n) => `{unit}: enemies within ${n} cells are slowed.`),
   {
     id: 'pack', name: 'Pack tactics', tiers: { Common: 0.08, Rare: 0.12, Legendary: 0.18 },
-    text: (n) => `{unit}: hits ${pct(n)} harder for each other crafted unit within ${K.pack.radius} cells.`,
+    text: (n) => `{unit}: hits ${pct(n)} harder for each other crafted unit within ${K.pack.radius} cells, up to ${K.pack.max} (+${pct(n * K.pack.max)}).`,
     fits: (t, run) => isUnit(t) && packMates(run, t) > 0,
     apply: (_, n, t) => { (t as UnitTower).pack = ((t as UnitTower).pack ?? 0) + n; },
   },
   {
     id: 'ace', name: 'Ace', tiers: { Common: 0.03, Rare: 0.05, Legendary: 0.08 },
-    text: (n) => `{unit}, the run's top killer: hits ${pct(n)} harder for every ${K.ace.per} kills it makes this run.`,
+    text: (n) => `{unit}, the run's top killer: hits ${pct(n)} harder for every ${K.ace.per} kills it makes this run, up to +${pct(n * K.ace.max)}.`,
     fits: (t, run) => isUnit(t) && topKiller(run) === t,
     apply: (_, n, t) => { (t as UnitTower).ace = ((t as UnitTower).ace ?? 0) + n; },
   },
@@ -206,29 +208,84 @@ export function drawCards(run: TrainingRun, n: number = C.offer): CardDraw[] {
   return out;
 }
 
-/** Put three on offer (a boss died). Does nothing while an offer is already up. */
+/** Is a draw a stratagem or a trophy rather than a boss card? */
+export const isSpecial = (d: CardDraw) => d.id.startsWith(STRAT_PREFIX) || d.id.startsWith(TROPHY_PREFIX);
+
+/** The offer with its one-offs in: a trophy due (a boss with a trick fell) and the first stratagem ready, each in
+ *  place of one of the drawn cards, from the end. Never more than TRAINING.cards.offer cards. */
+function withSpecials(run: TrainingRun, drawn: CardDraw[]): CardDraw[] {
+  const extra: CardDraw[] = [];
+  if (run.trophyDue) extra.push(run.trophyDue);
+  const s = readyStrats(run)[0];
+  if (s) extra.push({ id: STRAT_PREFIX + s.id, rarity: 'Legendary' });
+  const keep = drawn.filter((d) => !isSpecial(d)).slice(0, Math.max(0, C.offer - extra.length));
+  return [...keep, ...extra].slice(0, C.offer);
+}
+
+/** Put three on offer (a boss died): the drawn cards, with a trophy or stratagem in place of one each (withSpecials).
+ *  Does nothing while an offer is already up. */
 export function offerCards(run: TrainingRun): void {
   if (run.offer?.length) return;
-  const d = drawCards(run);
+  const d = withSpecials(run, drawCards(run));
   if (d.length) run.offer = d;
 }
 
+/** The tower a trophy or card goes to, named; 'Its tower' once it has gone. */
+const towerName = (run: TrainingRun, d: CardDraw) => cardTower(run, d)?.name ?? 'Its tower';
+
 /** A drawn card's name and text, its tower named. A card no longer in the set (an old save's) keeps its id. */
 export function cardText(run: TrainingRun, d: CardDraw): { name: string; text: string } {
+  if (d.id.startsWith(STRAT_PREFIX)) {
+    const s = stratById(d.id.slice(STRAT_PREFIX.length));
+    return { name: s ? `Stratagem: ${s.name}` : d.id, text: s?.text ?? '' };
+  }
+  if (d.id.startsWith(TROPHY_PREFIX)) {
+    const t = trophyById(d.id.slice(TROPHY_PREFIX.length));
+    return { name: t ? `Trophy: ${t.name}` : d.id, text: t?.text.replace('{unit}', towerName(run, d)) ?? '' };
+  }
   const c = cardById(d.id);
   const n = c?.tiers[d.rarity];
   if (!c || n === undefined) return { name: c?.name ?? d.id, text: '' };
-  return { name: c.name, text: c.text(n).replace('{unit}', cardTower(run, d)?.name ?? 'Its tower') };
+  return { name: c.name, text: c.text(n).replace('{unit}', towerName(run, d)) };
+}
+
+/** Towers holding a card of id `card` (each once). */
+export const holdersOf = (run: TrainingRun, card: string): CardTower[] =>
+  [...new Set(run.cards.filter((d) => d.id === card).map((d) => cardTower(run, d)).filter((t): t is CardTower => !!t))];
+
+/** Apply a stratagem or trophy draw. */
+function applySpecial(run: TrainingRun, d: CardDraw): void {
+  if (d.id.startsWith(STRAT_PREFIX)) {
+    const s = stratById(d.id.slice(STRAT_PREFIX.length));
+    if (!s || run.stratagems?.includes(s.id)) return;
+    run.stratagems = [...(run.stratagems ?? []), s.id];
+    if (s.tower) for (const t of new Set(s.needs.flatMap((c) => holdersOf(run, c)))) s.tower(t);
+    s.run?.(run);
+    return;
+  }
+  const t = trophyById(d.id.slice(TROPHY_PREFIX.length));
+  if (!t) return;
+  run.trophies = [...(run.trophies ?? []), t.id];
+  run.trophyDue = undefined;
+  const to = cardTower(run, d);
+  if (t.tower && to) t.tower(to);
+  if (t.skill && to && isUnit(to)) to.skills.push({ source: t.name, effect: t.skill, cd: 0 });
+  t.run?.(run);
 }
 
 /** Take card `i` of the offer. A card no longer in the set (an old save's), or whose tower has gone, does nothing. */
 export function pickCard(run: TrainingRun, i: number): void {
   const d = run.offer?.[i];
   if (!d) throw new Error('No such card on offer.');
-  const c = cardById(d.id);
-  const n = c?.tiers[d.rarity];
-  const t = cardTower(run, d);
-  if (c && n !== undefined && (!c.fits || t)) c.apply(run, n, t);
+  if (isSpecial(d)) applySpecial(run, d);
+  else {
+    const c = cardById(d.id);
+    const n = c?.tiers[d.rarity];
+    const t = cardTower(run, d);
+    if (c && n !== undefined && (!c.fits || t)) c.apply(run, n, t);
+  }
+  // A trophy passed over is gone: it was this boss's alone.
+  if (run.offer!.some((x) => x.id.startsWith(TROPHY_PREFIX))) run.trophyDue = undefined;
   run.cards.push(d);
   run.offer = undefined;
   const { name, text } = cardText(run, d);
@@ -236,8 +293,10 @@ export function pickCard(run: TrainingRun, i: number): void {
 }
 
 /** The card auto play takes: the rarest, the first of those. */
-export const autoCardIndex = (run: TrainingRun): number =>
-  (run.offer ?? []).reduce((best, d, i, xs) => (RANK[d.rarity] > RANK[xs[best].rarity] ? i : best), 0);
+export const autoCardIndex = (run: TrainingRun): number => {
+  const rank = (d: CardDraw) => (isSpecial(d) ? 3 : RANK[d.rarity]);
+  return (run.offer ?? []).reduce((best, d, i, xs) => (rank(d) > rank(xs[best]) ? i : best), 0);
+};
 
 /** Re-draws of the card offer left this run (the Drill Honours reroll perk). */
 export const rerollsLeft = (run: TrainingRun): number => Math.max(0, rerollsOf(run) - (run.rerolls ?? 0));
@@ -255,7 +314,7 @@ export function rerollCards(run: TrainingRun): void {
   const why = rerollProblem(run);
   if (why) throw new Error(why);
   run.rerolls = (run.rerolls ?? 0) + 1;
-  const d = drawCards(run);
+  const d = withSpecials(run, drawCards(run));
   run.offer = d.length ? d : run.offer;
   run.log.push('The card offer is re-drawn.');
 }

@@ -1,5 +1,6 @@
 import { TRAINING_ENEMIES } from '../../rules/downtimeData';
 import { BASE, type TrainingRun } from '../../rules/training';
+import { FX_ALPHA } from './drawLive';
 
 // View-only fx the engine doesn't make: a burst where an enemy dies, and a red flash on the base when one gets
 // through. Found by watching the run between frames (an enemy gone while still alive near the base leaked; any other
@@ -52,7 +53,7 @@ export function drawBursts(ctx: CanvasRenderingContext2D, run: TrainingRun, s: n
     const x = b.x * s;
     const y = b.y * s;
     const r = Math.max(4, b.r * s) * (b.boss ? 2 : 1);
-    ctx.globalAlpha = 1 - k;
+    ctx.globalAlpha = FX_ALPHA * (1 - k);
     ctx.strokeStyle = b.color;
     ctx.lineWidth = Math.max(1.5, s * 0.12);
     ctx.beginPath(); ctx.arc(x, y, r * (0.6 + 1.4 * k), 0, Math.PI * 2); ctx.stroke();

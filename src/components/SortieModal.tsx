@@ -4,7 +4,7 @@ import { nowIso, uid } from '../model/factory';
 import { localDate } from '../model/date';
 import { FeatList } from './Feats';
 import { featFaction } from '../rules/feats';
-import type { Campaign, Force, SortieRecap, Unit } from '../model/types';
+import type { Campaign, CatalogBook, Force, SortieRecap, Unit } from '../model/types';
 import { echoPortrait } from '../model/emblem';
 import { unitName } from '../rules/battle';
 import { levelForXp } from '../rules/engine';
@@ -13,11 +13,12 @@ import { raiderPool } from '../rules/raiders';
 import { TIER_TAG } from './training/CardOffer';
 import { applySortie, offTableKey, offTableLeft, postWeekly, weekBoard } from '../rules/downtime';
 import { partyProblem, sortieProblem, sortieScout, startSortie } from '../rules/tasks';
-import { SORTIE, SORTIE_BOONS, BOON_TIERS, boonText, type SortieBoonTier, type SortieLength, type SortieMarkId, type SortieMode } from '../rules/downtimeData';
+import { SORTIE, SORTIE_BOONS, SORTIE_SPECS, SORTIE_REROLLS, BOON_TIERS, boonText, type SortieBoonId, type SortieBoonTier, type SortieLength, type SortieMarkId, type SortieMode } from '../rules/downtimeData';
 import {
   active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, startRound, nextTurn, braceFor, omensRead, sigWeaker,
   isFort, keepsHaul, leaveCombat, leaveEvent, memberName, memberUp, nextSlots, onField, patchUp, pickBoon, quitRun, distOf, DISTANCES, reachText, reachable, runXp, skillProblem,
   skillTargets, skillsOf, slotOf, SLOTS, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
+  rerollOffer, rerollsFor, specDue, pickSpec, specChoices, roleOfMember, pairsOf, isSpecial, previewOf, meterOf,
   ambushOdds, beastInfo, tierPay, boonDrawText, boonLabel, heldBoon, isUpgrade, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons, sortieHistory,
   type SortieBoonDraw, type SortieFx, type SortieIntentKind, type SortieModel, type SortieNode, type SortieNodeKind, type SortieRun, type SortieSkill, type SortieSkillKind, type SortieSquad,
 } from '../rules/sortie';
@@ -26,6 +27,9 @@ import { Modal, confirmAction, toast } from './ui';
 import { EmblemBadge, Portrait } from './Emblem';
 import { WeekCountdown } from './WeekCountdown';
 import { Glyph, Icon, IconText, SvgIcon, type IconName } from './Icon';
+import { RoleBadge } from './warpath/RoleBadge';
+import { SortieBuild } from './sortie/SortieBuild';
+import './sortie/sortie.css';
 
 const NODE_ICON: Record<SortieNodeKind, IconName> = {
   fight: 'g:crossed-swords', elite: 'g:crowned-skull', camp: 'g:camping-tent', shrine: 'g:sparkles', cache: 'g:locked-chest', shop: 'g:scales', boss: 'g:warlord-helmet',
@@ -233,6 +237,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
   const [auto, setAuto] = useState(false);
   const [skill, setSkill] = useState<string | null>(null);
   const [summary, setSummary] = useState('');
+  const [buildOpen, setBuildOpen] = useState(false);
   const run = runRef.current;
   const units = picked.map((id) => force.units.find((u) => u.id === id));
   const problem = mode === 'shard' ? sortieProblem(force, c, units) : partyProblem(units);
@@ -327,6 +332,20 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
     return () => window.clearInterval(t);
   }, [auto, run, book, after]);
 
+  // B opens the build panel, on the map or in a fight (the panel closes itself).
+  const live = !!run && !run.over;
+  useEffect(() => {
+    if (!live || buildOpen) return;
+    const on = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (e.key.toLowerCase() !== 'b' || e.ctrlKey || e.metaKey || e.altKey || t?.closest('input, textarea, select')) return;
+      e.preventDefault();
+      setBuildOpen(true);
+    };
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  }, [live, buildOpen]);
+
   const begin = () => {
     if (!book) return;
     if (problem) return toast(problem, 'error');
@@ -343,6 +362,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
         ascension: tier === SORTIE.tiers.length - 1 ? asc : 0,
         marks: (story?.stats?.wins ?? 0) > 0 ? marks : [],
         raiders: raiderPool(state.books, state.forces, force),
+        rerolls: rerollsFor(story),
       });
     setRecapOpen(null);
     banked.current = false;
@@ -564,6 +584,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                   <div key={id} className={`sortie-beast${open ? ' lord' : ''}`}>
                     <div>
                       <b>{SORTIE_BOONS[id].name}</b>{SORTIE_BOONS[id].unit && <span className="muted small"> · one unit</span>}
+                      {SORTIE_BOONS[id].pair && <span className="muted small"> · stratagem: {SORTIE_BOONS[id].pair!.map((x) => SORTIE_BOONS[x].name).join(' + ')}</span>}
                       <span className="muted small"> · {open ? 'unlocked' : `${goalText(u.goal, u.n)} (${Math.min(have, u.n)}/${u.n})`}</span>
                     </div>
                     {BOON_TIERS.filter((t) => SORTIE_BOONS[id].tiers[t]).map((t) => (
@@ -572,6 +593,13 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                   </div>
                 );
               })}
+              <div className={`sortie-beast${rerollsFor(story) ? ' lord' : ''}`}>
+                <div>
+                  <b>Rerolls</b>
+                  <span className="muted small"> · {rerollsFor(story) ? 'unlocked' : `${goalText(SORTIE_REROLLS.goal, SORTIE_REROLLS.need)} (${Math.min(goalProgress(story, SORTIE_REROLLS.goal), SORTIE_REROLLS.need)}/${SORTIE_REROLLS.need})`}</span>
+                </div>
+                <div className={`small${rerollsFor(story) ? '' : ' muted'}`}>Each run starts with {SORTIE_REROLLS.n} rerolls: redraw a boon offer's plain cards. Not in the weekly.</div>
+              </div>
             </div>
           )}
         </div>
@@ -604,6 +632,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
   }
 
   const cap = xpCap(run);
+  const due = specDue(run);
   const title = `Sortie${run.mode === 'shard' ? ' (Shard run)' : ''}`;
 
   return (
@@ -616,16 +645,21 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
           <label className="row small" style={{ gap: 4, marginRight: 'auto' }} data-tip="The party plays itself: path, orders, boons and shrine choices.">
             <input type="checkbox" checked={auto} disabled={!!run.over} onChange={(e) => setAuto(e.target.checked)} /> Auto-play
           </label>
+          {!run.over && <button onClick={() => setBuildOpen(true)} aria-keyshortcuts="B">Build <span className="muted">(B)</span></button>}
           {!run.over && <button onClick={close}>Turn back</button>}
           {run.over && <button className="primary" onClick={onClose}>Done</button>}
         </>
       }
     >
       <div className="sortie">
+        {buildOpen && <SortieBuild run={run} onClose={() => setBuildOpen(false)} />}
         <div className="sortie-main">
+          {due !== undefined && (run.screen === 'map' || run.screen === 'reward') && (
+            <SpecPicker run={run} i={due} onPick={(id) => doit(() => pickSpec(run, due, id))} />
+          )}
           {run.screen === 'map' && (
             <>
-              <MapScreen run={run} onEnter={(n) => doit(() => enterNode(run, book, n))} />
+              <MapScreen run={run} book={book} onEnter={(n) => doit(() => enterNode(run, book, n))} />
               <div className="sortie-panel">
                 <h3>Formation</h3>
                 <p className="muted small" style={{ marginTop: 0 }}>The party's starting line for the next fight. You can only change it here, between fights.</p>
@@ -652,9 +686,10 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
               <p className="muted small">Take a boon for the rest of the run{run.offer.patch ? ', or patch the party up instead' : ''}.</p>
               <div className="sortie-boons">
                 {run.offer.boons.map((d, i) => (
-                  <button key={d.id} className={`sortie-boon ${d.tier.toLowerCase()}`} onClick={() => doit(() => pickBoon(run, i))}>
+                  <button key={d.id} className={`sortie-boon ${d.tier.toLowerCase()}${isSpecial(d.id) ? ' special' : ''}`} onClick={() => doit(() => pickBoon(run, i))}>
                     <BoonHead run={run} d={d} />
                     <span className="small">{boonDrawText(run, d)}</span>
+                    <PairBox run={run} id={d.id} />
                   </button>
                 ))}
                 {run.offer.patch && (
@@ -664,7 +699,14 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                   </button>
                 )}
               </div>
-              <button className="ghost" onClick={() => doit(() => pickBoon(run, null))}>Take nothing</button>
+              <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+                <button className="ghost" onClick={() => doit(() => pickBoon(run, null))}>Take nothing</button>
+                {(run.rerolls ?? 0) > 0 && (
+                  <button disabled={!run.offer.boons.some((d) => !isSpecial(d.id))} onClick={() => doit(() => rerollOffer(run))}>
+                    Reroll <span className="muted">({run.rerolls} left)</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
           {run.screen === 'event' && <EventScreen run={run} onChoose={(i) => doit(() => eventChoose(run, i))} onLeave={() => doit(() => leaveEvent(run, book))} />}
@@ -716,6 +758,7 @@ export default function SortieModal({ force, c, onClose }: { force: Force; c?: C
                   <ul>{summary.split('; ').map((x, i) => <li key={i}>{x.charAt(0).toUpperCase() + x.slice(1)}</li>)}</ul>
                 </div>
               )}
+              <Meter rows={meterOf(run, false)} title="Damage this run" />
               {run.weekly && <p className="small">Weekly challenge {run.weekly}: <b>{weeklyScore(run)} pts</b>{c ? ' (posted to the campaign board)' : ''}.</p>}
               {story?.recaps?.[0] && (
                 <>
@@ -784,6 +827,10 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
             <b className="grow">{memberName(m)}</b>
             {!memberUp(m) && <span className="muted">down</span>}
           </div>
+          <div className="row small" style={{ gap: 4, flexWrap: 'wrap' }}>
+            <RoleBadge role={roleOfMember(m)} />
+            {m.spec && SORTIE_SPECS[m.spec] && <span className="sortie-chip spec">{SORTIE_SPECS[m.spec].name}</span>}
+          </div>
           <div className="sortie-models">
             {m.models.map((x, i) => <Token key={i} face={null} m={x} />)}
           </div>
@@ -803,16 +850,23 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
       {run.mode === 'shard' ? <div>Haul: {haulText(run)}</div> : <div>Supply: {run.haul.supply} <span className="muted">(for shops)</span></div>}
       <div>Nodes cleared: {run.depth}</div>
       {!run.marks?.length ? null : <div data-tip={marksOf(run).map((m) => m.text).join(' ')}>Pact marks: {marksOf(run).map((m) => m.name.replace(/^Mark of (the )?/, '')).join(', ')} <span className="muted">({markHeat(run)} heat)</span></div>}
-      {run.omens || run.map.flat().some((n) => n.omen) ? (
-        <div data-tip="Each omen weakens the lord's own signature. Read them closely: before its fight you brace for one signature, and the right one is weaker again.">
+      <div className="sortie-lord">
+        <div><span className="muted">The lord:</span> <b>{bossOf(run).name}</b></div>
+        <div><span className="sortie-chip sig">{bossOf(run).sig.name}</span> <span className="muted">{bossOf(run).sig.text}</span></div>
+        <div>
           Omens read: <b>{omensRead(run)}</b> / {SORTIE.omens.need}{sigWeaker(run, bossOf(run).sig.id) ? <span className="muted"> · signature {sigWeaker(run, bossOf(run).sig.id)}% weaker</span> : null}
         </div>
-      ) : null}
+        <div className="muted">Each omen weakens the signature. Brace for it before the lord's fight to weaken it again.</div>
+      </div>
       {run.weekly && <div>Weekly score: <b>{weeklyScore(run)}</b></div>}
       {run.boons.length > 0 && (
         <div>
           <div className="muted">Boons</div>
-          {run.boons.map((b) => <div key={b} data-tip={boonDrawText(run, heldBoon(run, b))}>• {boonLabel(run, heldBoon(run, b))}</div>)}
+          {run.boons.map((b) => (
+            <div key={b} className="sortie-side-line">
+              • <b>{boonLabel(run, heldBoon(run, b))}</b>{isSpecial(b) && <span className="sortie-chip">{SORTIE_BOONS[b].pair ? 'Stratagem' : 'Trophy'}</span>} <span className="muted">{boonDrawText(run, heldBoon(run, b))}</span>
+            </div>
+          ))}
         </div>
       )}
       <div className="sortie-journal">
@@ -841,7 +895,7 @@ function LineOrder({ units, down, onMove }: { units: Unit[]; down?: boolean[]; o
   );
 }
 
-function MapScreen({ run, onEnter }: { run: SortieRun; onEnter: (n: SortieNode) => void }) {
+function MapScreen({ run, book, onEnter }: { run: SortieRun; book?: CatalogBook; onEnter: (n: SortieNode) => void }) {
   const next = reachable(run);
   const W = 300;
   const ROW = 58;
@@ -904,6 +958,31 @@ function MapScreen({ run, onEnter }: { run: SortieRun; onEnter: (n: SortieNode) 
         })}
       </svg>
       <MapLegend run={run} />
+      {book && <Previews run={run} book={book} />}
+    </div>
+  );
+}
+
+/** The fights the party can see ahead: their Echo squads, sized as they'll come. Hidden ground stays hidden. */
+function Previews({ run, book }: { run: SortieRun; book: CatalogBook }) {
+  const next = reachable(run);
+  const seen = run.map.flat().filter((n) => n.row > run.row && !n.hidden && (n.kind === 'fight' || n.kind === 'elite'))
+    .sort((a, b) => Number(next.includes(b)) - Number(next.includes(a)) || a.row - b.row || a.col - b.col).slice(0, 6);
+  const rows = seen.map((n) => ({ n, sq: previewOf(run, book, n) })).filter((x) => x.sq?.length);
+  if (!rows.length) return null;
+  return (
+    <div className="sortie-previews small">
+      <div className="sortie-side-head">Ahead</div>
+      {rows.map(({ n, sq }) => (
+        <div key={`${n.row}.${n.col}`} className={`sortie-preview ${n.kind}${next.includes(n) ? ' open' : ''}`}>
+          <span className="sortie-preview-head">
+            <Icon name={NODE_ICON[n.kind]} /> {NODE_NAME[n.kind]}{n.affix ? `: ${SORTIE.affixes[n.affix].name}` : ''} <span className="muted">· step {n.row + 1}{next.includes(n) ? ', next' : ''}</span>
+          </span>
+          {sq!.map((x, i) => <span key={i} className="sortie-chip">{x.n}× {x.name}</span>)}
+          {n.affix && <span className="muted"> {SORTIE.affixes[n.affix].text}</span>}
+        </div>
+      ))}
+      <div className="muted">Marauders may still come in a scouted fight's place.</div>
     </div>
   );
 }
@@ -1011,7 +1090,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
   const who = c.over || !me ? '' : c.need === 'order' ? `Round ${c.round}: ${me.name} (${at}) is up. Give its order for the round.` : '';
 
   return (
-    <div className="sortie-panel">
+    <div className={`sortie-panel sortie-fight ${c.kind}`}>
       <div className="row" style={{ gap: 8 }}>
         <h3 className="grow" style={{ margin: 0 }}>
           {c.kind === 'boss' ? bossOf(run).name : fightTitle[c.kind]}
@@ -1019,6 +1098,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
         </h3>
         <span className="muted small">Round {c.round} · {c.kills} kill{c.kills === 1 ? '' : 's'}</span>
       </div>
+      {c.affix && <div className="small sortie-affix-line"><span className="sortie-chip affix">{SORTIE.affixes[c.affix].name}</span> {SORTIE.affixes[c.affix].text}</div>}
       {!c.over && c.queue.length > 0 && (
         <div className="sortie-init" data-tip="Who acts next this round, fastest first">
           <span className="sortie-init-label">{c.need === 'start' ? `Round ${c.round} order` : 'Turn order'}</span>
@@ -1054,6 +1134,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
                     <div className="row small" style={{ gap: 6 }}>
                       <Portrait unit={p.unit} size={26} />
                       <span className="grow"><b>{p.name}</b> <span className="muted">Q{p.quality}+ D{p.defense}+</span>{p.shield > 0 && <span className="sortie-status"> · shield {p.shield}</span>}</span>
+                      {p.member !== undefined && run.party[p.member] && <RoleBadge role={roleOfMember(run.party[p.member])} bare />}
                       {c.orders[p.key] && <span className="sortie-ordered" data-tip="Has its order for the round"><Icon name="l:check" /></span>}
                     </div>
                     <div className="sortie-models">
@@ -1067,7 +1148,11 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
                         {p.crack?.round === c.round && <span className="sortie-cracked">{p.crack.kind === 'refuse' ? 'cracked: won’t take orders' : 'cracked: fights wild, -1 to hit'}</span>}
                       </div>
                     )}
-                    {statusesOf(p, c.round).length > 0 && <div className="small sortie-status">{statusesOf(p, c.round).join(', ')}</div>}
+                    {statusesOf(p, c.round).length > 0 && <div className="small">{statusesOf(p, c.round).map((x) => <span key={x} className="sortie-chip status">{x}</span>)}</div>}
+                    <div className="small sortie-meter-row">
+                      {p.spec && SORTIE_SPECS[p.spec] && <span className="sortie-chip spec">{SORTIE_SPECS[p.spec].name}</span>}
+                      <span className="sortie-chip meter">dealt {c.meter?.[p.key]?.dealt ?? 0} · taken {c.meter?.[p.key]?.taken ?? 0}</span>
+                    </div>
                     {next !== undefined && next !== i && <div className="small muted sortie-next">next round: {SLOTS[next]}</div>}
                   </>
                 )}
@@ -1096,7 +1181,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
                     <button
                       key={e.key}
                       data-sq={e.key}
-                      className={`sortie-echo${can ? ' target' : ''}${chosen && !can ? ' out' : ''}`}
+                      className={`sortie-echo ${e.key === c.lord ? 'boss' : c.kind}${can ? ' target' : ''}${chosen && !can ? ' out' : ''}`}
                       disabled={!chosen}
                       onClick={() => target(e)}
                     >
@@ -1105,9 +1190,10 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
                         <span className="small"><b>{e.name}</b>{e.hero ? ' (Hero)' : ''} <span className="muted">Q{e.quality}+ D{e.defense}+</span></span>
                         {e.raider && <span className="small sortie-raider">Marauder · {e.raider}</span>}
                         <span className="sortie-models">{e.models.map((m, i) => <Token key={i} face={null} m={m} />)}</span>
-                        {statusesOf(e, c.round).length > 0 && <span className="small sortie-status">{statusesOf(e, c.round).join(', ')}</span>}
+                        {statusesOf(e, c.round).length > 0 && <span className="small">{statusesOf(e, c.round).map((x) => <span key={x} className="sortie-chip status">{x}</span>)}</span>}
+                        {icon && <span className="small sortie-intent-text">{intent}</span>}
                       </span>
-                      {icon && <span className="sortie-intent" data-tip={intent}><Glyph g={icon} /></span>}
+                      {icon && <span className="sortie-intent" aria-hidden><Glyph g={icon} /></span>}
                     </button>
                   );
                 })}
@@ -1187,6 +1273,7 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
           {chosen && <p className="small muted" style={{ margin: '4px 0 0' }}>{chosen.text}</p>}
         </>
       )}
+      <Meter rows={meterOf(run, true)} title="Damage this fight" />
       <div className="sortie-log small">
         {[...c.log].reverse().slice(0, 14).map((l, i) => <div key={i} className={`tone-${l.tone}`}>{l.text}</div>)}
       </div>
@@ -1208,6 +1295,67 @@ function BoonHead({ run, d, price }: { run: SortieRun; d: SortieBoonDraw; price?
       {isUpgrade(run, d) && <span className="sortie-rare"> · upgrade</span>}
       {d.unit !== undefined && run.party[d.unit] && <span className="sortie-rare"> · for {memberName(run.party[d.unit])}</span>}
       {price && <> <span className="sortie-price">{price}</span></>}
+      {b.pair && <span className="sortie-chip strat">Stratagem</span>}
+      {b.spoil && <span className="sortie-chip trophy">Trophy</span>}
     </b>
+  );
+}
+
+/** Under a boon card: the stratagems it is half of, the other half and whether the party holds it. */
+function PairBox({ run, id }: { run: SortieRun; id: SortieBoonId }) {
+  const pairs = pairsOf(id).filter((p) => !run.boons.includes(p.strat) && (!run.unlocked || run.unlocked.includes(p.strat)));
+  if (!pairs.length) return null;
+  return (
+    <span className="sortie-pair small">
+      {pairs.map((p) => {
+        const held = run.boons.includes(p.other);
+        return (
+          <span key={p.strat} className={held ? 'held' : undefined}>
+            Pairs with <b>{SORTIE_BOONS[p.other].name}</b> ({held ? `held, ${heldBoon(run, p.other).tier}` : 'not held'}): <b>{SORTIE_BOONS[p.strat].name}</b>. {SORTIE_BOONS[p.strat].tiers.Legendary}
+          </span>
+        );
+      })}
+    </span>
+  );
+}
+
+/** A unit's speciality: two to choose from, free, kept for the run. */
+function SpecPicker({ run, i, onPick }: { run: SortieRun; i: number; onPick: (id: string) => void }) {
+  const m = run.party[i];
+  return (
+    <div className="sortie-panel sortie-spec">
+      <h3>{memberName(m)} has earned a speciality</h3>
+      <p className="muted small" style={{ marginTop: 0 }}>Pick one. It is free and lasts the rest of the run. <RoleBadge role={roleOfMember(m)} /></p>
+      <div className="sortie-boons">
+        {specChoices(m).map((id) => (
+          <button key={id} className="sortie-boon" onClick={() => onPick(id)}>
+            <b>{SORTIE_SPECS[id].name}</b>
+            <span className="small">{SORTIE_SPECS[id].text}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Wounds each party unit dealt and took, as bars. */
+function Meter({ rows, title }: { rows: { name: string; dealt: number; taken: number }[]; title: string }) {
+  const top = Math.max(1, ...rows.map((r) => Math.max(r.dealt, r.taken)));
+  if (!rows.some((r) => r.dealt || r.taken)) return null;
+  return (
+    <div className="sortie-meter small">
+      <div className="sortie-side-head">{title}</div>
+      {rows.map((r, i) => (
+        <div key={i} className="sortie-meter-line">
+          <span className="sortie-meter-name">{r.name}</span>
+          <span className="sortie-meter-bars">
+            <span className="dealt" style={{ width: `${(r.dealt / top) * 100}%` }} />
+            <span className="taken" style={{ width: `${(r.taken / top) * 100}%` }} />
+          </span>
+          <span className="sortie-meter-num">{r.dealt} <span className="muted">/ {r.taken}</span></span>
+        </div>
+      ))}
+      <div className="muted">Wounds dealt / taken.</div>
+    </div>
   );
 }

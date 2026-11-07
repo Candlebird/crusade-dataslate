@@ -315,7 +315,9 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 - `cardUseful(run, c: TrainingCard): boolean` — drill.cardOpen, and a tower card with a unit or default emplacement on the field `fits`, a whole-run card whose `useful` holds (no Heroes with every unit at its cap, no longer holds with no grounded unit to hold).
 - `drawCards(run, n = offer): CardDraw[]` (only cardUseful cards, never more than TRAINING.cards.offer; a tower card gets `unitId` for a unit, `pieceId` for an emplacement), `cardById(id)`, `cardTower(run, d)`
 - `rerollsLeft(run)`, `rerollProblem(run)`, `rerollCards(run)` — the Second thoughts perk: re-draw the offer, run.rerolls++.
-- `offerCards(run): void` — sets run.offer unless one is on offer; always 3.
+- `offerCards(run): void` — sets run.offer unless one is on offer; always 3. `withSpecials` puts run.trophyDue and the first ready stratagem in place of cards from the end (still 3); rerollCards keeps them.
+- `isSpecial(d)` (id `strat:` / `trophy:`, rarity Legendary), `holdersOf(run, card)`. pickCard applies a special (stratagems.ts / trophies.ts) and pushes it to run.cards, run.stratagems or run.trophies.
+- Growth caps (TRAINING.cards): Ace `ace.max` steps of `ace.per` kills (harm.aceSteps); Pack `pack.max` units (harm.packCount/packLimit, +STRAT.packMore with Hunting Pack); Kill chain `chain.max` stacks (harm.chainMax, +STRAT.chainMore with Chain Reaction). Card texts state the cap.
 - `cardText(run, d: CardDraw): { name; text }`
 - `pickCard(run, i: number): void` — apply, push to run.cards, clear offer, log.
 - `autoCardIndex(run): number`
@@ -355,9 +357,26 @@ Numbers in `TRAINING.finale` (from, step, to, bars, climb, endless, rise, riseEv
 
 ### bot.ts (not in index.ts: the tests, and the app's Auto (debug) button via components/training/useAuto, import it directly)
 - `interface MazeSpot { n; x; y }`
-- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (waves 1-2: the walker gun that covers most route, never a grade down, the hand's best walker gun placed first (`bestOpener`); then exact-grade recipe progress, a grade-down keep included, then grade, a second Firepower ranked two grades lower), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use (past wave 4 with no unit up, only a recipe half filled holds a Shard), never a flyers-only one that eats a walker gun (nor any on waves 1-2), spend (mend when low, levels cheapest first, then luck, then defences' upgrades cheapest first while 100 credits stay banked), pick card 0 (`BOT_CARD`).
+- `botBuild(run, units: Unit[], maze: MazeSpot[], cursor: number): number` — place hand at next legal spots, keep (waves 1-2: the walker gun that covers most route, never a grade down, the hand's best walker gun placed first (`bestOpener`); then exact-grade recipe progress, a grade-down keep included, then grade, a second Firepower ranked two grades lower), craft when ready (unit on the used Shard nearest the route), then ready default towers none of whose Shards an uncrafted unit could still use (past wave 4 with no unit up, only a recipe half filled holds a Shard), never a flyers-only one that eats a walker gun (nor any on waves 1-2), spend (mend when low, levels cheapest first, then luck, then defences' upgrades cheapest first while 100 credits stay banked), pick `botCard(run)` (a trophy, else a stratagem, else card 0), then pick every due spec (`botSpec(t)`: the first of the two, skipping hold specs unless the unit is grounded with Tough > 1).
 - `botMoves(run, units, maze, cursor): Generator<string, number>` — botBuild a move at a time (each yield one move, a few words saying it; returns the cursor); botBuild runs it straight through, so headless results are the same.
 - `playRun(units: Unit[], seed: number, opts?: { maze?; maxWaves?; dt?; nexus?; drill?; siege? }): TrainingRun`
+
+### specs.ts (not in index.ts; import directly)
+- Two specs per Warpath archetype (`RoleId = SquadRole`; `roleFor(unit)` at craft sets `UnitTower.role`, `roleOfTower(t)` falls back on its category). `SPEC = { level, kills }`: a crafted unit may pick once it has `min(level, cap)` level-ups or `kills` kills; free and for good (`UnitTower.spec`).
+- `SPECS`, `specById`, `specsOf(role)`, `specReady`, `specDue(run)`, `specProgress(t)`, `specProblem(run, id, spec)`, `pickSpec(run, id, spec)` (static changes at the pick), `specRate(run, t)` (combat.rateOf), `specMul(t, e, boss)` (harm.cardMul).
+
+### stratagems.ts (not in index.ts)
+- `STRATAGEMS` (10 pairs of boss cards, each card in one pair at most), `STRAT` numbers, `STRAT_PREFIX`, `stratById`, `hasStrat`, `heldCount`, `stratStatus` (active / ready / building), `readyStrats`, `pairOf(run, card)`. Run-wide: both cards held anywhere; once a run.
+
+### trophies.ts (not in index.ts)
+- `TROPHIES` (10), `TROPHY_OF_TRICK`, `TROPHY_OF_SIG`, `trophyFor(trick, sig)`, `towerTrophy`. harm.hurt on a boss with a trick (real lord, Final lord, nemesis) sets run.trophyDue (to the killing unit or emplacement; a skill trophy to the top-killing unit if a Shard killed) before offerCards. Plain bosses leave none; none mends the base.
+
+### buildView.ts (not in index.ts)
+- `buildOf(run): BuildView` — the build panel: each tower's held cards with live numbers (`liveLines`), role, spec or its progress and choice, relics, auras; stratagems with needs; trophies; whole-run cards; groups Drill locks.
+
+### nextRound.ts additions
+- `nextBoss(run): NextBoss | undefined` — the next boss wave from run.wave + 1: name, trick in words, trophy. `bossNameAt(run, w)` — wave w's boss name (the card offer's kicker).
+- `Armed.waveDealt` — damage this wave (reset by startWave), for the HUD's damage meter.
 
 ### nexusTest.ts (test-only; not in index.ts)
 - `guardian(name, tier, rules?)`, `campaign(threat, guardians?, o?)` — a round-2 campaign for the Nexus tests.

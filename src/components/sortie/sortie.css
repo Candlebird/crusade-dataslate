@@ -1,0 +1,71 @@
+/* Sortie: build panel, stratagems, specialities, previews, damage meter and the visual pass. */
+
+.sortie-chip { display: inline-block; margin: 1px 3px 1px 0; padding: 0 6px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 0.74rem; line-height: 1.5; color: var(--muted-2); background: rgba(255, 255, 255, 0.04); white-space: nowrap; }
+.sortie-chip.held { color: var(--gold); border-color: var(--gold-dim); }
+.sortie-chip.spec, .sortie-chip.sig { color: var(--gold); border-color: var(--gold-dim); }
+.sortie-chip.strat { color: var(--gold); border-color: var(--gold); margin-left: 6px; }
+.sortie-chip.trophy { color: #d68cf0; border-color: #a05ac0; margin-left: 6px; }
+.sortie-chip.affix { color: #d68cf0; border-color: #a05ac0; }
+.sortie-chip.status { color: var(--cyan); border-color: color-mix(in srgb, var(--cyan) 50%, transparent); }
+.sortie-chip.meter { font-variant-numeric: tabular-nums; }
+.sortie-gold { color: var(--gold); }
+
+/* Build panel: over the whole Sortie, scrolls on short screens. */
+.sortie-build { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom)); background: rgba(6, 7, 9, 0.95); }
+.sortie-build-pane { flex: 1; min-height: 0; width: min(620px, 100%); overflow-y: auto; }
+.sortie-build h2 { margin: 0; color: var(--gold); text-align: center; }
+.sortie-build-pane > p { margin: 2px 0 8px; text-align: center; }
+.sortie-build h3 { margin: 14px 0 6px; color: var(--muted-2); font-size: 0.85rem; letter-spacing: 0.1em; text-transform: uppercase; }
+.sortie-build ul { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.sortie-build li { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid var(--line-2); border-radius: 8px; background: rgba(255, 255, 255, 0.03); }
+.sortie-build li p { margin: 2px 0 0; line-height: 1.3; }
+.sortie-build-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.sortie-build-pair.building, .sortie-build-pair.locked, .sortie-build-pair.missed { border-style: dashed; }
+.sortie-build-pair.missed { opacity: 0.6; }
+.sortie-build-pair.active, .sortie-build-pair.ready { border-color: var(--gold); }
+
+/* Reward cards: the pair box, and stratagems and trophies stand out. */
+.sortie-pair { display: flex; flex-direction: column; gap: 2px; margin-top: 4px; padding: 4px 6px; border: 1px dashed var(--line-2); border-radius: 4px; color: var(--muted-2); text-align: left; }
+.sortie-pair .held { color: var(--text); }
+.sortie-pair .held b { color: var(--gold); }
+.sortie-boon.special { border-color: var(--gold); box-shadow: 0 0 8px rgba(201, 162, 74, 0.35); }
+.sortie-spec { border-color: var(--gold-dim); }
+
+/* Map: what's ahead. */
+.sortie-previews { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; }
+.sortie-preview { padding: 4px 6px; border: 1px solid var(--line); border-left: 3px solid var(--muted-2); border-radius: 4px; background: var(--bg-2); }
+.sortie-preview.elite { border-left-color: #b04fd0; }
+.sortie-preview.open { border-color: var(--gold-dim); }
+.sortie-preview-head { display: block; margin-bottom: 2px; }
+
+/* Side panel. */
+.sortie-lord { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border: 1px solid var(--line); border-left: 3px solid #c0392b; border-radius: 4px; background: var(--bg-2); }
+.sortie-side-line { line-height: 1.35; }
+
+/* Damage meter. */
+.sortie-meter { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+.sortie-meter-line { display: grid; grid-template-columns: minmax(70px, 30%) 1fr auto; align-items: center; gap: 6px; }
+.sortie-meter-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sortie-meter-bars { display: flex; flex-direction: column; gap: 2px; }
+.sortie-meter-bars > span { display: block; height: 4px; min-width: 1px; border-radius: 2px; }
+.sortie-meter-bars .dealt { background: var(--gold); }
+.sortie-meter-bars .taken { background: #c0392b; }
+.sortie-meter-num { font-variant-numeric: tabular-nums; }
+.sortie-meter-row { display: flex; flex-wrap: wrap; gap: 2px; }
+
+/* Echo squads tinted by how hard the fight is: plain, elite magenta, the lord red. */
+.sortie-echo { border-left-width: 3px; }
+.sortie-echo.fight { border-left-color: #8a8f98; }
+.sortie-echo.elite { border-left-color: #b04fd0; background: color-mix(in srgb, #b04fd0 8%, var(--bg-2)); }
+.sortie-echo.boss { border-left-color: #d8322a; background: color-mix(in srgb, #d8322a 10%, var(--bg-2)); }
+.sortie-affix-line { margin: 4px 0; }
+
+/* Intents and telegraphs at full strength, with their words visible. */
+.sortie-intent { opacity: 1; color: var(--warn); }
+.sortie-intent-text { color: var(--warn); font-weight: 600; }
+.sortie-tell { opacity: 1; }
+
+/* Effects toned down so the field stays readable. */
+.sortie-fx { opacity: 0.8; }
+.sortie-trail.mine, .sortie-trail.foe { filter: none; }
+.sortie-dmg { font-size: 1rem; }

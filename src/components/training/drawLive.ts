@@ -11,7 +11,7 @@ import { drawAt } from './smooth';
  * An enemy shape, `r` pixels round, centred on (x, y) and turned to `facing`, with a dark outline so it stands off the
  * route and pads. An elite gets a gold outline.
  */
-export function enemyShape(ctx: CanvasRenderingContext2D, shape: TrainingEnemyShape, x: number, y: number, r: number, facing: number, color: string, elite?: boolean) {
+export function enemyShape(ctx: CanvasRenderingContext2D, shape: TrainingEnemyShape, x: number, y: number, r: number, facing: number, color: string, elite?: boolean, rim?: string) {
   // Points of a regular polygon, or a star alternating between two radii.
   const ring = (n: number, r1: number, r2 = r1, turn = 0) =>
     Array.from({ length: n * (r2 === r1 ? 1 : 2) }, (_, i) => {
@@ -36,6 +36,13 @@ export function enemyShape(ctx: CanvasRenderingContext2D, shape: TrainingEnemySh
   ctx.beginPath();
   pts[shape].forEach(([px, py], i) => (i ? ctx.lineTo(px, py) : ctx.moveTo(px, py)));
   ctx.closePath();
+  // The wave tier's halo goes on first and wide, so only its outer edge shows past the outline and any armour rim.
+  if (rim) {
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = rim;
+    ctx.lineWidth = Math.max(2.5, r * 0.4);
+    ctx.stroke();
+  }
   // Lit from the front: a lighter nose, the base colour behind.
   const g = ctx.createLinearGradient(r, 0, -r, 0);
   g.addColorStop(0, shade(color, 0.35));
@@ -62,6 +69,28 @@ export function enemyShape(ctx: CanvasRenderingContext2D, shape: TrainingEnemySh
   }
   ctx.restore();
 }
+
+/** Effects (shots, blows, rings) draw at this strength so the field reads; danger warnings and status rings stay full. */
+export const FX_ALPHA = 0.8;
+
+/** How the swarm shows the waves climbing. Each kind keeps its own colour and shape (players know them), so a deep wave
+ *  only darkens that colour a little, and wears a halo round its shape: magenta from wave TIER_FROM, red from TIER_RED. */
+const TIER_FROM = 15;
+const TIER_RED = 35;
+/** The most a kind's colour darkens (at TIER_RED and beyond); its hue never moves. */
+const TIER_DARK = 0.22;
+
+/** An enemy's fill on wave `w`: its kind's own colour, a little darker the deeper the run (same hue, hex). */
+export function tierColor(color: string, w: number): string {
+  const k = Math.min(1, (w - TIER_FROM) / (TIER_RED - TIER_FROM));
+  if (k <= 0) return color;
+  const n = parseInt(color.slice(1), 16);
+  const [r, g, b] = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => Math.round(c * (1 - TIER_DARK * k)));
+  return `#${((1 << 24) | (r << 16) | (g << 8) | b).toString(16).slice(1)}`;
+}
+
+/** The halo round an enemy's shape on wave `w`: none early, magenta from TIER_FROM, red from TIER_RED. */
+export const tierRim = (w: number): string | undefined => (w >= TIER_RED ? '#e03030' : w >= TIER_FROM ? '#d94bd0' : undefined);
 
 /** The colour of the status that shows on an enemy, worst first. */
 const TINTS: [Status, string][] = [['stun', '#ffe066'], ['slow', '#5ab0ff'], ['daze', FX_COLOR.field], ['mark', '#ff5ad1'], ['bleed', '#d0303a']];
@@ -136,7 +165,7 @@ export function drawEnemies(ctx: CanvasRenderingContext2D, run: TrainingRun, s: 
       ctx.lineWidth = Math.max(2, s * 0.15);
       ctx.beginPath(); ctx.arc(x, y, r * 1.25 + Math.max(2, s * 0.15), 0, Math.PI * 2); ctx.stroke();
     }
-    enemyShape(ctx, d.shape, x, y, r, e.face ?? 0, d.color, e.elite);
+    enemyShape(ctx, d.shape, x, y, r, e.face ?? 0, boss ? d.color : tierColor(d.color, run.wave), e.elite, boss ? undefined : tierRim(run.wave));
     const tint = statusTint(e);
     if (tint) { ctx.strokeStyle = tint; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r * 1.25 + 2, 0, Math.PI * 2); ctx.stroke(); }
     if (boss || e.hp < e.maxHp) {
@@ -151,14 +180,14 @@ export function drawEnemies(ctx: CanvasRenderingContext2D, run: TrainingRun, s: 
 function ring(ctx: CanvasRenderingContext2D, f: Fx, s: number) {
   const k = 1 - f.t / FX_TIME.pulse;
   const r = Math.max(1, (f.r ?? 1) * s * (0.3 + 0.7 * k));
-  ctx.globalAlpha = 0.7 * (1 - k);
+  ctx.globalAlpha = FX_ALPHA * 0.7 * (1 - k);
   ctx.lineWidth = 2;
   ctx.beginPath(); ctx.arc(f.x1 * s, f.y1 * s, r, 0, Math.PI * 2);
   if (f.color === FX_COLOR.bleed || f.color === FX_COLOR.blast) {
     ctx.fillStyle = f.color;
-    ctx.globalAlpha = 0.18 * (1 - k);
+    ctx.globalAlpha = FX_ALPHA * 0.18 * (1 - k);
     ctx.fill();
-    ctx.globalAlpha = 0.7 * (1 - k);
+    ctx.globalAlpha = FX_ALPHA * 0.7 * (1 - k);
   }
   ctx.stroke();
 }
@@ -191,7 +220,7 @@ export function drawFx(ctx: CanvasRenderingContext2D, run: TrainingRun, s: numbe
   for (const f of run.fx) {
     if (f.kind === 'hold') continue;
     ctx.strokeStyle = f.color;
-    ctx.globalAlpha = Math.min(1, f.t / 0.1) * (f.miss ? 0.45 : 1);
+    ctx.globalAlpha = FX_ALPHA * Math.min(1, f.t / 0.1) * (f.miss ? 0.45 : 1);
     if (f.kind === 'pulse') ring(ctx, f, s);
     else if (f.melee) slash(ctx, f, s);
     else {

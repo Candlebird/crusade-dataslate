@@ -22,11 +22,16 @@ export interface HudBarProps {
   /** Auto (debug, TRAINING.debugAuto): on or off; left out, no button. */
   auto?: boolean;
   onAuto?: () => void;
+  /** Open the build panel (B). */
+  onBuild?: () => void;
+  /** The per-wave damage meter: on or off, and its toggle. */
+  meter?: boolean;
+  onMeter?: () => void;
 }
 
 /** The strip over the map: wave, base, credits, luck, the campaign's threat and event and next real Echo Lord (in a
  *  campaign), the Sortie nemesis waiting (if any), speed, and Start wave / End run. */
-export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onPause, auto, onAuto }: HudBarProps) {
+export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onPause, auto, onAuto, onBuild, meter, onMeter }: HudBarProps) {
   const low = run.baseHp <= TRAINING.baseHp / 3;
   const why = run.phase === 'build' ? startProblem(run) : null;
   const next = run.wave + 1;
@@ -90,6 +95,8 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
           {auto !== undefined && onAuto && (
             <button className={auto ? 'primary' : ''} aria-pressed={auto} data-tip="Debug: the test bot plays the run (a run that uses it banks nothing)" onClick={onAuto}>Auto (debug)</button>
           )}
+          {onBuild && <button onClick={onBuild} aria-keyshortcuts="B" data-tip="Your build: each defence's cards, specialisation and live numbers, stratagems, trophies and the next boss (key B; pauses a wave)">Build</button>}
+          {onMeter && <button className={meter ? 'primary' : ''} aria-pressed={!!meter} data-tip="Damage each defence dealt this wave" onClick={onMeter}>Meter</button>}
           {onPause && (live || auto) && <button className="training-hud-go" onClick={onPause}>{paused ? 'Resume' : 'Pause'}</button>}
           {run.phase === 'build' && (
             <button className="primary training-hud-go" disabled={!!why || auto} data-tip={why ?? undefined} onClick={onStart}>Start wave {next}</button>

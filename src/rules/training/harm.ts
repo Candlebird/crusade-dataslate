@@ -6,7 +6,10 @@ import { offerCards } from './cards';
 import { payKill } from './economy';
 import { centre, remaining, upstream, WAYPOINTS } from './map';
 import { rand, saveChance } from './rng';
-import { lordDmg } from './lords';
+import { lordDmg, lordOf } from './lords';
+import { specMul } from './specs';
+import { hasStrat, STRAT } from './stratagems';
+import { TROPHY_PREFIX, trophyFor } from './trophies';
 import { tallyHarm } from './tally';
 import type { ShardType } from '../downtimeData';
 import type { Enemy, Grade, Tower, TowerGun, TowerSkill, TrainingRun, UnitTower } from './types';
@@ -107,13 +110,25 @@ export function dmgMul(t: Tower): number {
   return t.atkBonus * (1 + (t.dmgBoost.left > 0 ? t.dmgBoost.mul : 0)) * last * up;
 }
 
+/** Times Ace counts for a unit's kills: one per TRAINING.cards.ace.per, at most ace.max. */
+export const aceSteps = (t: UnitTower): number => Math.min(TRAINING.cards.ace.max, Math.floor(t.kills / TRAINING.cards.ace.per));
+
+/** Units Pack tactics counts: those near it, at most TRAINING.cards.pack.max. */
+export const packLimit = (run: TrainingRun): number => TRAINING.cards.pack.max + (hasStrat(run, 'huntingPack') ? STRAT.packMore : 0);
+export const packCount = (run: TrainingRun, t: UnitTower): number => Math.min(packLimit(run), packMates(run, t));
+
+/** Kill chain's most stacks (Chain Reaction adds some). */
+export const chainMax = (run: TrainingRun): number => TRAINING.cards.chain.max + (hasStrat(run, 'chainReaction') ? STRAT.chainMore : 0);
+
 /** What a tower's cards add against this enemy: Crossfire on a held one, Pack tactics for units near it, Ace for its
  *  kills. */
 export function cardMul(run: TrainingRun, t: Tower, e: Enemy): number {
-  let m = t.crossfire && e.heldBy !== undefined ? 1 + t.crossfire : 1;
+  const pinned = e.heldBy !== undefined || (!!e.status?.slow && hasStrat(run, 'killingGround'));
+  let m = t.crossfire && pinned ? 1 + t.crossfire : 1;
   if (!isUnit(t)) return m;
-  if (t.pack) m *= 1 + t.pack * packMates(run, t);
-  if (t.ace) m *= 1 + t.ace * Math.floor(t.kills / TRAINING.cards.ace.per);
+  if (t.spec) m *= specMul(t, e, isBoss(e));
+  if (t.pack) m *= 1 + t.pack * packCount(run, t);
+  if (t.ace) m *= 1 + t.ace * aceSteps(t);
   return m;
 }
 
@@ -132,17 +147,37 @@ export function hurt(run: TrainingRun, by: Tower | undefined, e: Enemy, dmg: num
   const before = e.hp;
   e.hp -= lordDmg(run, by, e, (dmg + mark) * mul, how);
   const dealt = before - Math.max(0, e.hp);
-  if (by) by.dealt += dealt;
+  if (by) {
+    by.dealt += dealt;
+    by.waveDealt = (by.waveDealt ?? 0) + dealt;
+  }
   tallyHarm(run, by, e, dealt, how, e.hp <= 0);
   if (e.hp > 0) return;
   if (by) {
     by.kills += 1;
-    if (by.chain) by.chain = { ...by.chain, stacks: Math.min(TRAINING.cards.chain.max, by.chain.stacks + 1), left: TRAINING.cards.chain.secs };
+    if (by.chain) by.chain = { ...by.chain, stacks: Math.min(chainMax(run), by.chain.stacks + 1), left: TRAINING.cards.chain.secs };
   }
   payKill(run, e);
   onEchoDeath(run, e);
   if (chain) deathBlasts(run, e);
-  if (def.spawn === 'boss') offerCards(run);
+  if (def.spawn === 'boss') {
+    queueTrophy(run, by, e);
+    offerCards(run);
+  }
+}
+
+/** A boss with a trick leaves its trophy for the next card offer (trophies.ts): a tower trophy to the tower that slew
+ *  it, or (a Shard, nothing, or a skill trophy with no unit to carry it) the run's top-killing crafted unit. */
+function queueTrophy(run: TrainingRun, by: Tower | undefined, e: Enemy): void {
+  const trick = lordOf(run, e)?.trick;
+  const sig = e.nem ? run.nemesis?.sig : undefined;
+  const t = trophyFor(trick, sig);
+  if (!t) return;
+  const top = run.pieces.reduce<UnitTower | undefined>((b, p) => (p.kind === 'unit' && p.kills >= (b?.kills ?? -1) ? p : b), undefined);
+  const to: Tower | undefined = !t.tower && !t.skill ? undefined
+    : by && (isUnit(by) || (by.kind === 'default' && !t.skill)) ? by : top ?? (by?.kind === 'default' ? by : undefined);
+  if ((t.tower || t.skill) && !to) return;
+  run.trophyDue = { id: TROPHY_PREFIX + t.id, rarity: 'Legendary', ...(to ? (isUnit(to) ? { unitId: to.unitId } : { pieceId: to.id }) : {}) };
 }
 
 /** Units with a death-blast make an enemy slain near them explode: its dmg to every enemy round the body. */

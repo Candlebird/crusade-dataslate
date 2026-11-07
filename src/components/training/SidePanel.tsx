@@ -34,6 +34,8 @@ export interface SidePanelProps {
   onChange: () => void;
   /** Base HP each wave played this sitting cost (by wave), to note on its log line. */
   hpLost?: Record<number, number>;
+  /** Open the build panel, which spells out every held card. */
+  onBuild?: () => void;
 }
 
 export function SidePanel(p: SidePanelProps) {
@@ -70,6 +72,7 @@ export function SidePanel(p: SidePanelProps) {
               const t = cardText(run, d);
               return <span key={i} className={`tag ${cardTag(d)}`} data-tip={`${t.name}: ${t.text}`}>{t.name}</span>;
             })}
+            {p.onBuild && <button className="small" onClick={p.onBuild}>What each does (B)</button>}
           </div>
         )}
         <div className="training-log muted small" aria-label="Run log, newest first">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyDef } from '../../rules/downtimeData';
 import { checkWaves, finalBoss, finalOf, hasChecks, inEndless, isBossWave, isNemesisWave, lordIndex, lordLine, nemesisTricks, previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
+import { nextBoss } from '../../rules/training/nextRound';
 import { enemyShape } from './drawLive';
 
 export interface WavePreviewProps {
@@ -50,6 +51,7 @@ export function WaveStatus({ run }: WavePreviewProps) {
             : <span data-tip="A wave with none through pays bonus credits">none through yet</span>}
         </div>
       ) : <WavePreview run={run} />}
+      {!live && <NextBossNote run={run} />}
       {!live && waveTags(n).some((t) => tagText(t, n)) && (
         <div className="training-status-note muted">{waveTags(n).map((t) => tagText(t, n)).filter(Boolean).join(' ')}</div>
       )}
@@ -122,4 +124,16 @@ export function enemyRundown(d: TrainingEnemyDef, g: PreviewGroup): string {
   lines.push(`Costs the base ${d.leak} HP if it gets through.`);
   if (g.elites) lines.push(`${g.elites} of them elites (gold outline): ×${TRAINING.wave.eliteHp} wounds, cost the base ${Math.max(d.leak, TRAINING.leak.elite)}.`);
   return lines.join('\n');
+}
+
+/** The next boss in a line under the wave preview: its wave, name, trick and the trophy it leaves. */
+function NextBossNote({ run }: WavePreviewProps) {
+  const b = nextBoss(run);
+  if (!b) return null;
+  return (
+    <div className="training-status-note small">
+      <b>Next boss, wave {b.wave}: {b.name}.</b>{b.trick ? <span className="muted"> {b.trick}</span> : null}
+      {b.trophy && <span> Trophy: <span className="tag gold">{b.trophy.name}</span></span>}
+    </div>
+  );
 }
