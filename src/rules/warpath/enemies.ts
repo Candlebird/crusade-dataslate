@@ -1,9 +1,10 @@
 import { hitChance, rand, saveChance } from '../training/rng';
-import { DOCTRINES, WARPATH } from './data';
+import { BOSS_TRICKS, DOCTRINES, HERO_POWERS, SPECS, STRATAGEMS, WARPATH } from './data';
 import { inCover, terrainAt, unblock, type Grid } from './field';
 import { hurtEnemy, onField } from './combat';
-import { enemyMul, guardianMul, minutes, mods, softDeadly, woundsPer } from './mods';
-import { clock } from './loot';
+import { enemyMul, guardianMul, minutes, mods, ordered, softDeadly, woundsPer } from './mods';
+import { bossName, clock } from './loot';
+import type { LordTrick } from '../training/types';
 import type { Blow, Body, Enemy, EnemyKind, Missile, Squad, WarpathRun } from './types';
 import { has, TREE_FX } from './meta';
 import { boon, dodgeOf, plateOf, roleOf, shrug } from './traits';
@@ -115,8 +116,18 @@ export { pickKind };
 
 /** Bosses on the clock: a captain every captainEvery seconds; every lordEvery, an Echo Lord instead. */
 export function bossStep(run: WarpathRun): void {
+  // Each run deals its bosses' tricks in its own order, so the run ahead can be planned round.
+  if (!run.bossDeck) {
+    const d: LordTrick[] = [...BOSS_TRICKS.deck];
+    for (let i = d.length - 1; i > 0; i--) {
+      const j = Math.floor(rand(run) * (i + 1));
+      [d[i], d[j]] = [d[j], d[i]];
+    }
+    run.bossDeck = d;
+  }
   const next = (run.bossesDone + 1) * W.bosses.captainEvery;
   if (run.t < next || !run.enemyKinds.length) return;
+  const dealt = run.bossDeck[run.bossesDone % run.bossDeck.length];
   run.bossesDone += 1;
   const lord = next % W.bosses.lordEvery === 0;
   const a = run.face + (rand(run) - 0.5);
@@ -125,14 +136,13 @@ export function bossStep(run: WarpathRun): void {
   e.hp = e.maxHp = hp;
   e.size = lord ? B.lordSize : B.size;
   e.armour = lord ? 1 : 0;
-  if (lord) {
-    const i = Math.floor(run.t / W.bosses.lordEvery) - 1;
-    const l = run.lords[i];
-    e.lord = { i, ...(l ? { trick: l.trick } : {}), cd: 4, ward: 0 };
-    if (l?.trick === 'armour') e.armour += 1;
-  }
-  const name = e.lord && run.lords[e.lord.i] ? run.lords[e.lord.i].name : `${run.enemyKinds[e.kind].name} (${lord ? 'lord' : 'captain'})`;
+  const i = lord ? Math.floor(run.t / W.bosses.lordEvery) - 1 : -1;
+  const trick = run.lords[i]?.trick ?? dealt;
+  e.lord = { i, trick, cd: 4, ward: 0 };
+  if (trick === 'armour') e.armour += 1;
+  const name = bossName(run, e);
   run.log.push(`${clock(run.t)} ${name} takes the field.`);
+  run.banner = { text: `${name}: ${BOSS_TRICKS.text[trick]}`, t: 4, tone: 'warn' };
 }
 
 /** The hero's Defense (a scarred save counts). */
@@ -143,12 +153,12 @@ export const bodyOf = (s: Squad) =>
   s.kind === 'fort' ? 1.6 : s.kind === 'heavy' || s.kind === 'artillery' ? 1.2 + s.size * 0.5 : 0.9 + Math.sqrt(s.size) * 0.75;
 
 /** Squads the swarm can hit: on the field and on the ground (not aircraft). */
-const groundSquads = (run: WarpathRun) => run.squads.filter((s, i) => i > 0 && s.kind !== 'air' && !s.rush && onField(s));
+const groundSquads = (run: WarpathRun) => run.squads.filter((s, i) => i > 0 && s.kind !== 'air' && !s.rush && !s.safe && onField(s));
 
 /** One strike's wounds onto a squad: a fortification loses HP; anything else loses at most one model, however big the
  *  strike (Hold the Line shrugs some off). */
 export function hurtSquad(run: WarpathRun, s: Squad, wounds: number): void {
-  if (wounds <= 0 || !onField(s) || s.rush) return;
+  if (wounds <= 0 || !onField(s) || s.rush || s.safe) return;
   if (s.fort) {
     s.fort.hp -= wounds * E.dmgPerWound;
     if (s.fort.hp <= 0) {
@@ -188,6 +198,7 @@ export function hurtSquad(run: WarpathRun, s: Squad, wounds: number): void {
       return;
     }
   }
+  s.regen = W.losses.regroup * mods(run).modelRegen;
   run.log.push(`${clock(run.t)} ${s.name} is cut down; it regroups.`);
 }
 
@@ -211,8 +222,11 @@ export function hurtHero(run: WarpathRun, dmg: number): void {
   if (dmg <= 0 || run.hp <= 0) return;
   const m = mods(run);
   // No one blow (a lord's swing, a big blast) takes more than a share of the hero's HP: it can be dodged, not one-shot.
-  dmg = Math.min(dmg * m.heroDmg, run.maxHp * (has(run, 'unbreakable') ? TREE_FX.unbreakable : E.heroBlowCap));
+  const wall = run.squads.some((s) => s.spec === 'shieldWall' && onField(s) && (s.x - run.hx) ** 2 + (s.y - run.hy) ** 2 < SPECS.shieldWall.reach ** 2);
+  const guard = (ordered(run, 'brace') ? HERO_POWERS.brace.cut : 1) * (wall ? SPECS.shieldWall.cut : 1);
+  dmg = Math.min(dmg * m.heroDmg * guard, run.maxHp * (has(run, 'unbreakable') ? TREE_FX.unbreakable : E.heroBlowCap));
   run.iframes = W.hero.iframes;
+  run.struck = true;
   if (has(run, 'shockwave') && dmg >= run.maxHp * TREE_FX.waveAt) shockwave(run);
   if (run.shield && run.shield > 0) {
     const soak = Math.min(run.shield, dmg);
@@ -259,7 +273,7 @@ function rollOnHero(run: WarpathRun, attacks: number, quality: number, ap: numbe
  *  elite's blows (`mul`) come as more attacks, not bigger ones: a hit still does its weapon's wounds (1, or Deadly), so
  *  models with more wounds than that always survive a single hit. Nothing touches a body mid-charge. */
 export function strikeSquad(run: WarpathRun, s: Squad, attacks: number, quality: number, ap: number, deadly: number, mul: number, blow?: Blow): void {
-  if (s.rush) return;
+  if (s.rush || s.safe) return;
   // In cover: +1 Defense, and hits land only rarely.
   const cover = !s.fort && !blow?.noCover && inCover(run.seed, s.x, s.y);
   const dodge = dodgeOf(s.body, !blow?.ranged, !!blow?.far) + (s.body?.entrench && blow?.far && (s.held ?? 0) >= R.holdAfter ? 2 : 0) + (boon(s, 'evade') ? 1 : 0);
@@ -345,6 +359,10 @@ function statusStep(e: Enemy, dt: number, hurt: (e: Enemy, n: number) => void): 
 function trickStep(run: WarpathRun, e: Enemy, dt: number): void {
   const L = e.lord;
   if (!L?.trick) return;
+  // A captain plays the same trick as a lord, slower, and with blows that grow with the clock like its own.
+  const captain = e.boss === 'captain';
+  const pace = captain ? BOSS_TRICKS.captainPace : 1;
+  const soft = guardianMul(run, e);
   L.cd -= dt;
   if (L.trick === 'regen') e.hp = Math.min(e.maxHp, e.hp + e.maxHp * 0.006 * dt);
   if (L.cd > 0) return;
@@ -357,26 +375,26 @@ function trickStep(run: WarpathRun, e: Enemy, dt: number): void {
         e.y = run.hy + Math.sin(a) * 9;
         run.fx.push({ kind: 'spell', x: e.x, y: e.y, n: 3, t: 0.5 });
       }
-      L.cd = 8;
+      L.cd = 8 * pace;
       break;
     case 'shield':
       L.ward = e.maxHp * 0.12;
-      L.cd = 12;
+      L.cd = 12 * pace;
       break;
     case 'summon':
-      for (let i = 0; i < 6; i++) spawnEnemy(run, pickKind(run), e.x + (rand(run) - 0.5) * 6, e.y + (rand(run) - 0.5) * 6);
-      L.cd = 10;
+      for (let i = 0; i < (captain ? 4 : 6); i++) spawnEnemy(run, pickKind(run), e.x + (rand(run) - 0.5) * 6, e.y + (rand(run) - 0.5) * 6);
+      L.cd = 10 * pace;
       break;
     case 'burst':
       for (let i = 0; i < 10; i++) {
         const a = (i / 10) * Math.PI * 2;
-        run.missiles.push({ x: e.x, y: e.y, vx: Math.cos(a) * E.shotSpeed * 0.6, vy: Math.sin(a) * E.shotSpeed * 0.6, life: 2, blast: false, quality: 4, ap: 1, dmg: 1, attacks: 2 });
+        run.missiles.push({ x: e.x, y: e.y, vx: Math.cos(a) * E.shotSpeed * 0.6, vy: Math.sin(a) * E.shotSpeed * 0.6, life: 2, blast: false, quality: 4, ap: 1, dmg: 1, attacks: 2 * soft });
       }
-      L.cd = 6;
+      L.cd = 6 * pace;
       break;
     case 'storm':
-      for (let i = 0; i < 3; i++) run.missiles.push({ x: run.hx + (rand(run) - 0.5) * 8, y: run.hy + (rand(run) - 0.5) * 8, vx: 0, vy: 0, life: E.blastFuse, blast: true, quality: 4, ap: 1, dmg: 1, attacks: 3 });
-      L.cd = 5;
+      for (let i = 0; i < 3; i++) run.missiles.push({ x: run.hx + (rand(run) - 0.5) * 8, y: run.hy + (rand(run) - 0.5) * 8, vx: 0, vy: 0, life: E.blastFuse, blast: true, quality: 4, ap: 1, dmg: 1, attacks: 3 * soft });
+      L.cd = 5 * pace;
       break;
     default:
       L.cd = 999;
@@ -438,7 +456,7 @@ function supportStep(run: WarpathRun, grid: Grid, e: Enemy, k: EnemyKind, tx: nu
 export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Enemy, n: number) => void): void {
   const mul = enemyMul(run);
   const fear = mods(run).fear;
-  const fearR2 = DOCTRINES.fearTactics.radius ** 2;
+  const fearR2 = (DOCTRINES.fearTactics.radius * (run.stratagems?.reignOfTerror ? STRATAGEMS.reignOfTerror.reach : 1)) ** 2;
   const ground = groundSquads(run);
   const roles = ground.map((s) => roleOf(s));
   const hero = run.squads[0];
@@ -470,9 +488,11 @@ export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Ene
     let body = 0.4;
     let score = d - body;
     if (!ways?.flies) ground.forEach((s, i) => {
+      // What's on the ground can't get at a flyer overhead (shots still can).
+      if (roles[i] === 'flyer') return;
       const r = bodyOf(s);
       const ds = Math.hypot(s.x - e.x, s.y - e.y);
-      const near = ds - r - (roles[i] === 'bulwark' ? R.taunt : 0);
+      const near = ds - r - (roles[i] === 'bulwark' ? R.taunt : s.spec === 'strongpoint' ? SPECS.strongpoint.taunt : 0);
       if (near < score && ds - r < W.losses.aggro) { score = near; d = ds; body = r; tx = s.x; ty = s.y; mark = s; }
     });
     const reach = e.size / 2 + body + E.touch * 0.5;
@@ -509,7 +529,7 @@ export function enemyStep(run: WarpathRun, grid: Grid, dt: number, hurt: (e: Ene
     }
     e.aim = 0;
     if (d > reach) {
-      let v = k.speed * (e.boss ? 0.85 : 1);
+      let v = k.speed * (e.boss ? 0.85 * (d > B.far ? B.closing : 1) : 1);
       if (e.status.slow) v *= 0.5;
       if (e.status.daze) v *= 0.75;
       if (fear && dh2 < fearR2) v *= 1 - fear;

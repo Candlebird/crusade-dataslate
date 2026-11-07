@@ -1,10 +1,10 @@
 import { rand } from '../training/rng';
-import { WARPATH } from './data';
+import { HERO_POWERS, SPECS, TROPHIES, WARPATH, type PowerId } from './data';
 import { terrainAt, terrainNear, unblock, type Grid } from './field';
-import { blastAt, bestMelee, densest, NO_AURA, rushBlow, strike } from './combat';
-import { mods, type Mods } from './mods';
+import { blastAt, bestMelee, densest, healHero, NO_AURA, rushBlow, strike } from './combat';
+import { deadlyNow, mods, ordered, type Mods } from './mods';
 import { clock } from './loot';
-import { boon, heroPowerOf, roleOf } from './traits';
+import { bless, boon, heroPowerOf, roleOf } from './traits';
 import type { Enemy, Squad, SquadRole, WarpathRun } from './types';
 
 // The force moving with the hero. Each archetype has its own orders: Chargers rush straight through packs, untouchable;
@@ -103,6 +103,10 @@ function fortStep(run: WarpathRun, grid: Grid, s: Squad, si: number, dt: number)
   }
 }
 
+/** How long the hero's order takes to come back. */
+export const heroEvery = (run: WarpathRun, m: Mods = mods(run)) =>
+  HERO_POWERS[heroPowerOf(run.squads[0])].every * m.cd * (run.trophies?.phaseAnchor ? TROPHIES.phaseAnchor.cd : 1);
+
 /** Start a charge from (x, y) through a point, and out the far side. */
 function startRush(run: WarpathRun, s: Squad, x: number, y: number, tx: number, ty: number, len: number): void {
   const d = Math.hypot(tx - x, ty - y) || 1;
@@ -124,30 +128,39 @@ function rushStep(run: WarpathRun, grid: Grid, s: Squad, si: number, px: number,
   r.t -= dt;
   s.charged = Math.max(s.charged ?? 0, R.firstBlows);
   const run_over: Enemy[] = [];
-  grid.near(x, y, R.impactRadius, (e) => {
+  const trample = s.spec === 'trample';
+  grid.near(x, y, R.impactRadius * (trample ? SPECS.trample.radius : 1), (e) => {
     if (r.hit.length + run_over.length >= R.impactCap) return true;
     if (!r.hit.includes(e.id)) run_over.push(e);
   });
   for (const e of run_over) {
     r.hit.push(e.id);
     rushBlow(run, grid, si, e, m);
+    if (trample && e.hp > 0) rushBlow(run, grid, si, e, m);
   }
   if (r.t <= 0 || d <= go) {
     delete s.rush;
     s.charged = R.fight;
-    s.rushCd = si === 0 ? R.heroRushEvery * m.cd : R.rushCd;
+    s.rushCd = si === 0 ? heroEvery(run, m) : R.rushCd * (s.spec === 'momentum' ? SPECS.momentum.cd : 1);
   }
   return { x, y };
 }
 
 /** A flyer's straight run: at the thickest pack near the hero and on past it, then round for another. */
-function flyStep(run: WarpathRun, grid: Grid, s: Squad, dt: number): void {
+function flyStep(run: WarpathRun, grid: Grid, s: Squad, si: number, dt: number): void {
+  // A Bomb Run: the load goes on the pack this pass was aimed at.
+  if (s.spec === 'bombRun' && s.knot && dist2(s, s.knot.x, s.knot.y) < 9) {
+    const B = SPECS.bombRun;
+    blastAt(run, grid, si, s.knot.x, s.knot.y, B.radius, B.hits, B.ap, s.quality, 'boom', { deadly: deadlyNow(run) });
+    delete s.knot;
+  }
   if (!s.pass || dist2(s, s.pass.x, s.pass.y) < 4) {
     const k = densest(grid, run.hx, run.hy, W.air.seek);
     const tx = k?.x ?? run.hx + (rand(run) - 0.5) * W.air.seek;
     const ty = k?.y ?? run.hy + (rand(run) - 0.5) * W.air.seek;
     const d = Math.hypot(tx - s.x, ty - s.y) || 1;
     s.pass = { x: tx + ((tx - s.x) / d) * W.air.over, y: ty + ((ty - s.y) / d) * W.air.over };
+    if (k) s.knot = { x: tx, y: ty, t: run.t + 9 };
   }
   const d = Math.hypot(s.pass.x - s.x, s.pass.y - s.y) || 1;
   const go = Math.min(d, W.air.speed * dt);
@@ -163,12 +176,13 @@ function blinkStep(run: WarpathRun, grid: Grid, s: Squad, si: number, i: number,
   if ((s.stay ?? 0) > 0) {
     s.stay! -= dt;
     if (s.stay! > 0) return true;
+    if (s.spec === 'wraith') burst(run, grid, si, s.x, s.y, m);
     const a = i * GOLDEN + rand(run);
     if (run.fx.length < 700) run.fx.push({ kind: 'spell', x: s.x, y: s.y, n: 2, t: 0.4 });
     s.x = run.hx + Math.cos(a) * F.ring;
     s.y = run.hy + Math.sin(a) * F.ring;
     unblock(run.seed, s, 1.2);
-    s.blink = R.blinkEvery * m.cd;
+    s.blink = R.blinkEvery * m.cd * (s.spec === 'reaper' ? SPECS.reaper.every : 1);
     return false;
   }
   s.blink = (s.blink ?? R.blinkEvery / 3) - dt;
@@ -179,7 +193,7 @@ function blinkStep(run: WarpathRun, grid: Grid, s: Squad, si: number, i: number,
   s.x = k.x;
   s.y = k.y;
   unblock(run.seed, s, 1.2);
-  s.stay = R.blinkStay;
+  s.stay = R.blinkStay * (s.spec === 'wraith' ? SPECS.wraith.stay : 1);
   s.charged = R.firstBlows;
   run.fx.push({ kind: 'spell', x: s.x, y: s.y, n: 3, t: 0.5 });
   burst(run, grid, si, s.x, s.y, m);
@@ -187,12 +201,12 @@ function blinkStep(run: WarpathRun, grid: Grid, s: Squad, si: number, i: number,
 }
 
 /** What arrives out of nowhere hits everything round it once. */
-function burst(run: WarpathRun, grid: Grid, si: number, x: number, y: number, m: Mods): void {
+function burst(run: WarpathRun, grid: Grid, si: number, x: number, y: number, m: Mods, radius: number = R.heroSwarm): void {
   const s = run.squads[si];
   const g = bestMelee(s) ?? s.guns[0];
   if (!g) return;
   const near: Enemy[] = [];
-  grid.near(x, y, R.heroSwarm, (e) => { near.push(e); return near.length >= R.impactCap; });
+  grid.near(x, y, radius, (e) => { near.push(e); return near.length >= R.impactCap; });
   for (const e of near) strike(run, grid, si, g, e, m, NO_AURA, false, false);
 }
 
@@ -212,14 +226,16 @@ function ambushStep(run: WarpathRun, grid: Grid, s: Squad, si: number, dt: numbe
     delete s.wander;
     delete s.cover;
     s.stay = R.ambushStay;
-    s.charged = R.firstBlows;
+    const alpha = s.spec === 'alphaStrike';
+    s.charged = alpha ? SPECS.alphaStrike.fury : R.firstBlows;
     run.fx.push({ kind: 'land', x: s.x, y: s.y, n: 3, t: 0.5 });
     burst(run, grid, si, s.x, s.y, m);
+    if (alpha) burst(run, grid, si, s.x, s.y, m);
     return true;
   }
   if (s.stay === undefined || (s.stay -= dt) <= 0 || dist2(s, run.hx, run.hy) > (R.deployLeash * 1.8) ** 2) {
     if (run.fx.length < 700) run.fx.push({ kind: 'land', x: s.x, y: s.y, n: 2, t: 0.4 });
-    s.reserve = R.ambushWait;
+    s.reserve = R.ambushWait * (s.spec === 'deepStrike' ? SPECS.deepStrike.wait : 1);
     delete s.stay;
     return true;
   }
@@ -300,11 +316,14 @@ function orders(run: WarpathRun, grid: Grid, s: Squad, si: number, dt: number): 
 
 /** A Bulwark's stomp when foes are on it. */
 function stompStep(run: WarpathRun, grid: Grid, s: Squad, si: number, dt: number): void {
-  s.stomp = (s.stomp ?? R.stompEvery) - dt;
+  const angry = s.spec === 'retribution';
+  const every = R.stompEvery * (angry ? SPECS.retribution.every : 1);
+  const radius = R.stompR * (angry ? SPECS.retribution.radius : 1);
+  s.stomp = (s.stomp ?? every) - dt;
   if (s.stomp > 0) return;
-  if (!grid.pick(s.x, s.y, R.stompR)) { s.stomp = 0.25; return; }
-  s.stomp = R.stompEvery;
-  blastAt(run, grid, si, s.x, s.y, R.stompR, s.size + 2 * s.tough, 1, s.quality, 'land');
+  if (!grid.pick(s.x, s.y, radius)) { s.stomp = 0.25; return; }
+  s.stomp = every;
+  blastAt(run, grid, si, s.x, s.y, radius, s.size + 2 * s.tough, 1, s.quality, 'land');
 }
 
 /** Boons, charges and Fear wear off. */
@@ -317,6 +336,7 @@ function tick(s: Squad, dt: number): void {
   if (s.charged && !s.rush) s.charged = Math.max(0, s.charged - dt);
   if (s.shaken) s.shaken = Math.max(0, s.shaken - dt);
   if (s.rushCd) s.rushCd = Math.max(0, s.rushCd - dt);
+  if (s.safe) s.safe = Math.max(0, s.safe - dt);
 }
 
 /** A wiped squad comes back at the hero's side, not where it fell. */
@@ -330,6 +350,16 @@ function regroup(run: WarpathRun, s: Squad): void {
   delete s.rush;
   delete s.pass;
   delete s.knot;
+}
+
+/** A wiped squad back on its feet at the hero's side: half its models, and a moment under cover to get its bearings
+ *  (coming back one model at a time only fed them to the crowd). */
+function standUp(run: WarpathRun, s: Squad): void {
+  if (s.kind !== 'air') regroup(run, s);
+  s.alive = Math.max(1, Math.ceil(s.size * W.losses.back));
+  s.wounds = 0;
+  s.safe = W.losses.safe;
+  if (run.fx.length < 700) run.fx.push({ kind: 'boon', x: s.x, y: s.y, n: 2, t: 0.6 });
 }
 
 /** Every unit back to full strength: lost models stand again, wiped squads regroup, a wrecked fort drops back in.
@@ -362,20 +392,20 @@ export function squadStep(run: WarpathRun, grid: Grid, dt: number): void {
   run.squads.forEach((s, si) => {
     tick(s, dt);
     if (si === 0) return;
-    // Lost models come back one at a time (wiped squads too, once one does).
+    // Lost models come back one at a time; a wiped squad regroups all at once.
     if (s.alive < s.size && s.kind !== 'fort') {
       const ferry = ferries.some((f) => f !== s && dist2(f, s.x, s.y) < R.ferryReach ** 2);
       s.regen -= dt * (ferry ? R.ferryRate : 1);
       if (s.regen <= 0) {
-        if (s.alive <= 0 && s.kind !== 'air') regroup(run, s);
-        s.alive += 1;
+        if (s.alive <= 0) standUp(run, s);
+        else s.alive += 1;
         s.regen = W.losses.regen * m.modelRegen;
       }
     } else s.regen = W.losses.regen * m.modelRegen;
     if (s.kind === 'fort') return fortStep(run, grid, s, si, dt);
     if (s.alive <= 0) return;
     const role = roleOf(s);
-    if (role === 'flyer') return flyStep(run, grid, s, dt);
+    if (role === 'flyer') return flyStep(run, grid, s, si, dt);
     if (s.rush) {
       const p = rushStep(run, grid, s, si, s.x, s.y, dt, m);
       s.x = p.x;
@@ -403,8 +433,10 @@ export function squadStep(run: WarpathRun, grid: Grid, dt: number): void {
     }
     if (role === 'bulwark') stompStep(run, grid, s, si, dt);
     // Scouts pull Shards in as they range.
-    if (s.traits?.scout && Math.floor(run.t * 4) !== Math.floor((run.t - dt) * 4)) {
-      for (const p of run.pickups) if (p.kind === 'gem' && dist2(p, s.x, s.y) < R.scoutPull ** 2) p.pulled = true;
+    const outrider = s.spec === 'outrider';
+    if ((s.traits?.scout || outrider) && Math.floor(run.t * 4) !== Math.floor((run.t - dt) * 4)) {
+      const pull = R.scoutPull * (outrider ? SPECS.outrider.pull : 1);
+      for (const p of run.pickups) if (p.kind === 'gem' && dist2(p, s.x, s.y) < pull ** 2) p.pulled = true;
     }
     const goal = orders(run, grid, s, si, dt);
     moveTo(run, s, goal.x, goal.y, dt);
@@ -429,8 +461,114 @@ function moveTo(run: WarpathRun, s: Squad, gx: number, gy: number, dt: number): 
   if ((s.x - run.hx) ** 2 + (s.y - run.hy) ** 2 > 40 * 40) { s.x = gx; s.y = gy; }
 }
 
-/** The hero's button and any charge under way. A charge goes the way it's steered, untouchable; a blink jumps and bursts
- *  at both ends. */
+/** Throw what stands within `reach` of a point back by `push` (bosses and what's guarding a site stand firm). */
+function shove(run: WarpathRun, x: number, y: number, reach: number, push: number): void {
+  for (const e of run.enemies) {
+    const d = Math.hypot(e.x - x, e.y - y);
+    if (e.boss || e.guard !== undefined || d > reach || d < 1e-6) continue;
+    e.x += ((e.x - x) / d) * push;
+    e.y += ((e.y - y) / d) * push;
+  }
+}
+
+/** The hero jumps, hurting what stands where it lands (a blink, and where it left too). */
+function jump(run: WarpathRun, grid: Grid, a: number, len: number, safe: number, m: Mods): void {
+  const h = run.squads[0];
+  const p = { x: run.hx + Math.cos(a) * len, y: run.hy + Math.sin(a) * len };
+  if (!h.body?.flying) unblock(run.seed, p, 0.8);
+  run.hx = p.x;
+  run.hy = p.y;
+  run.iframes = Math.max(run.iframes, safe);
+  h.charged = R.firstBlows;
+  burst(run, grid, 0, run.hx, run.hy, m);
+  run.fx.push({ kind: 'spell', x: run.hx, y: run.hy, n: R.heroSwarm, t: 0.5 });
+}
+
+/** Rally: the hero mends, every unit gets a model back (a wiped one regroups) and everyone's aim steadies. */
+function rallyForce(run: WarpathRun): void {
+  const P = HERO_POWERS.rally;
+  healHero(run, run.maxHp * P.heal);
+  for (const [i, s] of run.squads.entries()) {
+    bless(s, 'hit', P.secs);
+    if (i === 0) continue;
+    if (s.fort) { s.fort.hp = s.fort.hp > 0 ? Math.min(s.fort.maxHp, s.fort.hp + s.fort.maxHp * 0.1) : 0; continue; }
+    if (s.alive <= 0) standUp(run, s);
+    else if (s.alive < s.size) s.alive += 1;
+    else s.wounds = 0;
+  }
+}
+
+/** What the hero's order does the moment it's given. A charge or strafe runs on in `rushStep` and starts its cooldown
+ *  when it ends; everything else starts it here. */
+function giveOrder(run: WarpathRun, grid: Grid, power: PowerId, a: number, m: Mods): void {
+  const h = run.squads[0];
+  const P = HERO_POWERS;
+  const quality = Math.min(4, h.quality);
+  const timed = (id: 'volley' | 'sprint' | 'brace') => { run.order = { id, until: run.t + P[id].secs }; };
+  switch (power) {
+    case 'rush': case 'strafe':
+      startRush(run, h, run.hx, run.hy, run.hx + Math.cos(a), run.hy + Math.sin(a), P[power].len);
+      return;
+    case 'blink':
+      burst(run, grid, 0, run.hx, run.hy, m);
+      run.fx.push({ kind: 'spell', x: run.hx, y: run.hy, n: R.heroSwarm, t: 0.4 });
+      jump(run, grid, a, P.blink.len, P.blink.safe, m);
+      break;
+    case 'vanish':
+      run.fx.push({ kind: 'spell', x: run.hx, y: run.hy, n: 2, t: 0.4 });
+      jump(run, grid, a, P.vanish.len, P.vanish.safe, m);
+      burst(run, grid, 0, run.hx, run.hy, m, R.heroSwarm * 1.5);
+      break;
+    case 'whirl':
+      h.charged = R.firstBlows;
+      run.iframes = Math.max(run.iframes, P.whirl.safe);
+      burst(run, grid, 0, run.hx, run.hy, m, P.whirl.radius);
+      burst(run, grid, 0, run.hx, run.hy, m, P.whirl.radius);
+      run.fx.push({ kind: 'land', x: run.hx, y: run.hy, n: P.whirl.radius, t: 0.5 });
+      break;
+    case 'nova':
+      blastAt(run, grid, 0, run.hx, run.hy, P.nova.radius, P.nova.hits, P.nova.ap, quality, 'spell', { deadly: deadlyNow(run), spell: true });
+      shove(run, run.hx, run.hy, P.nova.radius, P.nova.push);
+      break;
+    case 'barrage': {
+      const B = P.barrage;
+      for (let i = 0; i < B.shells; i++) {
+        const at = densest(grid, run.hx + (rand(run) - 0.5) * B.reach, run.hy + (rand(run) - 0.5) * B.reach, B.reach / 2);
+        if (at) blastAt(run, grid, 0, at.x, at.y, B.radius, B.hits, B.ap, quality, 'boom', { deadly: deadlyNow(run) });
+      }
+      break;
+    }
+    case 'volley':
+      timed('volley');
+      run.fx.push({ kind: 'land', x: run.hx, y: run.hy, n: 6, t: 0.5 });
+      break;
+    case 'mark': {
+      const M = P.mark;
+      for (const e of run.enemies) {
+        const d2 = dist2(e, run.hx, run.hy);
+        if (d2 < M.near ** 2 || ((e.boss || e.elite) && d2 < M.reach ** 2)) e.status.mark = Math.max(e.status.mark ?? 0, M.secs);
+      }
+      run.fx.push({ kind: 'spell', x: run.hx, y: run.hy, n: M.near, t: 0.5 });
+      break;
+    }
+    case 'sprint':
+      timed('sprint');
+      for (const p of run.pickups) if (p.kind === 'gem' && dist2(p, run.hx, run.hy) < P.sprint.pull ** 2) p.pulled = true;
+      break;
+    case 'brace':
+      timed('brace');
+      shove(run, run.hx, run.hy, P.brace.reach, P.brace.push);
+      run.fx.push({ kind: 'land', x: run.hx, y: run.hy, n: P.brace.reach, t: 0.5 });
+      break;
+    case 'rally':
+      rallyForce(run);
+      run.fx.push({ kind: 'land', x: run.hx, y: run.hy, n: 8, t: 0.6 });
+      break;
+  }
+  h.rushCd = heroEvery(run, m);
+}
+
+/** The hero's button and any charge under way. A charge goes the way it's steered, untouchable. */
 export function heroAct(run: WarpathRun, grid: Grid, input: { dx: number; dy: number; act?: boolean }, dt: number): void {
   const h = run.squads[0];
   const m = mods(run);
@@ -448,39 +586,19 @@ export function heroAct(run: WarpathRun, grid: Grid, input: { dx: number; dy: nu
     return;
   }
   if (!input.act || h.rushCd) return;
-  const power = heroPowerOf(h);
-  if (!power) return;
   const len = Math.hypot(input.dx, input.dy);
-  const a = len > 0.05 ? Math.atan2(input.dy, input.dx) : run.face;
-  if (power === 'rush') {
-    startRush(run, h, run.hx, run.hy, run.hx + Math.cos(a), run.hy + Math.sin(a), R.heroRush);
-    return;
-  }
-  burst(run, grid, 0, run.hx, run.hy, m);
-  run.fx.push({ kind: 'spell', x: run.hx, y: run.hy, n: R.heroSwarm, t: 0.4 });
-  const p = { x: run.hx + Math.cos(a) * R.heroBlink, y: run.hy + Math.sin(a) * R.heroBlink };
-  if (!h.body?.flying) unblock(run.seed, p, 0.8);
-  run.hx = p.x;
-  run.hy = p.y;
-  run.iframes = Math.max(run.iframes, R.heroBlinkSafe);
-  h.charged = R.firstBlows;
-  h.rushCd = R.heroBlinkEvery * m.cd;
-  burst(run, grid, 0, run.hx, run.hy, m);
-  run.fx.push({ kind: 'spell', x: run.hx, y: run.hy, n: R.heroSwarm, t: 0.5 });
+  giveOrder(run, grid, heroPowerOf(h), len > 0.05 ? Math.atan2(input.dy, input.dx) : run.face, m);
 }
 
-/** The hero button's cooldown as a share left (0 ready, 1 just used), or undefined if the hero has none. */
-export function heroCooldown(run: WarpathRun): { power: 'rush' | 'blink'; left: number } | undefined {
+/** The hero's order and its cooldown as a share left (0 ready, 1 just used). */
+export function heroCooldown(run: WarpathRun): { power: PowerId; left: number } {
   const h = run.squads[0];
-  const power = heroPowerOf(h);
-  if (!power) return undefined;
-  const full = (power === 'rush' ? R.heroRushEvery : R.heroBlinkEvery) * mods(run).cd;
-  return { power, left: h.rush ? 1 : Math.min(1, (h.rushCd ?? 0) / full) };
+  return { power: heroPowerOf(h), left: h.rush ? 1 : Math.min(1, (h.rushCd ?? 0) / heroEvery(run)) };
 }
 
 /** The hero's speed in inches a second. */
 export function heroSpeed(run: WarpathRun, fear: boolean): number {
   const h = run.squads[0];
   const t = h.body?.strider ? undefined : terrainAt(run.seed, run.hx, run.hy);
-  return h.advance * W.hero.speedPer * mods(run).speed * (1 + W.levels.speed * h.level) * (fear ? 0.7 : 1) * (t?.kind === 'difficult' ? 0.6 : 1) * (boon(h, 'speed') ? R.speedBoon : 1);
+  return h.advance * W.hero.speedPer * mods(run).speed * (1 + W.levels.speed * h.level) * (fear ? 0.7 : 1) * (t?.kind === 'difficult' ? 0.6 : 1) * (boon(h, 'speed') ? R.speedBoon : 1) * (ordered(run, 'sprint') ? HERO_POWERS.sprint.speed : 1);
 }

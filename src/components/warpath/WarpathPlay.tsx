@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  bossesOf, botInput, botPick, cardText, choose, clock, heroCooldown, reroll, ROLES, roleOf, skip, step, WARPATH, xpNeed, type Input, type SquadRole, type WarpathRun,
+  bossesOf, bossName, botInput, botPick, cardText, choose, clock, HERO_POWERS, heroCooldown, reroll, ROLES, roleOf, skip, step, WARPATH, xpNeed, type Input, type PowerId, type SquadRole, type WarpathRun,
 } from '../../rules/warpath';
 import { Icon } from '../Icon';
 import { RoleBadge, roleTint } from './RoleBadge';
@@ -27,7 +27,7 @@ function readZoom(): number {
   }
 }
 
-interface Hud { hp: number; maxHp: number; xp: number; need: number; level: number; t: number; kills: number; points: number; bosses: number; boss?: { name: string; share: number; lord: boolean }; squads: { id: string; name: string; role: SquadRole; share: number; away: boolean; level: number }[]; power?: { power: 'rush' | 'blink'; left: number } }
+interface Hud { hp: number; maxHp: number; xp: number; need: number; level: number; t: number; kills: number; points: number; bosses: number; boss?: { name: string; share: number; lord: boolean }; squads: { id: string; name: string; role: SquadRole; share: number; away: boolean; level: number }[]; power: { power: PowerId; left: number } }
 
 const hudOf = (run: WarpathRun): Hud => {
   const b = run.enemies.find((e) => e.boss === 'lord') ?? run.enemies.find((e) => e.boss);
@@ -38,7 +38,7 @@ const hudOf = (run: WarpathRun): Hud => {
       share: s.fort ? s.fort.hp / Math.max(1, s.fort.maxHp) : s.alive / s.size,
     })),
     power: heroCooldown(run),
-    boss: b && { name: b.lord ? run.lords[b.lord.i]?.name ?? 'Echo Lord' : `${run.enemyKinds[b.kind].name}${b.boss === 'lord' ? ' (Echo Lord)' : ' (captain)'}`, share: b.hp / b.maxHp, lord: b.boss === 'lord' },
+    boss: b && { name: `${bossName(run, b)}${b.boss === 'lord' ? ' (Echo Lord)' : ' (captain)'}`, share: b.hp / b.maxHp, lord: b.boss === 'lord' },
   };
 };
 
@@ -263,6 +263,7 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
   };
   const hpShare = hud.hp / Math.max(1, hud.maxHp);
   const heroRole = roleOf(run.squads[0]);
+  const choosing = run.offer[0]?.kind === 'spec';
   const press = (on: boolean) => (e: React.PointerEvent) => { e.preventDefault(); actRef.current = on; };
 
   return (
@@ -318,33 +319,31 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
           ))}
         </div>
       )}
-      {hud.power && (
-        <button className={`warpath-act${hud.power.left <= 0 ? ' ready' : ''}`} style={{ ...roleTint(heroRole), '--cd': `${hud.power.left * 360}deg` } as React.CSSProperties}
+      <button className={`warpath-act${hud.power.left <= 0 ? ' ready' : ''}`} style={{ ...roleTint(heroRole), '--cd': `${hud.power.left * 360}deg` } as React.CSSProperties}
           onPointerDown={press(true)} onPointerUp={press(false)} onPointerCancel={press(false)} onPointerLeave={press(false)} onContextMenu={(e) => e.preventDefault()}
-          aria-label={hud.power.power === 'rush' ? 'Charge' : 'Blink'} title={`${hud.power.power === 'rush' ? 'Charge: rush through the enemy, untouchable' : 'Blink: jump, hurting what is at both ends'} (Space)`}>
+          aria-label={HERO_POWERS[hud.power.power].name} title={`${HERO_POWERS[hud.power.power].name}: ${HERO_POWERS[hud.power.power].text} (Space)`}>
           <Icon name={ROLES[heroRole].icon} />
-          <span>{hud.power.power === 'rush' ? 'Charge' : 'Blink'}</span>
-        </button>
-      )}
+          <span>{HERO_POWERS[hud.power.power].name}</span>
+      </button>
 
       {phase === 'card' && !peek && run.phase === 'card' && (
         <div className="training-cards warpath-cards" role="dialog" aria-label="Level up">
           <div className="training-cards-title">
             <div className="training-cards-kicker">{clock(run.t)} · {run.points}/{WARPATH.cap} pts on the field</div>
-            <h2>Level {run.level}</h2>
-            <div className="training-cards-sub">Take one. The run is paused.</div>
+            <h2>{choosing ? 'Specialise' : `Level ${run.level}`}</h2>
+            <div className="training-cards-sub">{choosing ? 'This unit has earned a speciality. The choice is for the rest of the run.' : 'Take one. The run is paused.'}</div>
           </div>
-          <DoctrineSlots run={run} />
+          {!choosing && <DoctrineSlots run={run} />}
           <div className="training-cards-row">
             {run.offer.map((c, i) => {
               const t = cardText(run, c);
               const delay = { animationDelay: `${0.05 + i * 0.1}s` };
               return (
                 <div key={`${run.level}:${run.rerolls}:${i}`} className="warpath-card-slot">
-                  <button className={`training-card ${c.kind === 'call' || c.kind === 'stratagem' ? 'legendary' : c.kind === 'doctrine' ? 'rare' : ''}`} style={delay}
+                  <button className={`training-card ${['call', 'stratagem', 'trophy', 'spec'].includes(c.kind) ? 'legendary' : c.kind === 'doctrine' ? 'rare' : ''}`} style={delay}
                     disabled={auto} onClick={act(() => choose(run, i))}>
                     <span className="training-card-shine" aria-hidden />
-                    <span className={`tag ${c.kind === 'call' || c.kind === 'stratagem' ? 'gold' : c.kind === 'doctrine' ? 'red' : ''}`}>{t.tag}</span>
+                    <span className={`tag ${['call', 'stratagem', 'trophy', 'spec'].includes(c.kind) ? 'gold' : c.kind === 'doctrine' ? 'red' : ''}`}>{t.tag}</span>
                     {t.icon && <Icon name={t.icon} className="warpath-card-icon" />}
                     <span className="training-card-name">{t.title}</span>
                     {t.role && <RoleBadge role={t.role} />}
@@ -361,8 +360,8 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
             })}
           </div>
           <div className="row warpath-card-actions">
-            <button className="ghost" disabled={auto || run.rerolls <= 0} onClick={act(() => reroll(run))}><Icon name="l:refresh-cw" /> Reroll ({run.rerolls})</button>
-            <button className="ghost" disabled={auto} onClick={act(() => skip(run))}><Icon name="g:meat" /> Skip: heal {Math.round(WARPATH.cards.skipHeal * 100)}%</button>
+            <button className="ghost" disabled={auto || choosing || run.rerolls <= 0} onClick={act(() => reroll(run))}><Icon name="l:refresh-cw" /> Reroll ({run.rerolls})</button>
+            <button className="ghost" disabled={auto || choosing} onClick={act(() => skip(run))}><Icon name="g:meat" /> Skip: heal {Math.round(WARPATH.cards.skipHeal * 100)}%</button>
             <button className="ghost" onClick={() => setPeek(true)}><Icon name="l:eye" /> Look</button>
             <button className="ghost" onClick={() => setBuild(true)}><Icon name="l:file-text" /> Build</button>
           </div>
@@ -383,7 +382,7 @@ export function WarpathPlay({ run, palette, auto, onAuto, onSave, onOver, onLeav
           {quitting
             ? <button className="danger" onClick={() => onQuit(run)}><Icon name="l:flag" /> Yes, end it here (banks what it earned)</button>
             : <button className="ghost danger" onClick={() => setQuitting(true)}><Icon name="l:flag" /> Give up the run</button>}
-          <p className="muted small">Move with WASD, the arrow keys or by dragging anywhere. Scroll to zoom. P or Esc pauses, B shows your build.{hud.power ? ` Space or the round button: ${hud.power.power === 'rush' ? 'charge' : 'blink'}.` : ''}</p>
+          <p className="muted small">Move with WASD, the arrow keys or by dragging anywhere. Scroll to zoom. P or Esc pauses, B shows your build.{` Space or the round button: ${HERO_POWERS[hud.power.power].name}.`}</p>
         </div>
       )}
       {build && run.phase !== 'over' && <WarpathBuild run={run} onClose={() => setBuild(false)} />}

@@ -1,13 +1,13 @@
 import type { Status } from '../abilities';
 import { rawDamage, readShot, runVolley } from '../shots';
 import { hitChance, rand, saveChance } from '../training/rng';
-import { DOCTRINES, STRATAGEMS, WARPATH } from './data';
+import { DOCTRINES, SPECS, STRATAGEMS, WARPATH } from './data';
 import { terrainAt, type Grid } from './field';
 import { blastRadius, mods, penalty, type Mods } from './mods';
 import { killed } from './loot';
 import { has, TREE_FX as T } from './meta';
 import { bless, boon, dodgeOf, plateOf, roleOf, shrug } from './traits';
-import type { Enemy, Squad, WarpathRun, WGun, WSpell } from './types';
+import type { BoonId, Enemy, Shell, Squad, WarpathRun, WGun, WSpell } from './types';
 
 // The force at work: every squad's guns on Training's volley clock (shots.ts), OPR rolls against the enemy's Defense,
 // rules on hit, relics and spells on their own clocks. Squads fire from where they stand (the hero's own guns from the hero).
@@ -44,17 +44,19 @@ export function aurasOf(run: WarpathRun): Auras[] {
 
 /** How far a gun reaches with levels and Veteran Drills. */
 export const reachOf = (s: Squad, g: WGun, m: Mods, aura?: Auras) =>
-  g.melee ? g.reach : (g.reach + (aura?.range ?? 0) * TILE + (boon(s, 'reach') ? R.reachBoon : 0)) * (1 + W.levels.reach * s.level) * m.reach;
+  g.melee ? g.reach : (g.reach + (aura?.range ?? 0) * TILE + (boon(s, 'reach') ? R.reachBoon : 0)) * (1 + W.levels.reach * s.level) * m.reach * (s.spec === 'overwatch' ? SPECS.overwatch.reach : 1);
 
 /** How fast a squad's gun goes: levels, doctrines, a frenzy, rate auras and scars. */
 export function rateOf(s: Squad, g: WGun, m: Mods, aura?: Auras): number {
   // Stance: a steady aim, a charge's fury, a flyer's short pass, Fear on it.
-  const steady = !g.melee && (s.held ?? 0) >= R.holdAfter ? 1 + R.holdRate : 1;
+  const line = s.spec === 'firingLine';
+  const steady = !g.melee && (s.held ?? 0) >= R.holdAfter * (line ? SPECS.firingLine.after : 1) ? 1 + (line ? SPECS.firingLine.rate : R.holdRate) : 1;
+  const trained = g.melee ? 1 : s.spec === 'overwatch' ? SPECS.overwatch.rate : s.spec === 'gunship' ? SPECS.gunship.rate : s.spec === 'harrier' && !s.held ? SPECS.harrier.rate : 1;
   const charged = g.melee && (s.charged ?? 0) > 0 ? 1 + R.chargeRate : 1;
   const flying = !g.melee && roleOf(s) === 'flyer' && s.kind !== 'hero' ? W.air.rate : 1;
   const shaken = (s.shaken ?? 0) > 0 ? R.shakenRate : 1;
   return (1 + W.levels.rate * s.level) * (g.melee ? m.meleeRate : m.shootRate) * (s.frenzyLeft > 0 ? s.frenzy : 1)
-    * (1 + (aura?.rate ?? 0)) * Math.max(0.3, 1 - penalty(s, 'rate')) * (1 + 0.04 * s.guessed.length) * steady * charged * flying * shaken;
+    * (1 + (aura?.rate ?? 0)) * Math.max(0.3, 1 - penalty(s, 'rate')) * (1 + 0.04 * s.guessed.length) * steady * charged * flying * shaken * trained;
 }
 
 /** Damage an enemy takes: kills are credited to the squad that lands the blow. */
@@ -67,6 +69,7 @@ export function hurtEnemy(run: WarpathRun, si: number, e: Enemy, dmg: number, cr
     if (dmg <= 0) return;
   }
   if (e.status.mark) dmg *= 1.25;
+  if (e.status.daze && run.stratagems?.reignOfTerror) dmg *= STRATAGEMS.reignOfTerror.dmg;
   // Giant Slayer: the big ones take more.
   const slayer = run.doctrines.giantSlayer ?? 0;
   if (slayer && (e.boss || e.elite || e.champ !== undefined)) dmg *= 1 + DOCTRINES.giantSlayer.dmg * slayer * (run.stratagems?.giantKiller ? STRATAGEMS.giantKiller.mul : 1);
@@ -134,7 +137,8 @@ export function strike(run: WarpathRun, grid: Grid, si: number, g: WGun, target:
   const far = !g.melee && dist > W.rules.far;
   const charging = (s.charged ?? 0) > 0;
   const single = (e: Enemy) => !!e.boss || run.enemyKinds[e.kind].pack === 1;
-  const cover = !g.melee && !g.indirect && !g.noCover && terrainAt(run.seed, target.x, target.y)?.kind === 'cover' ? -1 : 0;
+  const sharp = far && !!run.stratagems?.marksmen;
+  const cover = !sharp && !g.melee && !g.indirect && !g.noCover && terrainAt(run.seed, target.x, target.y)?.kind === 'cover' ? -1 : 0;
   const stealth = !g.melee && target.lord?.trick === 'stealth' ? -1 : 0;
   // Unstoppable ignores negative modifiers.
   const pen = g.unstoppable ? 0 : cover + stealth - dodgeOf(k0.body, g.melee, far);
@@ -151,15 +155,16 @@ export function strike(run: WarpathRun, grid: Grid, si: number, g: WGun, target:
     if (g.rapid && dist < g.reach / 2 && rand(run) < 0.34) strike(run, grid, si, g, target, m, aura, false, false);
     if (g.reaping || roleOf(s) === 'reaver') {
       const n = crowd(grid, o.x, o.y);
-      const odds = n >= R.crowdMany ? R.crowdManyOdds : n >= R.crowdFew ? R.crowdFewOdds : 0;
+      const f = s.spec === 'frenzy' ? SPECS.frenzy : undefined;
+      const odds = n >= (f?.many ?? R.crowdMany) ? f?.manyOdds ?? R.crowdManyOdds : n >= (f?.few ?? R.crowdFew) ? f?.fewOdds ?? R.crowdFewOdds : 0;
       if (odds > 0 && rand(run) < odds && target.hp > 0) strike(run, grid, si, g, target, m, aura, false, false);
     }
   }
   if (shot.miss) return;
   const levelDmg = Math.floor(s.level / W.levels.dmgEvery) * 0.5;
   const last = live.find((e) => e.kind === 'lastStand' && s.alive <= s.size / 2);
-  const hunted = roleOf(s) === 'hunter' ? R.huntMul : 1;
-  const mul = m.dmg * (last && last.kind === 'lastStand' ? last.mul : 1);
+  const hunted = roleOf(s) === 'hunter' ? (s.spec === 'marksman' ? SPECS.marksman.mul : R.huntMul) : 1;
+  const mul = m.dmg * (last && last.kind === 'lastStand' ? last.mul : 1) * (g.melee && run.stratagems?.butchersBill ? STRATAGEMS.butchersBill.mul : 1);
   const raw = rawDamage(g.deadly, levelDmg + sixes.reduce((n, e) => n + (e.dmg ?? 0), 0)) * mul;
   const over = has(run, 'overcharge');
   const leap = has(run, 'ricochet');
@@ -167,7 +172,7 @@ export function strike(run: WarpathRun, grid: Grid, si: number, g: WGun, target:
   const apOn = (e: Enemy) => {
     const k = run.enemyKinds[e.kind];
     const tough = k.hp / W.enemy.hpPerTough;
-    let ap = shot.ap - plateOf(k.body, far);
+    let ap = shot.ap - plateOf(k.body, far) + (sharp ? STRATAGEMS.marksmen.ap : 0);
     if (g.thrust && charging) ap += 1;
     if (g.duelist && single(e)) ap += 1;
     if (g.demolish && tough >= 3 && tough <= 9) ap += 2;
@@ -202,7 +207,8 @@ export function strike(run: WarpathRun, grid: Grid, si: number, g: WGun, target:
     if (first) {
       for (const q of live) if (q.kind === 'onHit' && (!q.only || (q.only === 'melee') === g.melee) && rand(run) < q.chance) afflict(run, si, e, q.status);
       if (g.suppress) afflict(run, si, e, 'daze');
-      if (g.slowing) afflict(run, si, e, 'slow');
+      if (g.slowing || s.spec === 'harrier' || (s.spec === 'suppressing' && !g.melee)) afflict(run, si, e, 'slow');
+      if (s.spec === 'spotter') afflict(run, si, e, 'mark');
     }
   };
   hit(target, true);
@@ -245,7 +251,8 @@ export function bestMelee(s: Squad): WGun | undefined {
 /** A body run down in a charge: a blow from its best melee weapon and its Impact hits (2+ to hit, each on its own save). */
 export function rushBlow(run: WarpathRun, grid: Grid, si: number, e: Enemy, m: Mods): void {
   const s = run.squads[si];
-  const g = bestMelee(s);
+  // A hero with no blade to speak of still does its guns' work as it goes through.
+  const g = bestMelee(s) ?? (si === 0 ? s.guns[0] : undefined);
   if (g) strike(run, grid, si, g, e, m, NO_AURA, false, false);
   const n = s.traits?.impact ?? 0;
   const k = run.enemyKinds[e.kind];
@@ -258,7 +265,7 @@ export function rushBlow(run: WarpathRun, grid: Grid, si: number, e: Enemy, m: M
 }
 
 /** The enemy a gun aims at: the nearest in reach, or the toughest for a Sniper; a Hunter's look for elites and bosses
- *  first. Shadowborn bodies can't be reached from as far. */
+ *  first, and every gun gives a boss in reach a share of its shots (the crowd would screen it for ever otherwise). Shadowborn bodies can't be reached from as far. */
 const aimOf = (run: WarpathRun, grid: Grid, s: Squad, g: WGun, m: Mods, aura: Auras) => {
   const o = originOf(run, s);
   const reach = reachOf(s, g, m, aura);
@@ -269,6 +276,10 @@ const aimOf = (run: WarpathRun, grid: Grid, s: Squad, g: WGun, m: Mods, aura: Au
   if (roleOf(s) === 'hunter') {
     const prey = grid.pick(o.x, o.y, reach, true, (e) => (!!e.boss || !!e.elite) && (!seen || seen(e)));
     if (prey) return prey;
+  }
+  if (!g.melee && run.bossesDone > run.captains + run.lordKills && rand(run) < W.bosses.focus) {
+    const boss = grid.pick(o.x, o.y, reach, false, (e) => !!e.boss && (!seen || seen(e)));
+    if (boss) return boss;
   }
   return grid.pick(o.x, o.y, reach, bigGun(g), seen);
 };
@@ -308,7 +319,8 @@ export function fireAll(run: WarpathRun, grid: Grid, dt: number): void {
     }
     timedRules(run, grid, si, dt, m, aura);
     passives(run, grid, si, dt);
-    if (s.traits?.buffs?.length) buffStep(run, s, dt, m);
+    if (s.traits?.buffs?.length || s.spec === 'warBanner') buffStep(run, s, dt, m);
+    if (s.spec === 'fieldSurgeon') surgeonStep(run, s, dt, m);
   });
   shellStep(run, grid, dt, m);
   treeClocks(run, grid, dt);
@@ -325,18 +337,25 @@ function knotFor(run: WarpathRun, grid: Grid, s: Squad, reach: number): { x: num
 /** Shells in the air come down: everything inside takes the gun's hit, each saving on its own. */
 function shellStep(run: WarpathRun, grid: Grid, dt: number, m: Mods): void {
   if (!run.shells?.length) return;
+  const more: Shell[] = [];
   for (const sh of run.shells) {
     sh.t -= dt;
     if (sh.t > 0) continue;
     const s = run.squads[sh.si];
     const g = s?.guns[sh.gun];
     if (!g) continue;
-    const blast = Math.max(g.blast, R.shellBlast);
+    const heavy = s.spec === 'heavyShells';
+    const blast = Math.max(g.blast, R.shellBlast) + (heavy ? SPECS.heavyShells.blast / W.blast.perX : 0);
     const target = grid.pick(sh.x, sh.y, blastRadius(blast));
-    if (target) strike(run, grid, sh.si, { ...g, blast }, target, m, NO_AURA, false, false);
+    if (target) strike(run, grid, sh.si, { ...g, blast, ap: g.ap + (heavy ? SPECS.heavyShells.ap : 0) }, target, m, NO_AURA, false, false);
     else if (run.fx.length < 700) run.fx.push({ kind: 'boom', x: sh.x, y: sh.y, n: blastRadius(blast), t: 0.3 });
+    // A Creeping Barrage walks on: a second landing further from the guns.
+    if (s.spec === 'creeping' && !sh.again) {
+      const d = Math.hypot(sh.x - s.x, sh.y - s.y) || 1;
+      more.push({ ...sh, x: sh.x + ((sh.x - s.x) / d) * SPECS.creeping.step, y: sh.y + ((sh.y - s.y) / d) * SPECS.creeping.step, t: SPECS.creeping.wait, again: true });
+    }
   }
-  run.shells = run.shells.filter((sh) => sh.t > 0);
+  run.shells = [...run.shells.filter((sh) => sh.t > 0), ...more];
 }
 
 /** Rules that work on a clock of their own: Fear shaking nearby foes, field effects. */
@@ -352,15 +371,17 @@ function passives(run: WarpathRun, grid: Grid, si: number, dt: number): void {
 
 /** A Support's boon, in turn, on everyone near it. */
 function buffStep(run: WarpathRun, s: Squad, dt: number, m: Mods): void {
+  const banner = s.spec === 'warBanner';
   s.buffCd = (s.buffCd ?? R.buffEvery / 2) - dt;
   if (s.buffCd > 0) return;
-  s.buffCd = R.buffEvery * m.cd;
-  const list = s.traits!.buffs!;
+  s.buffCd = R.buffEvery * m.cd * (banner ? SPECS.warBanner.every : 1);
+  const list: BoonId[] = s.traits?.buffs?.length ? s.traits.buffs : ['def'];
+  const reach = R.boonReach * (banner ? SPECS.warBanner.reach : 1);
   const id = list[(s.spell = (s.spell ?? 0) + 1) % list.length];
   const o = originOf(run, s);
   for (const q of run.squads) {
     const p = originOf(run, q);
-    if (!onField(q) || (p.x - o.x) ** 2 + (p.y - o.y) ** 2 > R.boonReach ** 2) continue;
+    if (!onField(q) || (p.x - o.x) ** 2 + (p.y - o.y) ** 2 > reach ** 2) continue;
     bless(q, id);
     if (run.fx.length < 700) run.fx.push({ kind: 'boon', x: p.x, y: p.y, n: 2, t: 0.6 });
   }
@@ -383,6 +404,16 @@ function mendNear(run: WarpathRun, o: { x: number; y: number }): void {
   if (run.fx.length < 700) run.fx.push({ kind: 'heal', x: best.x, y: best.y - 2, n: 1, t: 0.8 });
 }
 
+/** A Field Surgeon at work: a model back nearby and the hero mended, on its own clock. */
+function surgeonStep(run: WarpathRun, s: Squad, dt: number, m: Mods): void {
+  const F = SPECS.fieldSurgeon;
+  s.specCd = (s.specCd ?? F.every) - dt;
+  if (s.specCd > 0) return;
+  s.specCd = F.every * m.cd;
+  mendNear(run, s);
+  healHero(run, run.maxHp * F.heal);
+}
+
 /** A caster's next spell (its book's, in turn; a generic blast if it has none). Cost sets the pace. */
 function castStep(run: WarpathRun, grid: Grid, si: number, dt: number, m: Mods): void {
   const s = run.squads[si];
@@ -393,12 +424,13 @@ function castStep(run: WarpathRun, grid: Grid, si: number, dt: number, m: Mods):
   const list = s.spells ?? [];
   const sp: WSpell | undefined = list.length ? list[(s.spell ?? 0) % list.length] : undefined;
   s.spell = (s.spell ?? 0) + 1;
-  const pace = (W.caster.every / s.caster) * m.cd;
+  const pace = (W.caster.every / s.caster) * m.cd * (s.spec === 'adept' ? SPECS.adept.pace : 1);
+  const mass = s.spec === 'massSpell' ? SPECS.massSpell : undefined;
   if (!sp) {
     const target = grid.pick(o.x, o.y, reach);
     if (!target) { s.castCd = 0.5; return; }
     s.castCd = pace;
-    blastAt(run, grid, si, target.x, target.y, W.caster.radius, W.caster.hits * s.caster, W.caster.ap, 4, 'spell');
+    blastAt(run, grid, si, target.x, target.y, W.caster.radius * (mass?.radius ?? 1), Math.round(W.caster.hits * s.caster * (mass?.hits ?? 1)), W.caster.ap, 4, 'spell');
     return;
   }
   s.castCd = pace * (sp.cost / 2);
@@ -419,13 +451,14 @@ function castStep(run: WarpathRun, grid: Grid, si: number, dt: number, m: Mods):
     grid.near(knot.x, knot.y, radius, (e) => { afflict(run, si, e, sp.curse!); });
     return;
   }
-  const radius = sp.radius ?? W.caster.spellRadius;
+  const radius = (sp.radius ?? W.caster.spellRadius) * (mass?.radius ?? 1);
+  const hits = Math.round((sp.hits ?? 1) * W.caster.spellHits * (mass?.hits ?? 1));
   const opts = { deadly: sp.deadly, noRegen: sp.noRegen, spell: true };
-  blastAt(run, grid, si, knot.x, knot.y, radius, (sp.hits ?? 1) * W.caster.spellHits, sp.ap ?? 0, 3, 'spell', opts);
+  blastAt(run, grid, si, knot.x, knot.y, radius, hits, sp.ap ?? 0, 3, 'spell', opts);
   // More targets: other bodies in reach, each its own blast.
   for (let i = 1; i < sp.targets; i++) {
     const other = grid.pick(o.x + (rand(run) - 0.5) * reach, o.y + (rand(run) - 0.5) * reach, reach / 2);
-    if (other) blastAt(run, grid, si, other.x, other.y, radius, (sp.hits ?? 1) * W.caster.spellHits, sp.ap ?? 0, 3, 'spell', opts);
+    if (other) blastAt(run, grid, si, other.x, other.y, radius, hits, sp.ap ?? 0, 3, 'spell', opts);
   }
 }
 

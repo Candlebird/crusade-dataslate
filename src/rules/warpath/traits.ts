@@ -3,7 +3,7 @@ import type { Status } from '../abilities';
 import type { Gun } from '../autoBattle';
 import { hasRule, ruleRating } from '../engine';
 import { rand } from '../training/rng';
-import { WARPATH } from './data';
+import { POWER_OF, WARPATH, type PowerId } from './data';
 import { blastRadius } from './mods';
 import type { BoonId, Body, Blow, EnemyWays, Squad, SquadRole, SquadTraits, WarpathRun, WGun, WSpell } from './types';
 
@@ -140,11 +140,8 @@ export function roleOf(s: Squad): SquadRole {
   return s.caster > 0 ? 'mystic' : 'gunline';
 }
 
-/** The hero's button, if its archetype has one. */
-export const heroPowerOf = (s: Squad): 'rush' | 'blink' | undefined => {
-  const r = roleOf(s);
-  return r === 'charger' ? 'rush' : r === 'phantom' ? 'blink' : undefined;
-};
+/** The hero's order: every archetype gives one. */
+export const heroPowerOf = (s: Squad): PowerId => POWER_OF[roleOf(s)];
 
 /** How an enemy datasheet fights. */
 export function waysFrom(rules: string[], tough: number): EnemyWays | undefined {
@@ -204,7 +201,7 @@ export function spellsOf(u: Unit, books?: CatalogBook[]): WSpell[] | undefined {
 export const boon = (s: Squad, id: BoonId) => (s.boon?.[id] ?? 0) > 0;
 
 /** Give a boon for a while. */
-export function bless(s: Squad, id: BoonId, secs = W.roles.boonSecs): void {
+export function bless(s: Squad, id: BoonId, secs: number = W.roles.boonSecs): void {
   (s.boon ??= {})[id] = Math.max(s.boon[id] ?? 0, secs);
 }
 

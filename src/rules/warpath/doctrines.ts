@@ -1,17 +1,14 @@
 import { rand } from '../training/rng';
 import { blastAt, densest, hurtEnemy } from './combat';
-import { DOCTRINES, STRATAGEMS } from './data';
+import { DOCTRINES, STRATAGEMS, TROPHIES } from './data';
 import type { Grid } from './field';
-import { doc, minutes, mods } from './mods';
+import { deadlyNow, doc, minutes, mods } from './mods';
 import type { WarpathRun } from './types';
 
 // The doctrines that act on the field rather than turn a stat: blades, shells, Shard blasts and martyrs. Their blows grow
 // with the clock, so a pick made early still counts once the swarm has thickened.
 
 const D = DOCTRINES;
-
-/** A blast's Deadly now: one more every four minutes. */
-const deadlyNow = (run: WarpathRun) => 1 + Math.floor(minutes(run) / 4);
 
 /** Where each of the hero's blades is now (none without the doctrine). */
 export function bladesOf(run: WarpathRun): { x: number; y: number; a: number }[] {
@@ -50,6 +47,56 @@ function fireMission(run: WarpathRun, grid: Grid, shells: number): void {
   }
 }
 
+/** Trophies at work: a boss's trick, turned to the hero's use. */
+function trophyStep(run: WarpathRun, grid: Grid, dt: number): void {
+  const c = (run.docClock ??= {});
+  const won = run.trophies ?? {};
+  const T = TROPHIES;
+  const quality = Math.min(4, run.squads[0].quality);
+  if (won.wardStone) {
+    c.ward = (c.ward ?? T.wardStone.every) - dt;
+    if (c.ward <= 0) {
+      c.ward = T.wardStone.every;
+      run.shield = Math.max(run.shield ?? 0, run.maxHp * T.wardStone.shield);
+    }
+  }
+  if (won.stormcaller) {
+    c.storm = (c.storm ?? T.stormcaller.every) - dt;
+    if (c.storm <= 0) {
+      const at = densest(grid, run.hx, run.hy, T.stormcaller.reach);
+      c.storm = at ? T.stormcaller.every : 0.5;
+      if (at) blastAt(run, grid, 0, at.x, at.y, T.stormcaller.radius, T.stormcaller.hits, T.stormcaller.ap, quality, 'spell', { deadly: deadlyNow(run) });
+    }
+  }
+  if (won.burstCore) {
+    c.burst = (c.burst ?? 0) - dt;
+    if (run.struck && c.burst <= 0) {
+      c.burst = T.burstCore.every;
+      blastAt(run, grid, 0, run.hx, run.hy, T.burstCore.radius, T.burstCore.hits, T.burstCore.ap, quality, 'boom', { deadly: deadlyNow(run) });
+    }
+  }
+  run.struck = false;
+  if (won.livingHeart && run.hp > 0 && run.hp < run.maxHp * T.livingHeart.below) run.hp = Math.min(run.maxHp, run.hp + run.maxHp * T.livingHeart.heal * dt);
+}
+
+/** Triage: a model back on whichever unit has lost the most. */
+function triageStep(run: WarpathRun, dt: number): void {
+  const c = (run.docClock ??= {});
+  c.triage = (c.triage ?? STRATAGEMS.triage.every) - dt;
+  if (c.triage > 0) return;
+  c.triage = STRATAGEMS.triage.every;
+  let best;
+  let worst = 1;
+  for (const q of run.squads.slice(1)) {
+    if (q.fort || q.alive <= 0 || q.reserve || q.alive / q.size >= worst) continue;
+    worst = q.alive / q.size;
+    best = q;
+  }
+  if (!best) return;
+  best.alive += 1;
+  if (run.fx.length < 700) run.fx.push({ kind: 'heal', x: best.x, y: best.y - 2, n: 1, t: 0.8 });
+}
+
 /** The doctrines' own clocks, once a step. */
 export function doctrineStep(run: WarpathRun, grid: Grid, dt: number): void {
   const c = (run.docClock ??= {});
@@ -86,4 +133,7 @@ export function doctrineStep(run: WarpathRun, grid: Grid, dt: number): void {
     const p = run.martyrs.shift()!;
     blastAt(run, grid, 0, p.x, p.y, M.radius * chain, Math.round(M.hits * doc(run, 'martyrdom') * chain), M.ap, quality, 'boom', { deadly: deadlyNow(run) });
   }
+
+  if (run.stratagems?.triage) triageStep(run, dt);
+  trophyStep(run, grid, dt);
 }

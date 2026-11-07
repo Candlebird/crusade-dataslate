@@ -1,4 +1,4 @@
-import { DOCTRINES, WARPATH, type DoctrineId } from './data';
+import { DOCTRINES, HERO_POWERS, WARPATH, type DoctrineId, type PowerId } from './data';
 import { has, HONOURS, honoursOf, metaLv, TREE_FX as T } from './meta';
 import type { Enemy, Squad, WarpathRun } from './types';
 
@@ -9,6 +9,12 @@ export const doc = (run: WarpathRun, id: DoctrineId) => run.doctrines[id] ?? 0;
 
 /** Is Fire at Will's window open? */
 export const atWill = (run: WarpathRun) => has(run, 'barrage') && run.t % T.barrageEvery < T.barrageSecs;
+
+/** Is this timed order of the hero's still running? */
+export const ordered = (run: WarpathRun, id: PowerId) => run.order?.id === id && run.order.until > run.t;
+
+/** A blast's Deadly now: one more every four minutes. */
+export const deadlyNow = (run: WarpathRun) => 1 + Math.floor(run.t / 240);
 
 /** Doctrine totals, per stat. */
 export function mods(run: WarpathRun) {
@@ -26,7 +32,7 @@ export function mods(run: WarpathRun) {
   const stance = run.stance ?? 0;
   const moving = free || stance >= D.manoeuvre.after ? 1 + D.manoeuvre.rate * l('manoeuvre') : 1;
   const braced = free || stance <= -D.manoeuvre.after ? 1 - D.manoeuvre.guard * l('manoeuvre') : 1;
-  const all = hymn * tree * spree * moving * (atWill(run) ? 1 + T.barrageRate : 1);
+  const all = hymn * tree * spree * moving * (atWill(run) ? 1 + T.barrageRate : 1) * (ordered(run, 'volley') ? HERO_POWERS.volley.rate : 1);
   return {
     shootRate: (1 + D.relentless.rate * l('relentless')) * all,
     meleeRate: (1 + D.furious.rate * l('furious')) * all,
@@ -75,7 +81,7 @@ export function guardianMul(run: WarpathRun, e: Enemy): number {
 export const softDeadly = (deadly: number, mul: number) => Math.max(1, Math.round(1 + (deadly - 1) * mul));
 
 /** The hero's most HP: hpMin + Tough × hpPerTough, + a share a level. */
-/** Wounds a model in this squad takes to fall: its Tough x squadHp, doubled by each drill level. */
+/** Wounds a model in this squad takes to fall: its Tough x squadHp, multiplied by each drill level. */
 export const woundsPer = (s: Squad) => s.tough * WARPATH.losses.squadHp * WARPATH.levels.woundsMul ** s.level;
 
 export function heroMaxHp(run: WarpathRun): number {

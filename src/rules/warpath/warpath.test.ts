@@ -3,14 +3,15 @@ import { readFileSync } from 'node:fs';
 import { normalizeBook } from '../../armyforge/book';
 import type { Force } from '../../model/types';
 import { FORCES } from '../training/testForces';
-import { DOCTRINE_IDS, DOCTRINES, ROLES, STRATAGEM_IDS, STRATAGEM_LEVEL, STRATAGEMS, WARPATH } from './data';
+import { BOSS_TRICKS, DOCTRINE_IDS, DOCTRINES, HERO_POWERS, POWER_OF, ROLES, SPEC_IDS, SPECS, STRATAGEM_IDS, STRATAGEM_LEVEL, STRATAGEMS, TROPHIES, WARPATH } from './data';
 import { bladesOf, doctrineStep } from './doctrines';
-import { buildOf, candidates, cardText, choose, drawOffer, reroll, skip, xpNeed } from './levels';
+import { buildOf, candidates, cardText, choose, drawOffer, nextBoss, openLevelUp, reroll, skip, xpNeed } from './levels';
 import { autoplay, freshenRun, heroesOf, newRun, step } from './sim';
 import { hordeStep, siteStep } from './events';
 import { callIn, callLevel } from './levels';
 import { enemyKindsOf } from './roster';
-import { hurtHero, hurtSquad, missileStep, spawnEnemy, strikeSquad } from './enemies';
+import { bossStep, hurtHero, hurtSquad, missileStep, spawnEnemy, strikeSquad } from './enemies';
+import { bossName } from './loot';
 import { atWill, blastRadius, guardianMul, softDeadly, woundsPer } from './mods';
 import { chunkTerrain, Grid, inCover } from './field';
 import { heroCooldown, squadStep } from './squads';
@@ -281,7 +282,7 @@ describe('Warpath', () => {
     expect(run.enemies.length).toBe(n);
   });
 
-  it('each drill level doubles the wounds a model takes to fall', () => {
+  it('each drill level multiplies the wounds a model takes to fall', () => {
     let run = start(0);
     for (let i = 0; i < 6 && !run.squads.some((q) => q.kind === 'foot'); i++) autoplay((run = start(i)), 180);
     const s = run.squads.find((q) => q.kind === 'foot')!;
@@ -291,11 +292,12 @@ describe('Warpath', () => {
     const base = s.tough * WARPATH.losses.squadHp;
     expect(woundsPer(s)).toBe(base);
     s.level = 2;
-    expect(woundsPer(s)).toBe(base * 4);
+    const tall = base * WARPATH.levels.woundsMul ** 2;
+    expect(woundsPer(s)).toBeCloseTo(tall);
     const k = 1 / mods(run).losses;
-    hurtSquad(run, s, base * 3.9 * k);
+    hurtSquad(run, s, tall * 0.97 * k);
     expect(s.alive).toBe(s.size);
-    hurtSquad(run, s, base * 0.2 * k);
+    hurtSquad(run, s, tall * 0.06 * k);
     expect(s.alive).toBe(s.size - 1);
   });
 
@@ -362,13 +364,14 @@ describe('Warpath', () => {
     const open = lost(t!.x + 500, t!.y + 500);
     const covered = lost(t!.x, t!.y);
     expect(covered).toBeLessThan(open * 0.35);
-    // Wiped far from the hero: the first model back comes in at the hero's side.
+    // Wiped far from the hero: it comes back at half strength at the hero's side, briefly out of reach.
     s.size = 5;
     s.alive = 0;
     s.x = run.hx + 30;
     s.regen = 0.001;
     squadStep(run, new Grid(), 0.01);
-    expect(s.alive).toBe(1);
+    expect(s.alive).toBe(3);
+    expect(s.safe).toBeGreaterThan(0);
     expect(Math.hypot(s.x - run.hx, s.y - run.hy)).toBeLessThan(WARPATH.follow.ring + 2);
   });
 
@@ -525,16 +528,20 @@ describe('Warpath', () => {
     expect(heroCooldown(run)?.left).toBeGreaterThan(0);
   });
 
-  it('a Phantom hero blinks on the button; a Gunline hero has no button', () => {
+  it('every archetype gives its hero an order: a Phantom blinks, a Gunline fires a Volley', () => {
     const run = start(0);
     run.squads[0].role = 'phantom';
     const from = run.hx;
     step(run, { dx: 1, dy: 0, act: true });
-    expect(run.hx - from).toBeGreaterThan(WARPATH.roles.heroBlink / 2);
+    expect(run.hx - from).toBeGreaterThan(HERO_POWERS.blink.len / 2);
     expect(heroCooldown(run)?.power).toBe('blink');
     const plain = start(0);
     plain.squads[0].role = 'gunline';
-    expect(heroCooldown(plain)).toBeUndefined();
+    expect(heroCooldown(plain).power).toBe('volley');
+    const rate = mods(plain).shootRate;
+    step(plain, { dx: 0, dy: 0, act: true });
+    expect(mods(plain).shootRate).toBeCloseTo(rate * HERO_POWERS.volley.rate);
+    expect(heroCooldown(plain).left).toBeGreaterThan(0.9);
   });
 
   it('an Ambusher comes in off the field; a save from before archetypes reads them from the force', () => {
@@ -873,5 +880,91 @@ describe('Warpath', () => {
     const b = go();
     expect(a.kills).toBe(b.kills);
     expect(JSON.parse(JSON.stringify(a)).doctrines).toEqual(a.doctrines);
+  });
+
+  it('every archetype has an order and two specialisations, and the tables agree', () => {
+    for (const r of Object.keys(ROLES) as (keyof typeof ROLES)[]) {
+      expect(HERO_POWERS[POWER_OF[r]]).toBeDefined();
+      expect(SPEC_IDS.filter((id) => SPECS[id].role === r)).toHaveLength(2);
+    }
+    for (const t of BOSS_TRICKS.deck) expect(TROPHIES[BOSS_TRICKS.trophy[t]]).toBeDefined();
+  });
+
+  it('a unit that reaches the drill level is offered its specialisation, free of charge, and keeps it', () => {
+    const run = start(0);
+    autoplay(run, 180);
+    const s = run.squads[1];
+    run.phase = 'play';
+    run.offer = [];
+    for (const q of run.squads) q.spec = 'spotter';
+    delete s.spec;
+    s.level = WARPATH.levels.specAt;
+    run.queued = 1;
+    const need = run.queued;
+    expect(openLevelUp(run)).toBe(true);
+    expect(run.offer).toHaveLength(2);
+    expect(run.offer.every((c) => c.kind === 'spec')).toBe(true);
+    expect(run.queued).toBe(need);
+    skip(run);
+    reroll(run);
+    expect(run.phase).toBe('card');
+    const card = run.offer[0];
+    expect(cardText(run, card).text).not.toBe('');
+    choose(run, 0);
+    expect(s.spec).toBe(card.kind === 'spec' ? card.spec : undefined);
+    expect(run.queued).toBe(need - 1);
+  });
+
+  it('a boss plays a trick from the run\'s deck, says so, and its drop offers the trophy once', () => {
+    const run = start(0);
+    run.t = WARPATH.bosses.captainEvery;
+    run.phase = 'play';
+    const coming = (bossStep(run), run.bossDeck![0]);
+    const boss = run.enemies.find((e) => e.boss)!;
+    expect(boss.lord?.trick).toBe(coming);
+    expect(bossName(run, boss)).toContain(BOSS_TRICKS.names[coming]);
+    expect(run.banner?.text).toContain(BOSS_TRICKS.text[coming]);
+    expect(nextBoss(run)?.at).toBe(WARPATH.bosses.captainEvery * 2);
+    const id = BOSS_TRICKS.trophy[coming];
+    run.trophyDue = [id];
+    run.queued = 1;
+    run.offer = [];
+    openLevelUp(run);
+    expect(run.offer[0]).toEqual({ kind: 'trophy', id });
+    choose(run, 0);
+    expect(run.trophies?.[id]).toBe(true);
+    expect(run.trophyDue).toEqual([]);
+  });
+
+  it('a trophy passed over is gone, and the run deals its bosses the same way from the same seed', () => {
+    const run = start(0);
+    run.phase = 'play';
+    run.trophyDue = ['warHorn'];
+    run.queued = 1;
+    openLevelUp(run);
+    skip(run);
+    expect(run.trophyDue).toEqual([]);
+    expect(run.trophies?.warHorn).toBeFalsy();
+    const deck = () => { const r = start(0); r.t = WARPATH.bosses.captainEvery; bossStep(r); return r.bossDeck; };
+    expect(deck()).toEqual(deck());
+  });
+
+  it('an open stratagem always shows in the offer', () => {
+    const run = start(1);
+    run.doctrines.fireMission = STRATAGEM_LEVEL;
+    run.doctrines.shrapnel = STRATAGEM_LEVEL;
+    for (let i = 0; i < 12; i++) expect(drawOffer(run).some((c) => c.kind === 'stratagem')).toBe(true);
+  });
+
+  it('a regrouped squad cannot be touched for a moment', () => {
+    const run = start(0);
+    autoplay(run, 120);
+    const s = run.squads.find((q, i) => i > 0 && !q.fort)!;
+    s.alive = s.size;
+    const before = s.alive;
+    s.safe = 2;
+    hurtSquad(run, s, 9999);
+    strikeSquad(run, s, 50, 2, 4, 1, 1);
+    expect(s.alive).toBe(before);
   });
 });

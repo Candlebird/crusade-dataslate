@@ -9,7 +9,7 @@ import { DOCTRINE_IDS, WARPATH } from './data';
 import { doctrineStep } from './doctrines';
 import { Grid, unblock } from './field';
 import { enemyStep, feared, missileStep, spawnStep, bossStep, hurtHero } from './enemies';
-import { gainXp, openLevelUp, choose, candidates } from './levels';
+import { gainXp, openLevelUp, choose, candidates, pairOf } from './levels';
 import { collect } from './loot';
 import { hordeStep, siteStep } from './events';
 import { heroMaxHp, mods } from './mods';
@@ -206,7 +206,7 @@ export function botInput(run: WarpathRun): Input {
   let best = 400;
   for (const p of run.pickups) {
     const d2 = (p.x - run.hx) ** 2 + (p.y - run.hy) ** 2;
-    const want = p.kind === 'ration' ? (run.hp < run.maxHp * 0.6 ? 0.2 : 9) : p.kind === 'gem' ? 1 : 0.5;
+    const want = p.kind === 'ration' ? (run.hp < run.maxHp * 0.6 ? 0.2 : 9) : p.kind === 'gem' ? 1 : 0.1;
     if (d2 * want < best) { best = d2 * want; goal = p; }
   }
   // Nothing close to pick up and nothing pressing: go out to a site (an aid station only when the hero is hurt or a unit has lost half its models; champions are left).
@@ -241,8 +241,10 @@ export function botPick(run: WarpathRun): number {
       const s = run.squads.find((x) => x.unitId === c.unitId);
       return s?.kind === 'hero' ? 60 : 40 + (s ? s.dealt / Math.max(1, run.squads.reduce((n, x) => n + x.dealt, 0)) * 30 : 0);
     }
-    if (c.kind === 'stratagem') return 70;
-    if (c.kind === 'doctrine') return 45 + (run.doctrines[c.id] ?? 0) * 3 + (['relentless', 'deadlyStrikes', 'holdLine', 'fieldMedics'].includes(c.id) ? 8 : 0);
+    if (c.kind === 'spec') return 200;
+    if (c.kind === 'stratagem') return 150;
+    if (c.kind === 'trophy') return 140;
+    if (c.kind === 'doctrine') return 45 + (run.doctrines[c.id] ?? 0) * 3 + (['relentless', 'deadlyStrikes', 'holdLine', 'fieldMedics'].includes(c.id) ? 8 : 0) + (pairOf(run, c.id)?.held ? 18 : 0);
     return 0;
   };
   let bi = 0;

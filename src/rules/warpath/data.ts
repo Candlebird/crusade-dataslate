@@ -27,7 +27,7 @@ export const WARPATH = {
   /** Squads as bodies: an enemy goes for a squad whose edge is within `aggro` and nearer than the hero. Wounds on a
    *  squad (x `squadDmg`) take its models, each with Tough x `squadHp` wounds; one strike fells at most one model, and
    *  what's left of it is lost. Lost models come back one per `regen` s. */
-  losses: { aggro: 8, squadDmg: 1.25, squadHp: 2, regen: 10 },
+  losses: { aggro: 8, squadDmg: 1, squadHp: 2, regen: 10, regroup: 6, back: 0.5, safe: 4 },
   /** Flyers make straight strafing runs: `speed` inches a second at the thickest pack within `seek` of the hero, `over`
    *  past it and round again, firing `rate` x as fast (they're only over the target a moment). */
   air: { speed: 34, seek: 24, over: 18, rate: 1.4 },
@@ -58,8 +58,8 @@ export const WARPATH = {
     ferryReach: 10, ferryRate: 2, boonSecs: 8, boonReach: 12, buffEvery: 8, mendReach: 10,
     /** Passive rules on a `pulseEvery` clock: Scout pulls Shards within `scoutPull`; Fear dazes foes within `fearR`. */
     pulseEvery: 0.5, scoutPull: 5, fearR: 5,
-    /** The hero's button: a charge `heroRush`" long every `heroRushEvery` s; a blink `heroBlink`" every `heroBlinkEvery` s, bursting on foes within `heroSwarm`. */
-    heroRush: 16, heroRushEvery: 10, heroBlink: 10, heroBlinkEvery: 10, heroSwarm: 4, heroBlinkSafe: 0.4,
+    /** What arrives out of nowhere (a blink, an ambush) hits all within `heroSwarm`. The hero's orders are in HERO_POWERS. */
+    heroSwarm: 4,
     /** Fear on a squad: `shaken` s of firing at `shakenRate`. Boons: `speedBoon` x speed, +`reachBoon`" reach. */
     shaken: 2, shakenRate: 0.7, speedBoon: 1.3, reachBoon: 3.6,
   },
@@ -82,13 +82,14 @@ export const WARPATH = {
    *  s, lift off past `leash` and drop again near the hero `redrop` s later (keeping their wounds). `hpPerTough`: their HP. */
   fort: { land: 8, impact: 4, impactRadius: 3.5, respawn: 10, perPts: 0.1, leash: 36, redrop: 3, hpPerTough: 15, surcharge: 1 },
   /** Level-ups. Need for level n (from 1): base + lin × n + sq × n². */
-  xp: { base: 10, lin: 1.5, sq: 0.55, gemMerge: 300 },
-  /** Call-in cards only on every `callEvery`-th level-up (and one is then always offered if a unit fits). */
-  cards: { callEvery: 3, offer: 3, rerolls: 3, skipHeal: 0.2, healAtMax: 0.15 },
+  xp: { base: 10, lin: 1.5, sq: 0.85, gemMerge: 300 },
+  /** Call-in cards only on every `callEvery`-th level-up (and one is then always offered if a unit fits). Doctrines already
+   *  held, and partners of those held, show up `leanHeld` and `leanPair` times as often. */
+  cards: { leanHeld: 1.8, leanPair: 2.2, callEvery: 3, offer: 3, rerolls: 3, skipHeal: 0.2, healAtMax: 0.15 },
   /** Units and the hero level to 5 (+1 a trait, −1 a scar); each level: attacks rate, reach, damage on even levels. */
   /** Per drill level: fire rate, reach, harder hits every `dmgEvery`, hero HP and speed; each model's wounds (and a
    *  turret's HP) ×`woundsMul`. */
-  levels: { max: 5, rate: 0.14, reach: 0.1, dmgEvery: 2, hp: 0.12, speed: 0.03, woundsMul: 2 },
+  levels: { max: 5, rate: 0.14, reach: 0.1, dmgEvery: 2, hp: 0.12, speed: 0.03, woundsMul: 1.6, specAt: 1, specKills: 40 },
   /** Doctrine slots and levels. */
   doctrines: { slots: 6, max: 5 },
   /** Relics fire a golden volley on their own clock. */
@@ -119,7 +120,8 @@ export const WARPATH = {
    *  `fullAt` minutes. Lords always hit in full. */
   guardian: { from: 0.25, fullAt: 12 },
   /** Bosses: attacks × blows (a lord × lordBlows) every `every` × the usual clock; a captain every 3 min, an Echo Lord every 15 (wounds at minute 5, + a share a minute). */
-  bosses: { blows: 2, lordBlows: 3, every: 1.5, captainEvery: 180, lordEvery: 900, captainHp: 175, lordHp: 440, hpPerMin: 0.09, size: 3.2, lordSize: 4.4, drop: 1 },
+  /** `focus`: the share of shots that go to a boss in reach rather than the nearest body. Past `far` a boss closes at `closing` x its pace. */
+  bosses: { focus: 0.5, far: 6, closing: 2, blows: 2, lordBlows: 3, every: 1.5, captainEvery: 180, lordEvery: 900, captainHp: 175, lordHp: 440, hpPerMin: 0.09, size: 3.2, lordSize: 4.4, drop: 1 },
   /** Elites (as in Training): from `from` s, a share of the swarm (+ perMin a minute, to max) with more wounds, harder
    *  blows, a bigger body and a gold rim; their Shard is worth `xp` times as much. */
   elite: { from: 60, share: 0.03, perMin: 0.012, max: 0.17, hp: 3, dmg: 1.5, size: 1.35, xp: 5 },
@@ -192,9 +194,9 @@ export type DoctrineId = keyof typeof DOCTRINES;
 export const DOCTRINE_IDS = Object.keys(DOCTRINES) as DoctrineId[];
 
 /** The level both doctrines need before their stratagem can turn up. */
-export const STRATAGEM_LEVEL = 3;
+export const STRATAGEM_LEVEL = 2;
 
-/** Stratagems: two doctrines that belong together, both at level 3, open a one-off card that changes how they work. */
+/** Stratagems: two doctrines that belong together, both at STRATAGEM_LEVEL, open a one-off card that changes how they work. */
 export const STRATAGEMS = {
   stormOfSteel: { name: 'Storm of Steel', icon: 'g:sword-spin', needs: ['whirlingBlades', 'relentless'], text: 'Blades spin 40% faster and circle 2" wider.', spin: 1.4, reach: 2 },
   bloodFrenzy: { name: 'Blood Frenzy', icon: 'g:bloody-stash', needs: ['bloodTithe', 'killingSpree'], text: "Every unit's kills pay a third of the Blood Tithe.", share: 1 / 3 },
@@ -203,7 +205,93 @@ export const STRATAGEMS = {
   hitAndRun: { name: 'Hit and Run', icon: 'g:run', needs: ['manoeuvre', 'rapidAdvance'], text: 'Both halves of Fire and Manoeuvre work all the time.' },
   lastLine: { name: 'The Last Line', icon: 'g:trumpet-flag', needs: ['rallyingCry', 'holdLine'], text: 'Each Rallying Cry also shields the hero for 8% HP.', shield: 0.08 },
   giantKiller: { name: 'Giant Killer', icon: 'g:thunder-blade', needs: ['giantSlayer', 'armourPiercing'], text: 'Giant Slayer counts double.', mul: 2 },
+  butchersBill: { name: "Butcher's Bill", icon: 'g:bloody-sword', needs: ['furious', 'deadlyStrikes'], text: 'Melee attacks do 30% more damage.', mul: 1.3 },
+  marksmen: { name: 'Marksmen', icon: 'g:high-shot', needs: ['goodShot', 'veteranDrills'], text: 'Shots from past 5" ignore cover and gain AP(1).', ap: 1 },
+  triage: { name: 'Triage', icon: 'g:crowned-heart', needs: ['fieldMedics', 'reinforcements'], text: 'Every 6s a model comes back on your most hurt unit.', every: 6 },
+  leyLines: { name: 'Ley Lines', icon: 'g:floating-crystal', needs: ['shardLure', 'arcaneFocus'], text: "Every Shard you pick up takes 0.1s off the hero's order.", cut: 0.1 },
+  reignOfTerror: { name: 'Reign of Terror', icon: 'g:dread-skull', needs: ['fearTactics', 'killingSpree'], text: 'Fear Tactics reaches twice as far, and dazed enemies take 20% more damage.', reach: 2, dmg: 1.2 },
 } as const;
 
 export type StratagemId = keyof typeof STRATAGEMS;
 export const STRATAGEM_IDS = Object.keys(STRATAGEMS) as StratagemId[];
+
+/** The hero's order, by archetype: the button (Space) and how often it comes back. */
+export const HERO_POWERS = {
+  rush: { name: 'Charge', text: 'Rush through the enemy, untouchable, running down all you pass.', every: 10, len: 16 },
+  strafe: { name: 'Strafe', text: 'A long, untouchable run over the enemy, hitting all you pass.', every: 12, len: 24 },
+  blink: { name: 'Blink', text: 'Jump ahead, hurting what stands at both ends.', every: 10, len: 10, safe: 0.4 },
+  vanish: { name: 'Vanish', text: 'Drop out of sight, reappear far ahead and hit all round you.', every: 13, len: 18, safe: 1.2 },
+  whirl: { name: 'Whirlwind', text: 'Cut twice at everything round you, briefly untouchable.', every: 9, radius: 8, safe: 0.5 },
+  nova: { name: 'Nova', text: 'A blast round the hero that throws the crowd back.', every: 12, radius: 9, hits: 22, ap: 1, push: 5 },
+  barrage: { name: 'Barrage', text: 'Five shells land on the thickest packs in reach.', every: 14, shells: 5, reach: 30, radius: 4, hits: 9, ap: 1 },
+  volley: { name: 'Volley', text: 'Every unit fires 50% faster for 4s.', every: 14, secs: 4, rate: 1.5 },
+  mark: { name: 'Mark Prey', text: 'Elites and bosses in reach, and everything close by, take 25% more damage for 8s.', every: 12, reach: 26, near: 10, secs: 8 },
+  sprint: { name: 'Sprint', text: 'Run 60% faster for 3s and pull in the Shards around you.', every: 11, secs: 3, speed: 1.6, pull: 20 },
+  brace: { name: 'Brace', text: 'Throw back what is round the hero and take 65% less damage for 4s.', every: 13, secs: 4, cut: 0.35, reach: 8, push: 5 },
+  rally: { name: 'Rally', text: "Mend 12% HP, put a model back on every unit, and steady everyone's aim for 6s.", every: 16, heal: 0.12, secs: 6 },
+} as const;
+export type PowerId = keyof typeof HERO_POWERS;
+
+/** Which order each archetype gives its hero. */
+export const POWER_OF: Record<keyof typeof ROLES, PowerId> = {
+  charger: 'rush', flyer: 'strafe', phantom: 'blink', ambusher: 'vanish', reaver: 'whirl', mystic: 'nova', artillery: 'barrage',
+  gunline: 'volley', hunter: 'mark', skirmisher: 'sprint', bulwark: 'brace', fortress: 'brace', support: 'rally',
+};
+
+/** Specialisations: at drill level `levels.specAt`, or `levels.specKills` kills, a unit (not the hero) picks one of its archetype's two, for good. */
+export const SPECS = {
+  firingLine: { role: 'gunline', name: 'Firing Line', text: 'Settles in half the time, and a steady aim fires 45% faster instead of 15%.', after: 0.5, rate: 0.45 },
+  suppressing: { role: 'gunline', name: 'Suppressing Fire', text: 'Every enemy it hits at range is slowed.' },
+  creeping: { role: 'artillery', name: 'Creeping Barrage', text: 'Each shell lands twice, the second further on.', step: 5, wait: 0.35 },
+  heavyShells: { role: 'artillery', name: 'Heavy Shells', text: 'Shells burst 1.5" wider and gain AP(1).', blast: 1.5, ap: 1 },
+  overwatch: { role: 'fortress', name: 'Overwatch', text: 'Reaches 30% further and fires 25% faster.', reach: 1.3, rate: 1.25 },
+  strongpoint: { role: 'fortress', name: 'Strongpoint', text: 'Twice the HP, and enemies nearby go for it first.', hp: 2, taunt: 6 },
+  gunship: { role: 'flyer', name: 'Gunship', text: 'Fires 50% faster on its runs.', rate: 1.5 },
+  bombRun: { role: 'flyer', name: 'Bomb Run', text: 'Drops a bomb on the pack at the heart of each pass.', radius: 4.5, hits: 10, ap: 1 },
+  momentum: { role: 'charger', name: 'Momentum', text: 'Rushes again in half the time.', cd: 0.5 },
+  trample: { role: 'charger', name: 'Trample', text: 'A rush runs down a path 60% wider and hits all it meets twice.', radius: 1.6 },
+  reaper: { role: 'phantom', name: 'Reaper', text: 'Blinks nearly twice as often.', every: 0.55 },
+  wraith: { role: 'phantom', name: 'Wraith', text: 'Stays in the pack twice as long, and hits all round it again as it leaves.', stay: 2 },
+  deepStrike: { role: 'ambusher', name: 'Deep Strike', text: 'Back on the field in under half the time.', wait: 0.4 },
+  alphaStrike: { role: 'ambusher', name: 'Alpha Strike', text: 'Its landing hits twice, and its fury lasts 5s.', fury: 5 },
+  adept: { role: 'mystic', name: 'Adept', text: 'Casts about half again as often.', pace: 0.65 },
+  massSpell: { role: 'mystic', name: 'Mass Spell', text: 'Spells reach 50% wider and land 50% more hits.', radius: 1.5, hits: 1.5 },
+  fieldSurgeon: { role: 'support', name: 'Field Surgeon', text: 'Every 5s a model back on a unit near it, and the hero mends 1.5% HP.', every: 5, heal: 0.015 },
+  warBanner: { role: 'support', name: 'War Banner', text: 'Its boons come 40% sooner and reach twice as far.', every: 0.6, reach: 2 },
+  marksman: { role: 'hunter', name: 'Marksman', text: 'Hits elites and bosses 75% harder instead of 25%.', mul: 1.75 },
+  spotter: { role: 'hunter', name: 'Spotter', text: 'What it hits is marked: everyone does 25% more damage to it.' },
+  outrider: { role: 'skirmisher', name: 'Outrider', text: 'Pulls Shards in from three times as far.', pull: 3 },
+  harrier: { role: 'skirmisher', name: 'Harrier', text: 'Slows what it hits, and fires 30% faster on the move.', rate: 1.3 },
+  shieldWall: { role: 'bulwark', name: 'Shield Wall', text: 'The hero takes 20% less damage within 7" of it.', reach: 7, cut: 0.8 },
+  retribution: { role: 'bulwark', name: 'Retribution', text: 'Stomps twice as often and 50% wider.', every: 0.5, radius: 1.5 },
+  bloodbath: { role: 'reaver', name: 'Bloodbath', text: 'Its kills heal its wounds; every 4th brings a model back.', every: 4 },
+  frenzy: { role: 'reaver', name: 'Frenzy', text: 'Its extra attacks start at 3 foes round it, and come more often.', few: 3, many: 6, fewOdds: 0.5, manyOdds: 0.9 },
+} as const;
+export type SpecId = keyof typeof SPECS;
+export const SPEC_IDS = Object.keys(SPECS) as SpecId[];
+
+/** Trophies: a boss's trick, won by felling it. Its supply drop offers the trophy as a card among the others. */
+export const TROPHIES = {
+  phaseAnchor: { name: 'Phase Anchor', icon: 'g:vortex', text: "The hero's order comes back 30% sooner.", cd: 0.7 },
+  wardStone: { name: 'Ward Stone', icon: 'g:energy-shield', text: 'Every 15s the hero gains a shield of 10% HP.', every: 15, shield: 0.1 },
+  warHorn: { name: 'War Horn', icon: 'g:trumpet-flag', text: "Elites' Shards are worth twice as much.", xp: 2 },
+  burstCore: { name: 'Burst Core', icon: 'g:sun-radiations', text: 'When the hero is hit, a ring bursts out from it (every 6s at most).', every: 6, radius: 7, hits: 14, ap: 1 },
+  stormcaller: { name: 'Stormcaller', icon: 'g:power-lightning', text: 'Every 8s lightning strikes the thickest pack near the hero.', every: 8, reach: 26, radius: 5, hits: 14, ap: 2 },
+  livingHeart: { name: 'Living Heart', icon: 'g:crowned-heart', text: 'Below half HP, the hero mends 1.2% HP a second.', below: 0.5, heal: 0.012 },
+} as const;
+export type TrophyId = keyof typeof TROPHIES;
+export const TROPHY_IDS = Object.keys(TROPHIES) as TrophyId[];
+
+/** Boss tricks: what a boss does on the field, and the trophy it leaves. Captains play theirs at `captainPace` x the
+ *  clock, with blows at their guardian share. Nexus-only tricks fall in with the nearest trophy. */
+export const BOSS_TRICKS = {
+  captainPace: 1.6,
+  deck: ['burst', 'summon', 'teleport', 'shield', 'storm', 'regen'],
+  names: { teleport: 'the Phasing', shield: 'the Warded', summon: 'the Summoner', burst: 'the Burning', storm: 'the Stormbringer', regen: 'the Undying', fear: 'the Dread', armour: 'the Ironclad', stealth: 'the Unseen' },
+  text: {
+    teleport: 'It blinks to your side when you run.', shield: 'A ward soaks its damage, and comes back.', summon: 'It calls more bodies to its side.',
+    burst: 'It throws out rings of fire.', storm: 'It calls blasts down round you.', regen: 'It mends itself as it fights.',
+    fear: 'You run slower near it.', armour: 'It is harder to wound.', stealth: 'It is harder to shoot.',
+  },
+  trophy: { teleport: 'phaseAnchor', shield: 'wardStone', summon: 'warHorn', burst: 'burstCore', storm: 'stormcaller', regen: 'livingHeart', fear: 'warHorn', armour: 'wardStone', stealth: 'phaseAnchor' },
+} as const;

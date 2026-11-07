@@ -1,4 +1,4 @@
-import { buildOf, type WarpathRun } from '../../rules/warpath';
+import { buildOf, clock, type WarpathRun } from '../../rules/warpath';
 import { Icon } from '../Icon';
 import { RoleBadge } from './RoleBadge';
 
@@ -35,6 +35,13 @@ export function WarpathBuild({ run, onClose }: { run: WarpathRun; onClose: () =>
       <div className="warpath-build-pane">
         <h2>Your build</h2>
         <p className="muted small">{b.doctrines.length}/{b.slots} doctrines · {taken} {taken === 1 ? 'stratagem' : 'stratagems'}</p>
+        {b.next && (
+          <section>
+            <h3>Next boss</h3>
+            <p><b>{b.next.lord ? 'Echo Lord' : 'Captain'} {b.next.name}</b> <span className="warpath-build-tag">{clock(b.next.at)}</span></p>
+            <p className="small muted">{b.next.text} {b.next.held ? `You hold its trophy, ${b.next.trophy}.` : `Fell it to win ${b.next.trophy}.`}</p>
+          </section>
+        )}
         <section>
           <h3>Synergies</h3>
           {b.pairs.length === 0 && <p className="muted small">Take a doctrine to start a pair. Two paired doctrines at level {b.pairLevel} open a stratagem.</p>}
@@ -65,13 +72,26 @@ export function WarpathBuild({ run, onClose }: { run: WarpathRun; onClose: () =>
             <p className="small muted">Numbers are per level unless the text says otherwise.</p>
           </section>
         )}
+        {b.trophies.length > 0 && (
+          <section>
+            <h3>Trophies</h3>
+            <ul>
+              {b.trophies.map((t) => (
+                <li key={t.name}><Icon name={t.icon} /><div><b>{t.name}</b><p>{t.text}</p></div></li>
+              ))}
+            </ul>
+          </section>
+        )}
         <section>
           <h3>Force</h3>
           <ul>
             {b.units.map((u) => (
               <li key={u.id} className="warpath-build-unit">
                 <RoleBadge role={u.role} bare />
-                <div><b>{u.name}</b> <span className="warpath-build-tag">Level {u.level}/{u.max}</span></div>
+                <div>
+                  <b>{u.name}</b> <span className="warpath-build-tag">Level {u.level}/{u.max}</span>
+                  {u.spec && <p><b>{u.spec.name}:</b> {u.spec.text}</p>}
+                </div>
               </li>
             ))}
           </ul>

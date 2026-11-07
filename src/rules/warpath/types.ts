@@ -1,7 +1,7 @@
 import type { Effect, Status } from '../abilities';
 import type { RelicTier } from '../data';
 import type { LordTrick } from '../training/types';
-import type { DoctrineId, StratagemId } from './data';
+import type { DoctrineId, PowerId, SpecId, StratagemId, TrophyId } from './data';
 
 // Every shape a Warpath run holds. A run is plain data (JSON in and out) so it saves to the device and the cloud and
 // plays on with the same dice; the flock's bodies (view.ts) are rebuilt from it and never saved.
@@ -145,6 +145,11 @@ export interface Squad {
   saveAura?: number;
   /** A clock for passive rules (Scout, Fear, field effects). */
   pulse?: number;
+  /** Its specialisation (at drill level WARPATH.levels.specAt), and that spec's clock. */
+  spec?: SpecId;
+  /** Seconds left of the cover it comes back under after regrouping: nothing can touch it. */
+  safe?: number;
+  specCd?: number;
   /** Times Revive has stood it back up. */
   raised?: number;
   /** A flyer's run: where it's flying to. */
@@ -240,7 +245,7 @@ export interface Enemy {
   status: Partial<Record<Status, number>>;
   /** 'captain' | 'lord': a boss. */
   boss?: 'captain' | 'lord';
-  /** A real campaign lord's index in run.lords, its trick and the trick's clock. */
+  /** A boss's trick and clock: `i` is a campaign lord's index in run.lords, or -1 for a captain or a lord with no record. */
   lord?: { i: number; trick?: LordTrick; cd: number; ward: number };
   /** Boss scale, defense bonus. */
   size: number;
@@ -283,10 +288,10 @@ export interface Missile {
 }
 
 /** A shell in the air: lands at (x, y) in `t` s from squad `si`'s gun `gun`. */
-export interface Shell { x: number; y: number; t: number; si: number; gun: number }
+export interface Shell { x: number; y: number; t: number; si: number; gun: number; /** A Creeping Barrage's second landing. */ again?: boolean }
 
 export type PickupKind = 'gem' | 'ration' | 'beacon' | 'supply';
-export interface Pickup { id: number; kind: PickupKind; x: number; y: number; xp: number; life: number; pulled?: boolean }
+export interface Pickup { id: number; kind: PickupKind; x: number; y: number; xp: number; life: number; pulled?: boolean; /** A supply drop: the trophy its boss leaves. */ trophy?: TrophyId }
 
 /** A site on the map: a shrine to hold, a cache to open, a well to drink from, a champion to slay. */
 export type SiteKind = 'shrine' | 'cache' | 'well' | 'champion';
@@ -303,6 +308,8 @@ export type Card =
   | { kind: 'drill'; unitId: string }
   | { kind: 'doctrine'; id: DoctrineId }
   | { kind: 'stratagem'; id: StratagemId }
+  | { kind: 'spec'; unitId: string; spec: SpecId }
+  | { kind: 'trophy'; id: TrophyId }
   | { kind: 'score' };
 
 /** Terrain: blocking stops bodies, difficult slows, dangerous hurts, cover makes ranged hits harder. Circles. */
@@ -383,8 +390,16 @@ export interface WarpathRun {
   doctrines: Partial<Record<DoctrineId, number>>;
   /** Stratagems taken. */
   stratagems?: Partial<Record<StratagemId, boolean>>;
-  /** Doctrine clocks: the blades' next cut, the next Fire Mission. */
-  docClock?: { blade?: number; mission?: number };
+  /** Doctrine clocks: the blades' next cut, the next Fire Mission; trophy and stratagem clocks. */
+  docClock?: { blade?: number; mission?: number; ward?: number; storm?: number; burst?: number; triage?: number };
+  /** Trophies won, the boss tricks dealt out for this run, and trophies waiting to be offered. */
+  trophies?: Partial<Record<TrophyId, boolean>>;
+  bossDeck?: LordTrick[];
+  trophyDue?: TrophyId[];
+  /** The hero's order at work, and when it wears off. */
+  order?: { id: PowerId; until: number };
+  /** The hero was hit this step (Burst Core answers it). */
+  struck?: boolean;
   /** Killing Spree: kills in the streak, and when the last one fell. */
   spree?: number;
   spreeT?: number;

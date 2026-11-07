@@ -13,7 +13,7 @@ import {
   bankRecords, bossesOf, clearWarpath, clock, DOCTRINES, STRATAGEM_LEVEL, STRATAGEMS, freshenRun, hardOpen, heroesOf, loadWarpath, newerWarpath, newRun, saveWarpath, warpathFeats, warpathRepeats,
   warpathXp, weekBoard, weekTheme, WARPATH, type WarpathMode, type WarpathRun,
   BRANCHES, BRANCH_IDS, TREE, NODE_IDS, RENOWN, PRESTIGE, HONOURS, metaOf, nodeCost, nodeState, cantTake, takeNode, resetTree, resetValue, bankRenown, laurelsFor,
-  prestige, renownLine, heroPowerOf, ROLES, roleOf, roleOfUnit, rosterOf, squadOf, type NodeId, type BranchId, type SquadRole,
+  prestige, renownLine, HERO_POWERS, heroPowerOf, ROLES, roleOf, roleOfUnit, rosterOf, squadOf, type NodeId, type BranchId, type PowerId, type SquadRole,
 } from '../../rules/warpath';
 import { FeatList } from '../Feats';
 import { Icon } from '../Icon';
@@ -222,10 +222,9 @@ export default function WarpathModal({ force, c, onClose }: { force: Force; c?: 
   );
 }
 
-/** The picked hero's button, if its rules give it one. */
-function HeroPower({ power }: { power?: 'rush' | 'blink' }) {
-  if (!power) return null;
-  return <span className="small">Button (Space): {power === 'rush' ? 'charge through the enemy, untouchable' : 'blink, hurting what stands at both ends'}.</span>;
+/** The picked hero's order, set by its archetype. */
+function HeroPower({ power }: { power: PowerId }) {
+  return <span className="small">Order (Space): <b>{HERO_POWERS[power].name}.</b> {HERO_POWERS[power].text}</span>;
 }
 
 /** What each unit will do in a run: the force by archetype. */

@@ -1,5 +1,5 @@
 import { rand } from '../training/rng';
-import { DOCTRINES, STRATAGEMS, WARPATH } from './data';
+import { BOSS_TRICKS, DOCTRINES, SPECS, STRATAGEMS, TROPHIES, WARPATH } from './data';
 import { mods } from './mods';
 import { drillUp, gainXp } from './levels';
 import { has } from './meta';
@@ -16,6 +16,13 @@ export function drop(run: WarpathRun, kind: PickupKind, x: number, y: number, xp
 /** XP a model's Shard is worth: 1, 2 or 4 by tier. */
 const gemXp = (tier: number) => 2 ** tier;
 
+/** A boss's name: its Nexus lord's if it has one, and the trick it goes by. */
+export function bossName(run: WarpathRun, e: Enemy): string {
+  const base = (e.boss === 'lord' && e.lord ? run.lords[e.lord.i]?.name : undefined) ?? run.enemyKinds[e.kind].name;
+  const trick = e.lord?.trick;
+  return trick ? `${base} ${BOSS_TRICKS.names[trick]}` : base;
+}
+
 /** An enemy fell: the tally, its Shard, and for a boss a supply drop, the score and the log. A kill by a squad with a
  *  Leech rule mends the hero. */
 export function killed(run: WarpathRun, e: Enemy, si: number): void {
@@ -28,6 +35,11 @@ export function killed(run: WarpathRun, e: Enemy, si: number): void {
   // Blood Tithe: the hero's kills mend it; Blood Frenzy: anyone's, for a share.
   const tithe = (run.doctrines.bloodTithe ?? 0) * DOCTRINES.bloodTithe.heal * (si === 0 ? 1 : run.stratagems?.bloodFrenzy ? STRATAGEMS.bloodFrenzy.share : 0);
   if (tithe > 0 && run.hp > 0) run.hp = Math.min(run.maxHp, run.hp + tithe);
+  // Bloodbath: a kill closes this squad's wounds, and every so often a model stands back up.
+  if (s?.spec === 'bloodbath' && s.alive > 0) {
+    s.wounds = 0;
+    if (s.alive < s.size && s.kills % SPECS.bloodbath.every === 0) s.alive += 1;
+  }
   // Killing Spree: the streak grows, or starts again if it went cold.
   if (run.doctrines.killingSpree) {
     const S = DOCTRINES.killingSpree;
@@ -48,7 +60,7 @@ export function killed(run: WarpathRun, e: Enemy, si: number): void {
     return;
   }
   if (!e.boss) {
-    const xp = gemXp(k.tier) * (e.elite ? WARPATH.elite.xp : 1);
+    const xp = gemXp(k.tier) * (e.elite ? WARPATH.elite.xp * (run.trophies?.warHorn ? TROPHIES.warHorn.xp : 1) : 1);
     // Bodies past the merge count fold their Shard into the nearest one, so the field never fills with gems.
     if (run.pickups.length > WARPATH.xp.gemMerge) {
       const near = run.pickups.find((p) => p.kind === 'gem' && Math.abs(p.x - e.x) < 6 && Math.abs(p.y - e.y) < 6);
@@ -58,9 +70,13 @@ export function killed(run: WarpathRun, e: Enemy, si: number): void {
     return;
   }
   drop(run, 'supply', e.x, e.y);
+  // It comes to the hero: nobody should have to wade into the crowd for what a boss fight won.
+  const spoils = run.pickups[run.pickups.length - 1];
+  spoils.pulled = true;
+  if (e.lord?.trick) spoils.trophy = BOSS_TRICKS.trophy[e.lord.trick];
   run.fx.push({ kind: 'boom', x: e.x, y: e.y, n: e.size * 2, t: 0.9 });
   run.fx.push({ kind: 'fall', x: e.x, y: e.y, n: e.size, t: 1.4, hurt: e.boss === 'lord' });
-  const name = e.lord ? run.lords[e.lord.i]?.name ?? 'The Echo Lord' : `${k.name} (captain)`;
+  const name = bossName(run, e);
   if (e.boss === 'lord') {
     run.lordKills += 1;
     if (e.lord && run.lords[e.lord.i]) run.lords[e.lord.i].slain = true;
@@ -91,7 +107,7 @@ export function collect(run: WarpathRun, dt: number): void {
     const dx = run.hx - p.x;
     const dy = run.hy - p.y;
     const d = Math.hypot(dx, dy);
-    if (p.kind === 'gem' && (p.pulled || d < pull)) {
+    if (p.kind === 'supply' ? p.pulled : p.kind === 'gem' && (p.pulled || d < pull)) {
       p.pulled = true;
       const step = Math.min(d, P.pullSpeed * dt);
       if (d > 1e-6) { p.x += (dx / d) * step; p.y += (dy / d) * step; }
@@ -102,10 +118,15 @@ export function collect(run: WarpathRun, dt: number): void {
     if (p.kind === 'gem') {
       gainXp(run, p.xp * m.xp);
       if (run.doctrines.volatileShards) run.shardCharge = (run.shardCharge ?? 0) + 1;
+      const h = run.squads[0];
+      if (run.stratagems?.leyLines && h.rushCd) h.rushCd = Math.max(0, h.rushCd - STRATAGEMS.leyLines.cut);
     }
     else if (p.kind === 'ration') run.hp = Math.min(run.maxHp, run.hp + run.maxHp * P.ration);
     else if (p.kind === 'beacon') beacon = true;
-    else if (p.kind === 'supply') run.queued += WARPATH.bosses.drop;
+    else if (p.kind === 'supply') {
+      run.queued += WARPATH.bosses.drop;
+      if (p.trophy) (run.trophyDue ??= []).push(p.trophy);
+    }
   }
   if (beacon) for (const p of run.pickups) if (p.kind === 'gem') p.pulled = true;
   run.pickups = run.pickups.filter((p) => p.life > 0 || p.pulled);

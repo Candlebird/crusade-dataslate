@@ -1,5 +1,5 @@
 import { rand } from '../training/rng';
-import { DOCTRINE_IDS, DOCTRINES, ROLES, STRATAGEM_IDS, STRATAGEM_LEVEL, STRATAGEMS, WARPATH, type DoctrineId, type StratagemId } from './data';
+import { BOSS_TRICKS, DOCTRINE_IDS, DOCTRINES, ROLES, SPEC_IDS, SPECS, STRATAGEM_IDS, STRATAGEM_LEVEL, STRATAGEMS, TROPHIES, TROPHY_IDS, WARPATH, type DoctrineId, type StratagemId } from './data';
 import { doc, heroMaxHp, woundsPer } from './mods';
 import type { IconName } from '../../components/Icon';
 import type { Card, Squad, SquadRole, WarpathRun } from './types';
@@ -37,15 +37,27 @@ export const plansOpen = (run: WarpathRun): StratagemId[] =>
 /** What a doctrine card pairs with: the stratagem and what it does, the other doctrine and how many of its cards the run already holds. */
 export interface CardPair { plan: string; text: string; other: string; held: number }
 
-/** The stratagem a doctrine can still feed, and the doctrine it pairs with. */
-function pairOf(run: WarpathRun, id: DoctrineId): CardPair | undefined {
+/** The stratagem a doctrine can still feed (the one nearest done, if it has several), and the doctrine it pairs with. */
+export function pairOf(run: WarpathRun, id: DoctrineId): CardPair | undefined {
+  let best: CardPair | undefined;
   for (const k of STRATAGEM_IDS) {
     const needs: readonly DoctrineId[] = STRATAGEMS[k].needs;
     if (run.stratagems?.[k] || !needs.includes(id)) continue;
     const other = needs.find((d) => d !== id) ?? id;
-    return { plan: STRATAGEMS[k].name, text: STRATAGEMS[k].text, other: DOCTRINES[other].name, held: doc(run, other) };
+    if (!best || doc(run, other) > best.held) best = { plan: STRATAGEMS[k].name, text: STRATAGEMS[k].text, other: DOCTRINES[other].name, held: doc(run, other) };
   }
-  return undefined;
+  return best;
+}
+
+/** The next boss on the clock: when it comes, its trick and what it leaves. Undefined until the run has dealt its deck. */
+export function nextBoss(run: WarpathRun) {
+  const deck = run.bossDeck;
+  if (!deck) return undefined;
+  const at = (run.bossesDone + 1) * WARPATH.bosses.captainEvery;
+  const lord = at % WARPATH.bosses.lordEvery === 0;
+  const trick = (lord ? run.lords[at / WARPATH.bosses.lordEvery - 1]?.trick : undefined) ?? deck[run.bossesDone % deck.length];
+  const trophy = BOSS_TRICKS.trophy[trick];
+  return { at, lord, name: BOSS_TRICKS.names[trick] as string, text: BOSS_TRICKS.text[trick] as string, trophy: TROPHIES[trophy].name as string, held: !!run.trophies?.[trophy] };
 }
 
 /** A run's build at a glance: its pairs (taken, ready, then under way), doctrines, units and the tree's big rules. */
@@ -66,7 +78,9 @@ export function buildOf(run: WarpathRun) {
     doctrines: DOCTRINE_IDS.filter((id) => doc(run, id) > 0)
       .map((id) => ({ name: DOCTRINES[id].name as string, icon: DOCTRINES[id].icon as IconName, text: DOCTRINES[id].text as string, level: doc(run, id) }))
       .sort((a, b) => b.level - a.level),
-    units: run.squads.map((s) => ({ id: s.unitId, name: s.name, role: roleOf(s), level: s.level, max: s.maxLevel })),
+    units: run.squads.map((s) => ({ id: s.unitId, name: s.name, role: roleOf(s), level: s.level, max: s.maxLevel, spec: s.spec ? { name: SPECS[s.spec].name as string, text: SPECS[s.spec].text as string } : undefined })),
+    trophies: TROPHY_IDS.filter((id) => run.trophies?.[id]).map((id) => ({ name: TROPHIES[id].name as string, icon: TROPHIES[id].icon as IconName, text: TROPHIES[id].text as string })),
+    next: nextBoss(run),
     tree: NODE_IDS.filter((id) => TREE[id].key && has(run, id)).map((id) => ({ name: TREE[id].name, icon: TREE[id].icon, text: TREE[id].text(1) })),
   };
 }
@@ -85,15 +99,31 @@ export function candidates(run: WarpathRun): Card[] {
   return out;
 }
 
-const same = (a: Card, b: Card) => a.kind === b.kind && (a.kind === 'doctrine' || a.kind === 'stratagem' ? a.id === (b as typeof a).id : a.kind === 'score' || (a as { unitId: string }).unitId === (b as { unitId: string }).unitId);
+const same = (a: Card, b: Card) => a.kind === b.kind && (a.kind === 'doctrine' || a.kind === 'stratagem' || a.kind === 'trophy' ? a.id === (b as typeof a).id
+  : a.kind === 'score' || ((a as { unitId: string }).unitId === (b as { unitId: string }).unitId && (a.kind !== 'spec' || a.spec === (b as typeof a).spec)));
 
-/** Three cards (four with Grand Strategy), drawn by kind (call-ins only every third level-up, and then at least one), no two alike. */
+/** The trophy waiting to be offered, if any (one already won falls away). */
+function trophyDue(run: WarpathRun) {
+  while (run.trophyDue?.length && run.trophies?.[run.trophyDue[0]]) run.trophyDue.shift();
+  return run.trophyDue?.[0];
+}
+
+/** Three cards (four with Grand Strategy), drawn by kind, no two alike: a trophy won and an open stratagem always show,
+ *  call-ins come every third level-up (and then at least one), and doctrines lean to what the run is building. */
 export function drawOffer(run: WarpathRun): Card[] {
   const pool = candidates(run);
-  if (!pool.length) return [{ kind: 'score' }];
-  const weight = (c: Card) => (c.kind === 'stratagem' ? 6 : c.kind === 'call' ? 1.6 : c.kind === 'drill' ? 1 : 0.9 / Math.max(1, 0.5 * pool.filter((x) => x.kind === 'doctrine').length / 4));
-  const out: Card[] = [];
+  const due = trophyDue(run);
+  if (!pool.length && !due) return [{ kind: 'score' }];
+  const docBase = 0.9 / Math.max(1, 0.5 * pool.filter((x) => x.kind === 'doctrine').length / 4);
+  const lean = (id: DoctrineId) => (doc(run, id) > 0 ? K.leanHeld : pairOf(run, id)?.held ? K.leanPair : 1);
+  const weight = (c: Card) => (c.kind === 'stratagem' ? 6 : c.kind === 'call' ? 1.6 : c.kind === 'drill' ? 1 : c.kind === 'doctrine' ? docBase * lean(c.id) : 1);
+  const out: Card[] = due ? [{ kind: 'trophy', id: due }] : [];
   const left = [...pool];
+  const plan = left.find((c) => c.kind === 'stratagem');
+  if (plan) {
+    out.push(plan);
+    left.splice(left.indexOf(plan), 1);
+  }
   // A call-in level always shows at least one unit to call in.
   const calls = left.filter((c) => c.kind === 'call');
   if (calls.length) {
@@ -113,9 +143,25 @@ export function drawOffer(run: WarpathRun): Card[] {
   return out;
 }
 
-/** Open the next level-up, if one is waiting. */
+/** A unit's two specialisations, if it has earned the choice (a drill, or enough kills) and not made it. */
+function specOffer(run: WarpathRun): Card[] {
+  const L = WARPATH.levels;
+  const s = run.squads.find((q, i) => i > 0 && !q.spec && (q.level >= L.specAt || q.kills >= L.specKills));
+  if (!s) return [];
+  const role = roleOf(s);
+  return SPEC_IDS.filter((id) => SPECS[id].role === role).map((spec) => ({ kind: 'spec', unitId: s.unitId, spec }));
+}
+
+/** Open what's waiting: a unit's specialisation first (it costs no level-up), then the next level-up. */
 export function openLevelUp(run: WarpathRun): boolean {
-  if (run.queued <= 0 || run.phase !== 'play') return false;
+  if (run.phase !== 'play') return false;
+  const specs = specOffer(run);
+  if (specs.length) {
+    run.offer = specs;
+    run.phase = 'card';
+    return true;
+  }
+  if (run.queued <= 0) return false;
   run.queued -= 1;
   run.levelUps = (run.levelUps ?? 0) + 1;
   run.offer = drawOffer(run);
@@ -166,10 +212,29 @@ export function drillUp(run: WarpathRun, s: Squad): void {
 export function choose(run: WarpathRun, i: number): void {
   const c = run.offer[i];
   if (!c || run.phase !== 'card') return;
+  // A specialisation is a choice, not a level-up: nothing else comes with it.
+  if (c.kind === 'spec') {
+    const s = run.squads.find((x) => x.unitId === c.unitId);
+    if (s) {
+      s.spec = c.spec;
+      if (c.spec === 'strongpoint' && s.fort) {
+        s.fort.maxHp *= SPECS.strongpoint.hp;
+        s.fort.hp *= SPECS.strongpoint.hp;
+      }
+      run.log.push(`${s.name} specialises: ${SPECS[c.spec].name}.`);
+    }
+    run.offer = [];
+    run.phase = 'play';
+    openLevelUp(run);
+    return;
+  }
   if (c.kind === 'call') callIn(run, c.unitId);
   else if (c.kind === 'drill') {
     const s = run.squads.find((x) => x.unitId === c.unitId);
     if (s && s.level < s.maxLevel) drillUp(run, s);
+  } else if (c.kind === 'trophy') {
+    (run.trophies ??= {})[c.id] = true;
+    run.log.push(`Trophy taken: ${TROPHIES[c.id].name}.`);
   } else if (c.kind === 'stratagem') {
     (run.stratagems ??= {})[c.id] = true;
     run.log.push(`Stratagem taken: ${STRATAGEMS[c.id].name}.`);
@@ -187,13 +252,13 @@ export function choose(run: WarpathRun, i: number): void {
 
 /** Skip the cards for a heal. */
 export function skip(run: WarpathRun): void {
-  if (run.phase !== 'card') return;
+  if (run.phase !== 'card' || run.offer[0]?.kind === 'spec') return;
   run.hp = Math.min(run.maxHp, run.hp + run.maxHp * K.skipHeal);
   close(run);
 }
 
 export function reroll(run: WarpathRun): void {
-  if (run.phase !== 'card' || run.rerolls <= 0) return;
+  if (run.phase !== 'card' || run.rerolls <= 0 || run.offer[0]?.kind === 'spec') return;
   run.rerolls -= 1;
   run.offer = drawOffer(run);
 }
@@ -215,6 +280,8 @@ function rally(run: WarpathRun) {
 }
 
 function close(run: WarpathRun) {
+  // A trophy shown once and passed over is gone.
+  if (run.offer.some((c) => c.kind === 'trophy')) run.trophyDue?.shift();
   run.offer = [];
   run.phase = 'play';
   run.fx.push({ kind: 'level', x: run.hx, y: run.hy, t: 0.9 });
@@ -229,6 +296,10 @@ export function cardText(run: WarpathRun, c: Card): { title: string; text: strin
     const p = STRATAGEMS[c.id];
     return { title: p.name, text: p.text, icon: p.icon, tag: 'Stratagem' };
   }
+  if (c.kind === 'trophy') {
+    const t = TROPHIES[c.id];
+    return { title: t.name, text: t.text, icon: t.icon, tag: 'Trophy' };
+  }
   if (c.kind === 'doctrine') {
     const d = DOCTRINES[c.id as DoctrineId];
     const l = run.doctrines[c.id] ?? 0;
@@ -236,13 +307,14 @@ export function cardText(run: WarpathRun, c: Card): { title: string; text: strin
   }
   const s = c.kind === 'call' ? run.bench.find((x) => x.unitId === c.unitId) : run.squads.find((x) => x.unitId === c.unitId);
   if (!s) return { title: '?', text: '', tag: '' };
+  if (c.kind === 'spec') return { title: SPECS[c.spec].name, text: SPECS[c.spec].text, tag: s.name, role: roleOf(s) };
   if (c.kind === 'call') {
     const guns = s.guns.map((g) => g.name).join(', ');
     return { title: s.name, text: `${ROLES[roleOf(s)].text} ${s.size > 1 ? `${s.size} models, ` : ''}Q${s.quality}+ D${s.defense}+. ${guns}.`, tag: `Call in · ${s.points} pts`, role: roleOf(s) };
   }
   const lines = s.kind === 'hero'
     ? 'faster attacks, longer reach, more HP and speed'
-    : `faster attacks, longer reach, ${s.kind === 'fort' ? `×${WARPATH.levels.woundsMul} HP` : `${woundsPer(s) * WARPATH.levels.woundsMul} wounds a model`}`;
+    : `faster attacks, longer reach, ${s.kind === 'fort' ? `×${WARPATH.levels.woundsMul} HP` : `${Math.round(woundsPer(s) * WARPATH.levels.woundsMul * 10) / 10} wounds a model`}`;
   return { title: s.name, text: `Level ${s.level} → ${s.level + 1}: ${lines}${(s.level + 1) % WARPATH.levels.dmgEvery === 0 ? ', harder hits' : ''}.`, tag: `Drill · max ${s.maxLevel}`, role: roleOf(s) };
 }
 
