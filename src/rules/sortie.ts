@@ -1887,6 +1887,18 @@ export function nextTurn(run: SortieRun) {
   advance(run);
 }
 
+/** The Echo squad acting now, and the wounds it has dealt each party unit this turn (SORTIE.burstCap). */
+let burst: { by: string; dealt: Map<string, number> } | undefined;
+
+/** Wounds an Echo may still deal this party unit in its turn (Infinity outside an Echo's turn). */
+function burstRoom(att: SortieSquad, def: SortieSquad): number {
+  if (!burst || !att.echo || def.echo || burst.by !== att.key) return Infinity;
+  return Math.max(0, Math.max(1, Math.floor(maxOf(def) * SORTIE.burstCap)) - (burst.dealt.get(def.key) ?? 0));
+}
+function burstTake(att: SortieSquad, def: SortieSquad, n: number) {
+  if (burst && att.echo && !def.echo && burst.by === att.key) burst.dealt.set(def.key, (burst.dealt.get(def.key) ?? 0) + n);
+}
+
 /** A squad's turn: a stunned squad loses it, a shaken model steadies itself instead of acting, and the rest act together. */
 function squadTurn(run: SortieRun, s: SortieSquad) {
   const c = run.combat!;
@@ -1899,8 +1911,9 @@ function squadTurn(run: SortieRun, s: SortieSquad) {
   if (shaken.length) log(c, shaken.length === active(s).length ? `${s.name} steady themselves.` : `${shaken.length} model${shaken.length === 1 ? '' : 's'} of ${s.name} steady ${shaken.length === 1 ? 'itself' : 'themselves'}.`, 'info');
   const ms = active(s).filter((m) => !shaken.includes(m));
   if (!ms.length) return;
-  if (s.echo) echoTurn(run, s, ms);
-  else orderTurn(run, s, ms);
+  if (!s.echo) return orderTurn(run, s, ms);
+  burst = { by: s.key, dealt: new Map() };
+  try { echoTurn(run, s, ms); } finally { burst = undefined; }
 }
 
 /** Wounds that skip the dice (bleeding, thorns, blasts), most hurt model first. */
@@ -2111,7 +2124,7 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
     const rounds = mine && !a.melee ? lv(run, 'rounds') : 0;
     const pin = mine && !a.melee && def.echo ? lv(run, 'pinning') : 0;
     for (let i = 0; i < n; i++) {
-      if (!standing(def)) break;
+      if (!standing(def) || !burstRoom(att, def)) break;
       // A fractional bonus (Elite, Surge, Faulty Aim…) counts as a whole +1 that often, so it neither vanishes nor rounds up.
       const need = g.reliable ? 2 : clamp(att.quality - whole(run, mod), 2, 6);
       let r = hitRoll(run);
@@ -2142,7 +2155,8 @@ function strike(run: SortieRun, att: SortieSquad, def: SortieSquad, a: Strike): 
         w = Math.min(w, target.hp + def.shield);
         const soak = Math.min(def.shield, w);
         def.shield -= soak;
-        const lost = Math.min(target.hp, w - soak);
+        const lost = Math.min(target.hp, w - soak, burstRoom(att, def));
+        burstTake(att, def, lost);
         target.hp -= lost;
         dealt += lost;
         if (lost) meter(run, def, 'taken', lost);
@@ -2226,7 +2240,8 @@ function procs(run: SortieRun, att: SortieSquad, def: SortieSquad, melee: boolea
     if (rand(run) >= 1 - Math.pow(1 - e.chance, dmg / SORTIE.hpMul)) continue;
     if (e.status === 'execute') {
       const hurt = active(def).filter((m) => m.hp < m.max).sort((a, b) => a.hp - b.hp)[0];
-      if (!hurt) continue;
+      if (!hurt || hurt.hp > burstRoom(att, def)) continue;
+      burstTake(att, def, hurt.hp);
       hurt.hp = 0;
       fell(run, def, def.echo ? distOf(def) === 1 : true, att);
     } else if (e.status === 'knock') {

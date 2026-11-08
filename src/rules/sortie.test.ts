@@ -1360,3 +1360,26 @@ describe('Sortie echo packs', () => {
     }
   });
 });
+
+describe('Sortie: no one-shots', () => {
+  it("one Echo squad's turn never takes more than SORTIE.burstCap of a party unit's wounds, lords and elites included", () => {
+    let attacks = 0;
+    for (const mk of [PARTIES.line, PARTIES.brawl, PARTIES.fort]) for (let seed = 1; seed <= 4; seed++) {
+      const run = createRun(mk(), seed * 7919, 'free', 'long');
+      for (let i = 0; i < 20000 && !run.over; i++) {
+        const c = run.combat;
+        const seq0 = c?.fxSeq ?? 0;
+        autoStep(run, book);
+        if (!c || run.combat !== c) continue;
+        const dealt = new Map<string, number>();
+        for (const f of c.fx ?? []) if (f.n > seq0 && !f.mine) dealt.set(`${f.from}|${f.to}`, (dealt.get(`${f.from}|${f.to}`) ?? 0) + f.dmg);
+        for (const [k, n] of dealt) {
+          const p = c.party.find((q) => q.key === k.split('|')[1])!;
+          attacks++;
+          expect(n).toBeLessThanOrEqual(Math.max(1, Math.floor(p.models.reduce((x, m) => x + m.max, 0) * SORTIE.burstCap)));
+        }
+      }
+    }
+    expect(attacks).toBeGreaterThan(100);
+  });
+});

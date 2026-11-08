@@ -1005,8 +1005,8 @@ export const SORTIE = {
    * Sizing the unit up (sortie.ts sizeUp): trial fights per step, halving steps, the range of scales, and the share of
    * its wounds the fresh unit should keep on average (a loss keeps none) in each kind of fight.
    */
-  sizeUp: { tries: 30, steps: 6, min: 0.2, max: 5, left: { fight: 0.81, elite: 0.64, boss: 0.39 } as Record<'fight' | 'elite' | 'boss', number> },
-  ramp: 0.5,
+  sizeUp: { tries: 30, steps: 6, min: 0.2, max: 5, left: { fight: 0.77, elite: 0.59, boss: 0.35 } as Record<'fight' | 'elite' | 'boss', number> },
+  ramp: 0.7,
   /** At most this many Echo squads in a fight. */
   squads: 3,
   /** The Echo lord comes in late, in a round from the first to the second of these, while its escorts hold the field
@@ -1020,6 +1020,11 @@ export const SORTIE = {
   escortMaxTough: 12,
   /** Party melee attacks count this much: in OPR melee is a part of the game, here the Front could fight every round. */
   meleeCut: 0.85,
+  /**
+   * No one-shots: one Echo squad's turn (its charge, blows, shots and abilities together) takes at most this share of a
+   * party unit's full wounds; the rest is lost. Several Echoes in a round can still finish a unit.
+   */
+  burstCap: 0.35,
   /**
    * Camp: rest mends this share of each model's wounds and brings back `raise` of the squad's fallen (at least one).
    * After a fight, patching up mends `patch` and brings one back.
