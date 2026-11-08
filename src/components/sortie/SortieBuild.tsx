@@ -1,9 +1,7 @@
 import { useEffect } from 'react';
-import type { SquadRole } from '../../rules/warpath';
 import { SORTIE_SPECS } from '../../rules/downtimeData';
 import type { SortieRun } from '../../rules/sortie';
 import { buildOf, PAIR_STATUS } from '../../rules/sortieBuild';
-import { RoleBadge } from '../warpath/RoleBadge';
 import { TIER_TAG } from '../training/CardOffer';
 
 const KIND = { boon: 'Boon', stratagem: 'Stratagem', trophy: 'Trophy' } as const;
@@ -35,7 +33,6 @@ export function SortieBuild({ run, onClose }: { run: SortieRun; onClose: () => v
             <li key={i} className="sortie-build-unit">
               <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
                 <b>{u.name}</b>
-                <RoleBadge role={u.role as SquadRole} />
                 <span className="sortie-chip">{u.slot}</span>
                 <span className="sortie-chip">{u.up}/{u.models} models · {u.hp}/{u.max} wounds</span>
               </div>

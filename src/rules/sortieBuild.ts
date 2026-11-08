@@ -1,6 +1,6 @@
 import { SORTIE, SORTIE_BOONS, type SortieBoonId, type SortieBoonTier } from './downtimeData';
 import {
-  bossOf, boonDrawText, boonLabel, goalText, heldBoon, isSpecial, omensRead, roleOfMember, sigWeaker, specChoices, specDue, stratagemsDue,
+  bossOf, boonDrawText, boonLabel, goalText, heldBoon, isSpecial, omensRead, sigWeaker, specChoices, specDue, stratagemsDue,
   unitSheet, type SortieRun, type SortieSheet,
 } from './sortie';
 
@@ -10,7 +10,7 @@ import {
 export type SortiePairStatus = 'active' | 'ready' | 'building' | 'missed' | 'locked';
 
 export interface SortieBuild {
-  units: (SortieSheet & { role: string; due: boolean; choices: string[] })[];
+  units: (SortieSheet & { due: boolean; choices: string[] })[];
   boons: { id: SortieBoonId; label: string; tier: SortieBoonTier; text: string; curse: boolean; kind: 'boon' | 'stratagem' | 'trophy' }[];
   pairs: { id: SortieBoonId; name: string; text: string; status: SortiePairStatus; needs: { name: string; held: boolean }[]; lock?: string }[];
   lord: { name: string; sig: string; text: string; weaker: number; omens: string[]; need: number };
@@ -24,7 +24,7 @@ export const PAIR_STATUS: Record<SortiePairStatus, string> = {
 export function buildOf(run: SortieRun): SortieBuild {
   const held = (id: SortieBoonId) => run.boons.includes(id);
   const due = specDue(run);
-  const units = run.party.map((m, i) => ({ ...unitSheet(run, i), role: roleOfMember(m), due: due === i, choices: specChoices(m) }));
+  const units = run.party.map((m, i) => ({ ...unitSheet(run, i), due: due === i, choices: specChoices(m) }));
   const boons = run.boons.map((id) => {
     const d = heldBoon(run, id);
     const b = SORTIE_BOONS[id];

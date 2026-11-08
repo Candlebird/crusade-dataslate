@@ -18,7 +18,7 @@ import {
   active, actingSquad, autoMove, moveMember, autoStep, bossOf, campHome, epilogueOf, leaveShop, regionName, regionOf, shopBuy, shopHeal, campRaise, campRest, canSortie, xpCap, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightTitle, giveOrder, startRound, nextTurn, braceFor, omensRead, sigWeaker,
   isFort, keepsHaul, leaveCombat, leaveEvent, memberName, memberUp, nextSlots, onField, patchUp, pickBoon, quitRun, distOf, DISTANCES, reachText, reachable, runXp, skillProblem,
   skillTargets, skillsOf, slotOf, SLOTS, veteranTitle, sightOf, weekKey, weekSeed, weeklyScore,
-  rerollOffer, rerollsFor, specDue, pickSpec, specChoices, roleOfMember, pairsOf, isSpecial, previewOf, meterOf,
+  rerollOffer, rerollsFor, specDue, pickSpec, specChoices, pairsOf, isSpecial, previewOf, meterOf,
   ambushOdds, beastInfo, tierPay, boonDrawText, boonLabel, heldBoon, isUpgrade, cursesOf, shopPrice, marksOf, markHeat, goalProgress, goalText, lastStanding, unlockedBoons, sortieHistory,
   type SortieBoonDraw, type SortieFx, type SortieIntentKind, type SortieModel, type SortieNode, type SortieNodeKind, type SortieRun, type SortieSkill, type SortieSkillKind, type SortieSquad,
 } from '../rules/sortie';
@@ -27,7 +27,6 @@ import { Modal, confirmAction, toast } from './ui';
 import { EmblemBadge, Portrait } from './Emblem';
 import { WeekCountdown } from './WeekCountdown';
 import { Glyph, Icon, IconText, SvgIcon, type IconName } from './Icon';
-import { RoleBadge } from './warpath/RoleBadge';
 import { SortieBuild } from './sortie/SortieBuild';
 import './sortie/sortie.css';
 
@@ -827,10 +826,11 @@ function Side({ run, cap }: { run: SortieRun; cap: number }) {
             <b className="grow">{memberName(m)}</b>
             {!memberUp(m) && <span className="muted">down</span>}
           </div>
-          <div className="row small" style={{ gap: 4, flexWrap: 'wrap' }}>
-            <RoleBadge role={roleOfMember(m)} />
-            {m.spec && SORTIE_SPECS[m.spec] && <span className="sortie-chip spec">{SORTIE_SPECS[m.spec].name}</span>}
-          </div>
+          {m.spec && SORTIE_SPECS[m.spec] && (
+            <div className="row small" style={{ gap: 4, flexWrap: 'wrap' }}>
+              <span className="sortie-chip spec">{SORTIE_SPECS[m.spec].name}</span>
+            </div>
+          )}
           <div className="sortie-models">
             {m.models.map((x, i) => <Token key={i} face={null} m={x} />)}
           </div>
@@ -1134,7 +1134,6 @@ function CombatScreen({ run, skill, setSkill, onUse, onAuto, onStart, onBrace, o
                     <div className="row small" style={{ gap: 6 }}>
                       <Portrait unit={p.unit} size={26} />
                       <span className="grow"><b>{p.name}</b> <span className="muted">Q{p.quality}+ D{p.defense}+</span>{p.shield > 0 && <span className="sortie-status"> · shield {p.shield}</span>}</span>
-                      {p.member !== undefined && run.party[p.member] && <RoleBadge role={roleOfMember(run.party[p.member])} bare />}
                       {c.orders[p.key] && <span className="sortie-ordered" data-tip="Has its order for the round"><Icon name="l:check" /></span>}
                     </div>
                     <div className="sortie-models">
@@ -1325,7 +1324,7 @@ function SpecPicker({ run, i, onPick }: { run: SortieRun; i: number; onPick: (id
   return (
     <div className="sortie-panel sortie-spec">
       <h3>{memberName(m)} has earned a speciality</h3>
-      <p className="muted small" style={{ marginTop: 0 }}>Pick one. It is free and lasts the rest of the run. <RoleBadge role={roleOfMember(m)} /></p>
+      <p className="muted small" style={{ marginTop: 0 }}>Pick one. It is free and lasts the rest of the run.</p>
       <div className="sortie-boons">
         {specChoices(m).map((id) => (
           <button key={id} className="sortie-boon" onClick={() => onPick(id)}>
