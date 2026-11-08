@@ -70,7 +70,7 @@ describe('Sortie stratagems', () => {
 
 describe('Sortie elite trophies', () => {
   it('an elite with an affix puts its trophy among three rare cards', () => {
-    const run = createRun(party(), 7, 'free', 'short');
+    const run = createRun(party(), 3, 'free', 'short');
     run.screen = 'combat';
     startCombat(run, book, 'elite', 'armoured');
     expect(trophyOf('armoured')).toBe('plate');

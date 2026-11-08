@@ -1018,6 +1018,8 @@ export const SORTIE = {
   escortShare: 0.5,
   /** A lord's escorts are never this Tough or tougher (and at most one is Tough 6 or more). */
   escortMaxTough: 12,
+  /** Party melee attacks count this much: in OPR melee is a part of the game, here the Front could fight every round. */
+  meleeCut: 0.85,
   /**
    * Camp: rest mends this share of each model's wounds and brings back `raise` of the squad's fallen (at least one).
    * After a fight, patching up mends `patch` and brings one back.

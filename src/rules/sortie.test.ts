@@ -12,7 +12,7 @@ import { awardFeats, trainingFeats } from './feats';
 import { raidBand, raiderPool } from './raiders';
 import {
   gain, nextTurn, braceFor, omensRead, sigStrength, actingSquad, addQuirk, quirkInfo, sigsOf, tierPay, xpCap, active, autoChoice, autoStep, bossOf, bountyOf, regionName, relicKeysOf, relicsOf, threadDone, voiceKind, voiceLine, campRest, epilogueOf, leaveShop, regionOf, shopBuy, shopHeal, startCombat, choiceOpen, createRun, enterNode, eventChoose, eventOf, fightBudget, sizeUp, giveOrder, startRound, gunReach, keepsHaul, distOf,
-  leaveCombat, leaveEvent, moveMember, nextSlots, onField, partyLine, patchUp, pickBoon, reachable, runXp, skillProblem, skillsOf, squadOf,
+  echoSquads, leaveCombat, leaveEvent, moveMember, nextSlots, onField, partyLine, patchUp, pickBoon, reachable, runXp, skillProblem, skillsOf, squadOf,
   weekKey, weekSeed, weeklyScore, reveal, sightOf, veteranTitle,
   ambushOdds, beastInfo, beastKey, cursesOf, cursed, shopPrice, goalProgress, goalText, lastStanding, rematchTricks, sortieHistory, unlockedBoons, markHeat, marked,
   type SortieRun,
@@ -1010,9 +1010,9 @@ describe('sortie rematches, boon unlocks and last stands', () => {
   const won = (run: SortieRun) => Object.assign(run, { over: 'won' as const, bossDown: true });
 
   it('brings a lord slain before back with a trick per time, up to three', () => {
-    const plain = createRun(PARTIES.line(), 6);
+    const plain = createRun(PARTIES.line(), 5);
     expect(plain.rematch).toBeUndefined();
-    const run = createRun(PARTIES.line(), 6, 'free', 'short', { slain: { [plain.boss]: 9 } });
+    const run = createRun(PARTIES.line(), 5, 'free', 'short', { slain: { [plain.boss]: 9 } });
     expect(run.rematch).toBe(SORTIE.rematch.tricks.length);
     expect(rematchTricks(run).map((t) => t.name)).toEqual(SORTIE.rematch.tricks.map((t) => t.name));
     expect(run.journal.some((l) => l.text.includes('comes back changed'))).toBe(true);
@@ -1345,5 +1345,18 @@ describe('sortie marauders out of the other armies', () => {
     const pool = raiderPool([book, other], [rival]);
     expect(createRun(PARTIES.line(), 3, 'free', 'long', { weekly: '2026-W43', raiders: pool }).raiders).toBeUndefined();
     expect(createRun(PARTIES.line(), 3).raiders).toBeUndefined();
+  });
+});
+
+describe('Sortie echo packs', () => {
+  it('never field a great monster (Tough 12+) and at most one Tough 6+ beast, however big the fight', () => {
+    let x = 1;
+    const r = () => ((x = (x * 1103515245 + 12345) % 2147483648) / 2147483648);
+    const tough = (u: Unit) => Number(/Tough\((\d+)\)/.exec(u.rules.join(' '))?.[1] ?? 1);
+    for (let i = 0; i < 200; i++) {
+      const units = echoSquads(book, 300 + (i % 10) * 150, 'fight', r);
+      expect(units.filter((u) => tough(u) >= 12)).toHaveLength(0);
+      expect(units.filter((u) => tough(u) >= 6).length).toBeLessThanOrEqual(1);
+    }
   });
 });

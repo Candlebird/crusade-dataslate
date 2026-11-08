@@ -1381,10 +1381,10 @@ export function echoSquads(book: CatalogBook, budget: number, kind: SortieFightK
     if (lead) take(lead, Math.max(left * 0.7, lead.cost));
   }
   // Big Echoes only join fights big enough to hold them, so a pricey unit isn't sized up against a capped fight.
-  // A lord's escorts: never the great monsters (Tough 12 and up, worth far more here than their points), and at most one
-  // beast (Tough 6 and up), so one lord's fight isn't a few times another's.
+  // A lord's escorts and an echo pack: never the great monsters (Tough 12 and up, worth far more here than their points),
+  // and at most one beast (Tough 6 and up), so one fight isn't a few times another's. Elite fights may field them.
   const toughOf = (cu: CatalogUnit) => ruleRating(cu.rules, 'Tough') ?? 1;
-  const escorting = kind === 'boss' && !!named;
+  const escorting = kind === 'fight' || (kind === 'boss' && !!named);
   const small = units.filter((cu) => cu.cost <= Math.max(BIG_UNIT, budget * 0.5) && (!escorting || toughOf(cu) < SORTIE.escortMaxTough));
   let beasts = 0;
   for (let misses = 0; out.length < SORTIE.squads && misses < 40 && small.length; ) {
@@ -2078,7 +2078,7 @@ function rerollSave(run: SortieRun, def: SortieSquad, target: SortieModel): bool
 function strikeMul(run: SortieRun, att: SortieSquad, a: Strike): number {
   const c = run.combat!;
   return (has(run, 'fang') && atHalf(att) ? 1.25 : 1) * (!a.melee && spec(att, 'gunship') ? 1.25 : 1) * (a.melee && spec(att, 'frenzy') ? 1.25 : 1)
-    * (c.round === 1 && spec(att, 'alphaStrike') ? 1.5 : 1);
+    * (c.round === 1 && spec(att, 'alphaStrike') ? 1.5 : 1) * (a.melee ? SORTIE.meleeCut : 1);
 }
 
 /** A party unit's 6s to hit get Rending: Crossfire in round 1 (shooting), Deadeye on its units, and the Reaper. */
@@ -2529,7 +2529,7 @@ function expect(run: SortieRun, att: SortieSquad, guns: Gun[], def: SortieSquad,
     const ap = apOf(run, att, def, g, melee, dist);
     const fail = 1 - clamp((7 - def.defense - Math.max(0, ap) + def.defMod) / 6, 0, 5 / 6);
     const per = Math.min(g.deadly, def.models[0]?.max ?? 1);
-    n += g.attacks * att.atkBonus * hit * blastOn(g, def) * fail * per * (1 - def.ignore);
+    n += g.attacks * att.atkBonus * (melee && !att.echo ? SORTIE.meleeCut : 1) * hit * blastOn(g, def) * fail * per * (1 - def.ignore);
   }
   return n;
 }
