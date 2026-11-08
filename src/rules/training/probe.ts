@@ -18,6 +18,9 @@ export interface Probe {
   leaks: number[];
   /** Each boss: its wave and the pads it had reached when it died (LEGS when it got through). */
   bosses: { wave: number; pad: number }[];
+  /** Base HP lost on each wave (index = wave number), and the base HP it went in with. */
+  hpLost: number[];
+  hpIn: number[];
 }
 
 /** Does wave `w` fly (a flying wave, or a flying boss)? */
@@ -28,8 +31,12 @@ export function prober(): { watch: (run: TrainingRun) => void; done: (run: Train
   const leaks: number[] = [];
   const bosses: { wave: number; pad: number }[] = [];
   const live = new Map<number, { wave: number; pad: number }>();
+  const hpIn: number[] = [];
+  const hpLost: number[] = [];
   const watch = (run: TrainingRun) => {
     leaks[run.wave] = run.leaked;
+    hpIn[run.wave] = Math.max(hpIn[run.wave] ?? 0, run.baseHp);
+    hpLost[run.wave] = hpIn[run.wave] - run.baseHp;
     const seen = new Set<number>();
     for (const e of run.enemies) {
       if (TRAINING_ENEMIES[e.kind].spawn !== 'boss') continue;
@@ -46,7 +53,7 @@ export function prober(): { watch: (run: TrainingRun) => void; done: (run: Train
   const done = (run: TrainingRun): Probe => {
     for (const b of live.values()) bosses.push({ wave: b.wave, pad: LEGS });
     const fell = run.cleared + 1;
-    return { cleared: run.cleared, fell, fellFlying: flies(fell), leaks, bosses };
+    return { cleared: run.cleared, fell, fellFlying: flies(fell), leaks, bosses, hpLost, hpIn };
   };
   return { watch, done };
 }

@@ -321,6 +321,8 @@ export interface TrainingRun {
   mends: number;
   /** Enemies that reached the base this wave. */
   leaked: number;
+  /** Base HP lost this wave (TRAINING.leak.waveCap). */
+  waveLost?: number;
   nextId: number;
   pieces: Piece[];
   draft: DraftState;

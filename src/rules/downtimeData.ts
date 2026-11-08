@@ -186,7 +186,9 @@ export const TRAINING = {
    *  Echo Lord its `leak` × the share of its wounds left (rounded up), never below `bossMin`. Four times the old 20,
    *  since waves come four times as thick (`wave.crowd`): a leaking wave costs the same share of the base as before. */
   baseHp: 80,
-  leak: { elite: 3, bossMin: 4 },
+  /** `waveCap`: no one wave (its leaks and a lord's tremors together) takes more than this share of `baseHp`; the rest is
+   *  lost, so a wave the maze can't answer hurts but never wipes a whole base in one go. */
+  leak: { elite: 3, bossMin: 4, waveCap: 0.5 },
   /** Melee weapons reach this many cells from the middle of their piece (so they hit walkers squeezing past). */
   meleeReach: 2,
   /** Seconds between a tower's volleys: shooting, and melee (every tower: units, Shards, defaults). A volley spreads its
@@ -200,7 +202,7 @@ export const TRAINING = {
   auraRadius: 6,
   /** Every enemy has this many times its listed wounds (tuned with the balance bot, bot.balance.test.ts: a fresh sample force
    *  reaches about wave 18-23, as hard as the old waves with a fifth more wounds, since the players maze well). */
-  enemyHp: 0.2,
+  enemyHp: 0.23,
   /**
    * Holds: a crafted unit with Tough above 1 (not an Aircraft) grabs one walker in melee reach and holds it `perTough`
    * seconds per Tough, up to `max`; a boss or a monster is held `bigMul` as long. Let go, an enemy can't be grabbed
@@ -747,12 +749,12 @@ export const TRAINING = {
    */
   modes: {
     rampTo: 15,
-    /** A boss's wounds take the multiplier to this power (Hard x11 is x3.3 on the boss); its escorts take all of it. */
+    /** A boss's wounds take the multiplier to this power (Hard x12 is x3.5 on the boss); its escorts take all of it. */
     bossShare: 0.5,
     /** A boss on these waves has this share of its wounds besides (Hard and Insane only): the wave-15 Lord, Normal's toughest, lands as the ramp tops out. */
     bossWave: { 15: 0.9 } as Record<number, number>,
-    hard: { name: 'Hard', siege: 9.5, train: 11, reward: 1.5 },
-    insane: { name: 'Insane', siege: 19, train: 22, reward: 2 },
+    hard: { name: 'Hard', siege: 9.5, train: 12, reward: 1.5 },
+    insane: { name: 'Insane', siege: 19, train: 24, reward: 2 },
   },
   /**
    * Final waves (training/finale.ts, veterancy.ts). A run has a Final wave: `from` at first, `step` more for each step

@@ -5,7 +5,7 @@ import { centreOf, dist, mapOf, pieceById, towers } from './board';
 import { regrabTime } from './holds';
 import { finalOf } from './finaleCore';
 import { modeHpAt } from './modes';
-import { climbHp, move, spawnOne } from './waves';
+import { climbHp, hurtBase, move, spawnOne } from './waves';
 import type { Enemy, RunNemesis, SpawnPlan, TrainingRun } from './types';
 
 // The force's Sortie nemesis comes to Training as the boss of wave TRAINING.shared.nemesis.wave: its name, its
@@ -88,7 +88,7 @@ function act(run: TrainingRun, e: Enemy, sig: string) {
     wrench(run, e);
     move(e.flies ? undefined : mapOf(run), e, N.dive.cells);
   } else if (sig === 'tremor') {
-    run.baseHp = Math.max(0, run.baseHp - N.tremor.dmg);
+    hurtBase(run, N.tremor.dmg);
   } else if (sig === 'brood') {
     const hp = TRAINING_ENEMIES.swarm.hp * TRAINING.enemyHp * climbHp(run.wave, finalOf(run)) * N.brood.hp * modeHpAt(run, run.wave);
     for (let i = 0; i < N.brood.n; i++) {

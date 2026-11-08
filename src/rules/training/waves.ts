@@ -273,6 +273,14 @@ export function move(m: MapState | undefined, e: Enemy, step: number): void {
   }
 }
 
+/** The base takes `n` HP, but no wave takes more than TRAINING.leak.waveCap of the whole base. */
+export function hurtBase(run: TrainingRun, n: number): void {
+  const room = Math.max(0, TRAINING.baseHp * TRAINING.leak.waveCap - (run.waveLost ?? 0));
+  const lost = Math.min(n, room, run.baseHp);
+  run.waveLost = (run.waveLost ?? 0) + lost;
+  run.baseHp -= lost;
+}
+
 /** Walk every enemy not held or stunned (flyers straight pad to pad); ambush jumps; leaks cost run.baseHp, count
  *  run.leaked; the Final boss getting through marks run.finale.through (run.ts ends the run). A siege's colossus at an
  *  earlier damage check walks off the map at the base instead: no cost, no leak, and the run goes on. */
@@ -289,7 +297,7 @@ export function walk(run: TrainingRun, dt: number): void {
         gone.add(e.id);
         continue;
       }
-      run.baseHp = Math.max(0, run.baseHp - leakCost(e));
+      hurtBase(run, leakCost(e));
       run.leaked += 1;
       if (e.final && run.finale) run.finale.through = true;
       gone.add(e.id);
