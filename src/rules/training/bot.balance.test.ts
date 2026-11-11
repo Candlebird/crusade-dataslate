@@ -49,6 +49,14 @@ describe('training balance (bot)', () => {
     }
   });
 
+  it('gets units out early: most runs have two crafted before wave 10 (2026-11-10 recipe pass)', () => {
+    // Narrow forces of pricey units (three or so at 300+ pts) may still have only one out by then.
+    const early = runs.map((p) => p.crafts.filter((w) => w < 10).length);
+    console.log(`units crafted before wave 10: ${early.join(' ')}`);
+    expect(early.filter((n) => n >= 2).length).toBeGreaterThanOrEqual(runs.length / 2);
+    expect(early.filter((n) => n >= 1).length).toBeGreaterThanOrEqual(runs.length * 0.9);
+  });
+
   it('leaks next to nothing on waves 1-2 (a sensible first Shard holds them)', () => {
     // A first draft with no good gun for walkers (Firepower shoots only flyers) may let one Echo by; most hold.
     const early = runs.map((p) => p.leaks.slice(1, 3).map((l) => l ?? 0));

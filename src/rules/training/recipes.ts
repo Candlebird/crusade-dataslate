@@ -80,6 +80,13 @@ function tierOf(points: number): { count: number; lo: Grade; hi: Grade; high: nu
   return { count: tiers[i].count, lo, hi, high: Math.round(share * tiers[i].count) };
 }
 
+/** The damage share a unit's recipe tier gives it (TRAINING.shards.recipes `dmg`, 1 when unset): a tier whose Shards come
+ *  early hits softer, so a unit out by wave 5 doesn't outpace the waves. */
+export function tierDmg(points: number): number {
+  const tiers = TRAINING.shards.recipes as { upTo: number; dmg?: number }[];
+  return tiers[Math.max(0, tiers.findIndex((r) => points <= r.upTo))].dmg ?? 1;
+}
+
 /** Every multiset of `k` types (ascending), as lists. */
 function typeSets(k: number, from = 0): ShardType[][] {
   if (!k) return [[]];
@@ -203,7 +210,7 @@ export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): Uni
       ...x, range: x.melee ? x.range : x.range + rangeBonus(u, x.name), cd: 0, pending: 0, gap: 0, next: 0,
       ...(relicGuns.has(x.name) ? { relic: true } : {}),
     })),
-    hitShoot: f.hitShoot + h.shoot, hitMelee: f.hitMelee + h.melee, atkBonus: f.atkBonus + g.atk,
+    hitShoot: f.hitShoot + h.shoot, hitMelee: f.hitMelee + h.melee, atkBonus: (f.atkBonus + g.atk) * tierDmg(trainPoints(u)),
     boost: { hit: 0, save: 0, rate: 0, range: 0 }, dmgBoost: { mul: 0, left: 0 }, kills: 0, dealt: 0,
     up: 0, cap: levelCap(trainPoints(u)), holdLeft: 0, frenzy: 0, frenzyMul: 1, craftedAt, xp: 0,
     init: h.init + g.init, jumpy: h.jumpy, myopic: h.myopic,

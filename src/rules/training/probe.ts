@@ -21,6 +21,8 @@ export interface Probe {
   /** Base HP lost on each wave (index = wave number), and the base HP it went in with. */
   hpLost: number[];
   hpIn: number[];
+  /** The wave each crafted unit came out after (run.cleared at the craft), earliest first. */
+  crafts: number[];
 }
 
 /** Does wave `w` fly (a flying wave, or a flying boss)? */
@@ -53,7 +55,8 @@ export function prober(): { watch: (run: TrainingRun) => void; done: (run: Train
   const done = (run: TrainingRun): Probe => {
     for (const b of live.values()) bosses.push({ wave: b.wave, pad: LEGS });
     const fell = run.cleared + 1;
-    return { cleared: run.cleared, fell, fellFlying: flies(fell), leaks, bosses, hpLost, hpIn };
+    const crafts = run.pieces.flatMap((x) => (x.kind === 'unit' ? [x.craftedAt] : [])).sort((a, b) => a - b);
+    return { cleared: run.cleared, fell, fellFlying: flies(fell), leaks, bosses, hpLost, hpIn, crafts };
   };
   return { watch, done };
 }

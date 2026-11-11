@@ -316,7 +316,8 @@ export const TRAINING = {
    * grades (Flawed means Flawed). Between them the recipes use each of the 40 Shard kinds once. Each slot brings its
    * type's rule; only the `guns` slots bring a gun (one weapon, two for the Citadel), scaled so the whole does `dpsShare` of the damage a crafted unit from Shards of
    * the same value does: `unitDps` a point of recipe value at Defense `dpsDefense` (dps.ts towerDps; the sample
-   * forces' mean, measured, and checked by emplacements.test.ts). Quality is the best of its Shards' less
+   * forces' mean, pinned as measured before the 2026-11-10 recipe pass made units cheaper; emplacements.test.ts checks
+   * a unit still out-hits a default of the same Shards). Quality is the best of its Shards' less
    * `qualityBonus` (lower is better), never below 2+. A default takes no XP, levels, traits or relics, and is hidden
    * while one of the force's uncrafted unit recipes can be filled from its Shards. Each can be upgraded once between
    * waves (emplacements.upgradeDefault): `upgrade.dmg` more damage and `upgrade.reach` cells more reach, for
@@ -406,7 +407,9 @@ export const TRAINING = {
    * Shards. Each build phase `draw` are drawn, each of a random type and grade, the grade by the odds for the luck level
    * (bought with credits, `luckCost` each step). A grade's value is 2^(grade-1): a merge of two alike keeps the value
    * it took. A Shard's to-hit Quality by grade. Recipes: a unit costing `upTo` points or less needs `count` Shards, each
-   * of grade `grades[0]`–`grades[1]`.
+   * of grade `grades[0]`–`grades[1]`, and hits `dmg` as hard (1 when unset). The 100–249 pt tier asks only Cracked and
+   * Chipped Shards, so most forces have two units out before wave 10, and hits 15% softer to pay for it; the top tier asks
+   * Chipped and Flawed (2026-11-10 pass: Flawed and Flawless Shards came too late for a pricey force to field anything).
    */
   shards: {
     draw: 5,
@@ -430,9 +433,9 @@ export const TRAINING = {
     dmg: 1.3,
     recipes: [
       { upTo: 99, count: 2, grades: [1, 2] as [number, number] },
-      { upTo: 249, count: 3, grades: [2, 3] as [number, number] },
-      { upTo: Infinity, count: 4, grades: [3, 4] as [number, number] },
-    ],
+      { upTo: 249, count: 3, grades: [1, 2] as [number, number], dmg: 0.85 },
+      { upTo: Infinity, count: 4, grades: [2, 3] as [number, number] },
+    ] as { upTo: number; count: number; grades: [number, number]; dmg?: number }[],
     /**
      * Picking a recipe: the dearer a unit within its tier, the more of its slots at the tier's higher grade (the top
      * tier counts `topSpan` points as its width). A type's second slot fits `repeat` as well as its first (the third
@@ -749,12 +752,12 @@ export const TRAINING = {
    */
   modes: {
     rampTo: 15,
-    /** A boss's wounds take the multiplier to this power (Hard x12 is x3.5 on the boss); its escorts take all of it. */
+    /** A boss's wounds take the multiplier to this power (Hard x14 is x3.7 on the boss); its escorts take all of it. */
     bossShare: 0.5,
     /** A boss on these waves has this share of its wounds besides (Hard and Insane only): the wave-15 Lord, Normal's toughest, lands as the ramp tops out. */
     bossWave: { 15: 0.9 } as Record<number, number>,
-    hard: { name: 'Hard', siege: 9.5, train: 12, reward: 1.5 },
-    insane: { name: 'Insane', siege: 19, train: 24, reward: 2 },
+    hard: { name: 'Hard', siege: 9.5, train: 14, reward: 1.5 },
+    insane: { name: 'Insane', siege: 19, train: 28, reward: 2 },
   },
   /**
    * Final waves (training/finale.ts, veterancy.ts). A run has a Final wave: `from` at first, `step` more for each step
@@ -785,7 +788,7 @@ export const TRAINING = {
     to: 50,
     bars: { 30: 120, 35: 250, 40: 400, 45: 550, 50: 700 } as Record<number, number>,
     climb: 1.06,
-    endless: 1.2,
+    endless: 1.22,
     rise: 0.03,
     riseEvery: 2,
     endlessMax: 1.23,
