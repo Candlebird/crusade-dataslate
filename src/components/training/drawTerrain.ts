@@ -1,5 +1,5 @@
 import { TRAINING } from '../../rules/downtimeData';
-import { BASE, N, WAYPOINTS, centreOf, isFlyBossWave, isFlyWave, laneCells, type TrainingRun } from '../../rules/training';
+import { BASE, N, WAYPOINTS, centreOf, isFlyWave, laneCells, type TrainingRun } from '../../rules/training';
 import { BASE_ICON, COVER_ICONS, bar, drawIcon, label, roundRect } from './art';
 import { walkPath } from './routePath';
 
@@ -60,7 +60,7 @@ export function drawCover(ctx: CanvasRenderingContext2D, run: TrainingRun, s: nu
 }
 
 /** Is wave `w` one with flyers in it. */
-const flies = (w: number) => isFlyWave(w) || isFlyBossWave(w);
+const flies = isFlyWave;
 
 /**
  * The route walkers take through the maze as it stands, with arrows along it while building (faint during a wave so

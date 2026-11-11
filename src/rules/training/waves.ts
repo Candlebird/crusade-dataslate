@@ -18,18 +18,15 @@ const W = TRAINING.wave;
 const R = TRAINING.route;
 const F = TRAINING.finale;
 
-/** Every TRAINING.wave.flyEvery-th wave flies. */
-export const isFlyWave = (w: number) => w > 0 && w % W.flyEvery === 0;
-
 /** Every TRAINING.wave.bossEvery-th wave brings an Echo Lord. */
 export const isBossWave = (w: number) => w > 0 && w % W.bossEvery === 0;
 
-/** Every TRAINING.wave.flyBossEvery-th wave the boss flies (its escorts walk). */
-export const isFlyBossWave = (w: number) => w > 0 && w % W.flyBossEvery === 0;
+/** Every TRAINING.wave.flyEvery-th wave flies, but never a boss wave: every Echo Lord walks (the siege's damage checks too). */
+export const isFlyWave = (w: number) => w > 0 && w % W.flyEvery === 0 && !isBossWave(w);
 
-/** What wave `w` is, for the HUD: 'Flying', 'Boss', or both. */
+/** What wave `w` is, for the HUD: 'Flying' or 'Boss'. */
 export const waveTags = (w: number): string[] => [
-  ...(isFlyWave(w) || isFlyBossWave(w) ? ['Flying'] : []),
+  ...(isFlyWave(w) ? ['Flying'] : []),
   ...(isBossWave(w) ? ['Boss'] : []),
 ];
 
@@ -49,11 +46,11 @@ export const lateHp = (w: number) =>
 /** How tough a flyer is on wave `w` beside a walker: flyHp, fading flyFade a wave (the guns on the lane grow slower than the maze). */
 export const flyHpAt = (w: number) => W.flyHp * W.flyFade ** (w - 1);
 
-/** How many times tougher everything is on a ground wave `w` (no flying wave nor sky boss): earlyHp[w−1] on the first
+/** How many times tougher everything is on a ground wave `w` (not a flying wave): earlyHp[w−1] on the first
  *  waves (a gentle start), groundGrowth a wave from groundFrom to groundTo, groundLate a wave after, and ease a wave
  *  less from easeFrom to easeTo (the run-up to the wave-25 Lord), held after. */
 export const groundHpAt = (w: number, lv = w) =>
-  isFlyWave(w) || isFlyBossWave(w) ? 1
+  isFlyWave(w) ? 1
     : (W.earlyHp[lv - 1] ?? 1)
       * W.groundGrowth ** Math.max(0, Math.min(lv, W.groundTo) - W.groundFrom + 1) * W.groundLate ** Math.max(0, lv - W.groundTo)
       * W.ease ** Math.max(0, Math.min(lv, W.easeTo) - W.easeFrom + 1);
@@ -81,15 +78,14 @@ export const bossHpAt = (w: number) => W.bossHp[Math.min(W.bossHp.length, Math.m
 /** Wave `w`'s spawns for a force of `power` points, sorted by time (rolls `r`): one kind (waveKinds.ts), as many as
  *  the budget buys (past maxCount, or flyMax on a flying wave, the rest makes them tougher), every eliteEvery-th an
  *  elite; a boss wave's escorts take `escorts` of the budget (finale.escorts from finale.from, the boss keeping its old
- *  share, so the wave after is no cliff). A flying wave brings flyShare of the budget, its flyers flyHpAt as tough; on a
- *  boss wave that would fly only the boss flies (flyHpAt × flyBossHp as tough), its escorts walk. Past finale.from a
+ *  share, so the wave after is no cliff). A flying wave brings flyShare of the budget, its flyers flyHpAt as tough (a
+ *  boss wave never flies: isFlyWave). Past finale.from a
  *  wave is planned at its level (levelOf) and climbAt times as tough, for a run whose Final is `final`. */
 export function planFor(r: Rng, power: number, w: number, final: number = F.from): SpawnPlan[] {
   const lv = levelOf(w);
   const boss = isBossWave(w);
-  const skyBoss = boss && (isFlyWave(w) || isFlyBossWave(w));
-  // Flyers skip the maze, so a flying wave brings only flyShare of the budget (a flying boss's escorts walk).
-  const flies = !boss && isFlyWave(w);
+  // Flyers skip the maze, so a flying wave brings only flyShare of the budget.
+  const flies = isFlyWave(w);
   const budget = waveBudget(power, lv) * (flies ? W.flyShare : 1);
   const minions = boss ? budget * (w >= F.from ? F.escorts : W.escorts) : budget;
   const kind = waveKind(r, w, flies);
@@ -107,8 +103,8 @@ export function planFor(r: Rng, power: number, w: number, final: number = F.from
     at += W.gap * (0.7 + 0.6 * rand(r));
   }
   if (boss) {
-    const s = spawnPlan(r, 'lord', at / 2, 1, skyBoss, false);
-    s.hp = TRAINING_ENEMIES.lord.hp * tough * bossMul * bossHpAt(w) * F.endlessBoss ** deep * (skyBoss ? flyHpAt(lv) * W.flyBossHp : 1);
+    const s = spawnPlan(r, 'lord', at / 2, 1, false, false);
+    s.hp = TRAINING_ENEMIES.lord.hp * tough * bossMul * bossHpAt(w) * F.endlessBoss ** deep;
     out.push(s);
   }
   return out.sort((a, b) => a.at - b.at);

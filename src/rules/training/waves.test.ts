@@ -5,7 +5,7 @@ import { WAYPOINTS, centre, mapFor, open, route, routeLength } from './map';
 import { blankRun } from './testRun';
 import type { Enemy, RubblePiece, TrainingRun } from './types';
 import {
-  bossHpAt, groundHpAt, isBossWave, isFlyBossWave, isFlyWave, lateHp, layCover, leakCost, minionHpAt, planWave, previewGroups, previewWave,
+  bossHpAt, groundHpAt, isBossWave, isFlyWave, lateHp, layCover, leakCost, minionHpAt, planWave, previewGroups, previewWave,
   runCover, spawnDue, speedOf, walk, waveBudget, wavePoints,
 } from './waves';
 import { costOf, countFor } from './waveKinds';
@@ -43,10 +43,10 @@ function timeToLeak(run: TrainingRun, e: Enemy, max = 600): number {
 }
 
 describe('wave kinds', () => {
-  it('flyers every 4th, a boss every 5th, a flying boss every 20th', () => {
+  it('flyers every 4th, a boss every 5th, and no boss wave flies', () => {
     expect([1, 2, 3, 4, 8].map(isFlyWave)).toEqual([false, false, false, true, true]);
     expect([4, 5, 10, 11].map(isBossWave)).toEqual([false, true, true, false]);
-    expect([5, 20, 40, 60].map(isFlyBossWave)).toEqual([false, true, true, true]);
+    expect([20, 40, 60].map(isFlyWave)).toEqual([false, false, false]);
   });
 });
 
@@ -80,11 +80,11 @@ describe('planWave', () => {
     expect(planWave(blankRun(), 6).some((s) => s.flies)).toBe(false);
   });
 
-  it('brings one Echo Lord every boss wave, flying on wave 20 (its escorts walking)', () => {
+  it('brings one Echo Lord every boss wave, walking (wave 20 too), its escorts walking', () => {
     for (const w of [5, 10, 20]) {
       const p = planWave(blankRun(), w);
       expect(p.filter((s) => s.kind === 'lord')).toHaveLength(1);
-      expect(p.find((s) => s.kind === 'lord')!.flies).toBe(w === 20);
+      expect(p.find((s) => s.kind === 'lord')!.flies).toBe(false);
       expect(p.some((s) => s.kind !== 'lord' && s.flies)).toBe(false);
     }
     expect(planWave(blankRun(), 6).some((s) => s.kind === 'lord')).toBe(false);
@@ -129,8 +129,8 @@ describe('planWave', () => {
     // Eased from easeFrom to easeTo (23 to 25: both ground waves), then climbing at groundLate again from there.
     expect(groundHpAt(W.easeTo) / groundHpAt(W.easeTo - 2)).toBeCloseTo((W.groundLate * W.ease) ** 2);
     expect(groundHpAt(W.easeTo + 2) / groundHpAt(W.easeTo + 1)).toBeCloseTo(W.groundLate);
-    for (const w of [12, 16, 20, 24]) expect(groundHpAt(w)).toBe(1);
-    expect(isFlyWave(12) && isFlyBossWave(20)).toBe(true);
+    for (const w of [12, 16, 24]) expect(groundHpAt(w)).toBe(1);
+    expect(groundHpAt(20)).toBeGreaterThan(1);
   });
 
   it('toughens the Echo Lord by bossHp a boss wave, the last holding on', () => {

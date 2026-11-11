@@ -247,16 +247,16 @@ export const TRAINING = {
    * level-0 units are slow to earn their keep, so a bigger force mustn't fall sooner); past
    * `maxCount` enemies (`flyMax` on a flying wave) the rest of the budget makes them tougher instead. Every enemy has
    * `hpGrowth` times more wounds a wave from wave `hpFrom` to `hpTo`, `lateGrowth` times a wave after (waves.ts lateHp).
-   * Ground waves (not a flying wave nor the sky boss's) are tougher again from `groundFrom`, about when the first units
+   * Ground waves (every wave but a flying one) are tougher again from `groundFrom`, about when the first units
    * are crafted: `groundGrowth` times a wave to `groundTo`, `groundLate` a wave after (waves.ts groundHpAt), since crafted
    * units with long guns rake the whole maze while flyers only cross their reach once; from `easeFrom` to `easeTo` they
    * are `ease` times as tough a wave (the run-up to the wave-25 Lord, held after: later waves climb as before from there).
    * The first waves, while a Shard or two holds the maze, are gentler: wave w has `earlyBudget`[w-1] of its budget (fewer
-   * enemies), `earlyHp`[w-1] of its wounds and walks at `earlyPace`[w-1]. Every flying wave is as it was. Every `flyEvery`th wave flies, with `flyShare` of the budget (flyers skip the maze), its flyers `flyHp` × `flyFade`^(w-1)
+   * enemies), `earlyHp`[w-1] of its wounds and walks at `earlyPace`[w-1]. Every flying wave is as it was. Every `flyEvery`th wave but a boss wave flies, with `flyShare` of the budget (flyers skip the maze), its flyers `flyHp` × `flyFade`^(w-1)
    * as tough (thinner as the maze grows). Every enemy but the Lord is `minionGrowth` times tougher again a wave from wave 1
    * (waves.ts minionHpAt; the Lord's wounds go by `bossHp` alone). Every `bossEvery`th brings an Echo Lord with `escorts` of its budget as escorts
    * (the rest toughens the boss, never below `bossMin` of its wounds), the Lord `bossHp` times tougher again (one entry a
-   * boss wave, the last holding on); every `flyBossEvery`th the Lord flies (`flyBossHp` as tough; its escorts walk).
+   * boss wave, the last holding on). A boss wave never flies (since 2026-11-10: every Lord walks, the damage checks too).
    * Scouts come in with `scoutHp` of their wounds, Ambushers with `ambushHp`. Enemies come in `gap` seconds apart
    * (about). Every enemy (the Lord too) costs the budget its `cost` / `crowd`, so a wave is `crowd` times as thick as
    * its costs say (towers fire as much faster); a kill pays `crowd` times less, bar the Lord's. Each wave is one kind (a boss wave the boss and one kind of escort), drawn by `kinds` weight from those that
@@ -281,7 +281,7 @@ export const TRAINING = {
     groundFrom: 8,
     groundTo: 16,
     groundGrowth: 1.05,
-    groundLate: 1.02,
+    groundLate: 1.031,
     minionGrowth: 1.008,
     earlyHp: [0.5, 0.65, 0.8] as number[],
     earlyPace: [0.5, 0.7, 0.9] as number[],
@@ -295,11 +295,9 @@ export const TRAINING = {
     flyHp: 1.8,
     flyFade: 0.9,
     bossEvery: 5,
-    flyBossEvery: 20,
     escorts: 0.5,
     bossMin: 0.1,
-    bossHp: [2.0, 2.6, 3.5, 1.7, 0.45, 0.375] as number[],
-    flyBossHp: 0.75,
+    bossHp: [2.0, 2.6, 3.5, 1.3, 0.45, 0.375] as number[],
     scoutHp: 0.8,
     ambushHp: 0.65,
     gap: 0.15,

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { TRAINING, TRAINING_ENEMIES, type TrainingEnemyDef } from '../../rules/downtimeData';
-import { checkWaves, finalBoss, finalOf, hasChecks, inEndless, isBossWave, isNemesisWave, lordIndex, lordLine, nemesisTricks, previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
+import { checkWaves, finalBoss, finalOf, hasChecks, inEndless, isNemesisWave, lordIndex, lordLine, nemesisTricks, previewGroups, previewWave, waveTags, type PreviewGroup, type TrainingRun } from '../../rules/training';
 import { nextBoss } from '../../rules/training/nextRound';
 import { enemyShape } from './drawLive';
 
@@ -66,11 +66,10 @@ export const TAG_TEXT: Record<string, string> = {
 };
 
 /** On a boss wave that flies, only the Echo Lord does (and any swarm it summons); its escorts walk (waves.ts planFor). */
-const SKY_BOSS = 'Flying: only the Echo Lord flies, straight from pad to pad over the maze, so only pieces in reach of that line hit it'
   + ' (any swarm it summons flies too). Its escorts walk the maze.';
 
 /** What tag `t` means on wave `w`. */
-export const tagText = (t: string, w: number): string | undefined => (t === 'Flying' && isBossWave(w) ? SKY_BOSS : TAG_TEXT[t]);
+export const tagText = (t: string, _w?: number): string | undefined => TAG_TEXT[t];
 
 /** A tag for a wave one of the campaign's real Echo Lords leads; hover for its trick. */
 function RealLordTag({ run, w }: { run: TrainingRun; w: number }) {

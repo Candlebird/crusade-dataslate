@@ -3,7 +3,7 @@ import maze from '../trainingTestMaze.json';
 import { TRAINING_ENEMIES } from '../downtimeData';
 import { playRun } from './bot';
 import { LEGS } from './map';
-import { isFlyWave, isFlyBossWave } from './waves';
+import { isFlyWave } from './waves';
 import type { RunNexus, TrainingRun } from './types';
 
 // Test-only: the balance bot's run with probes on it (the balance tests' numbers). Never imported by the app.
@@ -25,8 +25,8 @@ export interface Probe {
   crafts: number[];
 }
 
-/** Does wave `w` fly (a flying wave, or a flying boss)? */
-export const flies = (w: number) => isFlyWave(w) || isFlyBossWave(w);
+/** Does wave `w` fly? */
+export const flies = isFlyWave;
 
 /** A probe to watch a bot run with (playRun's `watch`); `done` reads it once the run is over. */
 export function prober(): { watch: (run: TrainingRun) => void; done: (run: TrainingRun) => Probe } {
