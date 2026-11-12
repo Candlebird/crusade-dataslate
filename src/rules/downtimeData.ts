@@ -359,8 +359,6 @@ export const TRAINING = {
    */
   cards: {
     every: 5, offer: 3, odds: { Legendary: 0.1, Rare: 0.3 },
-    /** Pair nudge: with one half of a stratagem held, an offer shows the other half (in place of its last card) this often. */
-    pairNudge: 0.4,
     /** Pack tactics counts the other crafted units this near (centre to centre, so a diagonal neighbour counts). */
     pack: { radius: 3, max: 4 },
     /** Kill chain: a kill's speed-up lasts this long, and stacks this many times. */

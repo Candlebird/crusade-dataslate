@@ -9,7 +9,7 @@ import { RoleBadge } from '../warpath/RoleBadge';
 import { act } from './act';
 
 // The build panel (B): every crafted unit and emplacement with the cards it holds and their live numbers, its
-// specialisation, relics and auras; stratagems by status; trophies and whole-run cards; card groups Drill still locks;
+// specialisation, relics and auras; trophies and whole-run cards; card groups Drill still locks;
 // and the next boss. Everything is written out (no hover-only text), so it reads the same on a phone.
 
 const RARITY_TAG: Record<string, string> = { Common: '', Rare: 'red', Legendary: 'gold', Trophy: 'gold' };
@@ -78,8 +78,6 @@ export function TrainingBuild({ run, portraits, onClose, onChange }: TrainingBui
   }, [onClose]);
   const v = buildOf(run);
   const boss = nextBoss(run);
-  const order = { active: 0, ready: 1, building: 2 } as const;
-  const strats = [...v.strats].sort((a, b) => order[a.status] - order[b.status]);
   return (
     <div className="training-build" role="dialog" aria-label="Build">
       <div className="training-build-panel small">
@@ -107,17 +105,6 @@ export function TrainingBuild({ run, portraits, onClose, onChange }: TrainingBui
             );
           })}
         </div>
-
-        <h4>Stratagems</h4>
-        <div className="muted">Hold both cards of a pair (on any defences) and the next boss offers its stratagem in place of a card. Once a run each.</div>
-        {strats.map(({ strat, status, needs }) => (
-          <div key={strat.id} className={`training-build-strat ${status}`}>
-            <span className={`tag ${status === 'active' ? 'gold' : status === 'ready' ? 'red' : ''}`}>{status === 'active' ? 'Active' : status === 'ready' ? 'Next boss' : 'Building'}</span>{' '}
-            <b>{strat.name}</b>{' '}
-            <span className="muted">({needs.map((n) => `${n.name} ${n.held ? `held ${n.held}` : n.locked ? 'locked by Drill' : 'not held'}`).join(' + ')})</span>
-            <div className="muted">{strat.text}</div>
-          </div>
-        ))}
 
         {v.trophies.length > 0 && <><h4>Trophies</h4>{v.trophies.map((c, i) => <CardLine key={i} c={c} />)}</>}
         {v.runCards.length > 0 && <><h4>Whole-run cards</h4>{v.runCards.map((c, i) => <CardLine key={i} c={c} />)}</>}

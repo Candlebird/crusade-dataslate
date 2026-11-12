@@ -8,7 +8,6 @@ import { centre, remaining, upstream, WAYPOINTS } from './map';
 import { rand, saveChance } from './rng';
 import { lordDmg, lordOf } from './lords';
 import { specMul } from './specs';
-import { hasStrat, STRAT } from './stratagems';
 import { TROPHY_PREFIX, trophyFor } from './trophies';
 import { tallyHarm } from './tally';
 import type { ShardType } from '../downtimeData';
@@ -114,16 +113,16 @@ export function dmgMul(t: Tower): number {
 export const aceSteps = (t: UnitTower): number => Math.min(TRAINING.cards.ace.max, Math.floor(t.kills / TRAINING.cards.ace.per));
 
 /** Units Pack tactics counts: those near it, at most TRAINING.cards.pack.max. */
-export const packLimit = (run: TrainingRun): number => TRAINING.cards.pack.max + (hasStrat(run, 'huntingPack') ? STRAT.packMore : 0);
+export const packLimit = (_run: TrainingRun): number => TRAINING.cards.pack.max;
 export const packCount = (run: TrainingRun, t: UnitTower): number => Math.min(packLimit(run), packMates(run, t));
 
-/** Kill chain's most stacks (Chain Reaction adds some). */
-export const chainMax = (run: TrainingRun): number => TRAINING.cards.chain.max + (hasStrat(run, 'chainReaction') ? STRAT.chainMore : 0);
+/** Kill chain's most stacks. */
+export const chainMax = (_run: TrainingRun): number => TRAINING.cards.chain.max;
 
 /** What a tower's cards add against this enemy: Crossfire on a held one, Pack tactics for units near it, Ace for its
  *  kills. */
 export function cardMul(run: TrainingRun, t: Tower, e: Enemy): number {
-  const pinned = e.heldBy !== undefined || (!!e.status?.slow && hasStrat(run, 'killingGround'));
+  const pinned = e.heldBy !== undefined;
   let m = t.crossfire && pinned ? 1 + t.crossfire : 1;
   if (!isUnit(t)) return m;
   if (t.spec) m *= specMul(t, e, isBoss(e));

@@ -370,9 +370,8 @@ export interface TrainingRun {
   modeHp?: number;
   /** Test-only: a flat multiplier on every wave's wounds (the balance bot's stand-in for a stronger force). */
   hpFlat?: number;
-  /** Stratagems taken (stratagems.ts ids) and trophies won (trophies.ts ids), oldest first; the trophy the next
-   *  card offer holds (a boss with a trick just fell). */
-  stratagems?: string[];
+  /** Trophies won (trophies.ts ids), oldest first; the trophy the next card offer holds (a boss with a trick just
+   *  fell). An old save may still carry `stratagems` (the card pairs, cut 2026-11-11): ignored. */
   trophies?: string[];
   trophyDue?: CardDraw;
   /** Card offers re-drawn this run (cards.ts rerollCards). */

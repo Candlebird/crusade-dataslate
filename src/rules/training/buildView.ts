@@ -3,12 +3,11 @@ import { aceSteps, chainMax, packCount, packLimit } from './harm';
 import { cardById, cardText, cardTower, isSpecial, type CardTower } from './cards';
 import { cardOpen } from './drill';
 import { roleOfTower, specById, specProgress, specReady, specsOf, type RoleId, type TrainingSpec } from './specs';
-import { STRATAGEMS, stratStatus, heldCount, type Stratagem, type StratStatus } from './stratagems';
 import { TROPHY_PREFIX, trophyById } from './trophies';
 import type { TrainingRun } from './types';
 
 // The build panel's view of a run (pure): every crafted unit and emplacement with the cards it holds and their live
-// numbers, specs, relics and auras; stratagems by status; trophies and whole-run cards; card groups Drill still locks.
+// numbers, specs, relics and auras; trophies and whole-run cards; card groups Drill still locks.
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
@@ -36,16 +35,8 @@ export interface BuildTower {
   dealt: number;
 }
 
-export interface BuildStrat {
-  strat: Stratagem;
-  status: StratStatus;
-  /** Each paired card's name, how many the run holds, and whether Drill still locks it. */
-  needs: { name: string; held: number; locked: boolean }[];
-}
-
 export interface BuildView {
   towers: BuildTower[];
-  strats: BuildStrat[];
   trophies: HeldCard[];
   /** Whole-run cards taken (no tower). */
   runCards: HeldCard[];
@@ -84,10 +75,6 @@ export function buildOf(run: TrainingRun): BuildView {
       auras: t.skills.flatMap((s) => (s.effect.kind === 'aura' ? [`${s.source}: ${auraWords(s.effect.stat, s.effect.n)} within ${s.effect.radius} cells`] : [])),
     };
   });
-  const strats = STRATAGEMS.map((s) => ({
-    strat: s, status: stratStatus(run, s),
-    needs: s.needs.map((c) => ({ name: cardById(c)?.name ?? c, held: heldCount(run, c), locked: !cardOpen(run, c) })),
-  }));
   const trophies = (run.trophies ?? []).map((id) => {
     const tr = trophyById(id);
     const d = run.cards.find((x) => x.id === TROPHY_PREFIX + id);
@@ -96,7 +83,7 @@ export function buildOf(run: TrainingRun): BuildView {
   const runCards = run.cards.filter((d) => !isSpecial(d) && !cardById(d.id)?.fits).map((d) => ({ ...cardText(run, d), rarity: d.rarity }));
   const locked = Object.values(TRAINING.drill.groups).filter((g) => g.cards.some((c) => !cardOpen(run, c)))
     .map((g) => ({ name: g.name, cards: g.cards.map((c) => cardById(c)?.name ?? c) }));
-  return { towers, strats, trophies, runCards, locked };
+  return { towers, trophies, runCards, locked };
 }
 
 const auraWords = (stat: string, n: number) =>

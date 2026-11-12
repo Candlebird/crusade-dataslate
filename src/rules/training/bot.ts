@@ -1,7 +1,7 @@
 import type { Unit } from '../../model/types';
 import { SHARD_TYPES, TRAINING, type ShardType } from '../downtimeData';
 import { centreOf, placeProblem, routeOf, shardsOnMap, unitTowers } from './board';
-import { isSpecial, partnersWanted, pickCard } from './cards';
+import { pickCard } from './cards';
 import { pickSpec, roleOfTower, specDue, specsOf, type TrainingSpec } from './specs';
 import { TROPHY_PREFIX } from './trophies';
 import { buyLevel, buyLuck, buyMend, levelCost, levelProblem, luckProblem, mendProblem } from './economy';
@@ -186,15 +186,9 @@ function* spend(run: TrainingRun): Generator<string, void> {
   }
 }
 
-/** The card the bot takes from an offer: a trophy, else a stratagem, else one finishing a pair, else the first. */
+/** The card the bot takes from an offer: a trophy, else the first. */
 export function botCard(run: TrainingRun): number {
-  const o = run.offer ?? [];
-  const t = o.findIndex((d) => d.id.startsWith(TROPHY_PREFIX));
-  if (t >= 0) return t;
-  const s = o.findIndex(isSpecial);
-  if (s >= 0) return s;
-  const want = partnersWanted(run);
-  return Math.max(0, o.findIndex((d) => want.includes(d.id)));
+  return Math.max(0, (run.offer ?? []).findIndex((d) => d.id.startsWith(TROPHY_PREFIX)));
 }
 
 /** The spec the bot picks for a unit: one that works on holds only if the unit holds (grounded, Tough 2+), else the

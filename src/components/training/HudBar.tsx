@@ -95,7 +95,7 @@ export function HudBar({ run, best, speed, onSpeed, onStart, onQuit, paused, onP
           {auto !== undefined && onAuto && (
             <button className={auto ? 'primary' : ''} aria-pressed={auto} data-tip="Debug: the test bot plays the run (a run that uses it banks nothing)" onClick={onAuto}>Auto (debug)</button>
           )}
-          {onBuild && <button onClick={onBuild} aria-keyshortcuts="B" data-tip="Your build: each defence's cards, specialisation and live numbers, stratagems, trophies and the next boss (key B; pauses a wave)">Build</button>}
+          {onBuild && <button onClick={onBuild} aria-keyshortcuts="B" data-tip="Your build: each defence's cards, specialisation and live numbers, trophies and the next boss (key B; pauses a wave)">Build</button>}
           {onMeter && <button className={meter ? 'primary' : ''} aria-pressed={!!meter} data-tip="Damage each defence dealt this wave" onClick={onMeter}>Meter</button>}
           {onPause && (live || auto) && <button className="training-hud-go" onClick={onPause}>{paused ? 'Resume' : 'Pause'}</button>}
           {run.phase === 'build' && (

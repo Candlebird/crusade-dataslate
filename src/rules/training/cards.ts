@@ -5,7 +5,6 @@ import { packMates, unitTowers } from './board';
 import { cardOpen, rerollsOf } from './drill';
 import { applyLevel } from './economy';
 import { pick, rand } from './rng';
-import { heldCount, readyStrats, STRAT_PREFIX, STRATAGEMS, stratById, stratStatus } from './stratagems';
 import { TROPHY_PREFIX, trophyById } from './trophies';
 import type { CardDraw, DefaultTower, TrainingRun, UnitTower } from './types';
 
@@ -205,47 +204,24 @@ export function drawCards(run: TrainingRun, n: number = C.offer): CardDraw[] {
     const to = c.fits ? pick(run, ts.filter((t) => c.fits!(t, run))) : undefined;
     out.push(drawOf(c, found.x, to));
   }
-  return nudgePair(run, out);
+  return out;
 }
 
 const drawOf = (c: TrainingCard, rarity: RelicTier, to?: CardTower): CardDraw =>
   ({ id: c.id, rarity, ...(to ? (isUnit(to) ? { unitId: to.unitId } : { pieceId: to.id }) : {}) });
 
-/** The cards that would finish a stratagem: the other half of one not yet taken whose first half the run holds. */
-export const partnersWanted = (run: TrainingRun): string[] =>
-  STRATAGEMS.filter((s) => stratStatus(run, s) === 'building' && s.needs.some((c) => heldCount(run, c) > 0))
-    .map((s) => s.needs.find((c) => !heldCount(run, c))!);
+/** Is a draw a trophy rather than a boss card? */
+export const isSpecial = (d: CardDraw) => d.id.startsWith(TROPHY_PREFIX);
 
-/** Pair nudge (TRAINING.cards.pairNudge of the time): put one wanted partner (partnersWanted), useful and not already
- *  drawn, in place of the last card, at that card's rarity or the nearest below it the partner comes in (else its lowest). */
-function nudgePair(run: TrainingRun, out: CardDraw[]): CardDraw[] {
-  if (!out.length || out.some((d) => partnersWanted(run).includes(d.id)) || rand(run) >= C.pairNudge) return out;
-  const ids = partnersWanted(run).filter((id) => !out.some((d) => d.id === id));
-  const cs = ids.map(cardById).filter((c): c is TrainingCard => !!c && cardUseful(run, c));
-  if (!cs.length) return out;
-  const c = pick(run, cs);
-  const last = out[out.length - 1];
-  const tiers = (['Legendary', 'Rare', 'Common'] as RelicTier[]).filter((x) => c.tiers[x] !== undefined);
-  const rarity = tiers.find((x) => RANK[x] <= RANK[last.rarity]) ?? tiers[tiers.length - 1];
-  const to = c.fits ? pick(run, cardTowers(run).filter((t) => c.fits!(t, run))) : undefined;
-  return [...out.slice(0, -1), drawOf(c, rarity, to)];
-}
-
-/** Is a draw a stratagem or a trophy rather than a boss card? */
-export const isSpecial = (d: CardDraw) => d.id.startsWith(STRAT_PREFIX) || d.id.startsWith(TROPHY_PREFIX);
-
-/** The offer with its one-offs in: a trophy due (a boss with a trick fell) and the first stratagem ready, each in
- *  place of one of the drawn cards, from the end. Never more than TRAINING.cards.offer cards. */
+/** The offer with its one-off in: a trophy due (a boss with a trick fell), in place of the last drawn card. Never
+ *  more than TRAINING.cards.offer cards. */
 function withSpecials(run: TrainingRun, drawn: CardDraw[]): CardDraw[] {
-  const extra: CardDraw[] = [];
-  if (run.trophyDue) extra.push(run.trophyDue);
-  const s = readyStrats(run)[0];
-  if (s) extra.push({ id: STRAT_PREFIX + s.id, rarity: 'Legendary' });
+  const extra: CardDraw[] = run.trophyDue ? [run.trophyDue] : [];
   const keep = drawn.filter((d) => !isSpecial(d)).slice(0, Math.max(0, C.offer - extra.length));
   return [...keep, ...extra].slice(0, C.offer);
 }
 
-/** Put three on offer (a boss died): the drawn cards, with a trophy or stratagem in place of one each (withSpecials).
+/** Put three on offer (a boss died): the drawn cards, with a trophy in place of one (withSpecials).
  *  Does nothing while an offer is already up. */
 export function offerCards(run: TrainingRun): void {
   if (run.offer?.length) return;
@@ -258,10 +234,6 @@ const towerName = (run: TrainingRun, d: CardDraw) => cardTower(run, d)?.name ?? 
 
 /** A drawn card's name and text, its tower named. A card no longer in the set (an old save's) keeps its id. */
 export function cardText(run: TrainingRun, d: CardDraw): { name: string; text: string } {
-  if (d.id.startsWith(STRAT_PREFIX)) {
-    const s = stratById(d.id.slice(STRAT_PREFIX.length));
-    return { name: s ? `Stratagem: ${s.name}` : d.id, text: s?.text ?? '' };
-  }
   if (d.id.startsWith(TROPHY_PREFIX)) {
     const t = trophyById(d.id.slice(TROPHY_PREFIX.length));
     return { name: t ? `Trophy: ${t.name}` : d.id, text: t?.text.replace('{unit}', towerName(run, d)) ?? '' };
@@ -276,16 +248,8 @@ export function cardText(run: TrainingRun, d: CardDraw): { name: string; text: s
 export const holdersOf = (run: TrainingRun, card: string): CardTower[] =>
   [...new Set(run.cards.filter((d) => d.id === card).map((d) => cardTower(run, d)).filter((t): t is CardTower => !!t))];
 
-/** Apply a stratagem or trophy draw. */
+/** Apply a trophy draw. */
 function applySpecial(run: TrainingRun, d: CardDraw): void {
-  if (d.id.startsWith(STRAT_PREFIX)) {
-    const s = stratById(d.id.slice(STRAT_PREFIX.length));
-    if (!s || run.stratagems?.includes(s.id)) return;
-    run.stratagems = [...(run.stratagems ?? []), s.id];
-    if (s.tower) for (const t of new Set(s.needs.flatMap((c) => holdersOf(run, c)))) s.tower(t);
-    s.run?.(run);
-    return;
-  }
   const t = trophyById(d.id.slice(TROPHY_PREFIX.length));
   if (!t) return;
   run.trophies = [...(run.trophies ?? []), t.id];

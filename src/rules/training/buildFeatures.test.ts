@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TRAINING } from '../downtimeData';
-import { cardById, offerCards, partnersWanted, pickCard, rerollCards } from './cards';
+import { cardById, pickCard } from './cards';
 import { rateOf } from './combat';
 import { buildOf } from './buildView';
 import { aceSteps, cardMul, chainMax, hurt } from './harm';
@@ -8,12 +8,11 @@ import { botCard, botSpec } from './bot';
 import { nextLord } from './lordPick';
 import { nextBoss } from './nextRound';
 import { pickSpec, SPEC, SPECS, specDue, specProblem, specsOf } from './specs';
-import { pairOf, STRAT_PREFIX, STRATAGEMS } from './stratagems';
 import { blankRun, testEnemy, testUnit } from './testRun';
 import { TROPHIES, TROPHY_OF_SIG, TROPHY_OF_TRICK, TROPHY_PREFIX, trophyById } from './trophies';
-import type { CardDraw, TrainingRun, UnitTower } from './types';
+import type { TrainingRun, UnitTower } from './types';
 
-// The build-panel features: capped growth, specialisations, stratagems (card pairs) and trophies.
+// The build-panel features: capped growth, specialisations and trophies.
 
 const ROLES13 = ['fortress', 'flyer', 'artillery', 'phantom', 'mystic', 'charger', 'ambusher', 'support', 'hunter', 'skirmisher', 'bulwark', 'reaver', 'gunline'] as const;
 
@@ -22,7 +21,6 @@ const withUnits = (n = 1, o: Partial<UnitTower> = {}): TrainingRun => {
   for (let i = 0; i < n; i++) run.pieces.push(testUnit({ unitId: `u${i}`, x: 20 + i * 2, y: 30, ...o }));
   return run;
 };
-const held = (id: string, unitId = 'u0'): CardDraw => ({ id, rarity: 'Common', unitId });
 
 describe('capped growth', () => {
   it('Ace stops at its cap however many kills', () => {
@@ -92,43 +90,6 @@ describe('specialisations', () => {
   });
 });
 
-describe('stratagems', () => {
-  it('pair real boss cards, each card in one pair at most', () => {
-    const all = STRATAGEMS.flatMap((s) => s.needs);
-    expect(new Set(all).size).toBe(all.length);
-    for (const c of all) expect(cardById(c)).toBeDefined();
-    expect(STRATAGEMS.length).toBeGreaterThanOrEqual(8);
-  });
-
-  it('once both cards are held, the next offer holds it in place of a card: still three', () => {
-    const run = withUnits();
-    run.cards.push(held('whet'));
-    expect(pairOf(run, 'whet')).toMatchObject({ other: 'deadly', held: 0, status: 'building' });
-    run.cards.push(held('deadly'));
-    expect(pairOf(run, 'whet')!.status).toBe('ready');
-    offerCards(run);
-    expect(run.offer).toHaveLength(TRAINING.cards.offer);
-    expect(run.offer!.filter((d) => d.id === `${STRAT_PREFIX}overkill`)).toHaveLength(1);
-    const ap = (run.pieces[0] as UnitTower).guns[0].ap;
-    pickCard(run, run.offer!.findIndex((d) => d.id.startsWith(STRAT_PREFIX)));
-    expect(run.stratagems).toEqual(['overkill']);
-    expect((run.pieces[0] as UnitTower).guns[0].ap).toBe(ap + 1);
-    offerCards(run);
-    expect(run.offer!.some((d) => d.id.startsWith(STRAT_PREFIX))).toBe(false);
-  });
-
-  it('a re-draw keeps it and keeps three', () => {
-    const run = withUnits();
-    run.drill = { luck: 10, cards: [], perks: { reroll: 1 } };
-    run.drill.cards = Object.values(TRAINING.drill.groups).flatMap((g) => g.cards);
-    run.cards.push(held('bounty'), held('promote'));
-    offerCards(run);
-    rerollCards(run);
-    expect(run.offer).toHaveLength(3);
-    expect(run.offer!.some((d) => d.id === `${STRAT_PREFIX}spoils`)).toBe(true);
-  });
-});
-
 describe('trophies', () => {
   it('every trick and signature has one; none mends the base', () => {
     for (const id of [...Object.values(TROPHY_OF_TRICK), ...Object.values(TROPHY_OF_SIG)]) expect(trophyById(id)).toBeDefined();
@@ -175,7 +136,6 @@ describe('build view', () => {
     const v = buildOf(run);
     expect(v.towers[0].cards[0].name).toBe('Ace');
     expect(v.towers[0].live.join(' ')).toMatch(/Ace: 8% per 10 kills, up to \+64% \(now \+24%\)/);
-    expect(v.strats.length).toBe(STRATAGEMS.length);
   });
 });
 
@@ -192,31 +152,5 @@ describe('next boss', () => {
     const b = nextBoss(run)!;
     expect(b).toMatchObject({ wave: at.wave, name: 'Gorrak', trophy: { name: 'Living Heart' } });
     expect(b.trick).toMatch(/^.+: /);
-  });
-});
-
-describe('pair nudge', () => {
-  it('wants the other half of a stratagem once one half is held, and nothing once both are', () => {
-    const run = withUnits();
-    const s = STRATAGEMS[0];
-    run.cards.push(held(s.needs[0]));
-    expect(partnersWanted(run)).toContain(s.needs[1]);
-    run.cards.push(held(s.needs[1]));
-    expect(partnersWanted(run)).not.toContain(s.needs[1]);
-  });
-
-  it('shows a wanted partner in about TRAINING.cards.pairNudge of offers, and the bot takes it', () => {
-    let shown = 0;
-    const N = 400;
-    for (let seed = 1; seed <= N; seed++) {
-      const run = withUnits(2);
-      run.rng = seed;
-      run.cards.push(held('whet'));
-      offerCards(run);
-      const k = run.offer!.findIndex((d) => d.id === 'deadly');
-      if (k >= 0) { shown++; expect(botCard(run)).toBe(k); }
-      expect(run.offer!.length).toBeLessThanOrEqual(TRAINING.cards.offer);
-    }
-    expect(shown / N).toBeGreaterThan(TRAINING.cards.pairNudge * 0.7);
   });
 });
