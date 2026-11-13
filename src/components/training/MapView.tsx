@@ -286,6 +286,7 @@ export function MapView(props: MapViewProps) {
       return;
     }
     reportHover(at);
+    if (e.pointerType !== 'mouse') swallowGhostClick(e.currentTarget);
     place(hit.cell, hit.place);
   };
   const place = (cell: Tile, at: Tile) => {
@@ -344,3 +345,16 @@ const BAR: React.CSSProperties = {
   position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', display: 'flex', gap: 8, alignItems: 'center',
   padding: '6px 8px', borderRadius: 6, background: 'rgba(12,13,15,0.88)', border: '1px solid #2c333d', whiteSpace: 'nowrap',
 };
+
+/** A touch tap acts on pointerup, and the browser's click comes just after at the same spot. If the tap opened a
+ *  popup there (a piece card), that click would press whatever button sits under the finger (an upgrade bought by
+ *  accident). Swallow the next click off the map for a moment after a touch tap. */
+function swallowGhostClick(map: HTMLElement) {
+  const stop = (ev: MouseEvent) => {
+    if (ev.target instanceof Node && map.contains(ev.target)) return;
+    ev.stopPropagation();
+    ev.preventDefault();
+  };
+  window.addEventListener('click', stop, { capture: true, once: true });
+  window.setTimeout(() => window.removeEventListener('click', stop, { capture: true }), 600);
+}

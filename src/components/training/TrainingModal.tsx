@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Campaign, Force } from '../../model/types';
 import { unitPortrait } from '../../model/emblem';
 import {
-  ackStale, bankVictory, continueEndless, finalBoss, clearRubble, defaultByKey, clearSave, loadRun, pickCard, rerollCards, pieceAt, pieceById, placeDraft, quitRun, ambushSwap, scoutMove, scoutMoveProblem, saveRun, staleSave, startWave,
+  ackStale, bankVictory, continueEndless, finalBoss, defaultByKey, clearSave, loadRun, pickCard, rerollCards, pieceAt, pieceById, placeDraft, quitRun, ambushSwap, scoutMove, scoutMoveProblem, saveRun, staleSave, startWave,
   type Phase, type RunMode, type SavedRun, type Tile, type TrainingRun,
 } from '../../rules/training';
 import { TRAINING } from '../../rules/downtimeData';
@@ -252,9 +252,7 @@ export default function TrainingModal({ force, c, onClose }: { force: Force; c?:
       return;
     }
     if (p) {
-      if (p.kind === 'rubble') {
-        if (build) act(() => clearRubble(run, p.id), refresh);
-      } else setSel(sel === p.id ? null : p.id);
+      setSel(sel === p.id ? null : p.id);
       return;
     }
     if (placing && pick !== null) {

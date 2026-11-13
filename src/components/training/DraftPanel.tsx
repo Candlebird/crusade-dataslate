@@ -91,7 +91,7 @@ export function DraftPanel({ run, pick, sel, onPick, onFocus, onChange, onTab }:
       {step === 'keep' && <KeepTable run={run} sel={sel} onFocus={onFocus} onChange={onChange} />}
       {step === 'keep' && <CraftInstead run={run} onTab={onTab} />}
       {step === 'done' && <ReadyNote run={run} onTab={onTab} />}
-      {rubble > 0 && <div className="muted">Rubble on the map: {rubble}. It blocks walkers like any piece; tap one to clear it (free, between waves).</div>}
+      {rubble > 0 && <div className="muted">Rubble on the map: {rubble}. It blocks walkers like any piece; tap one, then Destroy, to clear it (free, between waves).</div>}
     </div>
   );
 }

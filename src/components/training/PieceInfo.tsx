@@ -1,7 +1,8 @@
 import type { Unit } from '../../model/types';
 import { SHARD_TYPES } from '../../rules/downtimeData';
 import { describe } from '../../rules/abilities';
-import { defaultByKey, gradeName, levelDmg, reach, type Piece, type Tower, type TowerGun, type TrainingRun } from '../../rules/training';
+import { clearProblem, clearRubble, defaultByKey, gradeName, levelDmg, reach, type Piece, type Tower, type TowerGun, type TrainingRun } from '../../rules/training';
+import { act } from './act';
 import { PieceActions, type MoveRule } from './PieceActions';
 import { HabitBadges, RecordBadges, RelicList } from './RecordBadges';
 import { xpShown } from '../../rules/engine';
@@ -36,7 +37,7 @@ export function gunLine(t: Tower, g: TowerGun): string {
 /** What the selected piece is: a crafted unit's weapons, skills, record, Sortie quirks, relics and tally, a
  *  default tower's Shards, or a Shard's type and grade. */
 export function PieceInfo({ run, piece, record, onClose, onChange, onMove }: PieceInfoProps) {
-  if (piece.kind === 'rubble') return null;
+  if (piece.kind === 'rubble') return <RubbleInfo run={run} id={piece.id} onClose={onClose} onChange={onChange} />;
   const unit = piece.kind === 'unit' ? piece : null;
   return (
     <div className="panel training-info small">
@@ -60,6 +61,23 @@ export function PieceInfo({ run, piece, record, onClose, onChange, onMove }: Pie
       {unit && <HabitBadges unit={unit} />}
       {unit?.relics?.length ? <RelicList relics={unit.relics} /> : null}
       <div className="muted">Quality {piece.quality}+ · {piece.kills} kill{piece.kills === 1 ? '' : 's'} · {Math.round(piece.dealt)} damage{unit ? ` · ${xpShown(unit.xp)} XP` : ''}</div>
+    </div>
+  );
+}
+
+/** Selected rubble: what it is, and a Destroy button (a tap on the map only selects it, so none goes by mistake). */
+function RubbleInfo({ run, id, onClose, onChange }: { run: TrainingRun; id: number; onClose: () => void; onChange: () => void }) {
+  const why = clearProblem(run, id);
+  return (
+    <div className="panel training-info small">
+      <div className="row">
+        <b className="grow">Rubble</b>
+        <button className="ghost small" onClick={onClose} aria-label="Deselect">×</button>
+      </div>
+      <div className="muted">It blocks walkers like any piece. Destroying it is free, between waves.</div>
+      <div className="row">
+        <button className="danger small" disabled={!!why} data-tip={why ?? undefined} onClick={() => { if (act(() => clearRubble(run, id), onChange)) onClose(); }}>Destroy</button>
+      </div>
     </div>
   );
 }
