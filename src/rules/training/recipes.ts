@@ -5,6 +5,8 @@ import { unitName } from '../battle';
 import { hasRule, levelForXp, ruleRating } from '../engine';
 import { SHARD_TYPES, TRAINING, type ShardType } from '../downtimeData';
 import { shardsOnMap } from './board';
+import { gunDps } from './dps';
+import { shardValue } from './shards';
 import { levelCap, trainPoints } from './economy';
 import { habitsOf } from './habits';
 import { socketRuns, socketsOf } from './relics';
@@ -193,7 +195,26 @@ const skillsOf = (u: Unit): TowerSkill[] =>
 
 /** A unit as a crafted tower, standing at `at`. `craftedAt`: run.cleared at the craft. Weapon ranges in inches are
  *  cells. Its record adds grit (veterans.ts); its relics go in sockets (relics.ts), whose timed effects leave its skills. */
-export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): UnitTower {
+/** A unit's Mass from its datasheet Tough (TRAINING.mass). */
+export const massOf = (tough: number): number => Math.max(0, Math.floor(tough) - TRAINING.mass.from);
+
+/** A unit's Hardy share on its damage (TRAINING.hardy): its datasheet Defense and Regeneration, paid for in points. */
+export const hardyMul = (u: Pick<Unit, 'defense' | 'rules'>): number =>
+  1 + TRAINING.hardy.perDef * Math.max(0, TRAINING.hardy.from - u.defense) + (hasRule(u.rules, 'Regeneration') ? TRAINING.hardy.regen : 0);
+
+/** The floor on a unit's hits (TRAINING.unitFloor): how many times its hits it needs to do share x unitDps a point of
+ *  its recipe's value; 1 when it already does. */
+export function floorMul(t: Pick<UnitTower, 'quality' | 'hitShoot' | 'hitMelee' | 'atkBonus' | 'guns'>, value: number): number {
+  const F = TRAINING.unitFloor;
+  if (!F.share || !value) return 1;
+  const dps = t.guns.reduce((n, g) => n + gunDps(t, g, TRAINING.defaults.dpsDefense) * (g.melee ? F.melee : 1), 0);
+  return dps > 0 ? Math.max(1, (F.share * TRAINING.defaults.unitDps * value) / dps) : 1;
+}
+
+/** Shard value of a recipe. */
+export const recipeValue = (r: Pick<Recipe, 'slots'>): number => r.slots.reduce((n, s) => n + shardValue(s.grade), 0);
+
+export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number, value = 0): UnitTower {
   const f = fighterOf(u);
   const h = habitsOf(u);
   const g = gritOf(u);
@@ -201,7 +222,7 @@ export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): Uni
   const relics = socketsOf(u);
   const relicGuns = new Set(u.relics.filter((r) => r.profile).map((r) => r.name));
   const skills = skillsOf(u).filter((s) => !relics.some((r) => socketRuns(r, s.source, s.effect.kind)));
-  return {
+  const t: UnitTower = {
     kind: 'unit', id, x: at.x, y: at.y, unitId: u.id, name: unitName(u), category: u.category, points: u.points,
     ...(trainPoints(u) !== u.points ? { price: trainPoints(u) } : {}),
     rank: levelForXp(u.xp), tough: Math.max(1, f.tough + g.tough + h.tough), size: f.size, impact: f.impact, skills,
@@ -210,13 +231,16 @@ export function unitTower(u: Unit, id: number, at: Tile, craftedAt: number): Uni
       ...x, range: x.melee ? x.range : x.range + rangeBonus(u, x.name), cd: 0, pending: 0, gap: 0, next: 0,
       ...(relicGuns.has(x.name) ? { relic: true } : {}),
     })),
-    hitShoot: f.hitShoot + h.shoot, hitMelee: f.hitMelee + h.melee, atkBonus: (f.atkBonus + g.atk) * tierDmg(trainPoints(u)),
+    hitShoot: f.hitShoot + h.shoot, hitMelee: f.hitMelee + h.melee, atkBonus: (f.atkBonus + g.atk) * tierDmg(trainPoints(u)) * hardyMul(u),
     boost: { hit: 0, save: 0, rate: 0, range: 0 }, dmgBoost: { mul: 0, left: 0 }, kills: 0, dealt: 0,
     up: 0, cap: levelCap(trainPoints(u)), holdLeft: 0, frenzy: 0, frenzyMul: 1, craftedAt, xp: 0,
     init: h.init + g.init, jumpy: h.jumpy, myopic: h.myopic,
     ...(grit !== 1 ? { grit } : {}), ...(relics.length ? { relics } : {}),
+    ...(massOf(f.tough) ? { mass: massOf(f.tough) } : {}),
     ...(u.quirks?.length ? { quirks: [...u.quirks] } : {}),
     ...(h.terrain ? { terrainHit: h.terrain } : {}),
     ...(hasRule(u.rules, 'Scout') ? { scout: true } : {}), ...(hasRule(u.rules, 'Ambush') ? { ambush: true } : {}),
   };
+  t.atkBonus *= floorMul(t, value);
+  return t;
 }

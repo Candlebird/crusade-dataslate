@@ -6,7 +6,7 @@ import { runBots } from './botPool';
 import { flies, mean, median, type Probe } from './probe';
 
 // Balance (bot): the sample forces fresh on the test maze, probed. The spec's targets, with 3 waves of slack: a fresh
-// force reaches wave 20-25 (17-28 passes), the bot leaks now and then in waves 8-15, and no flying wave (nor any one
+// force reaches wave 25-30 (20-32 passes; 2026-11-13 the GM accepted ~30 after the melee floor), the bot leaks now and then in waves 8-15, and no flying wave (nor any one
 // wave in 15-25) is a wall. The pad each boss dies on is only printed: bossHp (TRAINING.wave) is tuned by hand.
 // The runs are played once, on botPool's threads, and shared by every check here.
 
@@ -22,10 +22,10 @@ beforeAll(async () => {
 }, 300_000);
 
 describe('training balance (bot)', () => {
-  it('takes a fresh force to about wave 20-25 (17-28 with slack)', () => {
+  it('takes a fresh force to about wave 25-30 (20-32 with slack)', () => {
     const m = mean(runs.map((p) => p.cleared));
-    expect(m).toBeGreaterThanOrEqual(17);
-    expect(m).toBeLessThanOrEqual(28);
+    expect(m).toBeGreaterThanOrEqual(20);
+    expect(m).toBeLessThanOrEqual(32);
   });
 
   it('prints the pad each boss dies on in waves 5-25 (bossHp is hand-tuned; no target)', () => {
@@ -77,7 +77,7 @@ describe('training balance (bot)', () => {
       `  crafted ${outs[k].crafted}  luck ${outs[k].luck}  ${Math.round(outs[k].ms)} ms`).join('\n'));
     for (const o of outs) {
       expect(o.cleared).toBeGreaterThanOrEqual(7);
-      expect(o.cleared).toBeLessThanOrEqual(35);
+      expect(o.cleared).toBeLessThanOrEqual(38);
     }
   });
 });

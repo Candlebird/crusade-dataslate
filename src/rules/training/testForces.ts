@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import type { Relic, Unit } from '../../model/types';
+import type { CatalogBook, Relic, Unit } from '../../model/types';
 import { applySelection, normalizeBook } from '../../armyforge/book';
 import { unitFromCatalog } from '../../model/factory';
 import { LEVEL_THRESHOLDS } from '../data';
@@ -12,7 +12,9 @@ const AIM = 750;
 const MAX = 850;
 
 export const bookUnits = (file: string): Unit[] => {
-  const book = normalizeBook(JSON.parse(readFileSync(file, 'utf8')));
+  const raw = JSON.parse(readFileSync(file, 'utf8'));
+  // A book copied out of the app (*.app.json) is already in catalog shape.
+  const book: CatalogBook = file.endsWith('.app.json') ? raw : normalizeBook(raw);
   return book.units.map((cu) => unitFromCatalog(cu, applySelection(cu, {}), book));
 };
 
@@ -84,3 +86,46 @@ export function seasoned(units: Unit[], vet: number): Unit[] {
     relics: Array.from({ length: level >= 6 ? 2 : level >= 3 ? 1 : 0 }, (_, k) => ({ id: `r${i}${k}`, ...RELIC_SET[(i + k) % RELIC_SET.length] })),
   }));
 }
+
+/** The books the fairness probe plays (fairness.balance.test.ts): one a datasheet set (Shadow Stalkers is Void
+ *  Echoes' AoF twin, so it sits out). */
+export const FAIR_BOOKS = ['armies/void-echoes.gf.json', 'src/data/spears-of-dothea.raw.json', 'armies/large-alien-beasts.gf.json', 'armies/fabrication-moon.gf.json', 'armies/cobalt-knights.app.json'];
+
+/** A small seeded dice (mulberry32), so a test force is the same every run. */
+const dice = (seed: number) => () => {
+  seed = (seed + 0x6d2b79f5) | 0;
+  let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+};
+
+/** An "average" list of about `pts` from a book, as a player might take: datasheets drawn at random under the usual
+ *  list limits (no unit over 35% of the points, a hero a 375 pts, a datasheet at most 1 + pts/750 times), until no
+ *  more fit, landing within 100 pts of `pts`. */
+export function averageForce(units: Unit[], pts: number, seed: number): Unit[] {
+  const roll = dice(seed * 7919 + units.length);
+  const fits = units.filter((u) => u.points > 0 && u.points <= pts * 0.35);
+  const heroes = Math.floor(pts / 375);
+  const copies = 1 + Math.floor(pts / 750);
+  for (let tries = 0; ; tries++) {
+    const out: Unit[] = [];
+    let sum = 0;
+    for (;;) {
+      const room = fits.filter((u) => sum + u.points <= pts
+        && out.filter((o) => o.unitType === u.unitType).length < copies
+        && (u.category !== 'Hero' || out.filter((o) => o.category === 'Hero').length < heroes));
+      if (!room.length) break;
+      const u = room[Math.floor(roll() * room.length)];
+      out.push({ ...u, id: `${u.id}-${out.length}` });
+      sum += u.points;
+    }
+    if (sum >= pts - 100 || tries >= 50) return out;
+  }
+}
+
+/** Three average 2000 pt forces a fairness book. */
+export const FAIR_FORCES = FAIR_BOOKS.flatMap((file) => {
+  const us = bookUnits(file);
+  const name = file.split('/').pop()!.split('.')[0];
+  return [1, 2, 3].map((k) => ({ name: `${name} ${k}`, book: name, units: averageForce(us, 2000, k) }));
+});

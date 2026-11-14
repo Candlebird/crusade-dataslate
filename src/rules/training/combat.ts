@@ -2,8 +2,8 @@ import { SHARD_TYPES, TRAINING } from '../downtimeData';
 import { affixHit } from './affixes';
 import { centreOf, dist, towers } from './board';
 import {
-  afflict, canAim, cardMul, dmgMul, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, levelDmg, reach, targetFor,
-  terrainHit, towerById, unsaved,
+  afflict, canAim, cardMul, cleaveCount, dmgMul, enemiesNear, enemyDef, FX_COLOR, FX_TIME, hurt, isUnit, levelDmg, reach, targetFor,
+  massMul, terrainHit, towerById, unsaved, upPower,
 } from './harm';
 import { lordHit } from './lords';
 import { specRate } from './specs';
@@ -33,7 +33,7 @@ export function rateOf(run: TrainingRun, t: Tower): number {
   if (!isUnit(t)) return base;
   const H = TRAINING.habits;
   const habit = Math.max(0.5, 1 + H.rate * t.init) * (t.jumpy && run.t < H.jumpySecs ? H.jumpyMul : 1);
-  return base * (1 + TRAINING.levels.rate * t.up) * (t.frenzy > 0 ? t.frenzyMul : 1) * habit * (1 + specRate(run, t));
+  return base * (1 + TRAINING.levels.rate * upPower(t)) * (t.frenzy > 0 ? t.frenzyMul : 1) * habit * (1 + specRate(run, t));
 }
 
 /**
@@ -68,14 +68,19 @@ export function fire(run: TrainingRun, t: Tower, g: TowerGun, extra = false): bo
   if (miss) return true;
   const how = g.melee ? 'melee' : 'shot';
   const raw = rawDamage(g.deadly, levelDmg(t, g) + (six && isUnit(t) && t.category === 'Elite' ? 1 : 0) + sixes.reduce((n, e) => n + (e.dmg ?? 0), 0));
-  const dmgTo = (e: Enemy) => throughArmour(raw, enemyDef(e).armor, rend) * dmgMul(t) * cardMul(run, t, e) * (e.flies ? g.air ?? 1 : 1);
+  const dmgTo = (e: Enemy) => throughArmour(raw, enemyDef(e).armor, rend) * dmgMul(t) * cardMul(run, t, e) * massMul(run, t, e) * (g.melee && isUnit(t) ? TRAINING.unitMelee : 1) * (e.flies ? g.air ?? 1 : 1);
   // Blast(X): the hit spills onto up to X−1 others close by, each saving on its own.
   const splash = g.blast > 1 ? enemiesNear(run, target.x, target.y, TRAINING.blastRadius).filter((o) => o !== target && canAim(g, o)).slice(0, g.blast - 1) : [];
-  if (unsaved(run, target, ap)) {
+  // Mass: a blow that wounds cleaves into others round its target (TRAINING.mass), each saving on its own.
+  const cleave = g.melee && isUnit(t) && t.mass ? cleaveCount(t.mass) : 0;
+  const struck = !!cleave && unsaved(run, target, ap);
+  const cleft = struck ? enemiesNear(run, target.x, target.y, TRAINING.mass.cleaveRadius).filter((o) => o !== target && !splash.includes(o) && canAim(g, o)).slice(0, cleave) : [];
+  if (struck || (!cleave && unsaved(run, target, ap))) {
     hurt(run, t, target, dmgTo(target), how);
     onWound(run, t, g, target, live);
   }
   for (const o of splash) if (unsaved(run, o, ap)) hurt(run, t, o, dmgTo(o), how);
+  for (const o of cleft) if (o.hp > 0 && unsaved(run, o, ap)) hurt(run, t, o, dmgTo(o) * TRAINING.mass.cleaveShare, how);
   if (!extra && sixes.some((e) => e.again)) fire(run, t, g, true);
   return true;
 }

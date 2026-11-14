@@ -195,6 +195,13 @@ export const TRAINING = {
    *  shots over `volleySpread` of the wait. A quarter of the old 2 s and 1.2 s, for waves four times as thick. */
   shootEvery: 0.5,
   meleeEvery: 0.3,
+  /** A crafted unit's melee blows do this many times their damage: a blade reaches only `meleeReach` cells of the
+   *  maze, a gun most of it (2026-11-13 fairness pass; probe: fairness.balance.test.ts). */
+  unitMelee: 1.5,
+  /** Damage floor (2026-11-13): crafting uses up its Shards, so a unit is never weaker than they were worth. Its hits
+   *  are raised until its expected damage (dps.ts at defaults.dpsDefense, melee guns counted at `melee` since they reach
+   *  little of the maze; 0.2, not 0.4, lifts melee books such as Large Alien Beasts to par) is at least `share` x defaults.unitDps a point of its recipe's Shard value (recipes.floorMul). */
+  unitFloor: { share: 1, melee: 0.2 },
   volleySpread: 0.5,
   /** Blast(X) hits up to X enemies within this many cells of the target. */
   blastRadius: 2,
@@ -209,6 +216,18 @@ export const TRAINING = {
    * again (by anyone) for `regrab` seconds: `[at Defense 6+, at Defense 2+]`, straight between.
    */
   holds: { perTough: 0.3, max: 1.5, bigMul: 0.5, regrab: [3, 1.5] as [number, number] },
+  /**
+   * Mass (2026-11-13): a crafted unit's datasheet Tough (a model's) above `from`, fixed at its craft (levels, cards
+   * and trophies that add Tough don't add Mass). Holds top out by Tough 5, so a monster paid for wounds it couldn't
+   * use; Mass turns them into damage, never into longer holds. Its melee blows cleave: a blow that wounds also strikes
+   * up to ceil(Mass / `cleavePer`) (at most `cleaveMax`) other enemies within `cleaveRadius` cells of its target, each
+   * saving on its own, for `cleaveShare` of the damage. And every gun hits a lone enemy (none other within
+   * `loneRadius` cells of it) or a boss `lone` harder a point of Mass, up to `loneMax`.
+   */
+  mass: { from: 3, cleavePer: 3, cleaveMax: 3, cleaveShare: 0.5, cleaveRadius: 1.5, lone: 0.05, loneMax: 0.6, loneRadius: 1.5 },
+  /** Hardy (2026-11-13): towers are never attacked, so a unit's Defense better than `from`+ and its Regeneration buy
+   *  nothing; each Defense step better adds `perDef` to its damage (recipes.hardyMul), Regeneration `regen`. */
+  hardy: { from: 5, perDef: 0.15, regen: 0 },
   /**
    * Level-ups, bought with credits between waves. A unit's cap by its points (`upTo` or less); the first costs `base` ×
    * points / `perPoints` (its Training points: economy.trainPoints) × `costMul`, at least `minCost`, each after `growth`
@@ -233,6 +252,9 @@ export const TRAINING = {
     growth: 1.25,
     dmg: 0.5,
     meleeDmg: 1,
+    /** Even ladders (2026-11-13): a level of a unit capped below the top cap counts (top cap / its cap) ^ `even`
+     *  levels for rate and damage (harm.upPower), so a dear unit's few levels add up to a cheap one's many. */
+    even: 1,
     rate: 0.25,
     range: 1,
   },
@@ -280,8 +302,8 @@ export const TRAINING = {
     lateGrowth: 1.17,
     groundFrom: 8,
     groundTo: 16,
-    groundGrowth: 1.05,
-    groundLate: 1.031,
+    groundGrowth: 1.08,
+    groundLate: 1.05,
     minionGrowth: 1.008,
     earlyHp: [0.5, 0.65, 0.8] as number[],
     earlyPace: [0.5, 0.7, 0.9] as number[],
@@ -323,7 +345,7 @@ export const TRAINING = {
    */
   defaults: {
     upgrade: { dmg: 0.25, reach: 1, perValue: 4, min: 10 },
-    dpsShare: 0.85,
+    dpsShare: 1,
     unitDps: 1.384,
     dpsDefense: 5,
     qualityBonus: 1,
@@ -742,18 +764,18 @@ export const TRAINING = {
    * Shard's to hold). Tuned from a force that dealt 60,000 to the W44 colossus (the bot, its waves eased to play as that
    * force): on Hard it reaches the siege's last check, or wins the Final at 25, most of the time; on Insane (twice Hard)
    * less than half the time (modes.balance.test.ts). 20% under the first tuning (x12/x14, x24/x28 on an even ramp,
-   * which leaked on wave 2 on Insane), then ramped in to wave 15, not 10 (players couldn't finish Hard: the early waves outgrew a young maze). `reward`: the damage checks' and milestones'
+   * which leaked on wave 2 on Insane), then ramped in to wave 15, not 10 (players couldn't finish Hard: the early waves outgrew a young maze); 2026-11-13 eased again to x8/x10 and x16/x20 (GM: Hard too hard). `reward`: the damage checks' and milestones'
    * rewards times this, rounded up. A siege's modes start with the damage checks (siege.checksFrom); the colossus is the
    * same in every mode, and each mode has its own boards.
    */
   modes: {
     rampTo: 15,
-    /** A boss's wounds take the multiplier to this power (Hard x14 is x3.7 on the boss); its escorts take all of it. */
+    /** A boss's wounds take the multiplier to this power (Hard x10 is x3.2 on the boss); its escorts take all of it. */
     bossShare: 0.5,
     /** A boss on these waves has this share of its wounds besides (Hard and Insane only): the wave-15 Lord, Normal's toughest, lands as the ramp tops out. */
     bossWave: { 15: 0.9 } as Record<number, number>,
-    hard: { name: 'Hard', siege: 9.5, train: 14, reward: 1.5 },
-    insane: { name: 'Insane', siege: 19, train: 28, reward: 2 },
+    hard: { name: 'Hard', siege: 8, train: 10, reward: 1.5 },
+    insane: { name: 'Insane', siege: 16, train: 20, reward: 2 },
   },
   /**
    * Final waves (training/finale.ts, veterancy.ts). A run has a Final wave: `from` at first, `step` more for each step

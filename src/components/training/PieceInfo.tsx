@@ -8,7 +8,7 @@ import { HabitBadges, RecordBadges, RelicList } from './RecordBadges';
 import { xpShown } from '../../rules/engine';
 import { ShardBadge } from './ShardBadge';
 import { buildOf } from '../../rules/training/buildView';
-import { TowerBuild } from './TrainingBuild';
+import { SpecChoice, TowerBuild } from './TrainingBuild';
 
 export interface PieceInfoProps {
   run: TrainingRun;
@@ -39,6 +39,8 @@ export function gunLine(t: Tower, g: TowerGun): string {
 export function PieceInfo({ run, piece, record, onClose, onChange, onMove }: PieceInfoProps) {
   if (piece.kind === 'rubble') return <RubbleInfo run={run} id={piece.id} onClose={onClose} onChange={onChange} />;
   const unit = piece.kind === 'unit' ? piece : null;
+  // A due specialisation goes first, under the name, so it is plain one must be picked.
+  const built = piece.kind !== 'shard' ? buildOf(run).towers.find((x) => x.id === piece.id) : undefined;
   return (
     <div className="panel training-info small">
       <div className="row">
@@ -51,12 +53,13 @@ export function PieceInfo({ run, piece, record, onClose, onChange, onMove }: Pie
         </b>
         <button className="ghost small" onClick={onClose} aria-label="Deselect">×</button>
       </div>
+      {built && <SpecChoice run={run} t={built} onChange={onChange} />}
       {piece.kind !== 'shard' && <PieceActions run={run} piece={piece} onChange={onChange} onMove={onMove} />}
       {piece.kind === 'shard' && <div className="muted">{SHARD_TYPES[piece.type].text}{piece.draft ? ' From this draft: keep it or it crumbles.' : ''}</div>}
       {piece.kind === 'default' && <div className="muted">{defaultByKey(piece.key)?.text} No XP, levels, traits or relics.</div>}
       {piece.guns.map((g, i) => <div key={i}>{gunLine(piece, g)}</div>)}
       {unit?.skills.map((k, i) => <div key={`k${i}`} className="muted">{k.gun ? `${k.gun} · ` : ''}{k.source}: {describe(k.effect)}</div>)}
-      {piece.kind !== 'shard' && <HeldBuild run={run} id={piece.id} onChange={onChange} />}
+      {built && <TowerBuild run={run} t={built} onChange={onChange} compact noChoice />}
       {unit && record && <RecordBadges unit={record} full />}
       {unit && <HabitBadges unit={unit} />}
       {unit?.relics?.length ? <RelicList relics={unit.relics} /> : null}
@@ -80,11 +83,4 @@ function RubbleInfo({ run, id, onClose, onChange }: { run: TrainingRun; id: numb
       </div>
     </div>
   );
-}
-
-/** A defence's spec (and its pick when due), held boss cards with their numbers, live card lines and auras. */
-function HeldBuild({ run, id, onChange }: { run: TrainingRun; id: number; onChange: () => void }) {
-  const t = buildOf(run).towers.find((x) => x.id === id);
-  if (!t) return null;
-  return <TowerBuild run={run} t={t} onChange={onChange} compact />;
 }

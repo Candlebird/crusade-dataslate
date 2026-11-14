@@ -42,7 +42,11 @@ export const partsOf = (t: Tower): [ShardType, Grade][] =>
 
 /** Damage a hit gets from level-ups (0 for Shards). */
 export const levelDmg = (t: Tower, g: TowerGun): number =>
-  isUnit(t) ? t.up * (g.melee ? TRAINING.levels.meleeDmg : TRAINING.levels.dmg) : 0;
+  isUnit(t) ? upPower(t) * (g.melee ? TRAINING.levels.meleeDmg : TRAINING.levels.dmg) : 0;
+
+/** A unit's level-ups as they count for rate and damage: each worth (top cap / its cap) ^ levels.even. */
+export const upPower = (t: Pick<UnitTower, 'up' | 'cap'>): number =>
+  t.up * (Math.max(...TRAINING.levels.caps.map((c) => c.cap)) / Math.max(1, t.cap)) ** TRAINING.levels.even;
 
 /** A unit's skills of one kind, with the effect narrowed (none for a Shard). */
 export const skillsOf = <K extends Effect['kind']>(t: Tower, kind: K) =>
@@ -118,6 +122,29 @@ export const packCount = (run: TrainingRun, t: UnitTower): number => Math.min(pa
 
 /** Kill chain's most stacks. */
 export const chainMax = (_run: TrainingRun): number => TRAINING.cards.chain.max;
+
+/** How many others a blow from a unit of this Mass cleaves into (TRAINING.mass). */
+export const cleaveCount = (mass: number): number => (mass > 0 ? Math.min(TRAINING.mass.cleaveMax, Math.ceil(mass / TRAINING.mass.cleavePer)) : 0);
+
+/** How much harder a unit of this Mass hits a lone enemy or a boss (a share; TRAINING.mass). */
+export const loneBonus = (mass: number): number => Math.min(TRAINING.mass.loneMax, TRAINING.mass.lone * mass);
+
+/** Is an enemy alone: a boss, or no other live enemy within TRAINING.mass.loneRadius of it? */
+export function isLone(run: TrainingRun, e: Enemy): boolean {
+  if (isBoss(e)) return true;
+  const r2 = TRAINING.mass.loneRadius ** 2;
+  for (const o of run.enemies) {
+    if (o === e || o.hp <= 0) continue;
+    const dx = o.x - e.x;
+    const dy = o.y - e.y;
+    if (dx * dx + dy * dy <= r2) return false;
+  }
+  return true;
+}
+
+/** What a unit's Mass adds against this enemy: loneBonus on a lone one or a boss. */
+export const massMul = (run: TrainingRun, t: Tower, e: Enemy): number =>
+  isUnit(t) && t.mass && isLone(run, e) ? 1 + loneBonus(t.mass) : 1;
 
 /** What a tower's cards add against this enemy: Crossfire on a held one, Pack tactics for units near it, Ace for its
  *  kills. */

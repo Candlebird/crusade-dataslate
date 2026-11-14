@@ -65,9 +65,6 @@ export const TAG_TEXT: Record<string, string> = {
   Boss: `Boss: an Echo Lord leads this wave; it is tough, and costs the base at least ${TRAINING.leak.bossMin} HP if it gets through.`,
 };
 
-/** On a boss wave that flies, only the Echo Lord does (and any swarm it summons); its escorts walk (waves.ts planFor). */
-  + ' (any swarm it summons flies too). Its escorts walk the maze.';
-
 /** What tag `t` means on wave `w`. */
 export const tagText = (t: string, _w?: number): string | undefined => TAG_TEXT[t];
 

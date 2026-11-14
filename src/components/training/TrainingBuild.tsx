@@ -22,8 +22,24 @@ function CardLine({ c }: { c: HeldCard }) {
   );
 }
 
-/** One tower's build: role and spec (with the pick when it is due), held cards, live numbers, relics and auras. */
-export function TowerBuild({ run, t, onChange, compact }: { run: TrainingRun; t: BuildTower; onChange: () => void; compact?: boolean }) {
+/** A tower's specialisation pick, when one is due. */
+export function SpecChoice({ run, t, onChange }: { run: TrainingRun; t: BuildTower; onChange: () => void }) {
+  if (!t.specChoice) return null;
+  return (
+    <div className="training-build-choice">
+      <span className="small">Specialise (free, for good):</span>
+      {t.specChoice.map((s) => (
+        <button key={s.id} className="small" disabled={!!specProblem(run, t.id, s.id)} onClick={() => act(() => pickSpec(run, t.id, s.id), onChange)}>
+          <b>{s.name}</b> <span className="muted">· {s.text}</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** One tower's build: role and spec (with the pick when it is due, unless `noChoice`: the caller shows it), held cards,
+ *  live numbers, relics and auras. */
+export function TowerBuild({ run, t, onChange, compact, noChoice }: { run: TrainingRun; t: BuildTower; onChange: () => void; compact?: boolean; noChoice?: boolean }) {
   return (
     <>
       {(t.role || t.spec || t.specLine) && (
@@ -32,16 +48,7 @@ export function TowerBuild({ run, t, onChange, compact }: { run: TrainingRun; t:
           {t.spec ? <span><b>{t.spec.name}</b> <span className="muted">· {t.spec.text}</span></span> : <span className="muted">{t.specLine}</span>}
         </div>
       )}
-      {t.specChoice && (
-        <div className="training-build-choice">
-          <span className="small">Specialise (free, for good):</span>
-          {t.specChoice.map((s) => (
-            <button key={s.id} className="small" disabled={!!specProblem(run, t.id, s.id)} onClick={() => act(() => pickSpec(run, t.id, s.id), onChange)}>
-              <b>{s.name}</b> <span className="muted">· {s.text}</span>
-            </button>
-          ))}
-        </div>
-      )}
+      {!noChoice && <SpecChoice run={run} t={t} onChange={onChange} />}
       {t.cards.map((c, i) => <CardLine key={i} c={c} />)}
       {t.live.length > 0 && <div className="training-build-live">{t.live.join(' · ')}</div>}
       {!compact && t.relics.length > 0 && <div className="muted">Relics: {t.relics.join(', ')}</div>}

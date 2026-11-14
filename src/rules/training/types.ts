@@ -136,6 +136,8 @@ export interface UnitTower extends PieceBase, Armed {
   /** Seconds of frenzy left, and how many times as fast it attacks meanwhile. */
   frenzy: number;
   frenzyMul: number;
+  /** Its Mass (TRAINING.mass): datasheet Tough above mass.from, set at its craft; unset when 0. */
+  mass?: number;
   /** run.cleared when it was crafted: it earns XP as waves cleared since reach xpEvery, 2 × xpEvery, … */
   craftedAt: number;
   /** XP earned this run (never above TRAINING.xpCap). */

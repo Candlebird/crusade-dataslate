@@ -1,5 +1,5 @@
 import { TRAINING } from '../downtimeData';
-import { aceSteps, chainMax, packCount, packLimit } from './harm';
+import { aceSteps, chainMax, cleaveCount, loneBonus, packCount, packLimit } from './harm';
 import { cardById, cardText, cardTower, isSpecial, type CardTower } from './cards';
 import { cardOpen } from './drill';
 import { roleOfTower, specById, specProgress, specReady, specsOf, type RoleId, type TrainingSpec } from './specs';
@@ -55,6 +55,11 @@ export function liveLines(run: TrainingRun, t: CardTower): string[] {
     if (t.pack) out.push(`Pack tactics: ${pct(t.pack)} a unit near it, up to ${packLimit(run)} units, +${pct(t.pack * packLimit(run))} (now +${pct(t.pack * packCount(run, t))})`);
     if (t.ace) out.push(`Ace: ${pct(t.ace)} per ${TRAINING.cards.ace.per} kills, up to +${pct(t.ace * TRAINING.cards.ace.max)} (now +${pct(t.ace * aceSteps(t))})`);
     if (t.tough > 1) out.push(`Tough ${t.tough}`);
+    if (t.mass) {
+      const M = TRAINING.mass;
+      const cleave = t.guns.some((g) => g.melee) ? `its blows cleave into ${cleaveCount(t.mass)} more within ${M.cleaveRadius} cells for ${pct(M.cleaveShare)}, ` : '';
+      out.push(`Mass ${t.mass}: ${cleave}+${pct(loneBonus(t.mass))} against a lone enemy or a boss`);
+    }
   }
   return out;
 }

@@ -4,7 +4,7 @@ import { pieceById, unitTowers } from './board';
 import { roleFor } from './specs';
 import { abilities, auras, fireAll, holds, reap, tickEnemies } from './combat';
 import { trainPoints, waveCredits } from './economy';
-import { canTrain, recipesFor, recipeUses, unitTower } from './recipes';
+import { canTrain, recipesFor, recipeUses, recipeValue, unitTower } from './recipes';
 import { crumbleDraft, drawDraft, toRubble } from './shards';
 import { relics, resetSockets } from './relics';
 import { affixTick } from './affixes';
@@ -199,7 +199,7 @@ export function craft(run: TrainingRun, unit: Unit, uses: number[], onId: number
   if (why) throw new Error(why);
   const used = uses.map((id) => pieceById(run, id) as ShardPiece);
   const on = used.find((p) => p.id === onId)!;
-  const t: UnitTower = { ...unitTower(unit, on.id, on, run.cleared), role: roleFor(unit) };
+  const t: UnitTower = { ...unitTower(unit, on.id, on, run.cleared, recipeValue(run.recipes.find((r) => r.unitId === unit.id)!)), role: roleFor(unit) };
   run.pieces[run.pieces.indexOf(on)] = t;
   toRubble(run, uses.filter((id) => id !== onId));
   if (used.some((p) => p.draft)) crumbleDraft(run, []);

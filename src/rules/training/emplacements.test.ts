@@ -124,12 +124,13 @@ describe('default strength', () => {
     expect(unitPer).toBeGreaterThanOrEqual(TRAINING.defaults.unitDps * 0.9);
   });
 
-  it.each(DEFAULTS.map((d) => [d.key, d] as const))('%s is 10-20%% weaker than the pinned unit figure, and than a unit of the same Shards', (_k, d) => {
+  // Since 2026-11-13 a default matches a unit's damage floor for the same Shards (TRAINING.unitFloor); its limit is
+  // its one upgrade against a unit's levels.
+  it.each(DEFAULTS.map((d) => [d.key, d] as const))('%s does dpsShare of the pinned unit figure, no more than a unit of the same Shards', (_k, d) => {
     const t = defaultTower(d, 1, { x: 10, y: 10 });
     const dps = towerDps(t, TRAINING.defaults.dpsDefense) / defaultValue(d);
-    expect(dps / TRAINING.defaults.unitDps).toBeGreaterThanOrEqual(0.8);
-    expect(dps / TRAINING.defaults.unitDps).toBeLessThanOrEqual(0.9);
-    expect(dps / unitPer).toBeLessThanOrEqual(0.9);
+    expect(dps / TRAINING.defaults.unitDps).toBeCloseTo(TRAINING.defaults.dpsShare, 2);
+    expect(dps / unitPer).toBeLessThanOrEqual(1.0001);
   });
 
   it('takes no XP, levels, traits or relics', () => {
