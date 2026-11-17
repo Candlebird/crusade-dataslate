@@ -80,6 +80,21 @@ service cloud.firestore {
       allow delete: if player() && exists(/databases/$(database)/documents/paint/$(id)) && paintEditor(get(/databases/$(database)/documents/paint/$(id)).data);
     }
 
+    // Commonplace (candlebird.github.io/commonplace): personal notes. Anyone with a verified Google account can keep notes;
+    // each person only ever reads or writes their own. Not tied to the campaign.
+    function mine() { return signedIn() && resource.data.owner == email(); }
+    function minting() { return signedIn() && request.resource.data.owner == email(); }
+    match /notes/{id} {
+      allow read, delete: if mine();
+      allow create: if minting();
+      allow update: if mine() && minting();
+    }
+    match /notePhotos/{id} {
+      allow read, delete: if mine();
+      allow create: if minting() && request.resource.data.data.size() < 900000;
+      allow update: if mine() && minting() && request.resource.data.data.size() < 900000;
+    }
+
     // House rules are the GM's; core rule texts anyone can import.
     match /shared/{id} {
       allow read: if player();
