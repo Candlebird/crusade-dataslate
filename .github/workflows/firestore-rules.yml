@@ -1,0 +1,44 @@
+name: Publish Firestore rules
+
+# Publishes firestore.rules to the crusade-dataslate project whenever it changes on main.
+# Keyless: GitHub's OIDC token is exchanged for the rules-deployer service account (scripts/setup-rules-deploy.sh).
+on:
+  push:
+    branches: [main]
+    paths: [firestore.rules]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: firestore-rules
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      PROJECT: crusade-dataslate
+    steps:
+      - uses: actions/checkout@v4
+      - id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/765607704790/locations/global/workloadIdentityPools/github/providers/crusade-dataslate
+          service_account: rules-deployer@crusade-dataslate.iam.gserviceaccount.com
+          token_format: access_token
+      - name: Create ruleset and release it
+        env:
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: |
+          set -euo pipefail
+          api=https://firebaserules.googleapis.com/v1/projects/$PROJECT
+          body=$(jq -n --rawfile src firestore.rules '{source: {files: [{name: "firestore.rules", content: $src}]}}')
+          # Creating the ruleset compiles it; a syntax error fails here and nothing is released.
+          ruleset=$(curl -sS --fail-with-body -X POST "$api/rulesets" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$body" | jq -r .name)
+          echo "Created $ruleset"
+          release=$(jq -n --arg r "$ruleset" --arg n "projects/$PROJECT/releases/cloud.firestore" '{release: {name: $n, rulesetName: $r}, updateMask: "rulesetName"}')
+          curl -sS --fail-with-body -X PATCH "$api/releases/cloud.firestore" -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' -d "$release"
+          echo "Released $ruleset to cloud.firestore"

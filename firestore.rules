@@ -1,5 +1,5 @@
 // Security rules for the crusade-dataslate Firestore database.
-// Not deployed automatically: paste into Firebase console → Firestore → Rules → Publish.
+// Published automatically on push to main by .github/workflows/firestore-rules.yml (setup: scripts/setup-rules-deploy.sh).
 // Keep the GM's email in step with src/cloud/config.ts. Players are the GM plus everyone in members/.
 rules_version = '2';
 service cloud.firestore {
