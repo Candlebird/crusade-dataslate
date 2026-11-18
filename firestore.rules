@@ -80,19 +80,37 @@ service cloud.firestore {
       allow delete: if player() && exists(/databases/$(database)/documents/paint/$(id)) && paintEditor(get(/databases/$(database)/documents/paint/$(id)).data);
     }
 
-    // Commonplace (candlebird.github.io/commonplace): personal notes. Anyone with a verified Google account can keep notes;
-    // each person only ever reads or writes their own. Not tied to the campaign.
-    function mine() { return signedIn() && resource.data.owner == email(); }
-    function minting() { return signedIn() && request.resource.data.owner == email(); }
+    // Commonplace (candlebird.github.io/commonplace): notes. Anyone with a verified Google account can keep notes.
+    // A note is private to its owner unless shared: `members` may read it, `editors` may change its contents,
+    // only the owner may change who it is shared with, move it, or delete it. Not tied to the campaign.
+    function owns() { return signedIn() && resource.data.owner == email(); }
+    function inList(f) { return signedIn() && f in resource.data && email() in resource.data[f]; }
+    function keepsOwner() { return request.resource.data.owner == resource.data.owner; }
+    function newOwnDoc() {
+      return signedIn() && request.resource.data.owner == email()
+        && request.resource.data.members is list && email() in request.resource.data.members
+        && request.resource.data.editors is list && email() in request.resource.data.editors;
+    }
     match /notes/{id} {
-      allow read, delete: if mine();
-      allow create: if minting();
-      allow update: if mine() && minting();
+      allow read: if owns() || inList('members');
+      allow create: if newOwnDoc();
+      allow update: if (owns() && keepsOwner())
+        || (inList('editors') && !request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['owner', 'members', 'editors', 'shares', 'notebookId', 'createdAt']));
+      allow delete: if owns();
+    }
+    match /notebooks/{id} {
+      allow read: if owns() || inList('members');
+      allow create: if newOwnDoc();
+      allow update: if owns() && keepsOwner();
+      allow delete: if owns();
     }
     match /notePhotos/{id} {
-      allow read, delete: if mine();
-      allow create: if minting() && request.resource.data.data.size() < 900000;
-      allow update: if mine() && minting() && request.resource.data.data.size() < 900000;
+      // Photos follow their note's sharing; v1 photos (no members yet) are their owner's alone.
+      allow get: if inList('members') || (owns() && !('members' in resource.data));
+      allow create: if newOwnDoc() && request.resource.data.data.size() < 900000;
+      allow update: if (inList('editors') || (owns() && !('members' in resource.data))) && keepsOwner() && request.resource.data.data.size() < 900000;
+      allow delete: if inList('editors') || (owns() && !('members' in resource.data));
     }
 
     // House rules are the GM's; core rule texts anyone can import.
